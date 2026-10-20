@@ -547,6 +547,7 @@
         .marca.ext { color: var(--ok); background: var(--ok-bg); cursor: default; }
         tr.fila-externo td { background: color-mix(in srgb, var(--ok) 5%, transparent); }
         .efe-foto-opc { margin-top: .6rem; }
+        .req-tabla input.req-editado { border-color: var(--warn); background: var(--warn-bg); font-weight: 700; }
         .efe-origen { margin-top: .75rem; display: grid; gap: .35rem; }
         .efe-origen .segmentado { justify-self: start; flex-wrap: wrap; }
         .efe-origen .segmentado button:disabled { opacity: .45; cursor: not-allowed; }
@@ -5092,7 +5093,7 @@
     function reqPintarResultado() {
         const r = reqRes, out = document.getElementById('reqResultado');
         // Lo quitado con la × no aparece en su lista (ni se guarda ni se imprime en ella)
-        const enviar = r.filas.filter(f => f.piezasCava > 0 && !f.fuera1), comprar = r.filas.filter(f => f.aComprar > 0 && !f.fuera2);
+        const enviar = r.filas.filter(f => f.piezasCava > 0 && !f.fuera1), comprar = r.filas.filter(f => (f.aComprar > 0 || f.compraManual) && !f.fuera2);
         const avisosV = r.avisos.filter(a => !a.fuera);
         const quitados = [r.filas.filter(f => f.fuera1).length, r.filas.filter(f => f.fuera2).length, r.avisos.filter(a => a.fuera).length];
         const restaurar = n => quitados[n - 1] ? `<a href="#" class="req-restaurar" onclick="reqRestaurar(${n}); return false;">Restaurar quitados (${quitados[n - 1]})</a>` : '';
@@ -5111,14 +5112,15 @@
             </tr></thead><tbody>${enviar.map(f => { const i = r.filas.indexOf(f); return `<tr class="${f.consultar ? 'req-alerta' : sinLocal(f) ? 'req-nuevo' : ''}">${prod(f)}
                 <td>${reqN(f.ventaDiaria)} ${reqU(f)}</td><td>${f.exhibPiezas ? reqCant(f, f.exhibPiezas) : '—'}</td><td>${reqN(f.existencia)}</td><td>${reqN(f.necesidad)} ${reqU(f)}</td>
                 <td><b>${reqCant(f, f.piezas)}</b></td><td>${reqCant(f, f.piezasCava)}${f.unidad === 'KG' ? `<small>${reqN(f.enCava)} kg</small>` : ''}</td>
-                <td><input type="number" class="num" min="0" max="${f.opcional ? f.piezasCava : f.piezas}" step="${f.unidad === 'GRANEL' ? 0.1 : 1}" value="${f.deCava}" onchange="reqCambiarDeCava(${i}, this.value)"></td>
+                <td><input type="number" class="num${f.cavaManual ? ' req-editado' : ''}" min="0" step="${f.unidad === 'GRANEL' ? 0.1 : 1}" value="${f.deCava}" onchange="reqCambiarDeCava(${i}, this.value)">${f.cavaManual && f.deCavaCalc !== f.deCava ? `<small>calculado: ${reqCant(f, f.deCavaCalc)}</small>` : ''}</td>
                 <td>${f.aComprar ? reqCant(f, f.aComprar) : '—'}</td><td>${estado(f)}</td><td>${quitar(1, i)}</td></tr>`; }).join('')}</tbody></table></div>`
             : '<div class="empty">Nada de lo que necesita el local está en la cava.</div>';
         const t2 = comprar.length ? `<div class="tabla-wrap req-scroll"><table class="req-tabla"><thead><tr>
                 <th class="izq">Producto</th><th>Necesita</th><th>Piezas</th><th>De cava</th><th>A comprar</th><th class="izq">Motivo</th><th></th>
             </tr></thead><tbody>${comprar.map(f => `<tr>${prod(f)}<td>${reqN(f.necesidad)} ${reqU(f)}</td><td>${reqCant(f, f.piezas)}</td><td>${reqCant(f, f.deCava)}</td>
-                <td>${f.cajas ? `<b>${f.cajas} caja${f.cajas === 1 ? '' : 's'}</b><small>${f.cajas * f.porCaja} und (faltan ${f.aComprar})</small>`
-                    : `<b>${reqCant(f, f.aComprar)}</b>${f.unidad === 'KG' ? `<small>≈ ${reqN(f.aComprar * f.peso)} kg</small>` : ''}`}</td>
+                <td><input type="number" class="num${f.compraManual ? ' req-editado' : ''}" min="0" step="${f.unidad === 'GRANEL' ? 0.1 : 1}" value="${f.aComprar}" title="Cantidad a comprar en ${f.unidad === 'GRANEL' ? 'kilos' : f.unidad === 'UND' ? 'unidades' : 'piezas'}" onchange="reqCambiarComprar(${r.filas.indexOf(f)}, this.value)">
+                    ${f.cajas ? `<small><b>${f.cajas} caja${f.cajas === 1 ? '' : 's'}</b> · ${f.cajas * f.porCaja} und</small>` : f.unidad === 'KG' ? `<small>≈ ${reqN(f.aComprar * f.peso)} kg</small>` : ''}
+                    ${f.compraManual && f.aComprarCalc !== f.aComprar ? `<small>calculado: ${reqCant(f, f.aComprarCalc)}</small>` : ''}</td>
                 <td class="izq">${f.piezasCava ? 'La cava no alcanza' : 'No hay en la cava'}${f.cubiertoCon ? `<small>Una parte se cubrió con: ${esc(f.cubiertoCon.join(', '))}. Del tipo no alcanza lo que hay en la cava.</small>` : ''}</td><td>${quitar(2, r.filas.indexOf(f))}</td></tr>`).join('')}</tbody></table></div>`
             : '<div class="empty">No hace falta comprar nada: la cava cubre todo.</div>';
         const avisos = avisosV.length ? `<ul class="req-avisos">${avisosV.map(a => `<li class="${a.grave ? 'grave' : ''}">${quitar(3, r.avisos.indexOf(a))}<b>${esc(a.titulo)}</b>${esc(a.texto)}</li>`).join('')}</ul>`
@@ -5155,7 +5157,7 @@
             <div class="grafico-card"><div class="grafico-head"><h3>1. Despachar desde la cava</h3>${restaurar(1)}</div>${t1}
                 ${cubiertos.length ? `<div class="nota"><b>Cubiertos con otra marca de la cava</b> (no hace falta comprarlos): ${cubiertos.map(f => `${esc(f.nombre)} → ${esc(f.cubiertoCon.join(', '))}`).join(' · ')}</div>` : ''}
                 <div class="nota">En <b>azul</b>: hay en la cava y en el local no hay. Los que dicen "no está en el pedido" se mandan solo si escribe la cantidad en "De cava".</div>
-                <div class="nota">"De cava" se puede cambiar. "Consultar" = la cava no alcanza, u otros locales ya pidieron ese producto esta semana.</div></div>
+                <div class="nota">"De cava" y "A comprar" se pueden cambiar a la cantidad que quiera (lo cambiado queda resaltado y muestra lo calculado). "Consultar" = la cava no alcanza, u otros locales ya pidieron ese producto esta semana.</div></div>
             <div class="grafico-card"><div class="grafico-head"><h3>2. Hace falta comprar (no hay o no alcanza en la cava)</h3>${restaurar(2)}</div>${t2}</div>
             <div class="grafico-card"><div class="grafico-head"><h3>3. Variedad</h3>${restaurar(3)}</div>${avisos}</div>
             ${vinculos}${sinCat}
@@ -5184,15 +5186,26 @@
             .filter(f => f.deCava > 0 || f.aComprar > 0 || (f.piezas > 0 && !f.fuera1 && !f.fuera2));
         return { filas, avisos: reqRes.avisos.filter(a => !a.fuera) };
     }
+    // Cantidades a mano: "De cava" y "A comprar" aceptan lo que el usuario quiera (sin tope).
+    // Se recuerda lo calculado para mostrarlo al lado.
+    const reqRedondeo = (f, v) => Math.max(0, f.unidad === 'GRANEL' ? Math.round(v * 10) / 10 : Math.round(v));
     function reqCambiarDeCava(i, valor) {
         const f = reqRes.filas[i];
-        const v = Number(String(valor).replace(',', '.')) || 0;
-        // Lo que no estaba en el pedido (solo hay en la cava) se puede mandar igual: hasta lo que tenga la cava
-        const tope = f.opcional ? f.piezasCava : f.piezas;
-        f.deCava = Math.max(0, Math.min(tope, f.unidad === 'GRANEL' ? Math.round(v * 10) / 10 : Math.round(v)));
-        if (f.opcional) f.piezas = f.deCava;
-        reqFaltante(f);
+        if (f.deCavaCalc === undefined) { f.deCavaCalc = f.deCava; f.piezasCalc = f.piezas; f.aComprarCalc = f.aComprar; }
+        f.deCava = reqRedondeo(f, Number(String(valor).replace(',', '.')) || 0);
+        f.cavaManual = f.deCava !== f.deCavaCalc;
+        // Si manda más de lo calculado, el pedido sube a esa cantidad; si manda menos, el resto pasa a "A comprar"
+        f.piezas = f.opcional ? f.deCava : Math.max(f.piezasCalc, f.deCava);
+        if (!f.compraManual) reqFaltante(f);
         reqEstadoFila(f);
+        const y = window.scrollY; reqPintarResultado(); window.scrollTo(0, y);
+    }
+    function reqCambiarComprar(i, valor) {
+        const f = reqRes.filas[i];
+        if (f.aComprarCalc === undefined) f.aComprarCalc = f.aComprar;
+        f.aComprar = reqRedondeo(f, Number(String(valor).replace(',', '.')) || 0);
+        f.compraManual = f.aComprar !== f.aComprarCalc;
+        f.cajas = f.porCaja && f.aComprar > 0 ? Math.ceil(f.aComprar / f.porCaja) : 0;
         const y = window.scrollY; reqPintarResultado(); window.scrollTo(0, y);
     }
     async function reqGuardarVinculos() {
