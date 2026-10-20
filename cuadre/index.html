@@ -1,0 +1,1463 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="theme-color" content="#1e293b">
+    <link rel="apple-touch-icon" href="iconos/icon-192.png">
+    <title>Cuadre de Caja Consolidado</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%22400%20380%201130%201175%22%3E%3Cpath%20fill%3D%22%23F2EEE8%22%20stroke%3D%22%239c958a%22%20stroke-width%3D%2228%22%20d%3D%22M423%20398%20H950%20C1230%20398%201400%20560%201450%20788%20L1115%20952%20C1110%20790%201075%20655%20870%20655%20H773%20V1193%20L423%201365%20Z%22%2F%3E%3Cpath%20fill%3D%22%2344AC00%22%20d%3D%22M423%201365%20L1508%20834%20V865%20L658%201533%20H423%20Z%22%2F%3E%3Cpath%20fill%3D%22%23FF3D00%22%20d%3D%22M820%201533%20L1465%201026%20C1460%201140%201448%201225%201420%201295%20C1360%201440%201250%201490%201160%201505%20C1090%201522%201020%201533%20950%201533%20Z%22%2F%3E%3C%2Fsvg%3E">
+    <!-- Librerías para generar el PDF de la ficha (texto nítido, legible en el teléfono) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #1e293b; /* Fondo general en gris oscuro */
+            --card-bg: #0f172a; /* Fondo de la tarjeta en gris/azul oscuro más profundo */
+            --border: #334155;
+            --primary: #3b82f6;
+            --danger: #ef4444;
+            --text-main: #f8fafc; /* Texto principal claro */
+            --text-muted: #94a3b8; /* Texto secundario gris claro */
+            --title: #f1f5f9;
+            --subtitle: #60a5fa;
+            --input-bg: #1e293b;
+            --input-text: #ffffff;
+            --readonly-bg: #090d16;
+            --list-bg: #111827;
+            --totals-text: #e2e8f0;
+            --total-value: #34d399;
+            --shadow: rgba(0, 0, 0, 0.3);
+            --radius: 8px;
+            color-scheme: dark;
+        }
+
+        /* Tema claro */
+        :root[data-theme="light"] {
+            --bg-color: #e2e8f0;
+            --card-bg: #ffffff;
+            --border: #cbd5e1;
+            --primary: #2563eb;
+            --danger: #dc2626;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --title: #0f172a;
+            --subtitle: #1d4ed8;
+            --input-bg: #ffffff;
+            --input-text: #0f172a;
+            --readonly-bg: #f1f5f9;
+            --list-bg: #f8fafc;
+            --totals-text: #1e293b;
+            --total-value: #047857;
+            --shadow: rgba(0, 0, 0, 0.1);
+            color-scheme: light;
+        }
+
+        .header-bar { display: flex; justify-content: space-between; align-items: center; gap: 1rem; border-bottom: 2px solid var(--border); margin-bottom: 1rem; }
+        .header-bar h2 { border-bottom: none; margin-bottom: 0; }
+        .titulo-logo { display: flex; align-items: center; gap: .6rem; }
+        .logo-ccpv { width: 2.6rem; height: 2.6rem; flex: 0 0 auto; }
+        :root { --logo-d: #F2EEE8; }
+        :root[data-theme="light"] { --logo-d: #CBC3B5; }
+        .btn-theme {
+            background: var(--list-bg);
+            color: var(--text-main);
+            border: 1px solid var(--border);
+            white-space: nowrap;
+        }
+        .btn-theme:hover { border-color: var(--primary); }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 2rem;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1000px;
+            background: var(--card-bg);
+            padding: 2rem;
+            border-radius: var(--radius);
+            box-shadow: 0 4px 6px -1px var(--shadow);
+        }
+
+        h2 { margin-top: 0; border-bottom: 2px solid var(--border); padding-bottom: 10px; font-weight: 600; color: var(--title); }
+        h3 { color: var(--subtitle); font-size: 1.1rem; margin-top: 2rem; border-bottom: 1px solid var(--border); padding-bottom: 5px; }
+
+        .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
+        .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; }
+        
+        .form-group { margin-bottom: 1rem; display: flex; flex-direction: column; }
+        label { font-size: 0.875rem; font-weight: 500; margin-bottom: 0.5rem; color: var(--text-main); }
+        
+        input, select {
+            padding: 0.6rem;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 0.95rem;
+            background: var(--input-bg);
+            color: var(--input-text);
+        }
+        input:focus, select:focus { outline: none; border-color: var(--primary); }
+        input[readonly] { background: var(--readonly-bg); color: var(--text-muted); cursor: not-allowed; font-weight: bold; }
+
+        /* Ocultar flechas en campos numéricos */
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
+
+        .dynamic-list { background: var(--list-bg); padding: 1rem; border-radius: var(--radius); margin-bottom: 1rem; border: 1px solid var(--border); }
+        .dynamic-row { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; align-items: center; flex-wrap: wrap; }
+        .dynamic-row > * { flex: 1; min-width: 110px; }
+        
+        button {
+            padding: 0.6rem 1rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 0.875rem;
+        }
+        .btn-add { background: var(--primary); color: white; margin-top: 0.5rem; }
+        .btn-remove { background: var(--danger); color: white; flex: 0 0 auto !important; min-width: 40px !important; padding: 0.6rem; }
+        .btn-submit { background: #10b981; color: white; width: 100%; padding: 1rem; font-size: 1rem; margin-top: 2rem; }
+
+        .totals-box {
+            background: var(--list-bg);
+            border: 1px dashed var(--border);
+            padding: 1rem;
+            border-radius: var(--radius);
+            margin-top: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+            flex-wrap: wrap;
+            gap: 1rem;
+            color: var(--totals-text);
+        }
+        .total-value { color: var(--total-value); font-size: 1.2rem; }
+
+        .hidden { display: none !important; }
+
+        /* ===== TELÉFONO: menos márgenes, dos campos por fila, botones cómodos y sin zoom al escribir ===== */
+        @media (max-width: 640px) {
+            body { padding: 0; }
+            .container { padding: 1rem .85rem 1.5rem; border-radius: 0; box-shadow: none; min-height: 100vh; }
+            .header-bar { gap: .5rem; }
+            .header-bar h2, h2 { font-size: 1.2rem; }
+            h3 { margin-top: 1.4rem; font-size: 1rem; }
+            input, select, textarea { font-size: 16px; }          /* iOS no hace zoom con 16px */
+            button { min-height: 40px; }
+            .grid-2, .grid-3 { grid-template-columns: 1fr 1fr; gap: .6rem; }
+            .form-group { margin-bottom: .75rem; min-width: 0; }
+            .form-group input, .form-group select { width: 100%; box-sizing: border-box; min-width: 0; }
+            .dynamic-list { padding: .6rem; }
+            .dynamic-row { gap: .4rem; padding-bottom: .5rem; border-bottom: 1px dashed var(--border); }
+            .dynamic-row:last-child { border-bottom: none; }
+            .dynamic-row > * { flex: 1 1 calc(50% - .4rem); min-width: 0; box-sizing: border-box; }
+            .dynamic-row { position: relative; padding-right: 48px; }
+            .btn-remove { position: absolute; top: 0; right: 0; flex: 0 0 auto !important; min-width: 40px !important; height: 40px; }
+            .totals-box { padding: .75rem; gap: .5rem; }
+            .btn-submit { margin-top: 1.25rem; }
+            .selector-titulo { margin-top: .75rem; }
+            .locales-grid { gap: .6rem; }
+            .local-btn { padding: 1.1rem .6rem; font-size: .95rem; }
+            .local-btn .icono { width: 52px; height: 52px; }
+            .local-elegido { padding: .6rem .75rem; }
+        }
+        @media (max-width: 360px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+
+        /* Pantalla inicial: elegir local */
+        .selector-titulo { font-size: 1.4rem; font-weight: 700; color: var(--title); text-align: center; margin: 1.5rem 0 0.25rem; }
+        .selector-sub { text-align: center; color: var(--text-muted); margin: 0 0 1.75rem; }
+        .locales-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1rem; }
+        @media (max-width: 760px) { .locales-grid { grid-template-columns: repeat(2, 1fr); } }
+        .local-btn {
+            background: var(--list-bg); color: var(--text-main); border: 1px solid var(--border); border-radius: 14px;
+            padding: 1.75rem 1rem; display: flex; flex-direction: column; align-items: center; gap: 0.85rem;
+            font-size: 1.05rem; font-weight: 600; transition: border-color 0.15s, transform 0.15s;
+        }
+        .local-btn:hover { border-color: var(--primary); transform: translateY(-2px); }
+        .local-btn .icono, .local-icono {
+            width: 64px; height: 64px; border-radius: 16px; display: grid; place-items: center;
+            background: color-mix(in srgb, var(--primary) 15%, transparent); color: var(--primary);
+        }
+        .local-btn svg { width: 36px; height: 36px; }
+        .en-curso { font-size: 0.72rem; font-weight: 600; color: var(--total-value); border: 1px solid currentColor; border-radius: 999px; padding: 0.1rem 0.55rem; }
+
+        /* Local elegido, arriba de la ficha */
+        .local-elegido { display: flex; align-items: center; gap: 0.85rem; background: var(--list-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem 1rem; margin-bottom: 1.25rem; }
+        .local-icono { width: 44px; height: 44px; border-radius: 12px; }
+        .local-icono svg { width: 26px; height: 26px; }
+        .local-label { font-size: 0.75rem; color: var(--text-muted); }
+        .local-nombre { font-size: 1.15rem; font-weight: 700; }
+        .btn-cambiar { margin-left: auto; background: transparent; color: var(--primary); border: 1px solid var(--border); }
+        .btn-cambiar:hover { border-color: var(--primary); }
+        /* Encabezado en dos mitades: local | control de asistencia */
+        .encabezado-doble { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; margin-bottom: 1.25rem; }
+        .encabezado-doble .local-elegido { margin-bottom: 0; }
+        @media (max-width: 640px) { .encabezado-doble { grid-template-columns: 1fr; } }
+        .asis-icono { color: var(--danger); background: color-mix(in srgb, var(--danger) 14%, transparent); }
+        .asis-estado { font-size: 1rem; font-weight: 700; color: var(--danger); }
+        .asis-tarjeta.ok .asis-icono { color: var(--total-value); background: color-mix(in srgb, var(--total-value) 15%, transparent); }
+        .asis-tarjeta.ok .asis-estado { color: var(--total-value); }
+        .asis-tarjeta.ok { border-color: color-mix(in srgb, var(--total-value) 45%, var(--border)); }
+        .asis-tarjeta.falta { border-color: var(--danger); }
+
+        /* Ventana de asistencia */
+        .asis-fondo { position: fixed; inset: 0; z-index: 50; background: rgba(15, 23, 42, .6); display: flex; align-items: center; justify-content: center; padding: 16px; }
+        .asis-caja { background: var(--card-bg); color: var(--text-main); border: 1px solid var(--border); border-radius: 12px; width: 100%; max-width: 720px;
+                     max-height: 92vh; overflow-y: auto; padding: 1.25rem; box-shadow: 0 12px 32px rgba(0,0,0,.35); }
+        .asis-caja h3 { margin: 0 0 .75rem; border: none; padding: 0; }
+        .asis-datos { display: grid; grid-template-columns: repeat(4, 1fr); gap: .5rem; margin-bottom: .85rem; }
+        .asis-datos div { background: var(--list-bg); border: 1px solid var(--border); border-radius: 8px; padding: .45rem .6rem; min-width: 0; }
+        .asis-datos small { display: block; color: var(--text-muted); font-size: .72rem; }
+        .asis-datos b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .asis-fila { display: grid; grid-template-columns: 1fr 190px 190px 40px; gap: .5rem; align-items: end; margin-bottom: .5rem; }
+        .asis-fila label { font-size: .72rem; margin-bottom: .2rem; }
+        .asis-fila select, .asis-fila input { width: 100%; box-sizing: border-box; }
+        .hora-campo { display: flex !important; align-items: center; gap: 3px; min-width: 175px !important; box-sizing: border-box; }
+        .hora-campo b { flex: 0 0 auto; }
+        .hora-campo .hc-h, .hora-campo .hc-m { width: 3.2em !important; min-width: 0 !important; flex: 0 0 auto !important; text-align: center; padding-left: .25rem; padding-right: .25rem; box-sizing: border-box; }
+        .hora-campo .hc-ap { flex: 1 1 auto !important; min-width: 4.4em !important; width: auto !important; padding-left: .3rem; padding-right: .2rem; }
+        @media (max-width: 640px) { .hora-campo { min-width: 0 !important; } .hora-campo .hc-h, .hora-campo .hc-m { width: 2.8em !important; } .hora-campo .hc-ap { min-width: 3.8em !important; } }
+        .asis-acciones { display: flex; gap: .5rem; flex-wrap: wrap; justify-content: flex-end; margin-top: 1rem; }
+        .asis-acciones .btn-lista { margin-right: auto; background: transparent; color: var(--primary); border: 1px solid var(--primary); }
+        .asis-msj { font-size: .85rem; margin-top: .5rem; min-height: 1em; }
+        .asis-msj.error { color: var(--danger); } .asis-msj.ok { color: var(--total-value); }
+        .btn-gris { background: var(--list-bg); color: var(--text-main); border: 1px solid var(--border); }
+        @media (max-width: 640px) {
+            .asis-fondo { align-items: flex-end; padding: 0; }
+            .asis-caja { border-radius: 14px 14px 0 0; }
+            .asis-datos { grid-template-columns: 1fr 1fr; }
+            .asis-fila { grid-template-columns: 1fr 1fr 40px; }
+            .asis-fila .asis-trab { grid-column: 1 / -1; }
+        }
+        .tasa-nota { color: var(--text-muted); font-size: 0.75rem; margin-top: 0.35rem; min-height: 1em; }
+        .tasa-nota.error { color: var(--danger); }
+        .btn-reintentar { margin-top: 0.4rem; align-self: flex-start; background: transparent; color: var(--primary); border: 1px solid var(--border); padding: 0.35rem 0.75rem; }
+    </style>
+</head>
+<body>
+
+<!-- Datalist con la lista completa de trabajadores para autocompletado -->
+<datalist id="listaTrabajadores">
+    <option value="Alvaro Manuel Ortiz Diaz">
+    <option value="Anderson Josue Alvarado Becerra">
+    <option value="Carlos Enrrique Carrillo Zarate">
+    <option value="Claudia Zarate">
+    <option value="Endri Briceño">
+    <option value="Faidelys Bolivar">
+    <option value="Gastos Isabelica">
+    <option value="Lisbeth Perez">
+    <option value="Lizeth Ramos">
+    <option value="Gastos Oficina">
+    <option value="Gastos Parcelas">
+    <option value="Gastos Pizzería">
+    <option value="Gastos Ricardo Urriera">
+    <option value="Gastos Santa Rosa">
+    <option value="Genesis Morillo">
+    <option value="Hector Ibarra">
+    <option value="Jesus Villegas">
+    <option value="Jesus Wellman Sarate">
+    <option value="Jorman Duarte">
+    <option value="Junior Lanz">
+    <option value="Lerwuis Manuel Garcia Hernandez">
+    <option value="Maria Andreina Da Costa Rodriguez">
+    <option value="Mariangel Nathaly Bonilla Cardenas">
+    <option value="Marisela del Carmen Riera Riera">
+    <option value="Nairobbie Black">
+    <option value="Ronielis Peñaloza">
+    <option value="Salvador Avilio Sierra Veloz">
+    <option value="Wander Daniel Paredes">
+    <option value="Yosmar Rojas">
+</datalist>
+
+<div class="container">
+    <div class="header-bar">
+        <h2 class="titulo-logo"><svg class="logo-ccpv" viewBox="400 380 1130 1175" aria-hidden="true"><path fill="var(--logo-d, #F2EEE8)" d="M423 398 H950 C1230 398 1400 560 1450 788 L1115 952 C1110 790 1075 655 870 655 H773 V1193 L423 1365 Z"/><path fill="#44AC00" d="M423 1365 L1508 834 V865 L658 1533 H423 Z"/><path fill="#FF3D00" d="M820 1533 L1465 1026 C1460 1140 1448 1225 1420 1295 C1360 1440 1250 1490 1160 1505 C1090 1522 1020 1533 950 1533 Z"/></svg><span>Sistema de Control de Caja</span></h2>
+        <button type="button" id="btnTema" class="btn-theme" onclick="alternarTema()">Modo claro</button>
+    </div>
+    <!-- ============ PASO 1: ELEGIR EL LOCAL ============ -->
+    <section id="selectorLocal" class="hidden">
+        <p class="selector-titulo">¿En qué local estás?</p>
+        <p class="selector-sub">Seleccione el local para abrir la ficha de cuadre.</p>
+        <div class="locales-grid" id="localesGrid"></div>
+    </section>
+
+    <form id="mainForm" class="hidden">
+
+        <!-- ENCABEZADO: mitad local, mitad control de asistencia -->
+        <div class="encabezado-doble">
+            <div class="local-elegido">
+                <span class="local-icono" id="localIcono"></span>
+                <div>
+                    <div class="local-label">Local</div>
+                    <div class="local-nombre" id="localNombre"></div>
+                </div>
+                <button type="button" class="btn-cambiar" onclick="mostrarSelectorLocal()">Cambiar local</button>
+            </div>
+            <div class="local-elegido asis-tarjeta" id="asisTarjeta">
+                <span class="local-icono asis-icono">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="17" rx="2"/><path d="M9 2v4M15 2v4M4 10h16"/><path d="m9 15 2 2 4-4"/></svg>
+                </span>
+                <div>
+                    <div class="local-label">Control de asistencia</div>
+                    <div class="asis-estado" id="asisEstado">Pendiente</div>
+                </div>
+                <button type="button" class="btn-cambiar" onclick="abrirAsistencia()">Asistencia</button>
+            </div>
+        </div>
+        <div class="grid-3">
+            <div class="form-group">
+                <label>Nro de Ficha</label>
+                <input type="text" id="nroFicha" readonly placeholder="Se asigna al enviar">
+            </div>
+            <div class="form-group">
+                <label>Fecha Automática</label>
+                <input type="date" id="fecha" readonly required>
+            </div>
+            <div class="form-group">
+                <label>Tasa BCV (automática)</label>
+                <input type="number" step="0.01" min="0" id="tasaBCV" value="" readonly tabindex="-1" title="La tasa se toma automáticamente del BCV y no se puede modificar">
+                <button type="button" class="btn-reintentar hidden" id="btnReintentarTasa" onclick="cargarTasaBCV()">Reintentar</button>
+                <small class="tasa-nota" id="tasaNota"></small>
+            </div>
+            <!-- El local se elige en la pantalla inicial; este campo queda oculto para el envío -->
+            <select id="tienda" required hidden>
+                <option value="">Seleccionar...</option>
+                <option value="Santa Rosa">Santa Rosa</option>
+                <option value="Ricardo Urriera">Ricardo Urriera</option>
+                <option value="Isabelica">Isabelica</option>
+                <option value="Parcelas">Parcelas</option>
+            </select>
+            <div class="form-group">
+                <label>Turno</label>
+                <select id="turno" required>
+                    <option value="">Seleccionar...</option>
+                    <option value="Mañana">Mañana</option>
+                    <option value="Tarde">Tarde</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Cajero / Usuario</label>
+                <input type="text" id="cajero" list="listaTrabajadores" placeholder="Escribe y elige de la lista..." required>
+            </div>
+        </div>
+
+        <!-- EFECTIVO BS -->
+        <h3>1. Efectivo Bolívares</h3>
+        <div class="grid-3">
+            <div class="form-group">
+                <label>Recibí para Caja (Bs)</label>
+                <input type="number" step="0.01" min="0" id="bsRecibi" value="0" oninput="calcularEfectivoBs()" required>
+            </div>
+            <div class="form-group">
+                <label>Dejé para Caja (Bs)</label>
+                <input type="number" step="0.01" min="0" id="bsDeje" value="0" oninput="calcularEfectivoBs()" required>
+            </div>
+            <div class="form-group">
+                <label>Envié a Oficina (Bs)</label>
+                <input type="number" step="0.01" min="0" id="bsEnvie" value="0" oninput="calcularEfectivoBs()" required>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Gastos en Bs</label>
+            <div id="gastosBsContainer" class="dynamic-list"></div>
+            <button type="button" class="btn-add" onclick="agregarGastoBs(); enfocarNuevo('gastosBsContainer')">+ Añadir Gasto Bs</button>
+        </div>
+        <div class="totals-box">
+            <span>Ventas del Día (Bs):</span>
+            <span id="totalVentasBs" class="total-value">0,00</span>
+        </div>
+
+        <!-- TDD (TARJETAS) -->
+        <h3>2. TDD (Punto de Venta)</h3>
+        <div id="tddContainer" class="dynamic-list"></div>
+        <button type="button" class="btn-add" onclick="agregarTDD(); enfocarNuevo('tddContainer')">+ Añadir Lote TDD</button>
+        
+        <div class="grid-3" style="margin-top: 1rem;">
+            <div class="form-group">
+                <label>Sub Total Lotes (Bs)</label>
+                <input type="text" id="tddSubtotal" value="0,00" readonly>
+            </div>
+            <div class="form-group">
+                <label>Pagos Externos (Bs)</label>
+                <input type="number" step="0.01" min="0" id="tddPagosExternos" value="0" oninput="calcularTDD()" required>
+            </div>
+            <div class="form-group">
+                <label>Comentario Pago Externo</label>
+                <input type="text" id="tddComentarioExterno" placeholder="Detalle del pago">
+            </div>
+        </div>
+        <div class="totals-box">
+            <span>Total TDD (Bs):</span>
+            <span id="totalTDD" class="total-value">0,00</span>
+        </div>
+
+        <!-- BIOPAGO -->
+        <h3>3. Biopago</h3>
+        <p style="font-size: 0.8rem; color: var(--text-muted);">* Si el turno es de la tarde, debe colocar el monto de la mañana.</p>
+        <p style="font-size: 0.8rem; color: var(--text-muted);">* Si el turno es de la mañana, solo debe llenar el monto de la mañana.</p>
+
+        <div class="grid-2">
+            <div class="form-group">
+                <label>Monto de la Mañana</label>
+                <input type="number" step="0.01" min="0" id="bioManana" value="0" oninput="calcularBiopago()" required>
+            </div>
+            <div class="form-group">
+                <label>Monto total</label>
+                <input type="number" step="0.01" min="0" id="bioTarde" value="0" oninput="calcularBiopago()" required>
+            </div>
+        </div>
+        <div class="totals-box">
+            <span>Total Biopago:</span>
+            <span id="totalBiopago" class="total-value">0,00</span>
+        </div>
+
+        <!-- CRÉDITO -->
+        <h3>4. Crédito</h3>
+        <div id="creditoContainer" class="dynamic-list"></div>
+        <button type="button" class="btn-add" onclick="agregarCredito(); enfocarNuevo('creditoContainer')">+ Añadir Crédito</button>
+        <div class="totals-box">
+            <div>Total Crédito (Bs): <span id="totalCreditoBs" class="total-value">0,00</span></div>
+            <div>Total Crédito ($): <span id="totalCreditoDiv" class="total-value">0,00</span></div>
+        </div>
+
+        <!-- DIVISAS -->
+        <h3>5. Divisas ($)</h3>
+        <div class="grid-3">
+            <div class="form-group">
+                <label>Recibí para Caja ($)</label>
+                <input type="number" step="0.01" min="0" id="divRecibi" value="0" oninput="calcularDivisas()" required>
+            </div>
+            <div class="form-group">
+                <label>Dejé para Caja ($)</label>
+                <input type="number" step="0.01" min="0" id="divDeje" value="0" oninput="calcularDivisas()" required>
+            </div>
+            <div class="form-group">
+                <label>Envié a Oficina ($)</label>
+                <input type="number" step="0.01" min="0" id="divEnvie" value="0" oninput="calcularDivisas()" required>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Gastos en Divisas ($)</label>
+            <div id="gastosDivContainer" class="dynamic-list"></div>
+            <button type="button" class="btn-add" onclick="agregarGastoDivisas(); enfocarNuevo('gastosDivContainer')">+ Añadir Gasto $</button>
+        </div>
+        <div class="totals-box">
+            <span>Ventas del Día ($):</span>
+            <span id="totalVentasDiv" class="total-value">0,00</span>
+        </div>
+
+        <!-- PAGO MÓVIL -->
+        <h3>6. Pago Móvil</h3>
+        <div id="pagoMovilContainer" class="dynamic-list"></div>
+        <button type="button" class="btn-add" onclick="agregarPagoMovil(); enfocarNuevo('pagoMovilContainer')">+ Añadir Pago Móvil</button>
+        <div class="totals-box">
+            <span>Total Pago Móvil (Bs):</span>
+            <span id="totalPagoMovil" class="total-value">0,00</span>
+        </div>
+
+        <button type="submit" class="btn-submit">Finalizar Ficha y Preparar Envío</button>
+    </form>
+</div>
+
+<!-- ============ VENTANA: CONTROL DE ASISTENCIA ============ -->
+<div class="asis-fondo hidden" id="asisVentana" onclick="if (event.target === this) cerrarAsistencia()">
+    <div class="asis-caja" role="dialog" aria-labelledby="asisTitulo">
+        <h3 id="asisTitulo">Control de asistencia</h3>
+        <div class="asis-datos">
+            <div><small>Local</small><b id="asisLocal"></b></div>
+            <div><small>Fecha</small><b id="asisFecha"></b></div>
+            <div><small>Turno</small><b id="asisTurno"></b></div>
+            <div><small>Responsable</small><b id="asisResp"></b></div>
+        </div>
+        <div id="asisAviso" class="asis-msj"></div>
+        <div id="asisFilas"></div>
+        <button type="button" class="btn-add" onclick="agregarAsistencia(); enfocarNuevo('asisFilas')">+ Agregar trabajador</button>
+        <div class="asis-msj" id="asisMsj"></div>
+        <div class="asis-acciones">
+            <button type="button" class="btn-lista" id="asisBtnLista" onclick="asistenciaYaLista()">Asistencia ya lista</button>
+            <button type="button" class="btn-gris" onclick="cerrarAsistencia()">Cancelar</button>
+            <button type="button" class="btn-add" style="margin-top:0" onclick="guardarAsistencia()">Guardar asistencia</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ==========================================
+    // TELÉFONO: teclado numérico en montos (con coma/punto) y en referencias/lotes (solo dígitos).
+    // También en las filas que se agregan después (gastos, lotes, pagos móviles...).
+    // ==========================================
+    function ajustarTeclados(raiz) {
+        (raiz || document).querySelectorAll('input').forEach(i => {
+            if (i.dataset.teclado) return;
+            if (i.type === 'number' && !i.hasAttribute('inputmode')) i.setAttribute('inputmode', 'decimal');
+            if (i.type === 'password' && !i.hasAttribute('inputmode')) i.setAttribute('inputmode', 'numeric');
+            i.dataset.teclado = '1';
+        });
+    }
+    document.addEventListener('DOMContentLoaded', () => {
+        ajustarTeclados(document);
+        new MutationObserver(cambios => cambios.forEach(c => c.addedNodes.forEach(n => { if (n.nodeType === 1) ajustarTeclados(n.tagName === 'INPUT' ? n.parentNode : n); })))
+            .observe(document.body, { childList: true, subtree: true });
+    });
+
+    // ==========================================
+    // TEMA CLARO / OSCURO
+    // ==========================================
+    function aplicarTema(tema) {
+        document.documentElement.setAttribute('data-theme', tema);
+        document.getElementById('btnTema').textContent = tema === 'light' ? 'Modo oscuro' : 'Modo claro';
+    }
+
+    function alternarTema() {
+        const actual = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+        const nuevo = actual === 'light' ? 'dark' : 'light';
+        aplicarTema(nuevo);
+        try { localStorage.setItem('caja_tema', nuevo); } catch (e) {}
+    }
+
+    (function () {
+        let tema = 'dark';
+        try { tema = localStorage.getItem('caja_tema') || 'dark'; } catch (e) {}
+        aplicarTema(tema);
+    })();
+
+    // Bloquear scroll en inputs numéricos
+    document.addEventListener('wheel', function(event) {
+        if (document.activeElement.type === 'number') {
+            document.activeElement.blur();
+        }
+    });
+
+    // Bloquear teclas no numéricas en inputs numéricos
+    document.addEventListener('keydown', function(event) {
+        if (event.target.type === 'number') {
+            if (['e', 'E', '+', '-'].includes(event.key)) {
+                event.preventDefault();
+            }
+        }
+    });
+
+    function formatearMoneda(valor) {
+        return new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(valor);
+    }
+
+    function limpiarParaSheets(valor) {
+        if (valor === undefined || valor === null || valor === "") return 0;
+        
+        if (typeof valor === 'string') {
+            if (valor.includes(',') && valor.includes('.')) {
+                valor = valor.replace(/\./g, '').replace(',', '.');
+            } else if (valor.includes(',')) {
+                valor = valor.replace(',', '.');
+            }
+        }
+        
+        let num = parseFloat(valor);
+        return isNaN(num) ? 0 : num;
+    }
+
+    // Fecha LOCAL del equipo (toISOString usa hora UTC y en la noche daba el día siguiente)
+    function fechaLocalHoy() {
+        const d = new Date();
+        const anio = d.getFullYear();
+        const mes = String(d.getMonth() + 1).padStart(2, '0');
+        const dia = String(d.getDate()).padStart(2, '0');
+        return `${anio}-${mes}-${dia}`;
+    }
+    const hoy = fechaLocalHoy();
+    document.getElementById('fecha').value = hoy;
+
+    const listaBancos = ["R4", "BNC", "Bancrecer", "BDV"];
+    const listaBancosPM = [...listaBancos, "Provincial"]; // Bancos para Pago Móvil (incluye Provincial)
+    const listaTiposGasto = ["Compra material", "Pago proveedor", "Credito", "Otro"];
+    const listaTitulares = ["Plaza Valencia", "Junior Lanz", "Raimary Quintero"];
+    const listaTitularesPM = [...listaTitulares, "Lisbeth Perez"];
+    
+    // El número de ficha ya no se arma aquí: lo asigna la hoja al guardar (ficha anterior + 1)
+
+    function generarOpciones(arreglo) {
+        return arreglo.map(item => `<option value="${item}">${item}</option>`).join('');
+    }
+
+    // ==========================================
+    // HORA: campo propio (hora · minuto · a.m./p.m.) que se ve igual en PC y teléfono.
+    // Guarda el valor en 24 h ("19:05") en un input oculto con la clase de siempre (tdd-hora, asis-e...).
+    // ==========================================
+    function campoHora(clase, valor) {
+        const m = /^(\d{1,2}):(\d{2})/.exec(valor || '');
+        let h = '', mi = '', ap = '';
+        if (m) { const h24 = +m[1]; ap = h24 >= 12 ? 'PM' : 'AM'; h = String(h24 % 12 || 12).padStart(2, '0'); mi = m[2]; }
+        return `<span class="hora-campo">
+            <input type="text" class="hc-h" inputmode="numeric" maxlength="2" placeholder="hh" value="${h}" required pattern="0?[1-9]|1[0-2]" title="Hora de 1 a 12" oninput="sincronizarHora(this)">
+            <b>:</b>
+            <input type="text" class="hc-m" inputmode="numeric" maxlength="2" placeholder="mm" value="${mi}" required pattern="[0-5][0-9]" title="Minutos de 00 a 59" oninput="sincronizarHora(this)">
+            <select class="hc-ap" required onchange="sincronizarHora(this)"><option value="">--</option><option ${ap === 'AM' ? 'selected' : ''}>AM</option><option ${ap === 'PM' ? 'selected' : ''}>PM</option></select>
+            <input type="hidden" class="${clase}" value="${m ? m[1].padStart(2, '0') + ':' + m[2] : ''}">
+        </span>`;
+    }
+    function sincronizarHora(el) {
+        const c = el.closest('.hora-campo');
+        const h = parseInt(c.querySelector('.hc-h').value, 10), mi = c.querySelector('.hc-m').value, ap = c.querySelector('.hc-ap').value;
+        const ok = h >= 1 && h <= 12 && /^[0-5]\d$/.test(mi) && ap;
+        const h24 = ok ? (h % 12) + (ap === 'PM' ? 12 : 0) : 0;
+        c.querySelector('input[type=hidden]').value = ok ? String(h24).padStart(2, '0') + ':' + mi : '';
+        if (typeof guardarBorrador === 'function' && el.closest('#mainForm')) guardarBorrador();
+    }
+
+    // ==========================================
+    // ENTER = siguiente casilla (no envía la ficha). En "+ Añadir..." el Enter agrega otro renglón;
+    // para salir de ahí se usa Tab.
+    // ==========================================
+    function camposNavegables(zona) {
+        return Array.from(zona.querySelectorAll('input, select, textarea, button.btn-add')).filter(el =>
+            el.type !== 'hidden' && !el.disabled && !el.readOnly && el.offsetParent !== null);
+    }
+    document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.altKey) return;
+        const el = e.target;
+        if (!el.matches || !el.matches('input, select')) return; // botones y textarea se comportan normal
+        const modal = document.getElementById('asisVentana');
+        const zona = modal && !modal.classList.contains('hidden') && modal.contains(el) ? modal : el.closest('#mainForm');
+        if (!zona) return;
+        e.preventDefault();
+        const lista = camposNavegables(zona), i = lista.indexOf(el);
+        const sig = lista[i + 1];
+        if (sig) { sig.focus(); if (sig.select && sig.tagName === 'INPUT') try { sig.select(); } catch (_) {} }
+    });
+    // Al agregar un renglón con el botón, el cursor queda en su primera casilla
+    function enfocarNuevo(idContenedor) {
+        const filas = document.getElementById(idContenedor).children;
+        const ult = filas[filas.length - 1];
+        const primero = ult && camposNavegables(ult)[0];
+        if (primero) primero.focus();
+    }
+
+    function recalcularTodo() {
+        calcularCreditos();
+        calcularDivisas();
+    }
+
+    function agregarGastoBs(tipo = "", trab = "", desc = "", monto = 0) {
+        const div = document.createElement('div');
+        div.className = 'dynamic-row';
+        div.innerHTML = `
+            <select class="gbs-tipo" required><option value="">Tipo...</option>${generarOpciones(listaTiposGasto)}</select>
+            <input type="text" class="gbs-trab" list="listaTrabajadores" placeholder="Trabajador..." value="${trab}" required>
+            <input type="text" class="gbs-desc" placeholder="Descripción" value="${desc}" required>
+            <input type="number" step="0.01" min="0" class="gbs-monto" placeholder="Monto Bs" value="${monto}" oninput="calcularEfectivoBs(); guardarBorrador();" required>
+            <button type="button" class="btn-remove" onclick="this.parentElement.remove(); calcularEfectivoBs(); guardarBorrador();">X</button>
+        `;
+        if(tipo) div.querySelector('.gbs-tipo').value = tipo;
+        div.querySelectorAll('input, select').forEach(el => el.addEventListener('input', guardarBorrador));
+        document.getElementById('gastosBsContainer').appendChild(div);
+    }
+
+    function agregarTDD(lote = "", banco = "", titular = "", hora = "", monto = 0) {
+        const div = document.createElement('div');
+        div.className = 'dynamic-row';
+        div.innerHTML = `
+            <input type="text" class="tdd-lote" placeholder="Nro Lote (4 dígitos)" value="${lote}" required
+                   pattern="\\d{4}" maxlength="4" inputmode="numeric" title="El número de lote debe tener exactamente 4 dígitos">
+            <select class="tdd-banco" required><option value="">Banco...</option>${generarOpciones(listaBancos)}</select>
+            <select class="tdd-titular" required><option value="">Titular...</option>${generarOpciones(listaTitulares)}</select>
+            ${campoHora('tdd-hora', hora)}
+            <input type="number" step="0.01" min="0" class="tdd-monto" placeholder="Monto Bs" value="${monto}" oninput="calcularTDD(); guardarBorrador();" required>
+            <button type="button" class="btn-remove" onclick="this.parentElement.remove(); calcularTDD(); guardarBorrador();">X</button>
+        `;
+        if(banco) div.querySelector('.tdd-banco').value = banco;
+        if(titular) div.querySelector('.tdd-titular').value = titular;
+        div.querySelectorAll('input, select').forEach(el => el.addEventListener('input', guardarBorrador));
+        document.getElementById('tddContainer').appendChild(div);
+    }
+
+    function agregarCredito(nombre = "", desc = "", bs = 0) {
+        const div = document.createElement('div');
+        div.className = 'dynamic-row';
+        div.innerHTML = `
+            <input type="text" class="cred-nombre" list="listaTrabajadores" placeholder="A nombre de..." value="${nombre}" required>
+            <input type="text" class="cred-desc" placeholder="Descripción" value="${desc}" required>
+            <input type="number" step="0.01" min="0" class="cred-bs" placeholder="Monto Bs" value="${bs}" oninput="calcularCreditos(); guardarBorrador();" required>
+            <input type="text" class="cred-div" placeholder="Monto $" readonly>
+            <button type="button" class="btn-remove" onclick="this.parentElement.remove(); calcularCreditos(); guardarBorrador();">X</button>
+        `;
+        div.querySelectorAll('input, select').forEach(el => el.addEventListener('input', guardarBorrador));
+        document.getElementById('creditoContainer').appendChild(div);
+        calcularCreditos();
+    }
+
+    function agregarGastoDivisas(tipo = "", resp = "", desc = "", monto = 0) {
+        const div = document.createElement('div');
+        div.className = 'dynamic-row';
+        div.innerHTML = `
+            <select class="gdiv-tipo" required><option value="">Tipo...</option>${generarOpciones(listaTiposGasto)}</select>
+            <input type="text" class="gdiv-resp" list="listaTrabajadores" placeholder="Responsable..." value="${resp}" required>
+            <input type="text" class="gdiv-desc" placeholder="Descripción" value="${desc}" required>
+            <input type="number" step="0.01" min="0" class="gdiv-monto" placeholder="Monto $" value="${monto}" oninput="calcularDivisas(); guardarBorrador();" required>
+            <button type="button" class="btn-remove" onclick="this.parentElement.remove(); calcularDivisas(); guardarBorrador();">X</button>
+        `;
+        if(tipo) div.querySelector('.gdiv-tipo').value = tipo;
+        div.querySelectorAll('input, select').forEach(el => el.addEventListener('input', guardarBorrador));
+        document.getElementById('gastosDivContainer').appendChild(div);
+    }
+
+    function agregarPagoMovil(ref = "", banco = "", titular = "", monto = 0) {
+        const div = document.createElement('div');
+        div.className = 'dynamic-row';
+        div.innerHTML = `
+            <input type="text" class="pm-ref" placeholder="Nro Referencia (4 dígitos)" value="${ref}" required
+                   pattern="\\d{4}" maxlength="4" inputmode="numeric" title="La referencia debe tener exactamente 4 dígitos">
+            <select class="pm-banco" required><option value="">Banco...</option>${generarOpciones(listaBancosPM)}</select>
+            <select class="pm-titular" required><option value="">Titular...</option>${generarOpciones(listaTitularesPM)}</select>
+            <input type="number" step="0.01" min="0" class="pm-monto" placeholder="Monto Bs" value="${monto}" oninput="calcularPagoMovil(); guardarBorrador();" required>
+            <button type="button" class="btn-remove" onclick="this.parentElement.remove(); calcularPagoMovil(); guardarBorrador();">X</button>
+        `;
+        if(banco) div.querySelector('.pm-banco').value = banco;
+        if(titular) div.querySelector('.pm-titular').value = titular;
+        div.querySelectorAll('input, select').forEach(el => el.addEventListener('input', guardarBorrador));
+        document.getElementById('pagoMovilContainer').appendChild(div);
+    }
+
+    function calcularEfectivoBs() {
+        const recibi = parseFloat(document.getElementById('bsRecibi').value) || 0;
+        const deje = parseFloat(document.getElementById('bsDeje').value) || 0;
+        const envie = parseFloat(document.getElementById('bsEnvie').value) || 0;
+        let sumaGastos = 0;
+        document.querySelectorAll('.gbs-monto').forEach(input => sumaGastos += parseFloat(input.value) || 0);
+        
+        const total = (deje + envie + sumaGastos) - recibi;
+        document.getElementById('totalVentasBs').textContent = formatearMoneda(total);
+    }
+
+    function calcularTDD() {
+        let subtotal = 0;
+        document.querySelectorAll('.tdd-monto').forEach(input => subtotal += parseFloat(input.value) || 0);
+        document.getElementById('tddSubtotal').value = formatearMoneda(subtotal);
+        
+        const pagosExternos = parseFloat(document.getElementById('tddPagosExternos').value) || 0;
+        const total = subtotal - pagosExternos;
+        document.getElementById('totalTDD').textContent = formatearMoneda(total);
+    }
+
+    function calcularBiopago() {
+        const manana = parseFloat(document.getElementById('bioManana').value) || 0;
+        const tarde = parseFloat(document.getElementById('bioTarde').value) || 0;
+        const total = tarde === 0 ? manana : (tarde - manana);
+        document.getElementById('totalBiopago').textContent = formatearMoneda(total);
+    }
+
+    function calcularCreditos() {
+        const tasa = parseFloat(document.getElementById('tasaBCV').value) || 1;
+        let totalBs = 0;
+        let totalDiv = 0;
+        
+        document.querySelectorAll('#creditoContainer .dynamic-row').forEach(row => {
+            const inputBs = row.querySelector('.cred-bs');
+            const inputDiv = row.querySelector('.cred-div');
+            if (inputBs && inputDiv) {
+                const montoBs = parseFloat(inputBs.value) || 0;
+                const montoDiv = montoBs / tasa;
+                inputDiv.value = formatearMoneda(montoDiv);
+                totalBs += montoBs;
+                totalDiv += montoDiv;
+            }
+        });
+        
+        document.getElementById('totalCreditoBs').textContent = formatearMoneda(totalBs);
+        document.getElementById('totalCreditoDiv').textContent = formatearMoneda(totalDiv);
+    }
+
+    function calcularDivisas() {
+        const recibi = parseFloat(document.getElementById('divRecibi').value) || 0;
+        const deje = parseFloat(document.getElementById('divDeje').value) || 0;
+        const envie = parseFloat(document.getElementById('divEnvie').value) || 0;
+        let sumaGastos = 0;
+        document.querySelectorAll('.gdiv-monto').forEach(input => sumaGastos += parseFloat(input.value) || 0);
+        
+        const total = (deje + envie + sumaGastos) - recibi;
+        document.getElementById('totalVentasDiv').textContent = formatearMoneda(total);
+    }
+
+    function calcularPagoMovil() {
+        let total = 0;
+        document.querySelectorAll('.pm-monto').forEach(input => total += parseFloat(input.value) || 0);
+        document.getElementById('totalPagoMovil').textContent = formatearMoneda(total);
+    }
+
+    // ==========================================
+    // SISTEMA DE AUTOGUARDADO (LOCALSTORAGE)
+    // ==========================================
+    function guardarBorrador() {
+        const data = {
+            tasaBCV: document.getElementById('tasaBCV').value,
+            tienda: document.getElementById('tienda').value,
+            turno: document.getElementById('turno').value,
+            cajero: document.getElementById('cajero').value,
+            bsRecibi: document.getElementById('bsRecibi').value,
+            bsDeje: document.getElementById('bsDeje').value,
+            bsEnvie: document.getElementById('bsEnvie').value,
+            tddPagosExternos: document.getElementById('tddPagosExternos').value,
+            tddComentarioExterno: document.getElementById('tddComentarioExterno').value,
+            bioManana: document.getElementById('bioManana').value,
+            bioTarde: document.getElementById('bioTarde').value,
+            divRecibi: document.getElementById('divRecibi').value,
+            divDeje: document.getElementById('divDeje').value,
+            divEnvie: document.getElementById('divEnvie').value,
+            
+            gastosBs: Array.from(document.querySelectorAll('#gastosBsContainer .dynamic-row')).map(row => ({
+                tipo: row.querySelector('.gbs-tipo').value,
+                trabajador: row.querySelector('.gbs-trab').value,
+                descripcion: row.querySelector('.gbs-desc').value,
+                monto: row.querySelector('.gbs-monto').value
+            })),
+            lotesTDD: Array.from(document.querySelectorAll('#tddContainer .dynamic-row')).map(row => ({
+                lote: row.querySelector('.tdd-lote').value,
+                banco: row.querySelector('.tdd-banco').value,
+                titular: row.querySelector('.tdd-titular').value,
+                hora: row.querySelector('.tdd-hora').value,
+                monto: row.querySelector('.tdd-monto').value
+            })),
+            creditos: Array.from(document.querySelectorAll('#creditoContainer .dynamic-row')).map(row => ({
+                nombre: row.querySelector('.cred-nombre').value,
+                descripcion: row.querySelector('.cred-desc').value,
+                montoBs: row.querySelector('.cred-bs').value
+            })),
+            gastosDiv: Array.from(document.querySelectorAll('#gastosDivContainer .dynamic-row')).map(row => ({
+                tipo: row.querySelector('.gdiv-tipo').value,
+                responsable: row.querySelector('.gdiv-resp').value,
+                descripcion: row.querySelector('.gdiv-desc').value,
+                monto: row.querySelector('.gdiv-monto').value
+            })),
+            pagosMoviles: Array.from(document.querySelectorAll('#pagoMovilContainer .dynamic-row')).map(row => ({
+                referencia: row.querySelector('.pm-ref').value,
+                banco: row.querySelector('.pm-banco').value,
+                titular: row.querySelector('.pm-titular').value,
+                monto: row.querySelector('.pm-monto').value
+            })),
+            asistencia: (typeof asistencia !== 'undefined' && asistencia) || window.asisBorrador || []
+        };
+        localStorage.setItem('caja_borrador', JSON.stringify(data));
+    }
+
+    function cargarBorrador() {
+        const guardado = localStorage.getItem('caja_borrador');
+        if (!guardado) {
+            // Inicializar filas predeterminadas si no hay datos guardados
+            agregarGastoBs();
+            agregarTDD();
+            agregarCredito();
+            agregarGastoDivisas();
+            agregarPagoMovil();
+            return;
+        }
+
+        try {
+            const data = JSON.parse(guardado);
+            if(data.tasaBCV) document.getElementById('tasaBCV').value = data.tasaBCV;
+            if(data.tienda) document.getElementById('tienda').value = data.tienda;
+            if(data.turno) document.getElementById('turno').value = data.turno;
+            if(data.cajero) document.getElementById('cajero').value = data.cajero;
+            if(data.bsRecibi) document.getElementById('bsRecibi').value = data.bsRecibi;
+            if(data.bsDeje) document.getElementById('bsDeje').value = data.bsDeje;
+            if(data.bsEnvie) document.getElementById('bsEnvie').value = data.bsEnvie;
+            if(data.tddPagosExternos) document.getElementById('tddPagosExternos').value = data.tddPagosExternos;
+            if(data.tddComentarioExterno) document.getElementById('tddComentarioExterno').value = data.tddComentarioExterno;
+            if(data.bioManana) document.getElementById('bioManana').value = data.bioManana;
+            if(data.bioTarde) document.getElementById('bioTarde').value = data.bioTarde;
+            if(data.divRecibi) document.getElementById('divRecibi').value = data.divRecibi;
+            if(data.divDeje) document.getElementById('divDeje').value = data.divDeje;
+            if(data.divEnvie) document.getElementById('divEnvie').value = data.divEnvie;
+            window.asisBorrador = Array.isArray(data.asistencia) ? data.asistencia : [];   // asistencia ya llenada en esta ficha
+
+            // Cargar Gastos Bs
+            document.getElementById('gastosBsContainer').innerHTML = '';
+            if(data.gastosBs && data.gastosBs.length > 0) {
+                data.gastosBs.forEach(g => agregarGastoBs(g.tipo, g.trabajador, g.descripcion || "", g.monto));
+            } else { agregarGastoBs(); }
+
+            // Cargar TDD
+            document.getElementById('tddContainer').innerHTML = '';
+            if(data.lotesTDD && data.lotesTDD.length > 0) {
+                data.lotesTDD.forEach(l => agregarTDD(l.lote, l.banco, l.titular, l.hora, l.monto));
+            } else { agregarTDD(); }
+
+            // Cargar Créditos
+            document.getElementById('creditoContainer').innerHTML = '';
+            if(data.creditos && data.creditos.length > 0) {
+                data.creditos.forEach(c => agregarCredito(c.nombre, c.descripcion, c.montoBs));
+            } else { agregarCredito(); }
+
+            // Cargar Gastos Divisas
+            document.getElementById('gastosDivContainer').innerHTML = '';
+            if(data.gastosDiv && data.gastosDiv.length > 0) {
+                data.gastosDiv.forEach(gd => agregarGastoDivisas(gd.tipo, gd.responsable, gd.descripcion, gd.monto));
+            } else { agregarGastoDivisas(); }
+
+            // Cargar Pagos Móviles
+            document.getElementById('pagoMovilContainer').innerHTML = '';
+            if(data.pagosMoviles && data.pagosMoviles.length > 0) {
+                data.pagosMoviles.forEach(pm => agregarPagoMovil(pm.referencia, pm.banco, pm.titular, pm.monto));
+            } else { agregarPagoMovil(); }
+
+            // Recalcular todo al cargar
+            calcularEfectivoBs();
+            calcularTDD();
+            calcularBiopago();
+            calcularCreditos();
+            calcularDivisas();
+            calcularPagoMovil();
+
+        } catch(e) {
+            console.error("Error al cargar borrador", e);
+            agregarGastoBs();
+            agregarTDD();
+            agregarCredito();
+            agregarGastoDivisas();
+            agregarPagoMovil();
+        }
+    }
+
+    // Escuchar cambios generales para autoguardar
+    document.getElementById('mainForm').addEventListener('input', guardarBorrador);
+    document.getElementById('mainForm').addEventListener('change', guardarBorrador);
+
+    // Cargar datos guardados al iniciar
+    cargarBorrador();
+
+    // ==========================================
+    // PANTALLA INICIAL: ELEGIR EL LOCAL
+    // ==========================================
+    const ICONO_LOCAL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 4.5 4h15L21 9.5"/><path d="M3 9.5a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0"/><path d="M5 12v8h14v-8"/><path d="M10 20v-5h4v5"/></svg>';
+    const LOCALES = ['Santa Rosa', 'Ricardo Urriera', 'Isabelica', 'Parcelas'];
+
+    // Si hay una ficha a medio llenar, su local se marca como "Ficha en curso"
+    const localEnCurso = document.getElementById('tienda').value;
+    document.getElementById('localesGrid').innerHTML = LOCALES.map(l => `
+        <button type="button" class="local-btn" onclick="elegirLocal('${l}')">
+            <span class="icono">${ICONO_LOCAL}</span>${l}
+            ${l === localEnCurso ? '<span class="en-curso">Ficha en curso</span>' : ''}
+        </button>`).join('');
+    document.getElementById('localIcono').innerHTML = ICONO_LOCAL;
+
+    function mostrarSelectorLocal() {
+        document.getElementById('mainForm').classList.add('hidden');
+        document.getElementById('selectorLocal').classList.remove('hidden');
+        window.scrollTo(0, 0);
+    }
+    function mostrarFicha() {
+        document.getElementById('localNombre').textContent = document.getElementById('tienda').value;
+        document.getElementById('selectorLocal').classList.add('hidden');
+        document.getElementById('mainForm').classList.remove('hidden');
+        window.scrollTo(0, 0);
+    }
+    function elegirLocal(local) {
+        document.getElementById('tienda').value = local;
+        guardarBorrador();
+        mostrarFicha();
+        if (typeof revisarAsistenciaFondo === 'function') revisarAsistenciaFondo();   // ¿ese local ya tiene la asistencia del turno?
+    }
+    // Al abrir siempre se empieza eligiendo el local
+    mostrarSelectorLocal();
+
+    // ==========================================
+    // TASA BCV AUTOMÁTICA (tasa oficial publicada por DolarApi)
+    // ==========================================
+    // Se coloca sola salvo que el cajero la haya cambiado a mano en esta ficha.
+    // El BCV publica la tasa del próximo día hábil por adelantado (ej. el viernes ya publica la del lunes).
+    // El historial de DolarApi incluye esa tasa con su fecha valor; se toma la de fecha más reciente.
+    // Si el historial falla, se usa la tasa del día.
+    async function ultimaTasaPublicada() {
+        try {
+            const r = await fetch('https://ve.dolarapi.com/v1/historicos/dolares/oficial', { cache: 'no-store' });
+            const lista = await r.json();
+            const ultima = lista.filter(x => Number(x.promedio) > 0 && /^\d{4}-\d{2}-\d{2}/.test(x.fecha))
+                                .sort((x, y) => x.fecha.localeCompare(y.fecha)).pop();
+            if (ultima) return { tasa: Number(ultima.promedio), fecha: ultima.fecha.slice(0, 10) };
+        } catch (e) {}
+        const r = await fetch('https://ve.dolarapi.com/v1/dolares/oficial', { cache: 'no-store' });
+        const data = await r.json();
+        if (!Number(data.promedio)) throw new Error('respuesta sin tasa');
+        return { tasa: Number(data.promedio), fecha: String(data.fechaActualizacion || fechaLocalHoy()).slice(0, 10) };
+    }
+
+    async function cargarTasaBCV() {
+        const input = document.getElementById('tasaBCV');
+        const nota = document.getElementById('tasaNota');
+        const btnReintentar = document.getElementById('btnReintentarTasa');
+        btnReintentar.classList.add('hidden');
+        nota.className = 'tasa-nota';
+        nota.textContent = 'Buscando la tasa BCV...';
+        try {
+            const { tasa, fecha } = await ultimaTasaPublicada();
+            input.value = tasa.toFixed(2);
+            const [a, m, d] = fecha.split('-');
+            const dia = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'][new Date(+a, m - 1, +d, 12).getDay()];
+            nota.textContent = `Última tasa publicada por el BCV: vigente desde el ${dia} ${d}/${m}/${a} (automática).`;
+            try { localStorage.setItem('caja_ultima_tasa', input.value); } catch (e) {}
+        } catch (e) {
+            // Sin internet o servicio caído: se usa la última tasa obtenida automáticamente en este equipo
+            let ultima = null;
+            try { ultima = localStorage.getItem('caja_ultima_tasa'); } catch (e2) {}
+            input.value = ultima || '';
+            nota.className = 'tasa-nota error';
+            nota.textContent = ultima ? 'No se pudo consultar el BCV; se usa la última tasa obtenida en este equipo.'
+                                      : 'No se pudo consultar el BCV. Sin tasa no se puede enviar la ficha.';
+            btnReintentar.classList.remove('hidden');
+        }
+        recalcularTodo();
+        guardarBorrador();
+    }
+    cargarTasaBCV();
+
+    // ==========================================
+    // VALIDACIONES: TRABAJADORES DE LA LISTA Y CÓDIGOS DE 4 DÍGITOS
+    // ==========================================
+    const sinTildes = t => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+    const TRABAJADORES = Array.from(document.querySelectorAll('#listaTrabajadores option')).map(o => o.value);
+    const TRABAJADOR_POR_CLAVE = new Map(TRABAJADORES.map(n => [sinTildes(n), n]));
+
+    // Solo se acepta un nombre de la lista. Si coincide sin importar mayúsculas/tildes, se corrige al nombre exacto.
+    function validarTrabajador(input, corregir) {
+        const exacto = TRABAJADOR_POR_CLAVE.get(sinTildes(input.value));
+        if (corregir && exacto && input.value !== exacto) input.value = exacto;
+        input.setCustomValidity(!input.value || exacto ? '' : 'Seleccione un nombre de la lista. No se permiten nombres nuevos.');
+    }
+
+    // Lote y referencia: solo dígitos, máximo 4 (el "pattern" del campo exige exactamente 4 al enviar)
+    function limpiarCodigo(input) {
+        const limpio = input.value.replace(/\D/g, '').slice(0, 4);
+        if (input.value !== limpio) input.value = limpio;
+        const nombre = input.classList.contains('tdd-lote') ? 'El número de lote' : 'La referencia de pago móvil';
+        input.setCustomValidity(limpio && limpio.length !== 4 ? `${nombre} debe tener exactamente 4 dígitos.` : '');
+    }
+
+    function validarCampo(el, corregir) {
+        if (el.matches('input[list="listaTrabajadores"]')) validarTrabajador(el, corregir);
+        else if (el.matches('.tdd-lote, .pm-ref')) limpiarCodigo(el);
+    }
+    function validarTodo() {
+        document.querySelectorAll('input[list="listaTrabajadores"], .tdd-lote, .pm-ref').forEach(el => validarCampo(el, true));
+    }
+
+    // Mientras se escribe: marcar el error (sin corregir para no interrumpir); al salir del campo: corregir el nombre
+    document.getElementById('mainForm').addEventListener('input', e => validarCampo(e.target, false), true);
+    document.getElementById('mainForm').addEventListener('change', e => { validarCampo(e.target, true); guardarBorrador(); }, true);
+    validarTodo();
+
+    // Antes de enviar: el botón dispara la validación del navegador, que señala el primer campo con error
+    document.querySelector('.btn-submit').addEventListener('click', validarTodo);
+
+    // ==========================================
+    // CONTROL DE ASISTENCIA
+    // Cada local lleva una asistencia por turno (mañana y tarde) cada día. La ficha la exige,
+    // salvo que ese turno ya la tenga registrada en la hoja (otra ficha del mismo turno la envió).
+    // ==========================================
+    const URL_HOJA = "https://script.google.com/macros/s/AKfycbxy1eQSl0k8QRHOQj3Ee4gGYJDOQdTmtSfDId-lKh97nGSFCdorH8HTSlhvK6vENRwO/exec";
+    const TRABAJADORES_ASIS = TRABAJADORES.filter(n => !/^Gastos\b/i.test(n));   // solo personas, no cuentas de gastos
+    var asistencia = window.asisBorrador || [];   // [{ trabajador, entrada, salida }] que lleva esta ficha (se recupera del borrador)
+    let asisRegistrada = null;    // lo que dice la hoja: { clave, lista, trabajadores }
+    const datosAsis = () => ({ tienda: document.getElementById('tienda').value, fecha: document.getElementById('fecha').value,
+                               turno: document.getElementById('turno').value, cajero: document.getElementById('cajero').value });
+    const claveAsis = () => { const d = datosAsis(); return [d.tienda, d.fecha, d.turno].join('|'); };
+    const yaRegistrada = () => !!(asisRegistrada && asisRegistrada.clave === claveAsis() && asisRegistrada.lista);
+    const asistenciaCompleta = () => asistencia.length > 0 || yaRegistrada();
+    const escAsis = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+    function pintarEstadoAsis() {
+        const d = datosAsis(), tarjeta = document.getElementById('asisTarjeta');
+        let txt, ok = true;
+        if (asistencia.length) txt = `Lista · ${asistencia.length} trabajador(es)`;
+        else if (yaRegistrada()) txt = `Ya registrada para el turno ${d.turno.toLowerCase()}`;
+        else { ok = false; txt = d.turno ? 'Pendiente (obligatoria)' : 'Pendiente · elija el turno'; }
+        document.getElementById('asisEstado').textContent = txt;
+        tarjeta.classList.toggle('ok', ok);
+        tarjeta.classList.remove('falta');
+    }
+
+    // Pregunta a la hoja si ese local ya tiene la asistencia del turno ese día
+    async function consultarAsistencia() {
+        const d = datosAsis();
+        if (!d.tienda || !d.fecha || !d.turno) return null;
+        const clave = claveAsis();
+        const resp = await fetch(URL_HOJA, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ consultaFicha: 'asistencia', tienda: d.tienda, fecha: d.fecha, turno: d.turno }) });
+        const r = JSON.parse(await resp.text());
+        if (!r || r.resultado !== 'exito') throw new Error((r && (r.detalle || r.error)) || 'La hoja no respondió');
+        asisRegistrada = { clave, lista: !!r.lista, trabajadores: r.trabajadores || [] };
+        pintarEstadoAsis();
+        return asisRegistrada;
+    }
+    // Al elegir el turno o el local: se revisa en segundo plano
+    function revisarAsistenciaFondo() { pintarEstadoAsis(); consultarAsistencia().catch(() => {}); }
+    document.getElementById('turno').addEventListener('change', revisarAsistenciaFondo);
+    document.getElementById('cajero').addEventListener('change', () => { if (!document.getElementById('asisVentana').classList.contains('hidden')) document.getElementById('asisResp').textContent = datosAsis().cajero; });
+
+    function abrirAsistencia() {
+        const d = datosAsis();
+        document.getElementById('asisLocal').textContent = d.tienda || '—';
+        document.getElementById('asisFecha').textContent = d.fecha ? d.fecha.split('-').reverse().join('/') : '—';
+        document.getElementById('asisTurno').textContent = d.turno || '(elija el turno)';
+        document.getElementById('asisResp').textContent = d.cajero || '(escriba el cajero)';
+        const aviso = document.getElementById('asisAviso');
+        aviso.className = 'asis-msj'; aviso.textContent = '';
+        if (!d.turno) { aviso.className = 'asis-msj error'; aviso.textContent = 'Primero elija el turno de la ficha (Mañana o Tarde).'; }
+        else if (yaRegistrada()) {
+            const r = asisRegistrada.trabajadores;
+            aviso.className = 'asis-msj ok';
+            aviso.textContent = `Este turno ya tiene asistencia registrada (${r.length} trabajador(es), por ${r[0] ? r[0].responsable : '—'}). Puede dejarla en blanco con "Asistencia ya lista".`;
+        }
+        document.getElementById('asisMsj').textContent = '';
+        const cont = document.getElementById('asisFilas');
+        cont.innerHTML = '';
+        (asistencia.length ? asistencia : [{}]).forEach(a => agregarAsistencia(a));
+        document.getElementById('asisVentana').classList.remove('hidden');
+    }
+    function cerrarAsistencia() { document.getElementById('asisVentana').classList.add('hidden'); }
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarAsistencia(); });
+
+    function agregarAsistencia(a) {
+        a = a || {};
+        const fila = document.createElement('div');
+        fila.className = 'asis-fila';
+        fila.innerHTML = `
+            <div class="asis-trab"><label>Trabajador</label>
+                <select class="asis-t"><option value="">Seleccionar trabajador...</option>${TRABAJADORES_ASIS.map(n =>
+                    `<option ${n === a.trabajador ? 'selected' : ''}>${escAsis(n)}</option>`).join('')}</select></div>
+            <div><label>Entrada</label>${campoHora('asis-e', a.entrada)}</div>
+            <div><label>Salida</label>${campoHora('asis-s', a.salida)}</div>
+            <button type="button" class="btn-remove" title="Quitar" onclick="this.parentElement.remove()">X</button>`;
+        document.getElementById('asisFilas').appendChild(fila);
+    }
+
+    function guardarAsistencia() {
+        const msj = document.getElementById('asisMsj');
+        msj.className = 'asis-msj error';
+        if (!datosAsis().turno) { msj.textContent = 'Primero elija el turno de la ficha.'; return; }
+        const filas = Array.from(document.querySelectorAll('#asisFilas .asis-fila')).map(f => ({
+            trabajador: f.querySelector('.asis-t').value, entrada: f.querySelector('.asis-e').value, salida: f.querySelector('.asis-s').value
+        })).filter(a => a.trabajador || a.entrada || a.salida);
+        if (!filas.length) { msj.textContent = 'Agregue al menos un trabajador, o use "Asistencia ya lista" si el turno ya la tiene.'; return; }
+        const incompleta = filas.find(a => !a.trabajador || !a.entrada || !a.salida);
+        if (incompleta) { msj.textContent = `Falta ${!incompleta.trabajador ? 'el trabajador' : !incompleta.entrada ? 'la hora de entrada' : 'la hora de salida'} en una fila. La entrada y la salida son obligatorias.`; return; }
+        const iguales = filas.find(a => a.entrada === a.salida);
+        if (iguales) { msj.textContent = `La entrada y la salida de ${iguales.trabajador} son iguales.`; return; }
+        const nombres = filas.map(a => a.trabajador);
+        const repetido = nombres.find((n, i) => nombres.indexOf(n) !== i);
+        if (repetido) { msj.textContent = `${repetido} aparece dos veces.`; return; }
+        asistencia = filas;
+        guardarBorrador();
+        pintarEstadoAsis();
+        cerrarAsistencia();
+    }
+
+    // "Asistencia ya lista": confirma en la hoja que el turno ya la tiene; así esta ficha puede dejarla en blanco
+    async function asistenciaYaLista() {
+        const msj = document.getElementById('asisMsj'), btn = document.getElementById('asisBtnLista');
+        if (!datosAsis().turno) { msj.className = 'asis-msj error'; msj.textContent = 'Primero elija el turno de la ficha.'; return; }
+        btn.disabled = true; btn.textContent = 'Revisando en la hoja...';
+        try {
+            const r = await consultarAsistencia();
+            if (r && r.lista) {
+                if (asistencia.length && !confirm('Este turno ya tiene asistencia registrada. ¿Quitar la que llenó en esta ficha para no repetirla?')) return;
+                asistencia = [];
+                guardarBorrador();
+                pintarEstadoAsis();
+                cerrarAsistencia();
+            } else {
+                msj.className = 'asis-msj error';
+                msj.textContent = `El turno ${datosAsis().turno.toLowerCase()} de hoy todavía NO tiene asistencia registrada en la hoja: debe llenarla.`;
+            }
+        } catch (e) {
+            msj.className = 'asis-msj error';
+            msj.textContent = 'No se pudo revisar en la hoja (' + e.message + '). Revise la conexión o llene la asistencia.';
+        } finally { btn.disabled = false; btn.textContent = 'Asistencia ya lista'; }
+    }
+    pintarEstadoAsis();
+
+    // ==========================================
+    // PDF DE LA FICHA (texto real, se lee nítido en el teléfono y por Telegram)
+    // ==========================================
+    function generarPDF(p, nro) {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+        const M = 14;                                   // margen
+        const ancho = doc.internal.pageSize.getWidth();
+        const bs = v => 'Bs ' + formatearMoneda(v || 0);
+        const usd = v => '$ ' + formatearMoneda(v || 0);
+        const [a, m, d] = p.fecha.split('-');
+        const fechaTxt = `${d}/${m}/${a}`;
+
+        // Encabezado
+        doc.setFillColor(15, 23, 42);
+        doc.rect(0, 0, ancho, 30, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(18);
+        doc.text(`Ficha de cuadre Nº ${nro}`, M, 13);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(11);
+        doc.text(`${p.tienda}  ·  Turno ${p.turno}  ·  ${fechaTxt}`, M, 21);
+        doc.text(`Cajero: ${p.cajero}   ·   Tasa BCV: ${formatearMoneda(p.tasaBCV)}`, M, 27);
+        doc.setTextColor(0, 0, 0);
+
+        let y = 36;
+        const estilo = {
+            theme: 'grid',
+            styles: { fontSize: 10, cellPadding: 2, lineColor: [203, 213, 225] },
+            headStyles: { fillColor: [51, 65, 85], textColor: 255, fontStyle: 'bold' },
+            footStyles: { fillColor: [241, 245, 249], textColor: 20, fontStyle: 'bold' },
+            margin: { left: M, right: M }
+        };
+        function seccion(titulo, head, body, foot, alinearDerecha) {
+            if (y > 260) { doc.addPage(); y = 16; }
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(29, 78, 216);
+            doc.text(titulo, M, y);
+            doc.setTextColor(0, 0, 0);
+            const derecha = alinearDerecha || [];
+            doc.autoTable(Object.assign({}, estilo, {
+                startY: y + 2, head: head ? [head] : undefined, body, foot: foot ? [foot] : undefined,
+                // Montos alineados a la derecha en todas las filas (también encabezado y total)
+                didParseCell: data => { if (derecha.includes(data.column.index)) data.cell.styles.halign = 'right'; }
+            }));
+            y = doc.lastAutoTable.finalY + 8;
+        }
+        const conDatos = (filas, campoMonto) => filas.filter(f => (f[campoMonto] || 0) > 0);
+
+        // Resumen
+        seccion('Resumen', ['Concepto', 'Monto'], [
+            ['Ventas efectivo Bs', bs(p.ventasBs)],
+            ['Total TDD', bs(p.totalTDD)],
+            ['Total Biopago', bs(p.totalBiopago)],
+            ['Total Pago móvil', bs(p.totalPagoMovil)],
+            ['Total Crédito', `${bs(p.totalCreditoBs)}   (${usd(p.totalCreditoDiv)})`],
+            ['Ventas divisas', usd(p.ventasDiv)]
+        ], null, [1]);
+
+        // 1. Efectivo Bs
+        seccion('1. Efectivo bolívares', ['Recibí para caja', 'Dejé para caja', 'Envié a oficina'],
+            [[bs(p.bsRecibi), bs(p.bsDeje), bs(p.bsEnvie)]], null, [0, 1, 2]);
+        const gBs = conDatos(p.gastosBs, 'monto');
+        if (gBs.length) seccion('Gastos en Bs', ['Tipo', 'Trabajador', 'Descripción', 'Monto'],
+            gBs.map(g => [g.tipo, g.trabajador, g.descripcion, bs(g.monto)]),
+            ['', '', 'Total gastos', bs(gBs.reduce((s, g) => s + g.monto, 0))], [3]);
+
+        // 2. TDD
+        const lotes = conDatos(p.lotesTDD, 'monto');
+        seccion('2. TDD (punto de venta)', ['Lote', 'Banco', 'Titular', 'Hora', 'Monto'],
+            lotes.length ? lotes.map(l => [l.lote, l.banco, l.titular, l.hora, bs(l.monto)]) : [['—', '', '', '', bs(0)]],
+            ['', '', '', 'Subtotal lotes', bs(p.tddSubtotal)], [4]);
+        seccion('Ajustes TDD', ['Concepto', 'Monto'], [
+            ['Pagos externos' + (p.tddComentarioExterno ? ` (${p.tddComentarioExterno})` : ''), bs(p.tddPagosExternos)],
+            ['Total TDD', bs(p.totalTDD)]
+        ], null, [1]);
+
+        // 3. Biopago
+        seccion('3. Biopago', ['Monto de la mañana', 'Monto total', 'Total biopago del turno'],
+            [[bs(p.bioManana), bs(p.bioTarde), bs(p.totalBiopago)]], null, [0, 1, 2]);
+
+        // 4. Crédito
+        const creds = conDatos(p.creditos, 'montoBs');
+        seccion('4. Crédito', ['A nombre de', 'Descripción', 'Monto Bs', 'Monto $'],
+            creds.length ? creds.map(c => [c.nombre, c.descripcion, bs(c.montoBs), usd(c.montoDiv)]) : [['—', '', bs(0), usd(0)]],
+            ['', 'Total', bs(p.totalCreditoBs), usd(p.totalCreditoDiv)], [2, 3]);
+
+        // 5. Divisas
+        seccion('5. Divisas ($)', ['Recibí para caja', 'Dejé para caja', 'Envié a oficina'],
+            [[usd(p.divRecibi), usd(p.divDeje), usd(p.divEnvie)]], null, [0, 1, 2]);
+        const gDiv = conDatos(p.gastosDiv, 'monto');
+        if (gDiv.length) seccion('Gastos en divisas', ['Tipo', 'Responsable', 'Descripción', 'Monto'],
+            gDiv.map(g => [g.tipo, g.responsable, g.descripcion, usd(g.monto)]),
+            ['', '', 'Total gastos', usd(gDiv.reduce((s, g) => s + g.monto, 0))], [3]);
+        seccion('Ventas del día en divisas', null, [['Ventas del día ($)', usd(p.ventasDiv)]], null, [1]);
+
+        // 6. Pago móvil
+        const pms = conDatos(p.pagosMoviles, 'monto');
+        seccion('6. Pago móvil', ['Referencia', 'Banco', 'Titular', 'Monto'],
+            pms.length ? pms.map(x => [x.referencia, x.banco, x.titular, bs(x.monto)]) : [['—', '', '', bs(0)]],
+            ['', '', 'Total', bs(p.totalPagoMovil)], [3]);
+
+        // 7. Control de asistencia
+        const horas = (e, s) => { const [a, b] = e.split(':').map(Number), [c, d] = s.split(':').map(Number); let m = c * 60 + d - (a * 60 + b); if (m < 0) m += 1440; return (m / 60).toFixed(2).replace('.', ','); };
+        if ((p.asistencia || []).length) seccion('7. Control de asistencia (turno ' + p.turno + ')', ['Trabajador', 'Entrada', 'Salida', 'Horas'],
+            p.asistencia.map(a => [a.trabajador, a.entrada, a.salida, horas(a.entrada, a.salida)]), null, [3]);
+        else seccion('7. Control de asistencia', null, [['Ya registrado por otra ficha del turno ' + p.turno + ' de este día.']], null, []);
+
+        // Pie de página en todas las hojas
+        const paginas = doc.getNumberOfPages();
+        for (let i = 1; i <= paginas; i++) {
+            doc.setPage(i);
+            doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(120);
+            doc.text(`Ficha Nº ${nro} · ${p.tienda} · ${fechaTxt} · generada ${new Date().toLocaleString('es-VE')}`, M, 290);
+            doc.text(`Página ${i} de ${paginas}`, ancho - M, 290, { align: 'right' });
+        }
+
+        doc.save(`Ficha_${nro}_${p.tienda}_${p.fecha}_${p.turno}.pdf`);
+    }
+
+    // Evento de envío y conexión con Apps Script
+    document.getElementById('mainForm').addEventListener('submit', async function(e) {
+        e.preventDefault(); 
+        
+        // La tasa no se puede escribir a mano: sin tasa automática no se envía
+        if (!(parseFloat(document.getElementById('tasaBCV').value) > 0)) {
+            alert("No hay tasa BCV. Revise la conexión a internet y presione \"Reintentar\" junto a la tasa.");
+            return;
+        }
+
+        // Control de asistencia obligatorio, salvo que el turno ya lo tenga registrado en la hoja
+        if (!asistenciaCompleta()) {
+            try { await consultarAsistencia(); } catch (errAsis) {}
+            if (!asistenciaCompleta()) {
+                document.getElementById('asisTarjeta').classList.add('falta');
+                alert("Falta el control de asistencia del turno " + (document.getElementById('turno').value || "") +
+                      ".\n\nRegistre la hora de entrada y salida de los trabajadores, o presione \"Asistencia ya lista\" si este turno ya la tiene.");
+                abrirAsistencia();
+                return;
+            }
+        }
+
+        const confirmacion = confirm("¿Estás seguro de que la información está correcta y deseas finalizar la ficha?");
+        if (!confirmacion) return;
+
+        const clave = prompt("Ingrese la clave para continuar:");
+        if (clave !== "0000") {
+            alert("Clave incorrecta. Operación cancelada.");
+            return;
+        }
+
+        const botonSubmit = document.querySelector('.btn-submit');
+        botonSubmit.textContent = "Enviando...";
+        botonSubmit.disabled = true;
+
+        try {
+            const payload = {
+                fecha: document.getElementById('fecha').value,
+                tasaBCV: limpiarParaSheets(document.getElementById('tasaBCV').value),
+                tienda: document.getElementById('tienda').value,
+                turno: document.getElementById('turno').value,
+                cajero: document.getElementById('cajero').value,
+                
+                bsRecibi: limpiarParaSheets(document.getElementById('bsRecibi').value),
+                bsDeje: limpiarParaSheets(document.getElementById('bsDeje').value),
+                bsEnvie: limpiarParaSheets(document.getElementById('bsEnvie').value),
+                ventasBs: limpiarParaSheets(document.getElementById('totalVentasBs').textContent),
+                gastosBs: Array.from(document.querySelectorAll('#gastosBsContainer .dynamic-row')).map(row => ({
+                    tipo: row.querySelector('.gbs-tipo').value,
+                    trabajador: row.querySelector('.gbs-trab').value,
+                    descripcion: row.querySelector('.gbs-desc').value,   // -> Columna K de BD NOMINA
+                    monto: limpiarParaSheets(row.querySelector('.gbs-monto').value)
+                })),
+
+                tddSubtotal: limpiarParaSheets(document.getElementById('tddSubtotal').value),
+                tddPagosExternos: limpiarParaSheets(document.getElementById('tddPagosExternos').value),
+                tddComentarioExterno: document.getElementById('tddComentarioExterno').value,
+                totalTDD: limpiarParaSheets(document.getElementById('totalTDD').textContent),
+                lotesTDD: Array.from(document.querySelectorAll('#tddContainer .dynamic-row')).map(row => ({
+                    lote: row.querySelector('.tdd-lote').value,
+                    banco: row.querySelector('.tdd-banco').value,
+                    titular: row.querySelector('.tdd-titular').value,
+                    hora: row.querySelector('.tdd-hora').value,
+                    monto: limpiarParaSheets(row.querySelector('.tdd-monto').value)
+                })),
+
+                bioManana: limpiarParaSheets(document.getElementById('bioManana').value),
+                bioTarde: limpiarParaSheets(document.getElementById('bioTarde').value),
+                totalBiopago: limpiarParaSheets(document.getElementById('totalBiopago').textContent),
+
+                totalCreditoBs: limpiarParaSheets(document.getElementById('totalCreditoBs').textContent),
+                totalCreditoDiv: limpiarParaSheets(document.getElementById('totalCreditoDiv').textContent),
+                creditos: Array.from(document.querySelectorAll('#creditoContainer .dynamic-row')).map(row => ({
+                    nombre: row.querySelector('.cred-nombre').value,
+                    descripcion: row.querySelector('.cred-desc').value,
+                    montoBs: limpiarParaSheets(row.querySelector('.cred-bs').value),
+                    montoDiv: limpiarParaSheets(row.querySelector('.cred-div').value)
+                })),
+
+                divRecibi: limpiarParaSheets(document.getElementById('divRecibi').value),
+                divDeje: limpiarParaSheets(document.getElementById('divDeje').value),
+                divEnvie: limpiarParaSheets(document.getElementById('divEnvie').value),
+                ventasDiv: limpiarParaSheets(document.getElementById('totalVentasDiv').textContent),
+                gastosDiv: Array.from(document.querySelectorAll('#gastosDivContainer .dynamic-row')).map(row => ({
+                    tipo: row.querySelector('.gdiv-tipo').value,
+                    responsable: row.querySelector('.gdiv-resp').value,
+                    descripcion: row.querySelector('.gdiv-desc').value,
+                    monto: limpiarParaSheets(row.querySelector('.gdiv-monto').value)
+                })),
+
+                totalPagoMovil: limpiarParaSheets(document.getElementById('totalPagoMovil').textContent),
+                pagosMoviles: Array.from(document.querySelectorAll('#pagoMovilContainer .dynamic-row')).map(row => ({
+                    referencia: row.querySelector('.pm-ref').value,
+                    banco: row.querySelector('.pm-banco').value,
+                    titular: row.querySelector('.pm-titular').value,
+                    monto: limpiarParaSheets(row.querySelector('.pm-monto').value)
+                })),
+
+                // Control de asistencia del turno (vacío si ya estaba registrado por otra ficha)
+                asistencia: asistencia,
+                asistenciaYaRegistrada: !asistencia.length && yaRegistrada()
+            };
+
+            const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxy1eQSl0k8QRHOQj3Ee4gGYJDOQdTmtSfDId-lKh97nGSFCdorH8HTSlhvK6vENRwO/exec";
+
+            // Se lee la respuesta del script para confirmar que la hoja guardó la ficha
+            // (antes se enviaba "a ciegas" y siempre decía "éxito", aunque fallara)
+            let respuesta;
+            try {
+                const resp = await fetch(WEB_APP_URL, {
+                    method: "POST",
+                    headers: { "Content-Type": "text/plain;charset=utf-8" },
+                    body: JSON.stringify(payload)
+                });
+                respuesta = JSON.parse(await resp.text());
+            } catch (errRed) {
+                throw new Error("No hubo respuesta de la hoja (conexión o script). Revise la hoja antes de reenviar para no duplicar.");
+            }
+            if (!respuesta || respuesta.resultado !== "exito") {
+                const detalle = respuesta ? (respuesta.detalle || respuesta.error || JSON.stringify(respuesta)) : "sin detalle";
+                throw new Error("La hoja NO guardó la ficha: " + detalle);
+            }
+
+            // Limpiar borrador temporal solo cuando la hoja confirmó
+            localStorage.removeItem('caja_borrador');
+
+            // La hoja asignó el número de ficha (anterior + 1): se muestra y va en el PDF
+            const nro = respuesta.nroFicha;
+            document.getElementById('nroFicha').value = nro || '';
+
+            let avisoPdf = "";
+            try {
+                generarPDF(payload, nro);
+            } catch (errPdf) {
+                console.error(errPdf);
+                avisoPdf = "\n\nOJO: la ficha se guardó, pero no se pudo crear el PDF (" + errPdf.message + ").";
+            }
+
+            alert("Ficha Nº " + nro + " guardada en la hoja (fila " + respuesta.rowCuadre + ")." +
+                  (avisoPdf || "\nEl PDF se descargó en la PC."));
+            document.getElementById('mainForm').reset();
+            window.location.reload();
+        } catch (error) {
+            console.error(error);
+            alert("Error al enviar la ficha. Los datos siguen en pantalla.\n\n" + error.message);
+        } finally {
+            botonSubmit.textContent = "Finalizar Ficha y Preparar Envío";
+            botonSubmit.disabled = false;
+        }
+    });
+</script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});</script>
+</body>
+</html>
