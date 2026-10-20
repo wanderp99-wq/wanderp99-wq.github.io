@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "io.github.wanderp99_wq.dashboard",
+        "sha256_cert_fingerprints": ["19:EA:C8:8F:1B:FB:FA:51:8C:BF:DC:1F:C0:F6:6D:F9:DB:B4:A3:70:28:C7:CC:EA:7D:47:48:B4:1A:49:4C:AF"]
+      }
+    }]
