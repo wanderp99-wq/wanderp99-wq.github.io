@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="manifest" href="manifest.webmanifest">
-    <meta name="theme-color" content="#1e293b">
-    <link rel="apple-touch-icon" href="iconos/icon-192.png">
     <title>Cuadre de Caja Consolidado</title>
+    <!-- Tipografía estilo iOS: en iPhone/Mac usa San Francisco (la del sistema); en Windows/Android, Inter (la más parecida) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%22400%20380%201130%201175%22%3E%3Cpath%20fill%3D%22%23F2EEE8%22%20stroke%3D%22%239c958a%22%20stroke-width%3D%2228%22%20d%3D%22M423%20398%20H950%20C1230%20398%201400%20560%201450%20788%20L1115%20952%20C1110%20790%201075%20655%20870%20655%20H773%20V1193%20L423%201365%20Z%22%2F%3E%3Cpath%20fill%3D%22%2344AC00%22%20d%3D%22M423%201365%20L1508%20834%20V865%20L658%201533%20H423%20Z%22%2F%3E%3Cpath%20fill%3D%22%23FF3D00%22%20d%3D%22M820%201533%20L1465%201026%20C1460%201140%201448%201225%201420%201295%20C1360%201440%201250%201490%201160%201505%20C1090%201522%201020%201533%20950%201533%20Z%22%2F%3E%3C%2Fsvg%3E">
     <!-- Librerías para generar el PDF de la ficha (texto nítido, legible en el teléfono) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -68,8 +69,79 @@
         }
         .btn-theme:hover { border-color: var(--primary); }
 
+        /* ===== Interruptor y animaciones estilo iOS: el mismo bloque en el Dashboard y en la ficha =====
+           Interruptor: <label class="interruptor"><input type="checkbox"><span class="sw-pista"></span> Texto</label>
+           Al tocarlo, la perilla (una píldora blanca) se vuelve de cristal: crece, se ve la pista a través, se desliza y vuelve a ser blanca. */
+        label.interruptor { display: inline-flex; align-items: center; gap: .5rem; cursor: pointer; user-select: none; position: relative; -webkit-tap-highlight-color: transparent; }
+        label.interruptor > input[type=checkbox] { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; pointer-events: none; }
+        .sw-pista { --sw-viaje: .88rem; position: relative; width: 2.75rem; height: 1.3rem; border-radius: 999px; background: var(--sw-apagado, #d1d5db); transition: background-color .35s ease; flex: none; }
+        .sw-pista::after { content: ''; position: absolute; top: .12rem; left: .12rem; width: 1.63rem; height: 1.06rem; border-radius: 999px; background-color: #fff;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, .22), 0 0 0 .5px rgba(0, 0, 0, .05);
+            transition: translate .45s cubic-bezier(.3, 1.3, .5, 1), scale .22s cubic-bezier(.3, 1.4, .5, 1), background-color .22s ease, box-shadow .22s ease; }
+        label.interruptor > input:checked ~ .sw-pista { background-color: var(--sw-encendido, #34c759); }
+        label.interruptor > input:checked ~ .sw-pista::after { translate: var(--sw-viaje) 0; }
+        /* Cristal: mientras se mantiene presionado y mientras se desliza */
+        label.interruptor:active > .sw-pista::after, label.interruptor.sw-moviendo > .sw-pista::after {
+            scale: 1.42 1.6; background-color: rgba(255, 255, 255, .2); -webkit-backdrop-filter: blur(1.5px) saturate(1.8); backdrop-filter: blur(1.5px) saturate(1.8);
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .95), inset 0 2px 3px rgba(255, 255, 255, .75), inset 0 -2px 5px rgba(0, 0, 0, .14), 0 3px 10px rgba(0, 0, 0, .2); }
+        /* Tras repintar una ventana: la perilla del interruptor que se tocó arranca desde donde estaba */
+        label.interruptor.sw-desde > .sw-pista, label.interruptor.sw-desde > .sw-pista::after { transition: none; }
+        label.interruptor.sw-desde > input:checked ~ .sw-pista { background-color: var(--sw-apagado, #d1d5db); }
+        label.interruptor.sw-desde > input:not(:checked) ~ .sw-pista { background-color: var(--sw-encendido, #34c759); }
+        label.interruptor.sw-desde > input:checked ~ .sw-pista::after { translate: 0 0; }
+        label.interruptor.sw-desde > input:not(:checked) ~ .sw-pista::after { translate: var(--sw-viaje) 0; }
+        label.interruptor > input:focus-visible ~ .sw-pista { outline: 2px solid var(--primary); outline-offset: 2px; }
+        label.interruptor > input:disabled ~ .sw-pista { opacity: .45; } label.interruptor:has(input:disabled) { cursor: not-allowed; }
+        :root:not([data-theme="light"]) .sw-pista { --sw-apagado: #48484d; }
+        /* Ventanas: se abren creciendo desde donde se tocó, con el fondo difuminado */
+        .req-dlg-fondo, .asis-fondo { -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
+        .dlg-abriendo { animation: anim-fondo .38s ease both; }
+        .dlg-abriendo > * { transform-origin: var(--ox, 50%) var(--oy, 50%); animation: anim-dlg .46s cubic-bezier(.2, .95, .3, 1.04) both; }
+        @keyframes anim-fondo { from { background-color: rgba(0, 0, 0, 0); -webkit-backdrop-filter: blur(0); backdrop-filter: blur(0); } }
+        @keyframes anim-dlg { from { opacity: 0; transform: scale(.2); border-radius: 32px; } 45% { opacity: 1; } }
+        /* Pantallas y submenús: entran deslizándose desde la derecha (adelante) o desde la izquierda (atrás) */
+        body { overflow-x: clip; }
+        .anim-entra { animation: anim-entra .42s cubic-bezier(.32, .72, 0, 1) both; }
+        .anim-vuelve { animation: anim-vuelve .42s cubic-bezier(.32, .72, 0, 1) both; }
+        @keyframes anim-entra { from { transform: translateX(100%); box-shadow: -14px 0 30px rgba(0, 0, 0, .12); } }
+        @keyframes anim-vuelve { from { transform: translateX(-30%); opacity: .4; } }
+        @media (prefers-reduced-motion: reduce) { .sw-pista, .sw-pista::after { transition: none; } .dlg-abriendo, .dlg-abriendo > *, .anim-entra, .anim-vuelve { animation: none; } }
+        /* ===== Pendientes sin conexión (el mismo bloque en el Dashboard y en la ficha) ===== */
+        .cola-aviso { position: fixed; left: 12px; bottom: 12px; z-index: 900; display: inline-flex; align-items: center; gap: .45rem; padding: .5rem .85rem; border-radius: 999px;
+            border: 1px solid var(--border); background: var(--card-bg); color: var(--text-main); font: inherit; font-size: .85rem; font-weight: 600; cursor: pointer; box-shadow: 0 6px 18px rgba(0, 0, 0, .18); }
+        .cola-aviso.error { border-color: #ef4444; color: #ef4444; }
+        .cola-aviso .cola-punto { width: .55rem; height: .55rem; border-radius: 50%; background: #f59e0b; flex: none; }
+        .cola-aviso.enviando .cola-punto { background: #3b82f6; animation: cola-latido 1s ease-in-out infinite; } .cola-aviso.error .cola-punto { background: #ef4444; }
+        @keyframes cola-latido { 50% { opacity: .3; transform: scale(.7); } }
+        .cola-fondo { position: fixed; inset: 0; z-index: 1001; background: rgba(0, 0, 0, .5); display: flex; align-items: center; justify-content: center; padding: 1rem; }
+        .cola-caja { background: var(--card-bg); color: var(--text-main); border: 1px solid var(--border); border-radius: 14px; width: min(520px, 100%); max-height: calc(100dvh - 2rem); overflow-y: auto; padding: 1.1rem 1.25rem; box-shadow: 0 10px 30px rgba(0, 0, 0, .3); }
+        .cola-caja h3 { margin: 0 0 .25rem; font-size: 1.05rem; border: 0; padding: 0; } .cola-caja > p { margin: 0 0 .8rem; color: var(--text-muted); font-size: .85rem; }
+        .cola-item { border: 1px solid var(--border); border-radius: 10px; padding: .6rem .75rem; margin-bottom: .5rem; }
+        .cola-item b { display: block; font-size: .9rem; } .cola-item small { display: block; color: var(--text-muted); font-size: .78rem; margin-top: .1rem; }
+        .cola-item .cola-err { color: #ef4444; } .cola-item .cola-acc { display: flex; gap: .4rem; flex-wrap: wrap; margin-top: .45rem; }
+        .cola-item button, .cola-pie button { font: inherit; font-size: .8rem; padding: .3rem .7rem; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--text-main); cursor: pointer; }
+        .cola-pie { display: flex; justify-content: flex-end; gap: .5rem; margin-top: .6rem; }
+        .cola-toast { position: fixed; left: 50%; bottom: 64px; transform: translateX(-50%); z-index: 1002; max-width: min(92vw, 520px); padding: .7rem 1rem; border-radius: 12px;
+            background: #111827; color: #fff; font-size: .88rem; box-shadow: 0 8px 24px rgba(0, 0, 0, .3); animation: cola-toast .3s cubic-bezier(.2, .9, .3, 1.1) both; }
+        @keyframes cola-toast { from { opacity: 0; transform: translate(-50%, 12px); } }
+        label.interruptor.btn-theme { padding: .5rem .85rem; border-radius: 8px; font-size: .95rem; font-weight: 500; }
+        .header-acciones { display: flex; flex-wrap: wrap; gap: .5rem; justify-content: flex-end; }
+        /* Interruptor Ficha | Asistencia: el texto del lado activo se resalta */
+        .modo-vista .lado { color: var(--text-muted); } .modo-vista input:not(:checked) ~ .lado-ficha, .modo-vista input:checked ~ .lado-asis { color: var(--text-main); font-weight: 700; }
+        .modo-vista .sw-pista { --sw-encendido: var(--primary); }   /* elige entre dos pantallas: azul, no verde de sí/no */
+        /* Turno como botones (el select queda oculto pero sigue siendo el campo del formulario) */
+        select.turno-oculto { position: absolute; opacity: 0; width: 1px !important; height: 1px !important; min-width: 0 !important; padding: 0 !important; border: 0 !important; margin: 0 !important; overflow: hidden; pointer-events: none; }
+        .form-group:has(> .turno-oculto) { position: relative; }
+        /* Mismo alto que los demás campos (input: borde 1px + 0.6rem arriba y abajo + una línea de texto del mismo tamaño):
+           el alto lo fija la regla común de los campos; los botones llenan el recuadro. Mismo tamaño de letra y esquinas que los campos. */
+        .seg-turno { display: grid; grid-template-columns: 1fr 1fr; gap: .15rem; padding: .15rem; border: 1px solid var(--border); border-radius: 4px; background: var(--input-bg); font-size: 0.95rem; box-sizing: border-box; width: 100%; }
+        .seg-turno button { padding: 0 .5rem; margin: 0; min-height: 0; height: 100%; border: 0; border-radius: 3px; background: transparent; color: var(--text-main); font-family: inherit; font-size: inherit; line-height: 1.25; font-weight: 600; cursor: pointer; }
+        .seg-turno button:hover { background: var(--list-bg); } .seg-turno button.activo { background: var(--primary); color: #fff; }
+        .seg-turno button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Inter', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility;
             background-color: var(--bg-color);
             color: var(--text-main);
             margin: 0;
@@ -77,6 +149,7 @@
             display: flex;
             justify-content: center;
         }
+        button, input, select, textarea { font-family: inherit; }   /* los controles usan la misma letra que el resto */
 
         .container {
             width: 100%;
@@ -104,6 +177,8 @@
             background: var(--input-bg);
             color: var(--input-text);
         }
+        /* Todos los campos de una línea con el mismo alto (también fecha y el selector de turno): borde + 0.6rem arriba y abajo + una línea de texto */
+        input:not([type=checkbox]):not([type=radio]):not([type=file]), select, .seg-turno { box-sizing: border-box; line-height: 1.25; height: calc(1.25em + 1.2rem + 2px); }
         input:focus, select:focus { outline: none; border-color: var(--primary); }
         input[readonly] { background: var(--readonly-bg); color: var(--text-muted); cursor: not-allowed; font-weight: bold; }
 
@@ -158,7 +233,8 @@
             .header-bar { gap: .5rem; }
             .header-bar h2, h2 { font-size: 1.2rem; }
             h3 { margin-top: 1.4rem; font-size: 1rem; }
-            input, select, textarea { font-size: 16px; }          /* iOS no hace zoom con 16px */
+            input, select, textarea, .seg-turno { font-size: 16px; }          /* iOS no hace zoom con 16px */
+            .seg-turno button { min-height: 0; }
             button { min-height: 40px; }
             .grid-2, .grid-3 { grid-template-columns: 1fr 1fr; gap: .6rem; }
             .form-group { margin-bottom: .75rem; min-width: 0; }
@@ -236,6 +312,37 @@
         .asis-acciones { display: flex; gap: .5rem; flex-wrap: wrap; justify-content: flex-end; margin-top: 1rem; }
         .asis-acciones .btn-lista { margin-right: auto; background: transparent; color: var(--primary); border: 1px solid var(--primary); }
         .asis-msj { font-size: .85rem; margin-top: .5rem; min-height: 1em; }
+        .mf-tarjeta { margin-top: 1.25rem; display: flex; align-items: center; gap: .85rem; flex-wrap: wrap; background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: .9rem 1rem; }
+        .mf-icono { color: var(--primary) !important; background: color-mix(in srgb, var(--primary) 14%, transparent) !important; }
+        .mf-texto { flex: 1 1 220px; display: grid; gap: .15rem; } .mf-texto span { font-size: .85rem; color: var(--text-muted); }
+        .mf-abrir { white-space: nowrap; }
+        #mfSeccion { display: grid; gap: 1rem; }
+        .mf-caja { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 1rem 1.1rem; max-width: 460px; width: 100%; margin: 0 auto; }
+        .mf-caja h3 { margin: 0 0 .4rem; border: none; padding: 0; } .mf-caja input { width: 100%; box-sizing: border-box; }
+        .mf-cab { display: flex; justify-content: space-between; align-items: center; background: var(--primary); color: #fff; border-radius: 12px; padding: .9rem 1.1rem; }
+        .mf-local { font-size: 1.35rem; font-weight: 800; } .mf-fecha { opacity: .9; text-transform: capitalize; font-size: .9rem; } .mf-reloj { font-size: 1.9rem; font-weight: 800; }
+        .mf-form { display: flex; gap: .6rem; } .mf-form input { flex: 1; font-size: 1.15rem; padding: .75rem; text-align: center; letter-spacing: .1em; }
+        .mf-video { border-radius: 12px; overflow: hidden; border: 1px solid var(--border); max-width: 420px; width: 100%; justify-self: center; }
+        .mf-resultado { min-height: 140px; border-radius: 12px; border: 2px solid var(--border); background: var(--card-bg); display: flex; align-items: center; justify-content: center; padding: 1rem; }
+        .mf-resultado.ok { border-color: var(--total-value); background: color-mix(in srgb, var(--total-value) 12%, var(--card-bg)); }
+        .mf-resultado.alerta { border-color: #d97706; background: color-mix(in srgb, #d97706 14%, var(--card-bg)); }
+        .mf-resultado.mal { border-color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, var(--card-bg)); flex-direction: column; text-align: center; }
+        .mf-espera { color: var(--text-muted); text-align: center; }
+        .mf-persona { display: flex; gap: 1rem; align-items: center; width: 100%; }
+        .mf-persona img, .mf-inicial { width: 84px; height: 104px; border-radius: 10px; object-fit: cover; flex: none; background: var(--list-bg); display: flex; align-items: center; justify-content: center; font-size: 2.2rem; font-weight: 800; color: var(--text-muted); }
+        .mf-nombre { font-size: 1.35rem; font-weight: 800; } .mf-titulo { font-size: 1.15rem; font-weight: 700; margin-top: .15rem; } .mf-msj { margin-top: .25rem; }
+        .mf-pasos { display: flex; gap: .6rem; justify-content: center; flex-wrap: wrap; } .mf-pasos:empty { display: none; }
+        .mf-pie { text-align: center; font-size: .9rem; } .mf-pie a { color: var(--primary); }
+        @media (max-width: 560px) { .mf-form { flex-direction: column; } .mf-reloj { font-size: 1.4rem; } }
+        .asis-carnet { display: grid; gap: .35rem; } .asis-carnet div { display: flex; justify-content: space-between; gap: .5rem; padding: .45rem .65rem; background: var(--list-bg); border: 1px solid var(--border); border-radius: 8px; } .asis-carnet span { color: var(--text-muted); white-space: nowrap; }
+        .asis-horario { font-size: .85rem; margin: .25rem 0 .75rem; padding: .45rem .65rem; border-radius: 8px; background: var(--list-bg); border: 1px solid var(--border); }
+        .asis-eval { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: .35rem; margin-top: -.15rem; }
+        .asis-eval:empty { display: none; }
+        .punt { font-size: .74rem; font-weight: 700; padding: .12rem .5rem; border-radius: 999px; }
+        .punt-mal { color: var(--danger); background: color-mix(in srgb, var(--danger) 13%, transparent); }
+        .punt-extra { color: var(--primary); background: color-mix(in srgb, var(--primary) 13%, transparent); }
+        .punt-ok { color: var(--total-value); background: color-mix(in srgb, var(--total-value) 13%, transparent); }
+        .punt-aviso { color: #b45309; background: color-mix(in srgb, #d97706 12%, transparent); }
         .asis-msj.error { color: var(--danger); } .asis-msj.ok { color: var(--total-value); }
         .btn-gris { background: var(--list-bg); color: var(--text-main); border: 1px solid var(--border); }
         @media (max-width: 640px) {
@@ -249,8 +356,192 @@
         .tasa-nota.error { color: var(--danger); }
         .btn-reintentar { margin-top: 0.4rem; align-self: flex-start; background: transparent; color: var(--primary); border: 1px solid var(--border); padding: 0.35rem 0.75rem; }
     </style>
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="theme-color" content="#1e293b">
+    <link rel="apple-touch-icon" href="iconos/icon-192.png">
 </head>
 <body>
+<script>
+    // ==========================================
+    // ANIMACIONES ESTILO iOS (el mismo bloque en el Dashboard y en la ficha). Funcionan solas con todo lo nuevo que se agregue:
+    //  - cualquier <label class="interruptor"> anima su perilla al cambiar (también si la ventana se repinta: ver ANIM.antes/despues)
+    //  - cualquier ventana .req-dlg-fondo / .asis-fondo que aparece crece desde donde se tocó
+    //  - cualquier elemento con data-pantalla que deja de estar oculto entra deslizándose (ANIM.atras = true para "volver")
+    // ==========================================
+    const ANIM = (() => {
+        const quieto = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+        let ultimoSw = null, puntero = null, atras = false, atrasT = 0;
+        const mover = lab => { clearTimeout(lab._swT); lab.classList.add('sw-moviendo'); lab._swT = setTimeout(() => lab.classList.remove('sw-moviendo'), 330); };
+        // En captura: corre antes del onchange del interruptor (que puede repintar la ventana)
+        document.addEventListener('change', e => {
+            const i = e.target, lab = i && i.type === 'checkbox' && i.closest ? i.closest('label.interruptor') : null;
+            if (!lab) return;
+            ultimoSw = { i, t: Date.now() };
+            if (!quieto()) mover(lab);
+        }, true);
+        document.addEventListener('pointerdown', e => { puntero = { x: e.clientX, y: e.clientY, t: Date.now() }; }, true);
+        const FONDOS = '.req-dlg-fondo, .asis-fondo, .cola-fondo';
+        function abrirVentana(f) {
+            const caja = f.firstElementChild;
+            if (!caja || quieto()) return;
+            const r = caja.getBoundingClientRect(), p = puntero && Date.now() - puntero.t < 1500 ? puntero : { x: innerWidth / 2, y: innerHeight / 2 };
+            caja.style.setProperty('--ox', Math.round(p.x - r.left) + 'px'); caja.style.setProperty('--oy', Math.round(p.y - r.top) + 'px');
+            f.classList.remove('dlg-abriendo'); void f.offsetWidth; f.classList.add('dlg-abriendo');
+            clearTimeout(f._aT); f._aT = setTimeout(() => f.classList.remove('dlg-abriendo'), 500);
+        }
+        function pantalla(el, haciaAtras) {
+            if (quieto()) return;
+            const vuelve = haciaAtras === undefined ? atras : haciaAtras;
+            el.classList.remove('anim-entra', 'anim-vuelve'); void el.offsetWidth; el.classList.add(vuelve ? 'anim-vuelve' : 'anim-entra');
+            clearTimeout(el._pT); el._pT = setTimeout(() => el.classList.remove('anim-entra', 'anim-vuelve'), 480);
+        }
+        const aparecio = r => /\bhidden\b/.test(r.oldValue || '') && !r.target.classList.contains('hidden');
+        new MutationObserver(rs => {
+            const ventanas = new Set(), pantallas = new Set();
+            rs.forEach(r => {
+                if (r.type === 'attributes') {
+                    if (!aparecio(r)) return;
+                    if (r.target.matches(FONDOS)) ventanas.add(r.target); else if (r.target.hasAttribute('data-pantalla')) pantallas.add(r.target);
+                } else r.addedNodes.forEach(n => { if (n.nodeType === 1 && n.matches(FONDOS) && !n.classList.contains('hidden')) ventanas.add(n); });
+            });
+            ventanas.forEach(abrirVentana); pantallas.forEach(el => pantalla(el));
+        }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'], attributeOldValue: true });
+        return {
+            pantalla,
+            // La próxima pantalla que aparezca entra desde la izquierda (volver)
+            set atras(v) { atras = !!v; clearTimeout(atrasT); if (atras) atrasT = setTimeout(() => { atras = false; }, 0); },
+            get atras() { return atras; },
+            // Antes de repintar un bloque: ¿se acaba de tocar un interruptor dentro de él? (su posición entre los interruptores del bloque)
+            antes(el) {
+                if (!ultimoSw || Date.now() - ultimoSw.t > 400 || !el.contains(ultimoSw.i)) return -1;
+                return [...el.querySelectorAll('label.interruptor > input[type=checkbox]')].indexOf(ultimoSw.i);
+            },
+            // Después de repintar: el interruptor nuevo arranca donde estaba el anterior y se desliza
+            despues(el, n) {
+                if (n < 0 || quieto()) return;
+                const i = el.querySelectorAll('label.interruptor > input[type=checkbox]')[n], lab = i && i.closest('label.interruptor');
+                if (!lab) return;
+                lab.classList.add('sw-desde'); void lab.offsetWidth; lab.classList.remove('sw-desde'); mover(lab);
+                ultimoSw = { i, t: ultimoSw.t };
+            }
+        };
+    })();
+</script>
+<script>
+    // ==========================================
+    // PENDIENTES SIN CONEXIÓN (el mismo bloque en el Dashboard y en la ficha)
+    // Lo que no se pudo enviar por falta de internet (fichas, marcas con carnet, cambios del panel) queda guardado en este equipo
+    // (IndexedDB) y se envía solo, en el mismo orden, cuando vuelve la conexión. Cada registro lleva su "idem": si Google ya lo
+    // había guardado (se perdió la respuesta), el script no lo repite. Lo que necesita la clave del panel no se guarda con la clave:
+    // se envía cuando esa misma persona tiene la sesión abierta.
+    // ==========================================
+    const COLA = (() => {
+        const BD = 'pv-cola', ALM = 'pendientes', memoria = new Map();   // memoria: si el navegador no deja usar IndexedDB (solo mientras la página esté abierta)
+        let bd = null, enviando = false, cfg = { url: '', clave: () => '', usuario: () => '', alEnviar: {}, abrir: {}, alTerminar: null };
+        const nuevoIdem = () => (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2);
+        const dos = n => String(n).padStart(2, '0');
+        const ahoraLocal = () => { const d = new Date(); return `${d.getFullYear()}-${dos(d.getMonth() + 1)}-${dos(d.getDate())} ${dos(d.getHours())}:${dos(d.getMinutes())}`; };
+        const esc = t => String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const pedir = r => new Promise((ok, mal) => { r.onsuccess = () => ok(r.result); r.onerror = () => mal(r.error); });
+        function abrir() {
+            if (!bd) bd = new Promise(ok => {
+                try { const r = indexedDB.open(BD, 1); r.onupgradeneeded = () => r.result.createObjectStore(ALM, { keyPath: 'idem' }); r.onsuccess = () => ok(r.result); r.onerror = () => ok(null); }
+                catch (e) { ok(null); }
+            });
+            return bd;
+        }
+        const almacen = async modo => { const db = await abrir(); return db ? db.transaction(ALM, modo).objectStore(ALM) : null; };
+        async function lista() { const s = await almacen('readonly'); const l = s ? await pedir(s.getAll()) : [...memoria.values()]; return l.sort((a, b) => a.creado - b.creado); }
+        async function poner(x) { const s = await almacen('readwrite'); if (s) await pedir(s.put(x)); else memoria.set(x.idem, x); }
+        async function quitar(idem) { const s = await almacen('readwrite'); if (s) await pedir(s.delete(idem)); else memoria.delete(idem); }
+        // ¿De verdad no hay internet? (con wifi pero sin salida, navigator.onLine dice que sí hay)
+        async function sinInternet() {
+            if (navigator.onLine === false) return true;
+            try { const c = new AbortController(), t = setTimeout(() => c.abort(), 4000); await fetch('https://www.gstatic.com/generate_204', { mode: 'no-cors', cache: 'no-store', signal: c.signal }); clearTimeout(t); return false; }
+            catch (e) { return true; }
+        }
+        // Guarda un registro para enviarlo después. cuerpo: lo mismo que se iba a mandar (sin la clave del panel)
+        async function agregar({ tipo, desc, cuerpo, conClave = false, idem, extra = {} }) {
+            const x = { idem: idem || nuevoIdem(), tipo, desc, conClave, usuario: conClave ? cfg.usuario() : '', creado: Date.now(), marcadoEn: ahoraLocal(), estado: 'pendiente', error: '', intentos: 0, extra };
+            x.cuerpo = Object.assign({}, cuerpo, { idem: x.idem, sinConexion: true, marcadoEn: x.marcadoEn });
+            delete x.cuerpo.clave;
+            await poner(x); pintar();
+            return x;
+        }
+        function enviar() {
+            if (navigator.locks && navigator.locks.request) return navigator.locks.request('pv-cola', { ifAvailable: true }, l => l ? enviarYa() : null);   // una sola pestaña a la vez
+            return enviarYa();
+        }
+        async function enviarYa() {
+            if (enviando || !cfg.url) return;
+            const pend = (await lista()).filter(x => x.estado === 'pendiente');
+            if (!pend.length) { pintar(); return; }
+            enviando = true; pintar();
+            const hechos = [];
+            try {
+                for (const x of pend) {
+                    if (x.conClave && (!cfg.clave() || x.usuario !== cfg.usuario())) continue;   // espera a que esa persona entre
+                    let r;
+                    try {
+                        const resp = await fetch(cfg.url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                                                           body: JSON.stringify(Object.assign({}, x.cuerpo, x.conClave ? { clave: cfg.clave() } : {})) });
+                        r = JSON.parse(await resp.text());
+                    } catch (e) {
+                        if (await sinInternet()) break;   // sigue sin internet: se intenta más tarde, en el mismo orden
+                        x.intentos++; if (x.intentos >= 5) { x.estado = 'error'; x.error = 'Google no respondió después de varios intentos.'; }
+                        await poner(x); break;
+                    }
+                    if (r && (r.ok === true || r.resultado === 'exito')) {
+                        await quitar(x.idem); hechos.push(x);
+                        try { if (cfg.alEnviar[x.tipo]) cfg.alEnviar[x.tipo](x, r); } catch (e) { console.error(e); }
+                    } else { x.estado = 'error'; x.error = (r && (r.error || r.detalle)) || 'El servidor no lo aceptó.'; await poner(x); }
+                }
+            } finally { enviando = false; pintar(); }
+            if (hechos.length && cfg.alTerminar) try { cfg.alTerminar(hechos); } catch (e) {}
+        }
+        // Botón flotante: cuántos faltan por enviar (y si alguno dio error)
+        async function pintar() {
+            const l = await lista(), errores = l.filter(x => x.estado === 'error').length;
+            let b = document.getElementById('colaAviso');
+            if (!l.length) { if (b) b.remove(); const f = document.getElementById('colaDlg'); if (f) f.remove(); return; }
+            if (!b) { b = document.createElement('button'); b.type = 'button'; b.id = 'colaAviso'; b.onclick = verLista; document.body.appendChild(b); }
+            b.className = 'cola-aviso' + (errores ? ' error' : enviando ? ' enviando' : '');
+            b.innerHTML = `<span class="cola-punto"></span>${errores ? `${errores} sin enviar (con error)` : enviando ? 'Enviando pendientes...' : `${l.length} pendiente${l.length > 1 ? 's' : ''} por enviar`}`;
+            if (document.getElementById('colaDlg')) verLista(true);
+        }
+        async function verLista(repintar) {
+            const l = await lista();
+            let f = document.getElementById('colaDlg');
+            if (!l.length) { if (f) f.remove(); return; }
+            if (!f) { if (repintar === true) return; f = document.createElement('div'); f.id = 'colaDlg'; f.className = 'cola-fondo'; f.onclick = e => { if (e.target === f) f.remove(); }; document.body.appendChild(f); }
+            const hora = x => new Date(x.creado).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: 'numeric', minute: '2-digit' });
+            f.innerHTML = `<div class="cola-caja" role="dialog" aria-label="Pendientes sin conexión"><h3>Pendientes por enviar</h3>
+                <p>Se guardaron en este equipo sin internet y se envían solos, en orden, cuando vuelve la conexión. No los vuelva a registrar.</p>
+                ${l.map(x => `<div class="cola-item"><b>${esc(x.desc)}</b><small>Guardado ${esc(hora(x))}${x.conClave && x.usuario ? ' · ' + esc(x.usuario) : ''}</small>
+                    ${x.estado === 'error' ? `<small class="cola-err">No se pudo enviar: ${esc(x.error)}</small>` : x.conClave && x.usuario !== cfg.usuario() ? `<small>Se enviará cuando ${esc(x.usuario)} entre al panel.</small>` : ''}
+                    <div class="cola-acc">${x.estado === 'error' ? `<button type="button" onclick="COLA.reintentar('${x.idem}')">Reintentar</button>` : ''}
+                        ${cfg.abrir[x.tipo] ? `<button type="button" onclick="COLA.abrirItem('${x.idem}')">Abrir</button>` : ''}
+                        <button type="button" onclick="COLA.descartar('${x.idem}')">Descartar</button></div></div>`).join('')}
+                <div class="cola-pie"><button type="button" onclick="COLA.enviar()">Enviar ahora</button><button type="button" onclick="document.getElementById('colaDlg').remove()">Cerrar</button></div></div>`;
+        }
+        function aviso(texto, ms = 6000) {
+            const t = document.createElement('div'); t.className = 'cola-toast'; t.textContent = texto; document.body.appendChild(t);
+            setTimeout(() => t.remove(), ms);
+        }
+        async function reintentar(idem) { const x = (await lista()).find(y => y.idem === idem); if (!x) return; x.estado = 'pendiente'; x.error = ''; x.intentos = 0; await poner(x); enviar(); }
+        async function descartar(idem) {
+            const x = (await lista()).find(y => y.idem === idem); if (!x) return;
+            if (!confirm(`¿Descartar "${x.desc}"? No se enviará y se pierde lo registrado.`)) return;
+            await quitar(idem); pintar();
+        }
+        async function abrirItem(idem) { const x = (await lista()).find(y => y.idem === idem); if (x && cfg.abrir[x.tipo]) { const f = document.getElementById('colaDlg'); if (f) f.remove(); cfg.abrir[x.tipo](x); } }
+        function configurar(o) { cfg = Object.assign(cfg, o); pintar(); setTimeout(enviar, 1500); }
+        window.addEventListener('online', () => setTimeout(enviar, 800));
+        document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') enviar(); });
+        setInterval(enviar, 30000);
+        return { nuevoIdem, agregar, enviar, lista, sinInternet, reintentar, descartar, abrirItem, configurar, aviso, ahoraLocal };
+    })();
+</script>
 
 <!-- Datalist con la lista completa de trabajadores para autocompletado -->
 <datalist id="listaTrabajadores">
@@ -288,16 +579,51 @@
 <div class="container">
     <div class="header-bar">
         <h2 class="titulo-logo"><svg class="logo-ccpv" viewBox="400 380 1130 1175" aria-hidden="true"><path fill="var(--logo-d, #F2EEE8)" d="M423 398 H950 C1230 398 1400 560 1450 788 L1115 952 C1110 790 1075 655 870 655 H773 V1193 L423 1365 Z"/><path fill="#44AC00" d="M423 1365 L1508 834 V865 L658 1533 H423 Z"/><path fill="#FF3D00" d="M820 1533 L1465 1026 C1460 1140 1448 1225 1420 1295 C1360 1440 1250 1490 1160 1505 C1090 1522 1020 1533 950 1533 Z"/></svg><span>Sistema de Control de Caja</span></h2>
-        <button type="button" id="btnTema" class="btn-theme" onclick="alternarTema()">Modo claro</button>
+        <div class="header-acciones">
+            <label class="interruptor btn-theme modo-vista" title="Cambiar entre la ficha de cuadre y marcar asistencia con carnet"><input type="checkbox" id="swVista" onchange="cambiarVista(this.checked)"><span class="lado lado-ficha">Ficha</span><span class="sw-pista"></span><span class="lado lado-asis">Asistencia</span></label>
+            <label class="interruptor btn-theme" title="Modo oscuro"><input type="checkbox" id="btnTema" onchange="alternarTema()"><span class="sw-pista"></span> Modo oscuro</label>
+        </div>
     </div>
     <!-- ============ PASO 1: ELEGIR EL LOCAL ============ -->
-    <section id="selectorLocal" class="hidden">
+    <section id="selectorLocal" class="hidden" data-pantalla>
         <p class="selector-titulo">¿En qué local estás?</p>
         <p class="selector-sub">Seleccione el local para abrir la ficha de cuadre.</p>
         <div class="locales-grid" id="localesGrid"></div>
+        <!-- Asistencia de trabajadores con el carnet (código de barras o QR) -->
+        <div class="mf-tarjeta">
+            <span class="local-icono asis-icono mf-icono"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="11" r="2"/><path d="M5.5 16c.6-1.6 1.8-2.4 3-2.4s2.4.8 3 2.4"/><path d="M14 9h4M14 12h4M14 15h2"/></svg></span>
+            <div class="mf-texto"><b>Asistencia de trabajadores</b><span>Cada trabajador pasa su carnet (lector o cámara) y queda marcada su entrada o su salida.</span></div>
+            <button type="button" class="btn-cambiar mf-abrir" onclick="mfAbrir()">Marcar asistencia con carnet</button>
+        </div>
     </section>
 
-    <form id="mainForm" class="hidden">
+    <!-- ============ MARCAR ASISTENCIA CON CARNET ============ -->
+    <section id="mfSeccion" class="hidden" data-pantalla>
+        <div id="mfLocales">
+            <p class="selector-titulo">¿En qué local se marca?</p>
+            <div class="locales-grid" id="mfLocalesGrid"></div>
+        </div>
+        <form id="mfAutorizar" class="mf-caja hidden" onsubmit="mfAutorizarEquipo(event)">
+            <h3>Autorizar este equipo para <span id="mfAutLocal"></span></h3>
+            <p class="selector-sub">Se hace una sola vez en este teléfono o computadora. Pida a un administrador que escriba su clave.</p>
+            <input type="password" id="mfClave" autocomplete="off" placeholder="Clave de administrador" required>
+            <div class="asis-msj error" id="mfAutError"></div>
+            <div class="asis-acciones"><button type="button" class="btn-gris" onclick="mfLocales()">Volver</button><button type="submit" class="btn-add" style="margin-top:0" id="mfBtnAut">Autorizar</button></div>
+        </form>
+        <div id="mfPantalla" class="hidden">
+            <div class="mf-cab"><div><div class="mf-local" id="mfLocal"></div><div class="mf-fecha" id="mfFecha"></div></div><div class="mf-reloj" id="mfReloj"></div></div>
+            <form class="mf-form" onsubmit="mfEnviarCampo(event)">
+                <input type="text" id="mfCodigo" inputmode="none" autocomplete="off" placeholder="Pase el carnet por el lector..." aria-label="Código del carnet">
+                <button type="button" class="btn-cambiar" id="mfBtnCam" onclick="mfCamara()">Usar la cámara</button>
+            </form>
+            <div id="mfVideo" class="mf-video hidden"></div>
+            <div id="mfResultado" class="mf-resultado"></div>
+            <div id="mfPasos" class="mf-pasos"></div>
+        </div>
+        <div class="mf-pie"><a href="#" onclick="mfCerrar(); return false;">← Volver a la ficha de cuadre</a></div>
+    </section>
+
+    <form id="mainForm" class="hidden" data-pantalla>
 
         <!-- ENCABEZADO: mitad local, mitad control de asistencia -->
         <div class="encabezado-doble">
@@ -345,11 +671,15 @@
             </select>
             <div class="form-group">
                 <label>Turno</label>
-                <select id="turno" required>
+                <select id="turno" class="turno-oculto" required tabindex="-1" aria-hidden="true">
                     <option value="">Seleccionar...</option>
                     <option value="Mañana">Mañana</option>
                     <option value="Tarde">Tarde</option>
                 </select>
+                <div class="seg-turno" role="radiogroup" aria-label="Turno">
+                    <button type="button" role="radio" data-turno="Mañana" onclick="elegirTurno('Mañana')">Mañana</button>
+                    <button type="button" role="radio" data-turno="Tarde" onclick="elegirTurno('Tarde')">Tarde</button>
+                </div>
             </div>
             <div class="form-group">
                 <label>Cajero / Usuario</label>
@@ -486,13 +816,14 @@
             <div><small>Responsable</small><b id="asisResp"></b></div>
         </div>
         <div id="asisAviso" class="asis-msj"></div>
+        <div id="asisHorario" class="asis-horario hidden"></div>
         <div id="asisFilas"></div>
-        <button type="button" class="btn-add" onclick="agregarAsistencia(); enfocarNuevo('asisFilas')">+ Agregar trabajador</button>
+        <button type="button" class="btn-add" id="asisBtnAgregar" onclick="agregarAsistencia(); enfocarNuevo('asisFilas')">+ Agregar trabajador</button>
         <div class="asis-msj" id="asisMsj"></div>
         <div class="asis-acciones">
             <button type="button" class="btn-lista" id="asisBtnLista" onclick="asistenciaYaLista()">Asistencia ya lista</button>
             <button type="button" class="btn-gris" onclick="cerrarAsistencia()">Cancelar</button>
-            <button type="button" class="btn-add" style="margin-top:0" onclick="guardarAsistencia()">Guardar asistencia</button>
+            <button type="button" class="btn-add" style="margin-top:0" id="asisBtnGuardar" onclick="guardarAsistencia()">Guardar asistencia</button>
         </div>
     </div>
 </div>
@@ -521,7 +852,7 @@
     // ==========================================
     function aplicarTema(tema) {
         document.documentElement.setAttribute('data-theme', tema);
-        document.getElementById('btnTema').textContent = tema === 'light' ? 'Modo oscuro' : 'Modo claro';
+        const sw = document.getElementById('btnTema'); if (sw) sw.checked = tema !== 'light';   // interruptor "Modo oscuro": encendido = oscuro
     }
 
     function alternarTema() {
@@ -870,7 +1201,7 @@
             const data = JSON.parse(guardado);
             if(data.tasaBCV) document.getElementById('tasaBCV').value = data.tasaBCV;
             if(data.tienda) document.getElementById('tienda').value = data.tienda;
-            if(data.turno) document.getElementById('turno').value = data.turno;
+            if(data.turno) { document.getElementById('turno').value = data.turno; if (typeof pintarTurno === 'function') pintarTurno(); }
             if(data.cajero) document.getElementById('cajero').value = data.cajero;
             if(data.bsRecibi) document.getElementById('bsRecibi').value = data.bsRecibi;
             if(data.bsDeje) document.getElementById('bsDeje').value = data.bsDeje;
@@ -954,12 +1285,36 @@
         </button>`).join('');
     document.getElementById('localIcono').innerHTML = ICONO_LOCAL;
 
+    // Turno con botones: escribe en el select (el campo real) y avisa el cambio como si se hubiera elegido en la lista
+    function pintarTurno() {
+        const v = document.getElementById('turno').value;
+        document.querySelectorAll('.seg-turno button').forEach(b => { const si = b.dataset.turno === v; b.classList.toggle('activo', si); b.setAttribute('aria-checked', si); });
+    }
+    function elegirTurno(v) {
+        const sel = document.getElementById('turno');
+        if (sel.value === v) return;
+        sel.value = v; pintarTurno();
+        sel.dispatchEvent(new Event('input', { bubbles: true })); sel.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    setTimeout(pintarTurno, 0);
+    // Interruptor Ficha | Asistencia (junto a Modo oscuro)
+    const marcarVista = asis => { const s = document.getElementById('swVista'); if (s) s.checked = asis; };
+    function cambiarVista(asistencia) {
+        if (asistencia) { mfAbrir(); return; }
+        ANIM.atras = true;   // la ficha vuelve desde la izquierda
+        mfDetenerCamara(); clearInterval(mfRelojId);
+        document.getElementById('mfSeccion').classList.add('hidden');
+        if (document.getElementById('tienda').value) mostrarFicha(); else mostrarSelectorLocal();   // vuelve a la ficha del local que tenía abierto
+    }
     function mostrarSelectorLocal() {
+        marcarVista(false);
+        ANIM.atras = true;   // "Cambiar local": se vuelve a la lista de locales
         document.getElementById('mainForm').classList.add('hidden');
         document.getElementById('selectorLocal').classList.remove('hidden');
         window.scrollTo(0, 0);
     }
     function mostrarFicha() {
+        marcarVista(false);
         document.getElementById('localNombre').textContent = document.getElementById('tienda').value;
         document.getElementById('selectorLocal').classList.add('hidden');
         document.getElementById('mainForm').classList.remove('hidden');
@@ -973,6 +1328,146 @@
     }
     // Al abrir siempre se empieza eligiendo el local
     mostrarSelectorLocal();
+
+    // ==========================================
+    // MARCAR ASISTENCIA CON CARNET (desde la pantalla inicial de la ficha)
+    // Cada local se autoriza una vez en este equipo con la clave de administrador; luego cada trabajador pasa su carnet
+    // y el script marca su entrada o su salida con la hora del servidor (BD ASISTENCIA, igual que el equipo de marcaje).
+    // ==========================================
+    const MF_LLAVE = 'ficha_marcaje';
+    let mfLocalActual = '', mfRelojId = null, mfLimpiarId = null, mfCam = null, mfUltimo = { codigo: '', en: 0 }, mfOcupado = false;
+    const mfEquipos = () => { try { return JSON.parse(localStorage.getItem(MF_LLAVE) || '{}') || {}; } catch (e) { return {}; } };
+    const mfHora = h => { const [H, M] = String(h || '').split(':').map(Number); return isNaN(H) ? '' : `${H % 12 || 12}:${String(M).padStart(2, '0')} ${H < 12 ? 'AM' : 'PM'}`; };
+    const mfFoto = url => { const m = /[-\w]{25,}/.exec(url || ''); return m ? `https://drive.google.com/thumbnail?id=${m[0]}&sz=w300` : ''; };
+    const MF_PASOS = { entrada: 'Entrada', salidaAlmuerzo: 'Salida a almuerzo', regresoAlmuerzo: 'Regreso de almuerzo', salida: 'Salida' };
+    async function mfApi(datos) {
+        const sinResp = m => Object.assign(new Error(m), { sinRespuesta: true });
+        let resp;
+        try { resp = await fetch(URL_HOJA, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(datos) }); }
+        catch (e) { throw sinResp('Sin conexión con la hoja.'); }
+        let r; try { r = JSON.parse(await resp.text()); } catch (e) { throw sinResp('La hoja no respondió. Revise la conexión.'); }
+        if (!r || !r.ok) throw new Error((r && r.error) || 'No se pudo marcar');
+        return r;
+    }
+    function mfAbrir() {
+        marcarVista(true);
+        document.getElementById('selectorLocal').classList.add('hidden');
+        document.getElementById('mainForm').classList.add('hidden');
+        document.getElementById('mfSeccion').classList.remove('hidden');
+        document.getElementById('mfLocalesGrid').innerHTML = LOCALES.map(l => `<button type="button" class="local-btn" onclick="mfElegir('${l}')"><span class="icono">${ICONO_LOCAL}</span>${l}
+            ${mfEquipos()[l] ? '<span class="en-curso">Autorizado</span>' : ''}</button>`).join('');
+        const ultimo = (() => { try { return localStorage.getItem('ficha_marcaje_local'); } catch (e) { return ''; } })();
+        if (ultimo && mfEquipos()[ultimo]) mfElegir(ultimo); else mfLocales();
+        window.scrollTo(0, 0);
+    }
+    function mfLocales() {
+        mfDetenerCamara(); clearInterval(mfRelojId);
+        ['mfAutorizar', 'mfPantalla'].forEach(id => document.getElementById(id).classList.add('hidden'));
+        document.getElementById('mfLocales').classList.remove('hidden');
+    }
+    function mfCerrar() { mfDetenerCamara(); clearInterval(mfRelojId); document.getElementById('mfSeccion').classList.add('hidden'); mostrarSelectorLocal(); }
+    function mfElegir(local) {
+        mfLocalActual = local;
+        try { localStorage.setItem('ficha_marcaje_local', local); } catch (e) {}
+        document.getElementById('mfLocales').classList.add('hidden');
+        if (!mfEquipos()[local]) {
+            document.getElementById('mfAutLocal').textContent = local;
+            document.getElementById('mfAutError').textContent = '';
+            document.getElementById('mfAutorizar').classList.remove('hidden');
+            document.getElementById('mfClave').focus();
+            return;
+        }
+        document.getElementById('mfAutorizar').classList.add('hidden');
+        document.getElementById('mfPantalla').classList.remove('hidden');
+        document.getElementById('mfLocal').textContent = local;
+        const pinta = () => { const d = new Date(); document.getElementById('mfReloj').textContent = d.toLocaleTimeString('es-VE', { hour: 'numeric', minute: '2-digit' });
+                              document.getElementById('mfFecha').textContent = d.toLocaleDateString('es-VE', { weekday: 'long', day: 'numeric', month: 'long' }); };
+        pinta(); clearInterval(mfRelojId); mfRelojId = setInterval(pinta, 15000);
+        mfResultado(null); mfEnfocar();
+    }
+    async function mfAutorizarEquipo(ev) {
+        ev.preventDefault();
+        const btn = document.getElementById('mfBtnAut'), err = document.getElementById('mfAutError');
+        btn.disabled = true; btn.textContent = 'Autorizando...'; err.textContent = '';
+        try {
+            const r = await mfApi({ action: 'marca_equipo_registrar', local: mfLocalActual, nombre: 'Ficha · ' + mfLocalActual, claveAdmin: document.getElementById('mfClave').value });
+            const eq = mfEquipos(); eq[mfLocalActual] = r.token; localStorage.setItem(MF_LLAVE, JSON.stringify(eq));
+            document.getElementById('mfClave').value = '';
+            mfElegir(mfLocalActual);
+        } catch (e) { err.textContent = e.message; }
+        finally { btn.disabled = false; btn.textContent = 'Autorizar'; }
+    }
+    function mfEnfocar() { const i = document.getElementById('mfCodigo'); if (i && !document.getElementById('mfPantalla').classList.contains('hidden') && !document.getElementById('mfPasos').innerHTML) i.focus(); }
+    document.addEventListener('click', () => setTimeout(mfEnfocar, 50));
+    function mfEnviarCampo(ev) { ev.preventDefault(); const i = document.getElementById('mfCodigo'), c = i.value.replace(/\D/g, ''); i.value = ''; if (c) mfMarcar(c); }
+    async function mfMarcar(codigo, paso) {
+        const token = mfEquipos()[mfLocalActual];
+        if (!token || mfOcupado) return;
+        if (!paso && codigo === mfUltimo.codigo && Date.now() - mfUltimo.en < 4000) return;   // la cámara lee el mismo carnet varias veces
+        mfUltimo = { codigo, en: Date.now() }; mfOcupado = true;
+        mfResultado({ cargando: true });
+        const idem = COLA.nuevoIdem(), datos = Object.assign({ action: 'marca_registrar', equipo: token, codigo, idem }, paso ? { paso } : {});
+        try {
+            const r = await mfApi(datos);
+            if (r.elegirPaso) {
+                mfResultado(Object.assign({}, r, { pregunta: true }));
+                document.getElementById('mfPasos').innerHTML = r.opciones.map(p => `<button type="button" class="btn-add" onclick="document.getElementById('mfPasos').innerHTML=''; mfMarcar('${codigo}', '${p}')">${MF_PASOS[p]}</button>`).join('');
+            } else mfResultado(r);
+        } catch (e) {
+            // Sin internet: la marca queda guardada con la hora de este equipo y se envía sola al volver la conexión
+            if (e.sinRespuesta && await COLA.sinInternet()) {
+                const hora = COLA.ahoraLocal().slice(11);
+                await COLA.agregar({ tipo: 'marca', desc: `Marca con carnet · ${mfLocalActual} · ${hora}`, cuerpo: datos, idem, extra: { local: mfLocalActual } });
+                mfResultado({ pendiente: true, hora });
+                return;
+            }
+            // El equipo dejó de estar autorizado: se olvida para que lo autoricen otra vez
+            if (/no está autorizado/i.test(e.message)) { const eq = mfEquipos(); delete eq[mfLocalActual]; localStorage.setItem(MF_LLAVE, JSON.stringify(eq)); }
+            mfResultado({ error: e.message });
+        } finally { mfOcupado = false; }
+    }
+    function mfResultado(r) {
+        clearTimeout(mfLimpiarId);
+        const caja = document.getElementById('mfResultado');
+        if (!r || !r.pregunta) document.getElementById('mfPasos').innerHTML = '';
+        if (!r) { caja.className = 'mf-resultado'; caja.innerHTML = '<div class="mf-espera">Pase el carnet por el lector o frente a la cámara</div>'; return; }
+        if (r.cargando) { caja.className = 'mf-resultado'; caja.innerHTML = '<div class="mf-espera">Marcando...</div>'; return; }
+        if (r.pendiente) { caja.className = 'mf-resultado alerta'; caja.innerHTML = `<div class="mf-titulo">Marca guardada sin conexión · ${mfHora(r.hora)}</div><div class="mf-msj">Se registrará sola, con esta hora, cuando vuelva internet. No pase el carnet otra vez.</div>`; mfLimpiarId = setTimeout(() => { mfResultado(null); mfEnfocar(); }, 7000); return; }
+        if (r.error) { caja.className = 'mf-resultado mal'; caja.innerHTML = `<div class="mf-titulo">No se marcó</div><div class="mf-msj">${escAsis(r.error)}</div>`; }
+        else {
+            const foto = mfFoto(r.foto);
+            caja.className = 'mf-resultado ' + (r.pregunta ? '' : r.alerta ? 'alerta' : 'ok');
+            caja.innerHTML = `<div class="mf-persona">${foto ? `<img src="${foto}" alt="">` : `<span class="mf-inicial">${escAsis(r.nombre.slice(0, 1))}</span>`}
+                <div><div class="mf-nombre">${escAsis(r.nombre)}</div><div class="mf-titulo">${r.pregunta ? '¿Qué va a marcar?' : escAsis((MF_PASOS[r.accion] || r.accion) + ' · ' + mfHora(r.hora))}</div>
+                ${r.accion === 'salida' && r.entrada ? `<div class="mf-msj">Entró ${mfHora(r.entrada)} · ${String(r.horas).replace('.', ',')} h</div>` : ''}
+                ${(r.mensajes || []).map(m => `<div class="mf-msj">${escAsis(m)}</div>`).join('')}</div></div>`;
+        }
+        mfLimpiarId = setTimeout(() => { mfResultado(null); mfEnfocar(); }, r.pregunta ? 20000 : 7000);
+    }
+    function mfCargarScript(src) {
+        return new Promise((ok, mal) => { if (document.querySelector(`script[src="${src}"]`)) return ok();
+            const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => mal(new Error('No se pudo cargar el lector (¿hay internet?)')); document.head.appendChild(s); });
+    }
+    async function mfCamara() {
+        if (mfCam) { mfDetenerCamara(); return; }
+        const btn = document.getElementById('mfBtnCam');
+        btn.disabled = true; btn.textContent = 'Abriendo cámara...';
+        try {
+            await mfCargarScript('https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js');
+            document.getElementById('mfVideo').classList.remove('hidden');
+            mfCam = new Html5Qrcode('mfVideo', { formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.CODE_128], verbose: false });
+            await mfCam.start({ facingMode: 'environment' }, { fps: 8, qrbox: { width: 260, height: 180 } }, t => { const c = String(t).replace(/\D/g, ''); if (c) mfMarcar(c); }, () => {});
+            btn.textContent = 'Cerrar cámara';
+        } catch (e) {
+            mfDetenerCamara();
+            mfResultado({ error: 'No se pudo abrir la cámara: ' + (e && e.message ? e.message : e) + '. Permita el uso de la cámara en el navegador.' });
+        } finally { btn.disabled = false; }
+    }
+    function mfDetenerCamara() {
+        if (mfCam) { const c = mfCam; mfCam = null; c.stop().catch(() => {}).finally(() => { try { c.clear(); } catch (e) {} }); }
+        const v = document.getElementById('mfVideo'); if (v) v.classList.add('hidden');
+        const b = document.getElementById('mfBtnCam'); if (b) b.textContent = 'Usar la cámara';
+    }
 
     // ==========================================
     // TASA BCV AUTOMÁTICA (tasa oficial publicada por DolarApi)
@@ -1028,8 +1523,11 @@
     // VALIDACIONES: TRABAJADORES DE LA LISTA Y CÓDIGOS DE 4 DÍGITOS
     // ==========================================
     const sinTildes = t => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
-    const TRABAJADORES = Array.from(document.querySelectorAll('#listaTrabajadores option')).map(o => o.value);
-    const TRABAJADOR_POR_CLAVE = new Map(TRABAJADORES.map(n => [sinTildes(n), n]));
+    // La lista sale de Talento humano › Trabajadores (BD TRABAJADORES). La escrita aquí queda de respaldo
+    // mientras no haya trabajadores registrados o si no hay internet. Las cuentas "Gastos ..." siempre se mantienen.
+    const LISTA_RESPALDO = Array.from(document.querySelectorAll('#listaTrabajadores option')).map(o => o.value);
+    let TRABAJADORES = LISTA_RESPALDO.slice();
+    let TRABAJADOR_POR_CLAVE = new Map(TRABAJADORES.map(n => [sinTildes(n), n]));
 
     // Solo se acepta un nombre de la lista. Si coincide sin importar mayúsculas/tildes, se corrige al nombre exacto.
     function validarTrabajador(input, corregir) {
@@ -1063,12 +1561,116 @@
     document.querySelector('.btn-submit').addEventListener('click', validarTodo);
 
     // ==========================================
+    // PUNTUALIDAD (mismas reglas que Personal.gs)
+    // Llegar más de 5 min tarde (a cualquier turno) quita el bono de puntualidad de la semana. La tarde puede salir 30 min antes del cierre.
+    // Horas extra: lo que pase del cierre (desde 15 min). De menos: si sale antes de la hora permitida.
+    // ==========================================
+    let PUNT_TOLERANCIA = 5;
+    const PUNT_MARGEN_EXTRA = 15;
+    const PUNT_HORARIOS_RESPALDO = ['Santa Rosa', 'Ricardo Urriera', 'Isabelica', 'Parcelas'].map(local => ({ local,
+        manana: { entrada: local === 'Santa Rosa' ? '07:00' : '07:30', salida: '15:00', salidaPermitida: '15:00' },
+        tarde: { entrada: '15:00', salida: '22:00', salidaPermitida: '21:30' },
+        domingoTarde: { entrada: '15:00', salida: '21:30', salidaPermitida: '21:00' } }));
+    let PUNT_HORARIOS = PUNT_HORARIOS_RESPALDO;
+    const puntSinTildes = t => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+    const puntMin = h => { const x = /^(\d{1,2}):(\d{2})/.exec(h || ''); return x ? +x[1] * 60 + +x[2] : null; };
+    // Horario que le toca a ese local, turno y fecha (el domingo en la tarde cierra a las 9:30 PM)
+    function puntHorario(local, turno, fecha) {
+        const fila = PUNT_HORARIOS.find(h => puntSinTildes(h.local) === puntSinTildes(local));
+        if (!fila) return null;
+        const t = puntSinTildes(turno);
+        if (t.startsWith('man')) return fila.manana;
+        if (t.startsWith('tar')) return fecha && new Date(fecha + 'T12:00:00').getDay() === 0 ? fila.domingoTarde : fila.tarde;
+        return null;
+    }
+    // Compara la entrada y la salida con el horario. Todo en minutos.
+    function puntEvaluar(h, entrada, salida) {
+        let e = puntMin(entrada), s = puntMin(salida);
+        if (!h || e === null || s === null) return null;
+        if (s <= e) s += 24 * 60;                                  // salió pasada la medianoche
+        // Puede salir desde la hora permitida hasta el cierre sin que cuente nada: quedarse hasta el cierre es su horario normal.
+        // Horas extra = lo que pase del turno completo (hasta el cierre). De menos = lo que falte para la hora permitida.
+        const he = puntMin(h.entrada), hp = puntMin(h.salidaPermitida), hs = puntMin(h.salida);
+        const tarde = e - he, antes = hp - s, trabajadas = s - e, minimo = hp - he, completo = hs - he;
+        const extra = trabajadas - completo, falta = minimo - trabajadas;
+        return { tarde: tarde > PUNT_TOLERANCIA ? tarde : 0, pierdeBono: tarde > PUNT_TOLERANCIA, salioAntes: antes > 0 ? antes : 0,
+                 extra: extra >= PUNT_MARGEN_EXTRA ? extra : 0, menos: falta > PUNT_TOLERANCIA ? falta : 0, trabajadas, esperadas: minimo };
+    }
+    const puntDur = n => { const h = Math.floor(n / 60), m = n % 60; return h ? `${h} h${m ? ` ${m} min` : ''}` : `${m} min`; };
+    // Llegó tarde: aviso amable (el mismo texto que da el equipo de marcaje, Personal.gs)
+    function puntRetardo(nombre, min) {
+        const h = Math.floor(min / 60), m = min % 60, mins = n => n + (n === 1 ? ' minuto' : ' minutos');
+        const tiempo = h ? h + (h === 1 ? ' hora' : ' horas') + (m ? ' con ' + mins(m) : '') : mins(m);
+        const pila = String(nombre || '').trim().split(/\s+/)[0];
+        return `${pila ? `Apreciado ${pila}, presentas` : 'Presenta'} un retardo de ${tiempo}. Para que no se vea afectado el bono de puntualidad, tu supervisor inmediato debe justificar el retraso en gerencia.`;
+    }
+    // Mensajes cortos para mostrar al marcar: [{ tipo: 'mal' | 'aviso' | 'ok', texto }]. Las horas extra no se anuncian aquí.
+    function puntMensajes(ev, nombre) {
+        if (!ev) return [];
+        const out = [];
+        if (ev.tarde) out.push({ tipo: 'aviso', texto: puntRetardo(nombre, ev.tarde) });
+        if (ev.salioAntes) out.push({ tipo: 'mal', texto: `Salió ${puntDur(ev.salioAntes)} antes de lo permitido` });
+        if (ev.menos) out.push({ tipo: 'mal', texto: `Trabajó ${puntDur(ev.menos)} menos que su turno` });
+        if (!out.length) out.push({ tipo: 'ok', texto: 'A tiempo' });
+        return out;
+    }
+
+    // ==========================================
     // CONTROL DE ASISTENCIA
     // Cada local lleva una asistencia por turno (mañana y tarde) cada día. La ficha la exige,
     // salvo que ese turno ya la tenga registrada en la hoja (otra ficha del mismo turno la envió).
     // ==========================================
-    const URL_HOJA = "https://script.google.com/macros/s/AKfycbxy1eQSl0k8QRHOQj3Ee4gGYJDOQdTmtSfDId-lKh97nGSFCdorH8HTSlhvK6vENRwO/exec";
-    const TRABAJADORES_ASIS = TRABAJADORES.filter(n => !/^Gastos\b/i.test(n));   // solo personas, no cuentas de gastos
+    const URL_HOJA = "https://script.google.com/macros/s/AKfycbyS0CMaKtl9A0ViefcNY_E6Mafqv1rCSFVDLbjjkZXWmtu04ZA-WjtkXyx3ZVS48CwV/exec";
+    COLA.configurar({ url: URL_HOJA, alEnviar: {
+        ficha: (x, r) => {
+            if (!r.nroFicha) { COLA.aviso(`${x.desc}: ya estaba guardada en la hoja.`); return; }
+            let pdf = 'El PDF se descargó.';
+            try { generarPDF(x.cuerpo, r.nroFicha); } catch (e) { pdf = 'No se pudo crear el PDF (' + e.message + ').'; }
+            COLA.aviso(`${x.desc} se envió: ficha Nº ${r.nroFicha}. ${pdf}`, 9000);
+        },
+        marca: (x, r) => COLA.aviso(r.nombre ? `Marca sin conexión registrada: ${r.nombre} · ${r.accion === 'salida' ? 'salida' : 'entrada'} ${String(r.hora || '')}` : `${x.desc}: registrada.`)
+    } });
+    // ¿Hay marcas con carnet de esta tienda y fecha guardadas sin conexión? (se envían antes que la ficha)
+    const marcasEnCola = async (tienda, fecha) => (await COLA.lista()).some(x => x.tipo === 'marca' && x.estado === 'pendiente' && x.extra && x.extra.local === tienda && x.marcadoEn.slice(0, 10) === fecha);
+    let TRABAJADORES_ASIS = TRABAJADORES.filter(n => !/^Gastos\b/i.test(n));   // solo personas, no cuentas de gastos
+
+    // Aplica una lista de personas (de la hoja): personas + cuentas "Gastos ..." en el autocompletado y en la asistencia
+    function aplicarTrabajadores(personas) {
+        if (!Array.isArray(personas) || !personas.length) return false;
+        const cuentas = LISTA_RESPALDO.filter(n => /^Gastos\b/i.test(n));
+        TRABAJADORES = personas.concat(cuentas);
+        TRABAJADOR_POR_CLAVE = new Map(TRABAJADORES.map(n => [sinTildes(n), n]));
+        TRABAJADORES_ASIS = personas.slice();
+        document.getElementById('listaTrabajadores').innerHTML = TRABAJADORES.slice().sort((a, b) => a.localeCompare(b, 'es'))
+            .map(n => `<option value="${escAsis(n)}">`).join('');
+        validarTodo();
+        return true;
+    }
+    // Primero lo último que se descargó (al instante, sirve sin internet) y luego la lista actual de la hoja
+    async function cargarTrabajadores() {
+        try { aplicarTrabajadores(JSON.parse(localStorage.getItem('caja_trabajadores') || 'null')); } catch (e) {}
+        try { const h = JSON.parse(localStorage.getItem('caja_horarios') || 'null'); if (h && h.length) PUNT_HORARIOS = h; } catch (e) {}
+        try { CARNET_DESDE = localStorage.getItem('caja_carnet_desde') || ''; pintarEstadoAsis(); } catch (e) {}
+        try {
+            const resp = await fetch(URL_HOJA, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ consultaFicha: 'trabajadores' }) });
+            const r = JSON.parse(await resp.text());
+            if (r && r.resultado === 'exito' && aplicarTrabajadores(r.trabajadores)) {
+                try { localStorage.setItem('caja_trabajadores', JSON.stringify(r.trabajadores)); } catch (e) {}
+            }
+            if (r && /^\d{4}-\d{2}-\d{2}$/.test(r.carnetDesde || '')) {
+                CARNET_DESDE = r.carnetDesde;
+                try { localStorage.setItem('caja_carnet_desde', r.carnetDesde); } catch (e) {}
+                pintarEstadoAsis();
+            }
+            if (r && Array.isArray(r.horarios) && r.horarios.length) {
+                PUNT_HORARIOS = r.horarios;
+                if (r.toleranciaMin) PUNT_TOLERANCIA = Number(r.toleranciaMin) || 5;
+                try { localStorage.setItem('caja_horarios', JSON.stringify(r.horarios)); } catch (e) {}
+            }
+        } catch (e) {}   // sin internet: queda la lista guardada o la de respaldo
+    }
+    setTimeout(cargarTrabajadores, 0);   // después de que se definan las funciones de más abajo
     var asistencia = window.asisBorrador || [];   // [{ trabajador, entrada, salida }] que lleva esta ficha (se recupera del borrador)
     let asisRegistrada = null;    // lo que dice la hoja: { clave, lista, trabajadores }
     const datosAsis = () => ({ tienda: document.getElementById('tienda').value, fecha: document.getElementById('fecha').value,
@@ -1078,9 +1680,20 @@
     const asistenciaCompleta = () => asistencia.length > 0 || yaRegistrada();
     const escAsis = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
+    // Desde esta fecha la asistencia se marca con el carnet en el equipo de marcaje: la ficha ya no la pide
+    var CARNET_DESDE = '';
+    const conCarnet = () => !!CARNET_DESDE && !!datosAsis().fecha && datosAsis().fecha >= CARNET_DESDE;
     function pintarEstadoAsis() {
         const d = datosAsis(), tarjeta = document.getElementById('asisTarjeta');
         let txt, ok = true;
+        if (conCarnet()) {
+            // Para enviar la ficha, al menos una entrada marcada con carnet en esta tienda y turno
+            const n = yaRegistrada() ? asisRegistrada.trabajadores.length : 0;
+            txt = n ? `Con carnet · ${n} marcaron en este turno` : d.turno ? 'Falta marcar la entrada con el carnet' : 'Se marca con el carnet · elija el turno';
+            document.getElementById('asisEstado').textContent = txt;
+            tarjeta.classList.toggle('ok', n > 0); tarjeta.classList.remove('falta');
+            return;
+        }
         if (asistencia.length) txt = `Lista · ${asistencia.length} trabajador(es)`;
         else if (yaRegistrada()) txt = `Ya registrada para el turno ${d.turno.toLowerCase()}`;
         else { ok = false; txt = d.turno ? 'Pendiente (obligatoria)' : 'Pendiente · elija el turno'; }
@@ -1105,6 +1718,7 @@
     // Al elegir el turno o el local: se revisa en segundo plano
     function revisarAsistenciaFondo() { pintarEstadoAsis(); consultarAsistencia().catch(() => {}); }
     document.getElementById('turno').addEventListener('change', revisarAsistenciaFondo);
+    document.getElementById('fecha').addEventListener('change', revisarAsistenciaFondo);
     document.getElementById('cajero').addEventListener('change', () => { if (!document.getElementById('asisVentana').classList.contains('hidden')) document.getElementById('asisResp').textContent = datosAsis().cajero; });
 
     function abrirAsistencia() {
@@ -1122,9 +1736,40 @@
             aviso.textContent = `Este turno ya tiene asistencia registrada (${r.length} trabajador(es), por ${r[0] ? r[0].responsable : '—'}). Puede dejarla en blanco con "Asistencia ya lista".`;
         }
         document.getElementById('asisMsj').textContent = '';
+        const h = puntHorario(d.tienda, d.turno, d.fecha), hh = t => { const [H, M] = t.split(':').map(Number); return `${H % 12 || 12}:${String(M).padStart(2, '0')} ${H < 12 ? 'AM' : 'PM'}`; };
+        const lineaHor = document.getElementById('asisHorario');
+        lineaHor.classList.toggle('hidden', !h);
+        if (h) lineaHor.innerHTML = `<b>Horario del turno:</b> ${hh(h.entrada)} a ${hh(h.salida)}` +
+            (h.salidaPermitida !== h.salida ? ` (puede salir a las ${hh(h.salidaPermitida)})` : '') + ` · tolerancia de llegada: ${PUNT_TOLERANCIA} min`;
         const cont = document.getElementById('asisFilas');
         cont.innerHTML = '';
+        // Con carnet: solo se ve quién marcó en este turno (ya no se llena a mano)
+        const carnet = conCarnet();
+        ['asisBtnAgregar', 'asisBtnGuardar', 'asisBtnLista'].forEach(id => document.getElementById(id).classList.toggle('hidden', carnet));
+        if (carnet) {
+            const dibujar = () => {
+                const lista = yaRegistrada() ? asisRegistrada.trabajadores : [];
+                aviso.className = 'asis-msj ok';
+                aviso.textContent = `Desde el ${CARNET_DESDE.split('-').reverse().join('/')} la asistencia se marca con el carnet en el equipo de marcaje. La ficha ya no la pide.`;
+                cont.innerHTML = lista.length ? `<div class="asis-carnet">${lista.map(t => `<div><b>${escAsis(t.trabajador)}</b><span>${escAsis(t.entrada)}${t.salida ? ' – ' + escAsis(t.salida) : ' · sin salida todavía'}</span></div>`).join('')}</div>`
+                    : '<div class="asis-msj">Todavía nadie marcó con el carnet en este turno.</div>';
+            };
+            dibujar();
+            consultarAsistencia().then(dibujar).catch(() => {});
+            document.getElementById('asisVentana').classList.remove('hidden');
+            return;
+        }
         (asistencia.length ? asistencia : [{}]).forEach(a => agregarAsistencia(a));
+        // Carnet y ficha en paralelo: quien ya marcó con su carnet no hace falta anotarlo (vale la marca del carnet)
+        const avisoCarnet = () => {
+            const marcados = yaRegistrada() ? asisRegistrada.trabajadores.filter(t => /^carnet/i.test(String(t.responsable || ''))) : [];
+            let caja = document.getElementById('asisCarnetAviso');
+            if (!caja) { caja = document.createElement('div'); caja.id = 'asisCarnetAviso'; caja.className = 'asis-msj ok'; aviso.after(caja); }
+            caja.innerHTML = marcados.length ? `<b>Ya marcaron con carnet (${marcados.length}):</b> ` + marcados.map(t => `${escAsis(t.trabajador)} (${escAsis(t.entrada)}${t.salida ? '–' + escAsis(t.salida) : ''})`).join(', ') +
+                '. No hace falta anotarlos: si los anota, vale la marca del carnet.' : '';
+        };
+        avisoCarnet();
+        if (d.turno) consultarAsistencia().then(avisoCarnet).catch(() => {});
         document.getElementById('asisVentana').classList.remove('hidden');
     }
     function cerrarAsistencia() { document.getElementById('asisVentana').classList.add('hidden'); }
@@ -1140,8 +1785,21 @@
                     `<option ${n === a.trabajador ? 'selected' : ''}>${escAsis(n)}</option>`).join('')}</select></div>
             <div><label>Entrada</label>${campoHora('asis-e', a.entrada)}</div>
             <div><label>Salida</label>${campoHora('asis-s', a.salida)}</div>
-            <button type="button" class="btn-remove" title="Quitar" onclick="this.parentElement.remove()">X</button>`;
+            <button type="button" class="btn-remove" title="Quitar" onclick="this.parentElement.remove()">X</button>
+            <div class="asis-eval"></div>`;
         document.getElementById('asisFilas').appendChild(fila);
+        // Al escribir las horas: aviso al instante si llegó tarde o trabajó de más / de menos
+        ['input', 'change'].forEach(ev => fila.addEventListener(ev, () => evaluarFilaAsis(fila)));
+        evaluarFilaAsis(fila);
+    }
+    function evaluacionFila(fila) {
+        const d = datosAsis();
+        return puntEvaluar(puntHorario(d.tienda, d.turno, d.fecha), fila.querySelector('.asis-e').value, fila.querySelector('.asis-s').value);
+    }
+    function evaluarFilaAsis(fila) {
+        const caja = fila.querySelector('.asis-eval');
+        const msjs = puntMensajes(evaluacionFila(fila), fila.querySelector('.asis-t').value);
+        caja.innerHTML = msjs.map(m => `<span class="punt punt-${m.tipo}">${escAsis(m.texto)}</span>`).join('');
     }
 
     function guardarAsistencia() {
@@ -1159,6 +1817,9 @@
         const nombres = filas.map(a => a.trabajador);
         const repetido = nombres.find((n, i) => nombres.indexOf(n) !== i);
         if (repetido) { msj.textContent = `${repetido} aparece dos veces.`; return; }
+        const d = datosAsis(), h = puntHorario(d.tienda, d.turno, d.fecha);
+        const avisos = filas.map(a => ({ a, ms: puntMensajes(puntEvaluar(h, a.entrada, a.salida), a.trabajador).filter(m => m.tipo !== 'ok') })).filter(x => x.ms.length);
+        if (avisos.length) alert('Avisos de asistencia\n\n' +avisos.map(x => `• ${x.a.trabajador}: ${x.ms.map(m => m.texto).join('; ')}`).join('\n'));
         asistencia = filas;
         guardarBorrador();
         pintarEstadoAsis();
@@ -1317,8 +1978,26 @@
             return;
         }
 
+        // Con carnet: la tienda tiene que tener marcada al menos una entrada en este turno (en el equipo de marcaje).
+        // Excepción (por ejemplo, se dañó el equipo de marcaje): un administrador lo autoriza con su clave y un motivo.
+        let sinMarcaje = null;
+        if (conCarnet()) {
+            try { await consultarAsistencia(); } catch (errAsis) {}
+            // Sin internet, las marcas de esta tienda guardadas en el equipo cuentan: se envían antes que la ficha y la hoja lo revisa
+            if (!yaRegistrada() && !(await marcasEnCola(document.getElementById('tienda').value, document.getElementById('fecha').value))) {
+                document.getElementById('asisTarjeta').classList.add('falta');
+                const falta = "No se ha marcado la asistencia de entrada del turno " + (document.getElementById('turno').value || "") + " en " + (document.getElementById('tienda').value || "esta tienda") + ".";
+                if (!confirm(falta + "\n\nLos trabajadores deben marcar su entrada con el carnet en el equipo de marcaje antes de enviar la ficha." +
+                             "\n\n¿No se pudo marcar (por ejemplo, se dañó el equipo de marcaje)? Pulse Aceptar para enviarla con autorización de un administrador.")) return;
+                const motivo = (prompt("Motivo (por ejemplo: se dañó el equipo de marcaje):") || "").trim();
+                if (!motivo) { alert("Sin motivo no se puede enviar la ficha sin asistencia marcada."); return; }
+                const claveAdm = prompt("Clave de administrador:") || "";
+                if (!claveAdm) return;
+                sinMarcaje = { motivo, claveAdmin: claveAdm };   // el servidor revisa la clave y deja la autorización registrada
+            }
+        }
         // Control de asistencia obligatorio, salvo que el turno ya lo tenga registrado en la hoja
-        if (!asistenciaCompleta()) {
+        if (!conCarnet() && !asistenciaCompleta()) {
             try { await consultarAsistencia(); } catch (errAsis) {}
             if (!asistenciaCompleta()) {
                 document.getElementById('asisTarjeta').classList.add('falta');
@@ -1406,14 +2085,16 @@
                 })),
 
                 // Control de asistencia del turno (vacío si ya estaba registrado por otra ficha)
-                asistencia: asistencia,
+                asistencia: conCarnet() ? [] : asistencia,   // con carnet la asistencia ya está en la hoja
+                sinMarcaje,                                   // autorización de administrador si no se pudo marcar la asistencia
                 asistenciaYaRegistrada: !asistencia.length && yaRegistrada()
             };
 
-            const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxy1eQSl0k8QRHOQj3Ee4gGYJDOQdTmtSfDId-lKh97nGSFCdorH8HTSlhvK6vENRwO/exec";
+            const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyS0CMaKtl9A0ViefcNY_E6Mafqv1rCSFVDLbjjkZXWmtu04ZA-WjtkXyx3ZVS48CwV/exec";
 
             // Se lee la respuesta del script para confirmar que la hoja guardó la ficha
             // (antes se enviaba "a ciegas" y siempre decía "éxito", aunque fallara)
+            payload.idem = COLA.nuevoIdem();   // si Google la guardó pero no respondió, al reenviarla con el mismo idem no se duplica
             let respuesta;
             try {
                 const resp = await fetch(WEB_APP_URL, {
@@ -1423,7 +2104,16 @@
                 });
                 respuesta = JSON.parse(await resp.text());
             } catch (errRed) {
-                throw new Error("No hubo respuesta de la hoja (conexión o script). Revise la hoja antes de reenviar para no duplicar.");
+                // Sin respuesta (sin internet o Google no contestó): la ficha queda guardada en este equipo y se envía sola
+                const sinRed = await COLA.sinInternet();
+                await COLA.agregar({ tipo: 'ficha', desc: `Ficha ${payload.tienda} · ${payload.fecha} · ${payload.turno} · ${payload.cajero}`, cuerpo: payload, idem: payload.idem,
+                                     extra: { tienda: payload.tienda, fecha: payload.fecha } });
+                localStorage.removeItem('caja_borrador');
+                alert((sinRed ? "No hay internet." : "La hoja no respondió.") + " La ficha quedó guardada en este equipo y se enviará sola cuando haya conexión, sin duplicarse. No la vuelva a llenar." +
+                      "\n\nEl número de ficha y el PDF se generan al enviarse: verá el aviso en esta pantalla. Mientras tanto aparece abajo como pendiente.");
+                document.getElementById('mainForm').reset();
+                window.location.reload();
+                return;
             }
             if (!respuesta || respuesta.resultado !== "exito") {
                 const detalle = respuesta ? (respuesta.detalle || respuesta.error || JSON.stringify(respuesta)) : "sin detalle";
