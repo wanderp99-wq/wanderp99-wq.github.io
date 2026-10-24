@@ -66,12 +66,13 @@
             </div>
             <div id="video" class="hidden"></div>
         </div>
-        <div id="resultado" class="resultado espera">Pase un carnet por el lector o frente a la cámara</div>
+        <div id="resultado" class="resultado espera">Pase un carnet por el lector, o muestre a la cámara el código QR (el cuadrado) del carnet</div>
         <div class="card" style="margin-top:14px">
             <label>Últimas pruebas</label>
             <ul class="historial" id="historial"><li><small>Todavía no ha probado ningún carnet.</small></li></ul>
         </div>
-        <p class="nota">Se muestra lo mismo que verá el trabajador al marcar su entrada, incluido el saludo. Si un carnet dice "no se leyó bien", páselo otra vez; si dice "no está registrado",
+        <p class="nota"><b>Con la cámara, use el código QR</b> (el cuadrado): se lee mucho mejor que el código de barras, que es para el lector USB.
+            Se muestra lo mismo que verá el trabajador al marcar su entrada, incluido el saludo. Si un carnet dice "no se leyó bien", páselo otra vez; si dice "no está registrado",
             se reemplazó por uno nuevo o falta asignarlo en Talento humano › Trabajadores.</p>
     </section>
 </main>
@@ -150,8 +151,8 @@
         try {
             await cargarScript('https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js');
             $('video').classList.remove('hidden');
-            cam = new Html5Qrcode('video', { formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.CODE_128], verbose: false });
-            await cam.start({ facingMode: 'environment' }, { fps: 8, qrbox: { width: 260, height: 180 } }, t => probar(t), () => {});
+            cam = new Html5Qrcode('video', { formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.CODE_128], verbose: false, experimentalFeatures: { useBarCodeDetectorIfSupported: true } });
+            await cam.start({ facingMode: 'environment' }, { fps: 15, qrbox: (w, h) => ({ width: Math.floor(w * 0.92), height: Math.floor(Math.min(h * 0.6, w * 0.55)) }), videoConstraints: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 }, advanced: [{ focusMode: 'continuous' }] } }, t => probar(t), () => {});
             btn.textContent = 'Cerrar cámara';
         } catch (e) { detenerCamara(); pintar({ error: 'No se pudo abrir la cámara: ' + (e && e.message ? e.message : e) + '. Permita el uso de la cámara en el navegador.' }); }
         finally { btn.disabled = false; }

@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="theme-color" content="#FF4000">
+    <link rel="apple-touch-icon" href="iconos/icon-192.png">
     <title>Dashboard general</title>
     <!-- Tipografía estilo iOS: en iPhone/Mac usa San Francisco (la del sistema); en Windows/Android, Inter (la más parecida) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -765,6 +768,11 @@
             cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: transform .15s, box-shadow .15s; }
         .hor-ficha:hover { box-shadow: 0 2px 8px color-mix(in srgb, var(--fc) 30%, transparent); }
         .hor-ficha.prestado { border-style: dashed; }
+        /* Turno que su trabajador hace en otra tienda (se ve en su tienda, no se arrastra) */
+        .hor-afuera { display: inline-flex; align-items: center; max-width: 100%; padding: .2rem .55rem; margin: .1rem; border-radius: 999px; font-size: .72rem; font-weight: 600;
+            color: var(--text-muted); border: 1px dashed var(--border); background: var(--list-bg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .hor-afuera b { color: var(--text-main); font-weight: 600; margin-right: .25rem; }
+        .req-dlg.hor-img-dlg { width: min(860px, 100%); } .hor-img-dlg img { width: 100%; border-radius: 12px; border: 1px solid var(--border); display: block; }
         .hor-ficha.no-puede { border-color: var(--bad); box-shadow: 0 0 0 1px var(--bad); } .hor-ficha.no-puede::before { content: '⚠'; color: var(--bad); margin-right: .25rem; }
         /* En Corrido y Libre el nombre va como texto gris (sigue siendo arrastrable) */
         .hor-ficha.texto { background: none; border-color: transparent; color: var(--text-muted); font-weight: 500; padding: .12rem .3rem; border-radius: 6px; }
@@ -1201,9 +1209,6 @@
             .vista tr.fila-egreso { border-left-color: var(--bad); }
             .vista tr.fila-externo { border-left-color: var(--ok); }
         }</style>
-    <link rel="manifest" href="manifest.webmanifest">
-    <meta name="theme-color" content="#FF4000">
-    <link rel="apple-touch-icon" href="iconos/icon-192.png">
 </head>
 <body>
 <script>
@@ -7971,6 +7976,8 @@
         horDatos.horarios.filter(x => x.id === w.id && x.local !== horLocal).forEach(x => dias.forEach((c, i) => {
             if (turnos(c).some(tt => turnos((x.dias || [])[i]).includes(tt))) a.push(`choca con ${x.local} el ${HOR_DIAS[i]}`); }));
         if (horEsPrestado(w)) return a.concat(dias.flatMap((c, i) => turnos(c).filter(tt => !horPuede(w, i, tt)).map(tt => `no puede ${HOR_DIAS[i]} ${HOR_COD[tt].toLowerCase()}`)));
+        const fuera = horAfuera(w, horLocal);
+        dias = dias.map((c, i) => c || (fuera[i] ? fuera[i].c : ''));   // lo que trabaja en otra tienda cuenta como asignado
         if (dias.some(x => !x)) a.push('días sin asignar');
         if (n('L') !== 1) a.push(n('L') ? n('L') + ' días libres' : 'sin día libre');
         if (n('C') !== 1) a.push(n('C') ? n('C') + ' días corridos' : 'sin día corrido');
@@ -8042,6 +8049,15 @@
         perPintar();
         mostrarBanner(`Horario de ${horLocal} limpio. Arme el nuevo y pulse Guardar (o cambie de semana sin guardar para conservar el anterior).`, 'ok');
     }
+    // Volver al horario guardado: se descartan los cambios sin guardar de esta tienda y semana y se lee de nuevo de la hoja
+    function horRecuperar() {
+        const k = horClave(horLocal);
+        if (!horDatos.horarios.some(x => x.local === horLocal)) { mostrarBanner(`No hay horario guardado de ${horLocal} para esta semana.`, 'warn'); return; }
+        if (horSinGuardar(horLocal) && !confirm(`¿Descartar los cambios sin guardar y volver al horario guardado de ${horLocal}?`)) return;
+        delete horBorr[k]; delete horPrestados[k]; delete horMas[k]; horElegida = null;
+        horDatos = null; perPintar();   // se vuelve a leer de la hoja (por si otro equipo lo cambió)
+        mostrarBanner(`Se recuperó el horario guardado de ${horLocal}.`, 'ok');
+    }
     function horCopiarAnterior() {
         const ant = horDatos.anterior.filter(x => x.local === horLocal);
         if (!ant.length) return;
@@ -8063,17 +8079,110 @@
         } catch (e) { mostrarBanner('No se pudo guardar el horario: ' + e.message, 'error'); }
         perPintar();
     }
-    async function horEnviar(btn) {
-        const actual = inicioSemana(fechaLocalHoy());
-        if (!confirm(`¿Enviar el horario de ${horLocal} al grupo de Telegram de la tienda y a sus encargados?\n\n${horSemana === actual ? 'Se envía como el horario vigente a partir de hoy.' : 'Se envía como el horario vigente a partir del sábado ' + fechaBonita(horSemana) + '.'}`)) return;
+    // ---------- Horario como imagen (el tablero tal cual y abajo un resumen por trabajador) para enviarlo por Telegram ----------
+    function horImagen(local) {
+        const ws = horTrabajadores(local), plan = horPlan(local), W = 1600, M = 40, colW = (W - 2 * M) / 7, lh = 40;
+        const C = { fondo: '#ffffff', texto: '#111827', gris: '#6b7280', borde: '#e5e7eb', suave: '#f8fafc', azul: '#2563eb', caja: '#2a78d6', resto: '#1baf7a' };
+        const SEC = { M: ['MAÑANA', '#f59e0b'], T: ['TARDE', '#3b82f6'], C: ['CORRIDO', '#8b5cf6'], L: ['LIBRE', '#94a3b8'] };
+        const esta = { M: c => c === 'M' || c === 'C', T: c => c === 'T' || c === 'C', C: c => c === 'C', L: c => c === 'L' };
+        const fuente = (px, peso = 500) => `${peso} ${px}px Inter, "Segoe UI", Arial, sans-serif`;
+        const nombre = w => horCorto(w.nombre) + (horEsPrestado(w) ? ` (${w.local || 'otra tienda'})` : '');
+        // Lo que va en cada celda: [{ texto, color, tipo: 'ficha' | 'texto' | 'fuera' }]
+        const celdas = {};
+        ['M', 'T', 'C', 'L'].forEach(cod => HOR_DIAS.forEach((_, i) => {
+            const l = ws.filter(w => esta[cod]((plan[w.id] || [])[i])).map(w => ({ texto: nombre(w), color: horEsCaja(w.cargo) ? C.caja : C.resto, tipo: cod === 'C' || cod === 'L' ? 'texto' : 'ficha' }));
+            ws.filter(w => !horEsPrestado(w)).forEach(w => { const f = horAfuera(w, local)[i]; if (f && esta[cod](f.c)) l.push({ texto: String(w.nombre).trim().split(/\s+/)[0] + ' · en ' + f.local, tipo: 'fuera' }); });   // solo el primer nombre: que quepa la tienda
+            celdas[cod + i] = l;
+        }));
+        const altoFila = cod => Math.max(56, Math.max(...HOR_DIAS.map((_, i) => celdas[cod + i].length)) * lh + 16);
+        const resumen = ws.filter(w => (plan[w.id] || []).some(Boolean) || horAfuera(w, local).some(Boolean)).map(w => {
+            const d = plan[w.id] || Array(7).fill(''), f = horEsPrestado(w) ? Array(7).fill(null) : horAfuera(w, local);
+            const dias = c => HOR_DIAS.filter((_, i) => d[i] === c).map(x => x.charAt(0) + x.slice(1).toLowerCase()).join(', ') || '—';
+            return { w, turnos: horUsados(d) + horUsados(f.map(x => x ? x.c : '')), man: d.filter(c => c === 'M').length, tar: d.filter(c => c === 'T').length, corrido: dias('C'), libre: dias('L'),
+                     fuera: f.map((x, i) => x ? `${HOR_DIAS[i].charAt(0) + HOR_DIAS[i].slice(1).toLowerCase()} ${HOR_COD[x.c].toLowerCase()} (${x.local})` : '').filter(Boolean).join(', ') };
+        });
+        const H = 130 + 64 + ['M', 'T', 'C', 'L'].reduce((s, c) => s + 44 + altoFila(c), 0) + 40 + 70 + 52 + resumen.length * 46 + 70;
+        const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+        const x = cv.getContext('2d');
+        const recorta = (txt, ancho) => { if (x.measureText(txt).width <= ancho) return txt; while (txt.length > 1 && x.measureText(txt + '…').width > ancho) txt = txt.slice(0, -1); return txt + '…'; };
+        const pildora = (px, py, w, h, r) => { x.beginPath(); x.moveTo(px + r, py); x.arcTo(px + w, py, px + w, py + h, r); x.arcTo(px + w, py + h, px, py + h, r); x.arcTo(px, py + h, px, py, r); x.arcTo(px, py, px + w, py, r); x.closePath(); };
+        x.fillStyle = C.fondo; x.fillRect(0, 0, W, H); x.textBaseline = 'middle';
+        // Título
+        x.fillStyle = C.azul; x.font = fuente(40, 700); x.fillText(`Horario de trabajo · ${local}`, M, 56);
+        x.fillStyle = C.gris; x.font = fuente(24); x.fillText(`Semana ${diaSemana(horSemana)} ${fechaBonita(horSemana)} – ${diaSemana(sumarDias(horSemana, 6))} ${fechaBonita(sumarDias(horSemana, 6))}`, M, 100);
+        let y = 130;
+        // Encabezado de días
+        x.fillStyle = '#eef4ff'; x.fillRect(M, y, W - 2 * M, 64); x.fillStyle = C.azul; x.fillRect(M, y + 62, W - 2 * M, 2);
+        HOR_DIAS.forEach((_, i) => { const f = sumarDias(horSemana, i), cx = M + i * colW + colW / 2; x.textAlign = 'center';
+            x.fillStyle = C.azul; x.font = fuente(24, 700); x.fillText(diaSemana(f).toUpperCase(), cx, y + 22); x.fillStyle = C.gris; x.font = fuente(18); x.fillText(fechaBonita(f).slice(0, 5), cx, y + 46); });
+        x.textAlign = 'left'; y += 64;
+        // Secciones
+        ['M', 'T', 'C', 'L'].forEach(cod => {
+            x.fillStyle = C.suave; x.fillRect(M, y, W - 2 * M, 44); x.fillStyle = SEC[cod][1]; x.fillRect(M, y, 6, 44);
+            x.fillStyle = C.texto; x.font = fuente(20, 700); x.fillText(SEC[cod][0], M + 20, y + 22); y += 44;
+            const h = altoFila(cod);
+            HOR_DIAS.forEach((_, i) => {
+                const cx = M + i * colW;
+                x.strokeStyle = C.borde; x.lineWidth = 1; x.strokeRect(cx + .5, y + .5, colW, h);
+                celdas[cod + i].forEach((e, k) => {
+                    const py = y + 8 + k * lh, ancho = colW - 16;
+                    if (e.tipo === 'ficha') {
+                        x.font = fuente(19, 600); const tx = recorta(e.texto, ancho - 24), tw = Math.min(ancho, x.measureText(tx).width + 24);
+                        pildora(cx + 8, py + 2, tw, 34, 17); x.fillStyle = e.color + '22'; x.fill(); x.strokeStyle = e.color + '88'; x.stroke();
+                        x.fillStyle = e.color; x.fillText(tx, cx + 20, py + 19);
+                    } else if (e.tipo === 'fuera') {
+                        x.font = fuente(15, 600); const tx = recorta(e.texto, ancho - 14), tw = Math.min(ancho, x.measureText(tx).width + 14);
+                        pildora(cx + 8, py + 2, tw, 34, 17); x.setLineDash([5, 4]); x.strokeStyle = '#9ca3af'; x.stroke(); x.setLineDash([]);
+                        x.fillStyle = C.gris; x.fillText(tx, cx + 15, py + 19);
+                    } else { x.font = fuente(19, 500); x.fillStyle = C.gris; x.fillText(recorta(e.texto, ancho - 8), cx + 12, py + 19); }
+                });
+            });
+            y += h;
+        });
+        // Leyenda
+        y += 20; x.font = fuente(18); [[C.caja, 'Caja (cajeros y encargados)'], [C.resto, 'Rebanadores y demás']].forEach(([c, n], k) => {
+            const lx = M + k * 360; pildora(lx, y, 28, 20, 10); x.fillStyle = c + '33'; x.fill(); x.strokeStyle = c; x.stroke(); x.fillStyle = C.gris; x.fillText(n, lx + 38, y + 10); });
+        y += 50;
+        // Resumen por trabajador
+        x.fillStyle = C.azul; x.font = fuente(28, 700); x.fillText('Resumen por trabajador', M, y + 20); y += 52;
+        const cols = [['Trabajador', 330], ['Turnos', 100], ['Mañana', 110], ['Tarde', 100], ['Corrido', 200], ['Libre', 200], ['En otra tienda', W - 2 * M - 1040]];
+        x.fillStyle = '#eef4ff'; x.fillRect(M, y, W - 2 * M, 46); x.font = fuente(18, 700); x.fillStyle = C.texto;
+        let cx = M; cols.forEach(([n, a]) => { x.fillText(n, cx + 12, y + 23); cx += a; }); y += 46;
+        resumen.forEach((r, k) => {
+            if (k % 2) { x.fillStyle = C.suave; x.fillRect(M, y, W - 2 * M, 46); }
+            x.strokeStyle = C.borde; x.beginPath(); x.moveTo(M, y + 46); x.lineTo(W - M, y + 46); x.stroke();
+            const vals = [horCorto(r.w.nombre) + ' · ' + (r.w.cargo || 'sin cargo') + (horEsPrestado(r.w) ? ' · de ' + (r.w.local || 'otra tienda') : ''), String(r.turnos), String(r.man), String(r.tar), r.corrido, r.libre, r.fuera || '—'];
+            cx = M; vals.forEach((v, j) => { x.font = fuente(18, j === 0 ? 600 : 500); x.fillStyle = j === 0 ? (horEsCaja(r.w.cargo) ? C.caja : C.resto) : C.texto; x.fillText(recorta(v, cols[j][1] - 20), cx + 12, y + 23); cx += cols[j][1]; });
+            y += 46;
+        });
+        x.fillStyle = C.gris; x.font = fuente(16); x.fillText(`Plaza Valencia · enviado el ${fechaBonita(fechaLocalHoy())}`, M, y + 40);
+        return cv.toDataURL('image/png');
+    }
+    // Enviar: primero se ve la imagen; al confirmar va al grupo de la tienda y a sus encargados
+    function horEnviar() {
+        let fondo = document.getElementById('horImgDlg');
+        if (!fondo) { fondo = document.createElement('div'); fondo.id = 'horImgDlg'; fondo.className = 'req-dlg-fondo hidden'; fondo.addEventListener('click', e => { if (e.target === fondo) fondo.classList.add('hidden'); }); document.body.appendChild(fondo); }
+        const img = horImagen(horLocal), actual = inicioSemana(fechaLocalHoy()), archivo = `Horario ${horLocal} ${horSemana}.png`;
+        fondo.innerHTML = `<div class="req-dlg hor-img-dlg" role="dialog" aria-label="Enviar horario"><div class="prg-head"><h3>Enviar horario de ${esc(horLocal)}</h3><button type="button" class="prg-x" title="Cerrar" onclick="document.getElementById('horImgDlg').classList.add('hidden')">✕</button></div>
+            <div class="req-sub">Así se enviará al grupo de Telegram de la tienda y a sus encargados, ${horSemana === actual ? 'como el horario vigente a partir de hoy' : 'como el horario vigente a partir del sábado ' + fechaBonita(horSemana)}.</div>
+            <img id="horImgVista" src="${img}" alt="Horario de ${esc(horLocal)}">
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><a class="btn-ghost" href="${img}" download="${esc(archivo)}" style="text-decoration:none">Descargar imagen</a>
+                <button type="button" class="btn-ghost" onclick="document.getElementById('horImgDlg').classList.add('hidden')">Cancelar</button>
+                <button type="button" class="btn-primary" id="horImgEnviar" onclick="horEnviarYa(this)">Enviar por Telegram</button></div></div>`;
+        fondo.classList.remove('hidden');
+    }
+    async function horEnviarYa(btn) {
+        const img = document.getElementById('horImgVista').src;
         btnCargando(btn, 'Enviando...');
         try {
-            const r = await llamarApi({ action: 'hor_telegram', semana: horSemana, local: horLocal });
+            const r = await llamarApi({ action: 'hor_telegram', semana: horSemana, local: horLocal, imagen: img.split(',')[1] });
             horDatos.horarios = r.horarios || horDatos.horarios;
             horUltimoMsj[horClave(horLocal)] = r.texto;
-            mostrarBanner(`Horario de ${horLocal} enviado al grupo${r.encargados.length ? ' y a ' + r.encargados.join(', ') : ''}.` +
-                          (r.sinChat.length ? ` Sin Telegram en su ficha: ${r.sinChat.join(', ')}.` : ''), r.sinChat.length ? 'warn' : 'ok');
-        } catch (e) { mostrarBanner('No se pudo enviar: ' + e.message, 'error'); }
+            document.getElementById('horImgDlg').classList.add('hidden');
+            mostrarBanner(`Horario de ${horLocal} enviado${r.comoImagen ? ' como imagen' : ''} al grupo${r.encargados.length ? ' y a ' + r.encargados.join(', ') : ''}.` +
+                          (!r.comoImagen ? ' (El script de Google es una versión anterior: se envió como texto. Publique Personal.gs para enviarlo como imagen.)' : '') +
+                          (r.sinChat.length ? ` Sin Telegram en su ficha: ${r.sinChat.join(', ')}.` : ''), r.sinChat.length || !r.comoImagen ? 'warn' : 'ok');
+        } catch (e) { mostrarBanner('No se pudo enviar: ' + e.message, 'error'); btn.disabled = false; btn.textContent = 'Enviar por Telegram'; return; }
         perPintar();
     }
     function horCabecera(conSemana) {
@@ -8113,9 +8222,10 @@
                 <button type="button" class="btn-primary" onclick="horGenerarYa()" ${ws.length ? '' : 'disabled'}>Generar automáticamente</button>
                 ${ant ? '<button type="button" class="btn-ghost" onclick="horCopiarAnterior()">Copiar la semana anterior</button>' : ''}
                 <button type="button" class="btn-ghost" onclick="horLimpiar()" ${ws.length ? '' : 'disabled'} title="Quita todos los turnos de esta semana (queda en borrador hasta Guardar)">Limpiar horario</button>
+                <button type="button" class="btn-ghost" onclick="horRecuperar()" ${guardado.length ? '' : 'disabled'} title="${guardado.length ? 'Descarta los cambios sin guardar y vuelve al horario guardado' : 'Todavía no hay horario guardado'}">Recuperar horario guardado</button>
                 <span class="espacio"></span>
                 <button type="button" class="btn-save" onclick="horGuardar(this)" ${sinGuardar ? '' : 'disabled'}>Guardar</button>
-                <button type="button" class="btn-ghost" onclick="horEnviar(this)" ${guardado.length && !sinGuardar && !pasada ? '' : 'disabled'} title="${sinGuardar ? 'Guarde primero los cambios' : pasada ? 'Esta semana ya pasó' : !guardado.length ? 'Guarde primero el horario' : 'Grupo de la tienda y encargados'}">Enviar por Telegram</button>
+                <button type="button" class="btn-ghost" onclick="horEnviar()" ${guardado.length && !sinGuardar && !pasada ? '' : 'disabled'} title="${sinGuardar ? 'Guarde primero los cambios' : pasada ? 'Esta semana ya pasó' : !guardado.length ? 'Guarde primero el horario' : 'Grupo de la tienda y encargados'}">Enviar por Telegram</button>
             </div>
             <div class="per-filtro-activo">${guardado.length ? `Guardado${enviado ? ` · enviado ${esc(enviado)}` : ' · todavía no se ha enviado'}` : 'Todavía no hay horario guardado para esta semana'}${sinGuardar ? ' · <b>hay cambios sin guardar</b>' : ''}
                 ${horSemana === actual ? ' · al enviarlo dirá "vigente a partir de hoy"' : ''}</div>
@@ -8157,6 +8267,18 @@
         const noPuede = dia >= 0 && (cod === 'C' ? ['M', 'T'] : cod === 'M' || cod === 'T' ? [cod] : []).some(x => !horPuede(w, dia, x));
         return `<span class="hor-ficha${sel ? ' sel' : ''}${prest ? ' prestado' : ''}${texto ? ' texto' : ''}${noPuede ? ' no-puede' : ''}" style="--fc:${horColor(w.cargo)}" data-hor-id="${esc(w.id)}" data-hor-dia="${dia}" data-hor-cod="${cod}" title="${esc(w.nombre)} · ${esc(w.cargo || 'sin cargo')}${prest ? ' · de ' + esc(w.local || 'otra tienda') : ''}${noPuede ? ' · su ficha dice que no puede este turno' : ''}">${esc(horCorto(w.nombre))}</span>`;
     }
+    // ---------- Turnos que un trabajador hace en otra tienda esta semana (llamado allá): se ven en su tienda y cuentan para sus turnos ----------
+    // [7] con { local, c } o null. Toma lo que se está armando en este panel para esa tienda y, si no, lo guardado.
+    function horAfuera(w, local) {
+        const out = Array(7).fill(null), otras = new Set(horDatos.horarios.filter(x => x.id === w.id && x.local !== local).map(x => x.local));
+        Object.keys(horBorr).forEach(k => { const [s, l] = k.split('|'); if (s === horSemana && l !== local && horBorr[k][w.id]) otras.add(l); });
+        otras.forEach(l => {
+            const borr = horBorr[horSemana + '|' + l], dias = borr && borr[w.id] ? borr[w.id] : ((horDatos.horarios.find(x => x.id === w.id && x.local === l) || {}).dias || []);
+            dias.forEach((c, i) => { if (!out[i] && (c === 'M' || c === 'T' || c === 'C')) out[i] = { local: l, c }; });
+        });
+        return out;
+    }
+    const horUsadosAfuera = (w, local) => horEsPrestado(w) ? 0 : horUsados(horAfuera(w, local).map(x => x ? x.c : ''));
     // ---------- Llamar a un trabajador de otra tienda (o departamento) para esta semana ----------
     const horPrestados = {};   // { 'semana|tienda': [ids] }
     const horEsPrestado = w => w.local !== horLocal;
@@ -8200,16 +8322,19 @@
     function horTablero(local, ws, plan) {
         horSelPintada = false;
         const pool = ws.filter(w => w.activo).map(w => {
-            const d = plan[w.id] || Array(7).fill(''), base = horBase(w), usados = horUsados(d), mas = Math.max(horMasDe(w.id), usados - base), total = base + mas, quedan = total - usados, prest = horEsPrestado(w);
-            const txt = (quedan > 0 ? `${quedan} de ${total}` : `${horCorto(w.nombre)} completo`) + (mas && !prest ? ` · <span class="hor-extra">${mas} de más</span>` : '');
+            const d = plan[w.id] || Array(7).fill(''), base = horBase(w), fuera = horUsadosAfuera(w, local), usados = horUsados(d) + fuera, mas = Math.max(horMasDe(w.id), usados - base), total = base + mas, quedan = total - usados, prest = horEsPrestado(w);
+            const lugares = [...new Set(horAfuera(w, local).filter(Boolean).map(x => x.local))];
+            const txt = (quedan > 0 ? `${quedan} de ${total}` : `${horCorto(w.nombre)} completo`) + (mas && !prest ? ` · <span class="hor-extra">${mas} de más</span>` : '') + (fuera && !prest ? ` · ${fuera} en ${esc(lugares.join(', '))}` : '');
             return `<span class="hortb-grupo">${prest ? `<span class="hortb-de">de ${esc(w.local || 'otra tienda')}</span>` : ''}${Array.from({ length: quedan }, () => horFicha(w, -1)).join('')}<small>${txt}</small>
                 ${mas > 0 && quedan > 0 && !(prest && total <= 1) ? `<button type="button" class="hortb-mas" title="Quitar un turno de más" onclick="horMasTurno('${esc(w.id)}', -1)">−</button>` : ''}
                 <button type="button" class="hortb-mas" title="Agregar un turno más a ${esc(w.nombre)}${prest ? '' : ` (además de los ${base} de su perfil)`}" onclick="horMasTurno('${esc(w.id)}', 1)">+</button>
                 ${prest && !usados ? `<button type="button" class="hortb-mas" title="Ya no llamarlo" onclick="horSoltarPrestado('${esc(w.id)}')">×</button>` : ''}</span>`;
         }).join('');
         const ayuda = { M: '', T: '', C: 'mañana y tarde (usa 2 turnos)', L: 'no usa turnos' };
+        const afuera = ws.filter(w => !horEsPrestado(w)).map(w => ({ w, dias: horAfuera(w, local) })).filter(a => a.dias.some(Boolean));
         const filas = HOR_SECCIONES.map(([cod, titulo, color, esta]) => `<tr class="hortb-sec" style="--hs:${color}"><td colspan="7">${titulo}${ayuda[cod] ? `<small>${ayuda[cod]}</small>` : ''}</td></tr>
-            <tr>${HOR_DIAS.map((_, i) => `<td class="hortb-celda${horElegida ? ' hor-elegible' : ''}" data-hor-drop="${i}|${cod}">${ws.filter(w => esta((plan[w.id] || [])[i])).map(w => horFicha(w, i, cod)).join('')}</td>`).join('')}</tr>`).join('');
+            <tr>${HOR_DIAS.map((_, i) => `<td class="hortb-celda${horElegida ? ' hor-elegible' : ''}" data-hor-drop="${i}|${cod}">${ws.filter(w => esta((plan[w.id] || [])[i])).map(w => horFicha(w, i, cod)).join('')}${
+                afuera.filter(a => a.dias[i] && esta(a.dias[i].c)).map(a => `<span class="hor-afuera" title="${esc(a.w.nombre)} trabaja este turno en ${esc(a.dias[i].local)}"><b>${esc(horCorto(a.w.nombre))}</b>en ${esc(a.dias[i].local)}</span>`).join('')}</td>`).join('')}</tr>`).join('');
         return `<div class="grafico-card"><div class="grafico-head"><h3>Arrastre cada nombre al día y turno</h3><button type="button" class="btn-ghost btn-mini" onclick="horLlamarVentana()">+ Llamar de otra tienda</button></div>
             <div class="hortb-pool" data-hor-drop="pool">${pool || '<span class="nota">No hay trabajadores activos.</span>'}</div>
             <div class="tabla-wrap"><table class="hortb"><thead><tr>${HOR_DIAS.map((_, i) => { const f = sumarDias(horSemana, i); return `<th>${diaSemana(f)}<small>${fechaBonita(f).slice(0, 5)}</small></th>`; }).join('')}</tr></thead>
@@ -8234,10 +8359,11 @@
         const nec = cod === 'C' ? ['M', 'T'] : cod === 'L' ? [] : [cod];
         const no = nec.find(x => !horPuede(w, dia, x));
         d[dia] = cod;
-        const n = horBase(w) + Math.max(horMasDe(id), horUsados(plan[id] || []) - horBase(w));
-        if (horUsados(d) > n) { mostrarBanner(`${w.nombre} ya tiene sus ${n} turnos de la semana. Pulse + junto a su nombre (arriba) para darle un turno más, o quite uno.`, 'warn'); perPintar(); return; }
+        const fuera = horUsadosAfuera(w, horLocal), diasFuera = horAfuera(w, horLocal);
+        const n = horBase(w) + Math.max(horMasDe(id), horUsados(plan[id] || []) + fuera - horBase(w));
+        if (horUsados(d) + fuera > n) { mostrarBanner(`${w.nombre} ya tiene sus ${n} turnos de la semana. Pulse + junto a su nombre (arriba) para darle un turno más, o quite uno.`, 'warn'); perPintar(); return; }
         // Con todos sus turnos puestos, los días que quedan vacíos pasan a ser su día libre (no a los llamados de otra tienda)
-        const libresAuto = !horEsPrestado(w) && horUsados(d) >= n ? d.map((x, i) => x ? -1 : i).filter(i => i >= 0) : [];
+        const libresAuto = !horEsPrestado(w) && horUsados(d) + fuera >= n ? d.map((x, i) => x || diasFuera[i] ? -1 : i).filter(i => i >= 0) : [];
         libresAuto.forEach(i => { d[i] = 'L'; });
         if (libresAuto.length) mostrarBanner(`${w.nombre} completó sus ${n} turnos: ${libresAuto.map(i => diaSemana(sumarDias(horSemana, i))).join(', ')} queda${libresAuto.length > 1 ? 'n' : ''} como día libre.`, 'ok');
         if (cod === 'L' && d.filter(x => x === 'L').length > 1) mostrarBanner(`${w.nombre} queda con ${d.filter(x => x === 'L').length} días libres.`, 'warn');
@@ -9471,7 +9597,8 @@
     // Código de barras (Code 128) y QR como SVG
     function svgBarras(codigo) {
         const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        JsBarcode(svg, codigo, { format: 'CODE128', displayValue: false, height: 40, margin: 0, width: 2 });
+        // Margen blanco a los lados (zona de silencio de 10 barras): sin él las cámaras no encuentran dónde empieza y termina el código
+        JsBarcode(svg, codigo, { format: 'CODE128', displayValue: false, height: 50, margin: 20, marginTop: 1, marginBottom: 1, width: 2, background: '#ffffff', lineColor: '#000000' });
         svg.setAttribute('preserveAspectRatio', 'none');   // ocupa todo el ancho del carnet (barras más anchas = se lee mejor)
         return svg.outerHTML + `<div class="num">${codigo.replace(/(\d{4})(?=\d)/g, '$1 ')}</div>`;
     }
@@ -9545,7 +9672,7 @@
             .marca-agua img{position:absolute;filter:grayscale(1) contrast(1.1) drop-shadow(-.45mm -.45mm 0 rgba(255,255,255,1)) drop-shadow(.5mm .5mm .2mm rgba(15,23,42,.6))}
             .dorso>*:not(.marca-agua){position:relative;z-index:1}
             .dorso .frase{text-shadow:0 0 .8mm #fff,0 0 1.6mm #fff}
-            .dorso .qr,.dorso .barras{background:#fff;padding:1.2mm;border-radius:1mm}   /* fondo liso: la marca de agua no estorba al lector */            .frente>*:not(.marca-agua):not(.pie){position:relative;z-index:1}
+            .dorso .qr,.dorso .barras{background:#fff;padding:1.2mm 0;border-radius:1mm}.dorso .qr{padding:1.2mm}   /* fondo liso: la marca de agua no estorba al lector */            .frente>*:not(.marca-agua):not(.pie){position:relative;z-index:1}
             .frente .nombre,.frente .cargo,.frente .datos{text-shadow:0 0 .8mm #fff,0 0 .8mm #fff,0 0 1.6mm #fff}
             .foto{width:30mm;height:37mm;border-radius:2.5mm;overflow:hidden;background:rgba(238,241,245,.25);border:.5mm solid #fff;outline:.3mm solid rgba(148,163,184,.6);display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:7pt;flex:none;box-shadow:0 .6mm 1.6mm rgba(15,23,42,.18)}
             .foto img{width:100%;height:100%;object-fit:cover}
@@ -9556,7 +9683,8 @@
             .dorso{justify-content:space-between;padding:5mm 3mm 6mm;border-top:3mm solid #FF4000}
             .dorso-logo{display:flex;flex-direction:column;align-items:center;gap:1mm}.dorso-logo img{width:22mm;height:22mm}.dorso-logo span{font-weight:800;font-size:9pt}
             .qr{width:26mm;height:26mm}.qr svg{width:100%;height:100%}
-            .barras{width:46mm}.barras svg{width:100%;height:11mm;display:block}.barras .num{display:none}
+            .barras{width:52mm;margin:0 -2mm}.barras svg{width:100%;height:13mm;display:block}
+            .barras .num{display:block;text-align:center;font:600 6.2pt 'Courier New',monospace;letter-spacing:.4pt;color:#334155;margin-top:.6mm}   /* el número, por si hay que escribirlo a mano */
             .frase{text-align:center;font-size:9pt;font-weight:700;font-style:italic;color:#FF4000}`;
         // De a 9 por hoja: la hoja de anversos y detrás la de reversos (en espejo: al imprimir a doble cara cada reverso cae detrás de su carnet)
         const hojas = [];
@@ -9703,7 +9831,7 @@
         clearTimeout(marcaLimpiar);
         const caja = document.getElementById('marcaResultado');
         if (!r || (!r.pregunta)) document.getElementById('marcaPasos').innerHTML = '';
-        if (!r) { caja.className = 'marca-resultado'; caja.innerHTML = '<div class="marca-espera">Pase su carnet por el lector o frente a la cámara</div>'; return; }
+        if (!r) { caja.className = 'marca-resultado'; caja.innerHTML = '<div class="marca-espera">Pase su carnet por el lector, o muestre a la cámara el código QR (el cuadrado) del carnet</div>'; return; }
         if (r.cargando) { caja.className = 'marca-resultado'; caja.innerHTML = '<div class="marca-espera">Marcando...</div>'; return; }
         if (r.pendiente) { caja.className = 'marca-resultado alerta'; caja.innerHTML = `<div class="marca-titulo">Marca guardada sin conexión · ${esc(r.hora)}</div><div class="marca-msj">Se registrará sola, con esta hora, cuando vuelva internet. No pase el carnet otra vez.</div>`; marcaLimpiar = setTimeout(() => marcaResultado(null), 7000); return; }
         if (r.error) { caja.className = 'marca-resultado mal'; caja.innerHTML = `<div class="marca-titulo">No se marcó</div><div class="marca-msj">${esc(r.error)}</div>`; }
@@ -9726,8 +9854,8 @@
         try {
             await cargarScript('https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js');
             document.getElementById('marcaVideo').classList.remove('hidden');
-            marcaCamara = new Html5Qrcode('marcaVideo', { formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.CODE_128], verbose: false });
-            await marcaCamara.start({ facingMode: 'environment' }, { fps: 8, qrbox: { width: 260, height: 180 } },
+            marcaCamara = new Html5Qrcode('marcaVideo', { formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.CODE_128], verbose: false, experimentalFeatures: { useBarCodeDetectorIfSupported: true } });
+            await marcaCamara.start({ facingMode: 'environment' }, { fps: 15, qrbox: (w, h) => ({ width: Math.floor(w * 0.92), height: Math.floor(Math.min(h * 0.6, w * 0.55)) }), videoConstraints: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 }, advanced: [{ focusMode: 'continuous' }] } },
                                     texto => { const c = String(texto).replace(/\D/g, ''); if (c) marcaRegistrar(c); }, () => {});
             btn.disabled = false; btn.textContent = 'Cerrar cámara';
         } catch (e) {

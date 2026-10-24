@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="theme-color" content="#1e293b">
+    <link rel="apple-touch-icon" href="iconos/icon-192.png">
     <title>Cuadre de Caja Consolidado</title>
     <!-- Tipografía estilo iOS: en iPhone/Mac usa San Francisco (la del sistema); en Windows/Android, Inter (la más parecida) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -356,9 +359,6 @@
         .tasa-nota.error { color: var(--danger); }
         .btn-reintentar { margin-top: 0.4rem; align-self: flex-start; background: transparent; color: var(--primary); border: 1px solid var(--border); padding: 0.35rem 0.75rem; }
     </style>
-    <link rel="manifest" href="manifest.webmanifest">
-    <meta name="theme-color" content="#1e293b">
-    <link rel="apple-touch-icon" href="iconos/icon-192.png">
 </head>
 <body>
 <script>
@@ -1430,7 +1430,7 @@
         clearTimeout(mfLimpiarId);
         const caja = document.getElementById('mfResultado');
         if (!r || !r.pregunta) document.getElementById('mfPasos').innerHTML = '';
-        if (!r) { caja.className = 'mf-resultado'; caja.innerHTML = '<div class="mf-espera">Pase el carnet por el lector o frente a la cámara</div>'; return; }
+        if (!r) { caja.className = 'mf-resultado'; caja.innerHTML = '<div class="mf-espera">Pase el carnet por el lector, o muestre a la cámara el código QR (el cuadrado) del carnet</div>'; return; }
         if (r.cargando) { caja.className = 'mf-resultado'; caja.innerHTML = '<div class="mf-espera">Marcando...</div>'; return; }
         if (r.pendiente) { caja.className = 'mf-resultado alerta'; caja.innerHTML = `<div class="mf-titulo">Marca guardada sin conexión · ${mfHora(r.hora)}</div><div class="mf-msj">Se registrará sola, con esta hora, cuando vuelva internet. No pase el carnet otra vez.</div>`; mfLimpiarId = setTimeout(() => { mfResultado(null); mfEnfocar(); }, 7000); return; }
         if (r.error) { caja.className = 'mf-resultado mal'; caja.innerHTML = `<div class="mf-titulo">No se marcó</div><div class="mf-msj">${escAsis(r.error)}</div>`; }
@@ -1455,8 +1455,8 @@
         try {
             await mfCargarScript('https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js');
             document.getElementById('mfVideo').classList.remove('hidden');
-            mfCam = new Html5Qrcode('mfVideo', { formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.CODE_128], verbose: false });
-            await mfCam.start({ facingMode: 'environment' }, { fps: 8, qrbox: { width: 260, height: 180 } }, t => { const c = String(t).replace(/\D/g, ''); if (c) mfMarcar(c); }, () => {});
+            mfCam = new Html5Qrcode('mfVideo', { formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.CODE_128], verbose: false, experimentalFeatures: { useBarCodeDetectorIfSupported: true } });
+            await mfCam.start({ facingMode: 'environment' }, { fps: 15, qrbox: (w, h) => ({ width: Math.floor(w * 0.92), height: Math.floor(Math.min(h * 0.6, w * 0.55)) }), videoConstraints: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 }, advanced: [{ focusMode: 'continuous' }] } }, t => { const c = String(t).replace(/\D/g, ''); if (c) mfMarcar(c); }, () => {});
             btn.textContent = 'Cerrar cámara';
         } catch (e) {
             mfDetenerCamara();
