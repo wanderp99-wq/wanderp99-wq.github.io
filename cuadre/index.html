@@ -188,7 +188,7 @@
             -webkit-appearance: none;
             margin: 0;
         }
-        input[type="number"] {
+        input[type="number"], input[data-num] {
             -moz-appearance: textfield;
         }
 
@@ -540,6 +540,61 @@
         document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') enviar(); });
         setInterval(enviar, 30000);
         return { nuevoIdem, agregar, enviar, lista, sinInternet, reintentar, descartar, abrirItem, configurar, aviso, ahoraLocal };
+    })();
+</script>
+<script>
+    // ==========================================
+    // MONTOS CON FORMATO (el mismo bloque en el Dashboard y en la ficha). Todo campo numérico (input type="number") se convierte
+    // solo, también los que se agreguen, en un campo que se escribe como moneda: 1.250,25 (punto de miles y coma decimal; un punto
+    // escrito al final se toma como coma). El código sigue leyendo .value como siempre ("1250.25") y al poner .value = 1250.25 se ve
+    // "1.250,25". Los decimales salen del step del campo (step="1" = sin decimales). Para dejar un campo sin formato: data-sin-formato.
+    // ==========================================
+    const NUM = (() => {
+        const nativo = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+        const decimales = el => { const s = el.getAttribute('data-step') || ''; return !s ? 2 : s === 'any' ? 3 : (s.split('.')[1] || '').length; };
+        const negativos = el => !(el.getAttribute('min') !== null && Number(el.getAttribute('min')) >= 0);
+        // Lo que se ve ("1.250,25") a número de JavaScript ("1250.25")
+        const leer = t => { t = String(t || '').trim(); if (!t) return ''; const n = t.replace(/\./g, '').replace(',', '.'); return n === '-' ? '' : n; };
+        // Número (o texto con punto decimal, como lo pone el código) a lo que se ve
+        function mostrar(v, dec) {
+            if (v === '' || v === null || v === undefined) return '';
+            let n = typeof v === 'number' ? v : Number(String(v).trim());
+            if (!isFinite(n)) n = Number(leer(v));
+            if (!isFinite(n)) return '';
+            return n.toLocaleString('es-VE', { minimumFractionDigits: 0, maximumFractionDigits: dec, useGrouping: true });
+        }
+        // Mientras se escribe: puntos de miles automáticos, coma decimal, y el cursor queda en su lugar
+        function vivo(el) {
+            const raw = nativo.get.call(el), dec = decimales(el);
+            let pos = el.selectionStart == null ? raw.length : el.selectionStart, s = raw;
+            if (dec > 0 && s[pos - 1] === '.' && !s.includes(',')) s = s.slice(0, pos - 1) + ',' + s.slice(pos);   // el punto recién escrito es la coma
+            const neg = negativos(el) && s.trim().startsWith('-');
+            const antes = s.slice(0, pos).replace(/[^\d,]/g, '').length;
+            const partes = s.replace(/[^\d,]/g, '').split(',');
+            const ent = partes[0].replace(/^0+(?=\d)/, ''), coma = dec > 0 && partes.length > 1, decs = coma ? partes.slice(1).join('').slice(0, dec) : '';
+            const nuevo = (neg ? '-' : '') + ent.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + (coma ? ',' + decs : '');
+            if (nuevo === raw) return;
+            nativo.set.call(el, nuevo);
+            let i = neg ? 1 : 0, k = 0; while (i < nuevo.length && k < antes) { if (/[\d,]/.test(nuevo[i])) k++; i++; }
+            try { el.setSelectionRange(i, i); } catch (e) {}
+        }
+        function convertir(el) {
+            if (el._num || el.type !== 'number' || el.hasAttribute('data-sin-formato')) return;
+            el._num = true;
+            const v = nativo.get.call(el);
+            el.setAttribute('data-step', el.getAttribute('step') || '');
+            el.type = 'text'; el.setAttribute('data-num', ''); el.autocomplete = 'off';
+            el.setAttribute('inputmode', decimales(el) ? 'decimal' : 'numeric');
+            Object.defineProperty(el, 'value', { configurable: true,
+                get() { return leer(nativo.get.call(this)); },
+                set(x) { nativo.set.call(this, mostrar(x, decimales(this))); } });
+            el.value = v;
+        }
+        const todos = raiz => { if (raiz.matches && raiz.matches('input[type=number]')) convertir(raiz); (raiz.querySelectorAll ? raiz.querySelectorAll('input[type=number]') : []).forEach(convertir); };
+        new MutationObserver(rs => rs.forEach(r => r.addedNodes.forEach(n => { if (n.nodeType === 1) todos(n); }))).observe(document.documentElement, { childList: true, subtree: true });
+        document.addEventListener('DOMContentLoaded', () => todos(document));
+        document.addEventListener('input', e => { if (e.target._num) vivo(e.target); }, true);   // en captura: antes del oninput del campo
+        return { convertir, todos, mostrar, leer };
     })();
 </script>
 

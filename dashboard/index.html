@@ -132,6 +132,8 @@
         .efe-ico { background: none; border: 0; cursor: pointer; font-size: 1rem; line-height: 1; text-decoration: none; padding: .2rem .3rem; border-radius: 6px; }
         .efe-ico:hover { background: var(--list-bg); } .efe-c { text-align: center !important; } .efe-e { font-size: .62rem; color: var(--text-muted); margin-left: .12rem; font-weight: 700; }
         .efe-falta { color: var(--text-muted); } .efe-tipo { margin-right: .35rem; }
+        .efe-fecha { font-size: .78rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+        td.efe-gris, td.efe-gris span { color: var(--text-muted); font-size: .84rem; }   /* tienda, concepto, turno y cajero en gris: el monto resalta */
         #efeCTabla th, #efeCTabla td { padding: .35rem .45rem; overflow: hidden; text-overflow: ellipsis; }
         #efeCTabla td.izq { white-space: normal; overflow-wrap: anywhere; }
 
@@ -230,7 +232,7 @@
         tr.fila-link td:first-child { color: var(--primary); font-weight: 600; }
         input[type="number"]::-webkit-inner-spin-button,
         input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-        input[type="number"] { -moz-appearance: textfield; text-align: right; font-variant-numeric: tabular-nums; }
+        input[type="number"], input[data-num] { -moz-appearance: textfield; text-align: right; font-variant-numeric: tabular-nums; }
 
         /* Filtros: el mismo formato en todos los módulos (orden: Buscar · fechas · tienda · estado/tipo), alineados abajo a la misma altura */
         .filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: .9rem; margin-bottom: 1.25rem; align-items: end; }
@@ -640,7 +642,7 @@
         .prg-monto label { display: flex; align-items: center; border: 1px solid var(--border); border-radius: 10px; background: var(--input-bg); padding-left: .65rem; }
         .prg-monto label span { color: var(--text-muted); font-weight: 600; } .prg-monto input { border: 0 !important; background: transparent; font-size: 1.15rem; width: 100%; min-width: 0; text-align: right; box-shadow: none !important; }
         .prg-linea { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; font-size: .88rem; color: var(--text-muted); }
-        .prg-linea input { width: auto; max-width: 9.5rem; padding: .3rem .45rem; } .prg-linea input[type=number] { max-width: 6.5rem; }
+        .prg-linea input { width: auto; max-width: 9.5rem; padding: .3rem .45rem; } .prg-linea input[type=number], .prg-linea input[data-num] { max-width: 6.5rem; }
         .prg-vence { display: flex; flex-direction: column; gap: .4rem; }
         .prg-chips { display: flex; flex-wrap: wrap; gap: .4rem; } .prg-chips input { display: none; }
         .prg-chips span { display: inline-block; padding: .4rem .8rem; border: 1px solid var(--border); border-radius: 999px; cursor: pointer; }
@@ -914,7 +916,7 @@
         .per-desglose tr.tot td { font-weight: 700; border-top: 1px solid var(--border); }
         .per-turnos { display: flex; align-items: center; gap: .5rem 1rem; flex-wrap: wrap; }
         .per-turnos label { margin: 0; display: flex; align-items: center; gap: .4rem; font-size: .82rem; }
-        .per-turnos input[type=number] { width: 80px; }
+        .per-turnos input[type=number], .per-turnos input[data-num] { width: 80px; }
         .per-desglose tr.per-sin td { color: var(--text-muted); text-decoration: line-through; } .per-desglose tr.per-sin td:last-child { text-decoration: none; }
         .req-dlg.per-dlg-ancho { width: min(1000px, 100%); max-width: min(1000px, 100%); }
         .per-htabla td { vertical-align: top; } .per-htabla input[type=time] { width: 112px; padding: .3rem .4rem; }
@@ -1176,7 +1178,7 @@
             #detalle .tabla-wrap > table { min-width: 0; table-layout: auto; }
             #detalle th:nth-child(5), #detalle td:nth-child(5), #detalle th:nth-child(6), #detalle td:nth-child(6) { display: none; }   /* el color de la diferencia ya dice si cuadra */
             #detalle td.metodo small { display: none; }
-            #detalle td input[type=number] { min-width: 84px; padding: .45rem; }
+            #detalle td input[type=number], #detalle td input[data-num] { min-width: 84px; padding: .45rem; }
             #detalle td .chip { font-size: .68rem; padding: .1rem .35rem; }
             #detalle tr.desglose td { display: table-cell !important; }
         }
@@ -1389,6 +1391,61 @@
         return { nuevoIdem, agregar, enviar, lista, sinInternet, reintentar, descartar, abrirItem, configurar, aviso, ahoraLocal };
     })();
 </script>
+<script>
+    // ==========================================
+    // MONTOS CON FORMATO (el mismo bloque en el Dashboard y en la ficha). Todo campo numérico (input type="number") se convierte
+    // solo, también los que se agreguen, en un campo que se escribe como moneda: 1.250,25 (punto de miles y coma decimal; un punto
+    // escrito al final se toma como coma). El código sigue leyendo .value como siempre ("1250.25") y al poner .value = 1250.25 se ve
+    // "1.250,25". Los decimales salen del step del campo (step="1" = sin decimales). Para dejar un campo sin formato: data-sin-formato.
+    // ==========================================
+    const NUM = (() => {
+        const nativo = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+        const decimales = el => { const s = el.getAttribute('data-step') || ''; return !s ? 2 : s === 'any' ? 3 : (s.split('.')[1] || '').length; };
+        const negativos = el => !(el.getAttribute('min') !== null && Number(el.getAttribute('min')) >= 0);
+        // Lo que se ve ("1.250,25") a número de JavaScript ("1250.25")
+        const leer = t => { t = String(t || '').trim(); if (!t) return ''; const n = t.replace(/\./g, '').replace(',', '.'); return n === '-' ? '' : n; };
+        // Número (o texto con punto decimal, como lo pone el código) a lo que se ve
+        function mostrar(v, dec) {
+            if (v === '' || v === null || v === undefined) return '';
+            let n = typeof v === 'number' ? v : Number(String(v).trim());
+            if (!isFinite(n)) n = Number(leer(v));
+            if (!isFinite(n)) return '';
+            return n.toLocaleString('es-VE', { minimumFractionDigits: 0, maximumFractionDigits: dec, useGrouping: true });
+        }
+        // Mientras se escribe: puntos de miles automáticos, coma decimal, y el cursor queda en su lugar
+        function vivo(el) {
+            const raw = nativo.get.call(el), dec = decimales(el);
+            let pos = el.selectionStart == null ? raw.length : el.selectionStart, s = raw;
+            if (dec > 0 && s[pos - 1] === '.' && !s.includes(',')) s = s.slice(0, pos - 1) + ',' + s.slice(pos);   // el punto recién escrito es la coma
+            const neg = negativos(el) && s.trim().startsWith('-');
+            const antes = s.slice(0, pos).replace(/[^\d,]/g, '').length;
+            const partes = s.replace(/[^\d,]/g, '').split(',');
+            const ent = partes[0].replace(/^0+(?=\d)/, ''), coma = dec > 0 && partes.length > 1, decs = coma ? partes.slice(1).join('').slice(0, dec) : '';
+            const nuevo = (neg ? '-' : '') + ent.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + (coma ? ',' + decs : '');
+            if (nuevo === raw) return;
+            nativo.set.call(el, nuevo);
+            let i = neg ? 1 : 0, k = 0; while (i < nuevo.length && k < antes) { if (/[\d,]/.test(nuevo[i])) k++; i++; }
+            try { el.setSelectionRange(i, i); } catch (e) {}
+        }
+        function convertir(el) {
+            if (el._num || el.type !== 'number' || el.hasAttribute('data-sin-formato')) return;
+            el._num = true;
+            const v = nativo.get.call(el);
+            el.setAttribute('data-step', el.getAttribute('step') || '');
+            el.type = 'text'; el.setAttribute('data-num', ''); el.autocomplete = 'off';
+            el.setAttribute('inputmode', decimales(el) ? 'decimal' : 'numeric');
+            Object.defineProperty(el, 'value', { configurable: true,
+                get() { return leer(nativo.get.call(this)); },
+                set(x) { nativo.set.call(this, mostrar(x, decimales(this))); } });
+            el.value = v;
+        }
+        const todos = raiz => { if (raiz.matches && raiz.matches('input[type=number]')) convertir(raiz); (raiz.querySelectorAll ? raiz.querySelectorAll('input[type=number]') : []).forEach(convertir); };
+        new MutationObserver(rs => rs.forEach(r => r.addedNodes.forEach(n => { if (n.nodeType === 1) todos(n); }))).observe(document.documentElement, { childList: true, subtree: true });
+        document.addEventListener('DOMContentLoaded', () => todos(document));
+        document.addEventListener('input', e => { if (e.target._num) vivo(e.target); }, true);   // en captura: antes del oninput del campo
+        return { convertir, todos, mostrar, leer };
+    })();
+</script>
 
 <div class="container">
     <div class="header-bar">
@@ -1463,7 +1520,7 @@
         <p class="menu-sub">Seleccione un módulo</p>
         <div id="menuModulos" class="menu-grid"></div>
         <div class="grafico-card hidden" id="menuEnLineaCard" style="margin-top:1.25rem">
-            <div class="grafico-head"><h3>Conectados ahora <span class="chip-mini" id="menuEnLineaN"></span></h3><button type="button" class="btn-ghost btn-mini" onclick="menuCargarEnLinea()">Actualizar</button></div>
+            <div class="grafico-head"><h3>Conectados ahora <span class="chip-mini" id="menuEnLineaN"></span></h3><button type="button" class="btn-ghost btn-mini act-modulo" onclick="menuCargarEnLinea()">Actualizar</button></div>
             <div class="grafico-sub">Personas con la sesión abierta en el panel y el módulo en el que están. Se actualiza solo cada 30 segundos.</div>
             <div id="menuEnLinea"></div>
         </div>
@@ -1770,7 +1827,7 @@
         <!-- Paso 2: administrar -->
         <div id="admPanel" class="hidden">
             <div class="grafico-card">
-                <div class="grafico-head"><h3>En línea</h3><button type="button" class="btn-ghost btn-mini" onclick="admCargarEnLinea()">Actualizar</button></div>
+                <div class="grafico-head"><h3>En línea</h3><button type="button" class="btn-ghost btn-mini act-modulo" onclick="admCargarEnLinea()">Actualizar</button></div>
                 <div class="grafico-sub">Quién tiene el panel abierto ahora (se actualiza solo cada 30 segundos). Incluye los equipos de marcaje.</div>
                 <div id="admEnLinea"></div>
             </div>
@@ -2919,7 +2976,7 @@
         document.getElementById('btnClaves').classList.toggle('hidden', vista === 'login' || vista === 'menu' || vista === 'marcaje');
         document.getElementById('menuAcciones').classList.toggle('hidden', !esPrincipal);
         setTimeout(pintarAtras, 0);
-        document.getElementById('btnActualizar').classList.toggle('hidden', !ACTUALIZAR[vista]);   // el mismo botón, en el mismo lugar, en todos los módulos
+        document.getElementById('btnActualizar').classList.toggle('hidden', vista === 'login' || vista === 'marcaje');   // el mismo botón, en el mismo lugar, en absolutamente todos los módulos
         ocultarBanner();
         mostrarBienvenida();
         if (vista === 'menu' || vista === 'admin') avisarScriptViejo();
@@ -2953,13 +3010,17 @@
 
     // "⟳ Actualizar" arriba (siempre en el mismo lugar): vuelve a leer los datos del módulo abierto. Un módulo nuevo se agrega aquí.
     const ACTUALIZAR = {
-        cuadre: () => cargarDatos(true), ventas: () => cargarDatos(true), pagos: () => pagActualizar(),
+        // Cuadre: las cajas y, si hay una caja abierta con su desglose de pagos, también ese desglose
+        cuadre: async () => { await cargarDatos(true); if (seleccion !== null && cuaItems[seleccion]) await cuaCargarItems(seleccion); },
+        ventas: () => cargarDatos(true), pagos: () => pagActualizar(),
+        menu: () => { renderMenu(); return menuCargarEnLinea(); }, admin: () => { admMostrar(); return admCargarEnLinea(); },
         efectivo: () => efeActualizar(), cajachica: () => efeActualizar(), reqcharcu: () => reqCargar(),
         asistencia: () => asisCargarHist(true), asisgestion: () => asisgCargar(true),
         nomina: () => perCargar(), talento: () => perCargar(), cxc: () => perCargar(), horarios: () => perCargar()
     };
     async function actualizarModulo() {
-        const fn = ACTUALIZAR[vistaActual], btn = document.getElementById('btnActualizar');
+        // Los módulos sin datos propios (en construcción) se vuelven a dibujar
+        const fn = ACTUALIZAR[vistaActual] || (() => irA(vistaActual, { sinHistorial: true })), btn = document.getElementById('btnActualizar');
         if (!fn || btn.disabled) return;
         btn.disabled = true; btnCargando(btn, 'Actualizando...');
         try { await fn(); } catch (e) { mostrarBanner('No se pudo actualizar: ' + e.message, 'error'); }
@@ -3059,6 +3120,14 @@
         irAdelante();
     }, true);
 
+    // Botones laterales del ratón: el de atrás = "← Atrás" y el de adelante = "Adelante →" (pantallas del panel, sin salir de la página)
+    ['mousedown', 'mouseup', 'auxclick', 'pointerup'].forEach(tipo => document.addEventListener(tipo, e => {
+        if (e.button !== 3 && e.button !== 4) return;
+        e.preventDefault();   // que el navegador no salga de la página
+        if (tipo !== 'mouseup' || !clave || vistaActual === 'login') return;
+        if (document.querySelector('.req-dlg-fondo:not(.hidden), .efe-modal:not(.hidden)')) return;
+        if (e.button === 3) irAtras(); else irAdelante();
+    }, true));
     // Tecla Esc en cualquier parte = "← Atrás". Si hay una ventana o lista abierta, Esc solo la cierra.
     document.addEventListener('keydown', e => {
         if (e.key !== 'Escape' || e.defaultPrevented || !clave || vistaActual === 'login' || vistaActual === 'marcaje') return;
@@ -4923,7 +4992,7 @@
             (cr.otroTurno ? `<div class="nota">${cr.otroTurno} crédito(s) de ese día son del otro turno y no se muestran.</div>` : '');
         return `<div class="desglose-caja">
             <div class="des-titulo des-titulo-fila"><span>${info.titulo} de la ficha <span class="nota-fila">Origen: ${esc(info.fuente)}</span></span>
-                <button type="button" class="btn-ghost btn-mini" onclick="cuaCargarItems(${f.fila})" title="Volver a leer de la hoja">Actualizar</button></div>
+                <button type="button" class="btn-ghost btn-mini act-modulo" onclick="cuaCargarItems(${f.fila})" title="Volver a leer de la hoja">Actualizar</button></div>
             ${items.length ? `<table class="des-tabla"><thead><tr>${cols.map(c => `<th class="izq">${c}</th>`).join('')}<th>Monto</th>
                 ${key === 'pm' || key === 'tdd' ? '<th class="izq">Validación</th>' : ''}<th></th></tr></thead><tbody>` +
                 items.map(i => `<tr class="${id(i) === cuaItemEditando ? 'des-editando' : ''}">${celdas(i).map(v => `<td class="izq">${esc(v || '—')}</td>`).join('')}
@@ -5167,7 +5236,7 @@
         const editando = items.find(i => id(i) === cuaItemEditando);
         return `<div class="des-sub">
             <div class="des-titulo des-titulo-fila"><span>Gastos registrados <span class="nota-fila">Origen: BD NOMINA (${tipo === 'gasto' ? 'EFEC' : 'DIV'})</span></span>
-                <button type="button" class="btn-ghost btn-mini" onclick="cuaCargarItems(${f.fila})">Actualizar</button></div>
+                <button type="button" class="btn-ghost btn-mini act-modulo" onclick="cuaCargarItems(${f.fila})">Actualizar</button></div>
             ${items.length ? `<table class="des-tabla"><thead><tr><th class="izq">Trabajador / quién</th><th class="izq">Descripción</th><th>Monto</th><th></th></tr></thead><tbody>` +
                 items.map(i => `<tr class="${id(i) === cuaItemEditando ? 'des-editando' : ''}"><td class="izq">${esc(i.cliente || '—')}</td><td class="izq">${esc(i.descripcion || '—')}</td>
                     <td>${fmtMoneda(monto(i), mon)}</td>
@@ -7298,15 +7367,21 @@
         const act = document.activeElement, idAct = act && el.contains(act) ? act.id : '';
         let pos = null; try { pos = idAct && typeof act.selectionStart === 'number' ? act.selectionStart : null; } catch (e) {}
         const wx = window.scrollX, wy = window.scrollY, sw = ANIM.antes(el);
+        const valorNativo = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+        const textoEscrito = idAct && act._num ? valorNativo.get.call(act) : null;   // un monto a medio escribir (ej. "1.250,") se conserva tal cual
         el.classList.remove('dlg-abriendo');   // un repintado no vuelve a animar la apertura de la ventana
         el.innerHTML = html;
+        NUM.todos(el);   // los campos de monto nuevos ya con formato, antes de devolver el cursor
         if (Object.keys(vistas).length) {
             const usados = {};
             [el, ...el.querySelectorAll('*')].forEach(e => { const k = marca(e), l = vistas[k]; if (!l) return; const n = usados[k] = (usados[k] || 0); if (l[n]) { e.scrollTop = l[n][0]; e.scrollLeft = l[n][1]; usados[k]++; } });
         }
         if (window.scrollX !== wx || window.scrollY !== wy) window.scrollTo(wx, wy);
         const foco = idAct && document.getElementById(idAct);
-        if (foco && el.contains(foco)) { foco.focus({ preventScroll: true }); if (pos !== null) try { foco.setSelectionRange(pos, pos); } catch (e) {} }
+        if (foco && el.contains(foco)) {
+            if (textoEscrito !== null && foco._num) valorNativo.set.call(foco, textoEscrito);
+            foco.focus({ preventScroll: true }); if (pos !== null) try { foco.setSelectionRange(pos, pos); } catch (e) {}
+        }
         ANIM.despues(el, sw);   // el interruptor que se tocó se desliza aunque la ventana se haya repintado
     }
     // Ventanas .req-dlg-fondo: si sigue abierta desde la última vez se queda donde estaba; si se cerró (clase hidden) y se abre de nuevo, empieza arriba.
@@ -7506,11 +7581,7 @@
             </tbody></table>`;
     }
     // Vuelve a dibujar un desglose sin perder el cursor de la casilla que se está escribiendo
-    function perRedibujar(idCaja, html) {
-        const act = document.activeElement, id = act && act.id;
-        document.getElementById(idCaja).innerHTML = html;
-        if (id && document.getElementById(id) && document.getElementById(idCaja).contains(document.getElementById(id))) document.getElementById(id).focus();
-    }
+    function perRedibujar(idCaja, html) { pintarConservando(document.getElementById(idCaja), html); }   // sin perder el cursor ni lo que se está escribiendo
 
     async function perIniciar(vista) {
         perVista = vista;
@@ -7654,7 +7725,7 @@
             x.total = x.ganado + x.punt + x.prod;
         }
         const tarifa = aj.tarifa === undefined || aj.tarifa === '' ? null : Number(aj.tarifa);
-        const pagoExtra = aj.pagarExtra ? r2(horasExtra * (tarifa || 0)) : 0, bono = r2(aj.bono);   // las horas extra se pagan solo si un administrador lo autorizó ("Pagar")
+        const pagoExtra = aj.pagarExtra ? r2(horasExtra * (tarifa || 0)) : 0, bono = aj.bonoAut ? r2(aj.bono) : 0;   // el bono adicional solo con autorización ("Pagar")   // las horas extra se pagan solo si un administrador lo autorizó ("Pagar")
         const generado = r2((x ? x.total : 0) + pagoExtra + bono);
         // Gastos: todo lo que debe (menos los gastos de tienda). Los excluidos quedan pendientes en Cuentas por cobrar.
         const deudas = d.deudas.filter(y => y.estado !== 'pagado' && y.tipoPersona !== 'Gasto de tienda' && (y.id === t.id || asisgClave(y.nombre) === k))
@@ -7793,6 +7864,20 @@
                 mostrarBanner(`Horas extra autorizadas por ${por}.`, 'ok');
             }, false);
     }
+    // Bono adicional: apagado por defecto; encenderlo pide el monto y la clave de un administrador. Apagarlo no pide clave.
+    function nomBonoAdicCambiar(id, el) {
+        if (!el.checked) { nomAjustar(id, { bonoAut: null, bono: 0 }); return; }
+        el.checked = false;   // se enciende solo con una clave correcta
+        nomPedirClave('Pagar bono adicional', 'Escriba el monto del bono adicional de esta semana; un administrador debe autorizarlo con su clave. Después escriba el motivo.',
+            async (clave, monto) => {
+                if (!(monto > 0)) throw new Error('Escriba el monto del bono');
+                const por = await nomQuienAutoriza(clave);
+                nomAjustar(id, { bonoAut: { por, cuando: new Date().toISOString() }, bono: r2(monto) });
+                mostrarBanner(`Bono adicional autorizado por ${por}. Escriba el motivo.`, 'ok');
+                setTimeout(() => { const m = document.getElementById('nomMotivo'); if (m) m.focus(); }, 80);
+            }, true);
+    }
+    const nomBonoAdicGuardado = c => { const m = /Bono adicional autorizado por ([^|]+)/.exec((c && c.detalle) || ''); return m ? `<em class="nom-autorizado">Autorizado por ${esc(m[1].trim())}</em>` : ''; };
     const nomExtraGuardado = c => { const m = /Horas extra autorizadas por ([^|]+)/.exec((c && c.detalle) || ''); return m ? `<em class="nom-autorizado">Autorizado por ${esc(m[1].trim())}</em>` : ''; };
     const nomAutorizadoGuardado = (c, bono) => { const m = new RegExp('Bono de ' + bono + ' autorizado por ([^|]+)').exec(c.detalle || ''); return m ? `<em class="nom-autorizado">Autorizado por ${esc(m[1].trim())}</em>` : ''; };
     // Quién autoriza con esa clave (debe ser administrador). Con el script nuevo: "nom_autorizar".
@@ -7856,9 +7941,11 @@
                     !(Number(n.p.bonoPuntualidad) > 0) ? 'su perfil no tiene este bono' : sinBono || (n.tarde ? 'llegó tarde esta semana' : '')) : '')}
                 ${fila('Bono de productividad', V.prod, c ? nomAutorizadoGuardado(c, 'productividad') : n.p ? nomBonoCtl(n, id, 'Prod',
                     !(Number(n.p.bonoProductividad) > 0) ? 'su perfil no tiene este bono' : sinBono) : '')}
-                <tr><td>Horas extra<small>${editable ? `<label class="nom-switch interruptor"><input type="checkbox" ${n.aj.pagarExtra ? 'checked' : ''} onchange="nomExtraCambiar('${id}', this)"><span class="sw-pista"></span>Pagar</label>` : ''}<span class="nom-nota">${reqN(V.horas, 2)} h${editable ? (!n.aj.pagarExtra ? (V.horas ? ' · no se pagan (requiere autorización)' : '') : ` × <input type="number" id="nomTarifa" class="nom-num" min="0" step="0.01" value="${n.tarifa === null ? '' : n.tarifa}" placeholder="${sug ? reqN(sug, 2) : '0,00'}" oninput="nomAjustar('${id}', { tarifa: this.value })"> $/h${sug && n.tarifa === null && V.horas ? ` · <a href="#" onclick="nomAjustar('${id}', { tarifa: '${sug}' }); return false;">usar ${perUsd(sug)}</a>` : ''}`) : V.horas && !V.extra ? ' · no se pagaron' : ` × ${perUsd(V.tarifa)}`}</span>${editable && n.aj.pagarExtra ? `<em class="nom-autorizado">Autorizado por ${esc(n.aj.pagarExtra.por || 'Administrador')}</em>` : !editable ? nomExtraGuardado(c) : ''}</small></td><td>${perUsd(V.extra)}</td></tr>
-                <tr><td>Bono adicional${editable ? `<small><input type="number" id="nomBono" class="nom-num" min="0" step="0.01" value="${n.aj.bono || ''}" placeholder="0,00" oninput="nomAjustar('${id}', { bono: this.value })">
-                    <input type="text" id="nomMotivo" maxlength="150" value="${esc(n.aj.motivoBono || '')}" placeholder="motivo" oninput="nomAjustar('${id}', { motivoBono: this.value }, false)" onchange="nomAjustar('${id}', { motivoBono: this.value })"></small>` : (c.motivoBono ? `<small>${esc(c.motivoBono)}</small>` : '')}</td><td>${perUsd(V.adic)}</td></tr>
+                <tr><td>Horas extra<small>${editable ? `<label class="nom-switch interruptor"><input type="checkbox" ${n.aj.pagarExtra ? 'checked' : ''} onchange="nomExtraCambiar('${id}', this)"><span class="sw-pista"></span>Pagar</label>` : ''}<span class="nom-nota">${reqN(V.horas, 2)} h${editable ? (!n.aj.pagarExtra ? (V.horas ? ' · no se pagan (requiere autorización)' : '') : ` × <input type="number" id="nomTarifa" class="nom-num" min="0" step="0.01" value="${n.tarifa === null ? '' : n.tarifa}" placeholder="${sug ? reqN(sug, 2) : '0,00'}" oninput="nomAjustar('${id}', { tarifa: this.value }, false)" onchange="nomAjustar('${id}', { tarifa: this.value })"> $/h${sug && n.tarifa === null && V.horas ? ` · <a href="#" onclick="nomAjustar('${id}', { tarifa: '${sug}' }); return false;">usar ${perUsd(sug)}</a>` : ''}`) : V.horas && !V.extra ? ' · no se pagaron' : ` × ${perUsd(V.tarifa)}`}</span>${editable && n.aj.pagarExtra ? `<em class="nom-autorizado">Autorizado por ${esc(n.aj.pagarExtra.por || 'Administrador')}</em>` : !editable ? nomExtraGuardado(c) : ''}</small></td><td>${perUsd(V.extra)}</td></tr>
+                <tr><td>Bono adicional${editable ? `<small><label class="nom-switch interruptor"><input type="checkbox" ${n.aj.bonoAut ? 'checked' : ''} onchange="nomBonoAdicCambiar('${id}', this)"><span class="sw-pista"></span>Pagar</label>
+                    ${n.aj.bonoAut ? `<span class="nom-nota"><input type="number" id="nomBono" class="nom-num" min="0" step="0.01" value="${n.aj.bono || ''}" placeholder="0,00" oninput="nomAjustar('${id}', { bono: this.value }, false)" onchange="nomAjustar('${id}', { bono: this.value })"> $</span>
+                    <input type="text" id="nomMotivo" maxlength="150" value="${esc(n.aj.motivoBono || '')}" placeholder="motivo" oninput="nomAjustar('${id}', { motivoBono: this.value }, false)" onchange="nomAjustar('${id}', { motivoBono: this.value })">
+                    <em class="nom-autorizado">Autorizado por ${esc(n.aj.bonoAut.por || 'Administrador')}</em>` : '<span class="nom-nota">sin bono adicional (requiere autorización)</span>'}</small>` : (c.motivoBono ? `<small>${esc(c.motivoBono)}</small>${nomBonoAdicGuardado(c)}` : '')}</td><td>${perUsd(V.adic)}</td></tr>
             </tbody></table>
             <div class="nom-total"><span>TOTAL</span><b>${perUsd(V.total)}</b></div>
             <div class="nom-card-pie">Desde el ${fechaBonita(nomSemana)} hasta el ${fechaBonita(sumarDias(nomSemana, 6))}${tasa ? `<span>Tasa $ ${fmt(tasa)}</span>` : ''}</div>
@@ -7940,7 +8027,7 @@
                  pagoTurnos: x.ganado, horasExtra: n.horasExtra, tarifaExtra: n.aj.pagarExtra ? n.tarifa || 0 : 0, pagoExtra: n.pagoExtra, bonoPuntualidad: x.punt, bonoProductividad: x.prod,
                  bonoAdicional: n.bono, motivoBono: String(n.aj.motivoBono || '').trim(), generado: n.generado, sueldoBase: x.base, ayudaSocial: x.ayuda, excluir: [...n.excl],
                  detalle: [n.puntPerdido && n.aj.forzarPunt && !n.aj.sinPunt ? `Bono de puntualidad autorizado por ${n.aj.forzarPunt.por || 'Administrador'} · ${perUsd(x.punt)}` : '', n.prodPerdido && n.aj.forzarProd && !n.aj.sinProd ? `Bono de productividad autorizado por ${n.aj.forzarProd.por || 'Administrador'} · ${perUsd(x.prod)}` : '',
-                           !n.puntPerdido && n.aj.sinPunt ? 'Bono de puntualidad quitado esta semana' : '', n.horasExtra > 0 ? (n.aj.pagarExtra ? `Horas extra autorizadas por ${n.aj.pagarExtra.por || 'Administrador'}` : `Horas extra no pagadas (${n.horasExtra} h)`) : '', !n.prodPerdido && n.aj.sinProd ? 'Bono de productividad quitado esta semana' : '']
+                           !n.puntPerdido && n.aj.sinPunt ? 'Bono de puntualidad quitado esta semana' : '', n.aj.bonoAut && n.bono > 0 ? `Bono adicional autorizado por ${n.aj.bonoAut.por || 'Administrador'}` : '', n.horasExtra > 0 ? (n.aj.pagarExtra ? `Horas extra autorizadas por ${n.aj.pagarExtra.por || 'Administrador'}` : `Horas extra no pagadas (${n.horasExtra} h)`) : '', !n.prodPerdido && n.aj.sinProd ? 'Bono de productividad quitado esta semana' : '']
                     .filter(Boolean).concat(n.filas.map(f => `${f.fecha} ${f.lugar} ${f.turno} ${f.entrada}-${f.salida || '?'}${f.extra ? ' (extra)' : ''}${f.ev && f.ev.tarde ? ' tarde ' + f.ev.tarde + ' min' : ''}`)).join(' | ') };
     }
     async function nomCerrar(ids, btn) {
@@ -11368,8 +11455,8 @@
         document.getElementById('efePorLlegarTitulo').textContent = `Por llegar (${pend.length})`;
         document.getElementById('efePorLlegar').innerHTML = pend.length ? `<table><thead><tr><th class="izq">Fecha</th><th class="izq">Tienda</th><th class="izq">Turno</th>
             <th class="izq">Cajero</th><th>Bs</th><th class="efe-c" title="Recibido">Rec.</th><th>$</th><th class="efe-c" title="Recibido">Rec.</th><th></th></tr></thead><tbody>` +
-            pend.map(f => `<tr><td class="izq">${efeFecha(f.fecha)}</td><td class="izq">${esc(f.tienda || 'Ingreso manual')}</td><td class="izq">${esc(f.turno)}</td>
-                <td class="izq">${efeCorto(f.cajero)}</td>
+            pend.map(f => `<tr><td class="izq">${efeFecha(f.fecha)}</td><td class="izq efe-gris">${esc(f.tienda || 'Ingreso manual')}</td><td class="izq efe-gris">${esc(f.turno)}</td>
+                <td class="izq efe-gris">${efeCorto(f.cajero)}</td>
                 <td>${f.bs ? efeMonto('Bs', f.bs, f.fecha) : efeSinEnvio(f) ? '<span title="Caja sin envío">Bs 0</span>' : '—'}</td>
                 <td class="efe-c">${f.bs > 0 || efeSinEnvio(f) ? efeSwRecibido(f, 'bs') : ''}</td>
                 <td>${f.usd ? fmtUsd(f.usd) : '—'}</td>
@@ -11451,8 +11538,8 @@
         document.getElementById('efeHTabla').innerHTML = lista.length ? `<table data-sin-paginar><thead><tr><th class="izq">Fecha</th><th class="izq">Concepto</th>
             <th class="izq">Responsable</th><th class="izq">Turno</th><th>Bs</th><th class="efe-c" title="Recibido">Rec.</th><th>$</th><th class="efe-c" title="Recibido">Rec.</th><th class="efe-c" title="Foto">📎</th><th class="efe-c" title="Verificado">Verif.</th><th></th></tr></thead><tbody>` +
             lista.slice(0, efeHLimite).map(f => `<tr class="${f.tipo === 'EGRESO' ? 'fila-egreso' : f.tipo === 'TRASPASO' ? 'fila-traspaso' : f.tipo === 'EXTERNO' ? 'fila-externo' : ''}"><td class="izq">${efeFecha(f.fecha)}</td>
-                <td class="izq">${tipoChip(f)}${f.tipo === 'TRASPASO' ? esc(f.turno || 'Traspaso a caja chica') : f.tipo === 'EGRESO' ? esc(f.turno || (f.etiqueta && f.etiqueta !== 'EGRESO' ? f.etiqueta : 'Egreso manual')) : f.tipo === 'EXTERNO' ? esc(f.turno) : esc(f.tienda || 'Ingreso manual')}</td><td class="izq">${efeCorto(f.cajero)}</td>
-                <td class="izq"><span title="${esc(f.tipo === 'INGRESO' ? f.turno : '')}">${f.tipo !== 'INGRESO' ? '' : turnoCorto(f.turno)}</span></td>
+                <td class="izq efe-gris">${tipoChip(f)}${f.tipo === 'TRASPASO' ? esc(f.turno || 'Traspaso a caja chica') : f.tipo === 'EGRESO' ? esc(f.turno || (f.etiqueta && f.etiqueta !== 'EGRESO' ? f.etiqueta : 'Egreso manual')) : f.tipo === 'EXTERNO' ? esc(f.turno) : esc(f.tienda || 'Ingreso manual')}</td><td class="izq efe-gris">${efeCorto(f.cajero)}</td>
+                <td class="izq efe-gris"><span title="${esc(f.tipo === 'INGRESO' ? f.turno : '')}">${f.tipo !== 'INGRESO' ? '' : turnoCorto(f.turno)}</span></td>
                 <td class="${f.bs < 0 ? 'monto-neg' : ''}">${f.bs ? efeMonto('Bs', f.bs, f.fecha) : efeSinEnvio(f) ? '<span title="Caja sin envío">Bs 0</span>' : ''}</td><td class="efe-c">${marca(f, 'bs')}</td>
                 <td class="${f.usd < 0 ? 'monto-neg' : ''}">${f.usd ? fmtUsd(f.usd) : ''}</td><td class="efe-c">${marca(f, 'usd')}</td>
                 <td class="efe-c">${efeFoto(f.foto)}</td>
@@ -11721,7 +11808,7 @@
             <th class="izq">Responsable</th><th>Monto</th><th>Saldo</th><th class="efe-c" title="Comprobante">📎</th><th class="efe-c" title="Verificado">Verif.</th><th></th></tr></thead><tbody>` +
             lista.map(m => `<tr class="${m.tipo === 'GASTO' && !m.verificado ? 'cc-sinverificar' : ''}"><td class="izq">${efeFecha(m.fecha)}</td>
                 <td class="izq"><span class="chip ${m.tipo === 'RECARGA' ? (m.origen === 'externo' ? 'st-info' : 'st-ok') : 'st-falta'}" title="${m.tipo === 'RECARGA' ? (m.origen === 'externo' ? 'Recarga externa (no afecta el flujo general)' : 'Recarga desde el flujo general') : 'Gasto'}">${m.tipo === 'RECARGA' ? 'Recarga' : 'Gasto'}</span></td>
-                <td class="izq">${esc(m.concepto)}</td><td class="izq">${efeCorto(m.responsable)}</td>
+                <td class="izq efe-gris">${esc(m.concepto)}</td><td class="izq efe-gris">${efeCorto(m.responsable)}</td>
                 <td class="${m.tipo === 'GASTO' ? 'monto-neg' : ''}">${m.tipo === 'GASTO' ? '−' : '+'}${efeMonto(m.moneda, m.monto, m.fecha)}</td>
                 <td>${efeMonto(m.moneda, m.saldo)}</td>
                 <td class="efe-c">${efeFoto(m.comprobante) || (m.tipo === 'GASTO' ? '<span class="efe-falta" title="Sin comprobante">—</span>' : '')}</td>
@@ -11812,7 +11899,7 @@
         } catch (e) { if (/clave/i.test(e.message)) efeClaveVerif = ''; mostrarBanner('No se pudo marcar como no verificado: ' + e.message, 'error'); efeModo(efeModoActual); }
     }
     // Listas más fáciles de leer: fecha corta (completa al pasar el cursor), íconos en vez de palabras y los detalles en el cursor
-    const efeFecha = f => !f ? '—' : `<span title="${fechaBonita(f)}">${f.slice(8, 10)}/${f.slice(5, 7)}${f.slice(0, 4) !== fechaLocalHoy().slice(0, 4) ? '/' + f.slice(2, 4) : ''}</span>`;
+    const efeFecha = f => !f ? '—' : `<span class="efe-fecha" title="${diaSemana(f)} ${fechaBonita(f)}">${f.slice(8, 10)}/${f.slice(5, 7)}/${f.slice(2, 4)}</span>`;   // año abreviado, letra pequeña
     const efeFoto = url => url ? `<a class="efe-ico" href="${esc(url)}" target="_blank" rel="noopener" title="Ver foto">📎</a>` : '';
     const efeBorrar = (accion, titulo) => `<button type="button" class="efe-ico" title="${esc(titulo)}" onclick="${accion}">🗑</button>`;
     const efeCorto = n => { const s = String(n || '').trim(); return `<span title="${esc(s)}">${esc(s.split(/\s+/).slice(0, 2).join(' '))}</span>`; };
