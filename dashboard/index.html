@@ -105,6 +105,14 @@
         .efe-actualizar { float: right; }
         .paginador { display: flex; align-items: center; justify-content: center; gap: .75rem; flex-wrap: wrap; padding: .75rem 0 .25rem; font-size: .85rem; color: var(--text-muted); }
         .paginador:empty { display: none; }
+        .tabla-desliza { overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; }
+        tr.pag-oculta { display: none !important; }
+        .pag-cuantos select { width: auto; padding: .2rem .4rem; margin-left: .3rem; }
+        /* Etiquetas y avisos cortos: el texto largo se ve al pasar el cursor o al tocarlos */
+        .chip:not(button) { max-width: 22ch; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
+        .chip.abierto { max-width: none; white-space: normal; }
+        .banner:not(:has(button, a, input, select)) { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
+        .banner:not(:has(button, a, input, select)):hover, .banner.abierto { display: block; -webkit-line-clamp: unset; }
         .pag-cuantos { display: inline-flex !important; align-items: center; gap: .4rem; margin: 0 !important; font-size: .85rem !important; }
         .pag-cuantos select { width: auto !important; padding: .3rem .4rem; }
         .efe-comprobante { margin-top: .75rem; display: grid; gap: .35rem; }
@@ -1173,38 +1181,16 @@
         .efe-moneda .efe-seg button { flex: 0 0 auto; white-space: nowrap; }
         tr.cc-sinverificar td { background: color-mix(in srgb, var(--warn) 7%, transparent); }
 
-        /* ===== TELÉFONO: ninguna tabla se desliza de lado. Cada fila pasa a ser una tarjeta (dato a la izquierda, valor a la derecha) ===== */
+        /* ===== TELÉFONO: las tablas se ven como tablas (compactas) y se deslizan de lado dentro de su recuadro si no caben ===== */
         @media (max-width: 720px) {
-            html, body { overflow-x: hidden; }
-            .tabla-wrap, .req-scroll, #efeCTabla, #efeHTabla, #efePorLlegar, #efePorTienda { overflow-x: visible !important; }
             .modo-tabs, .segmentado, .req-acciones, .per-deudas-ctrl, .grafico-head { flex-wrap: wrap; }
-            .vista table:not(.per-restr-tabla):not(.per-desglose) { display: block; width: 100% !important; min-width: 0 !important; table-layout: auto !important; }
-            .vista table:not(.per-restr-tabla):not(.per-desglose) thead { display: none; }
-            .vista table:not(.per-restr-tabla):not(.per-desglose) tbody,
-            .vista table:not(.per-restr-tabla):not(.per-desglose) tfoot { display: block; }
-            .vista table:not(.per-restr-tabla):not(.per-desglose) tr { display: block; border: 1px solid var(--border); border-radius: 10px; padding: .3rem .65rem; margin-bottom: .55rem; background: var(--card-bg); }
-            .vista table:not(.per-restr-tabla):not(.per-desglose) td,
-            .vista table:not(.per-restr-tabla):not(.per-desglose) tbody th {
-                display: block; width: auto !important; max-width: none !important; min-width: 0 !important; padding: .32rem 0 !important;
-                border: 0 !important; border-bottom: 1px dashed var(--border) !important; text-align: right !important; white-space: normal !important;
-                overflow: visible !important; text-overflow: clip !important; overflow-wrap: anywhere; background: transparent !important; }
-            .vista table:not(.per-restr-tabla):not(.per-desglose) tr > :last-child { border-bottom: 0 !important; }
-            .vista table:not(.per-restr-tabla):not(.per-desglose) td::before,
-            .vista table:not(.per-restr-tabla):not(.per-desglose) tbody th::before {
-                content: attr(data-label); float: left; margin-right: .75rem; max-width: 48%; text-align: left;
-                color: var(--text-muted); font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .02em; }
-            .vista table:not(.per-restr-tabla):not(.per-desglose) td[data-label=""]::before,
-            .vista table:not(.per-restr-tabla):not(.per-desglose) td:not([data-label])::before { content: none; }
-            .vista table:not(.per-restr-tabla):not(.per-desglose) td:empty { display: none; }
-            /* Tablero del horario: cada día se ve aunque esté vacío (es donde se suelta el nombre) */
-            .vista table.hortb td.hortb-celda { display: block !important; min-height: 2.6rem; padding: .35rem .2rem !important; }
-            .vista table.hortb tr.hortb-sec { padding: .15rem .65rem; background: var(--list-bg); border-left: 4px solid var(--hs, var(--primary)); }
-            .vista table td small, .vista table td .chip-sub { display: block; }
-            .vista table td .marca, .vista table td .chip { display: inline-block; width: auto; }
-            .vista table td .btn-eliminar, .vista table td .btn-mini, .vista table td .btn-recibir { margin-top: .15rem; }
-            .vista tr.fila-egreso, .vista tr.fila-traspaso, .vista tr.fila-externo, .vista tr.cc-sinverificar, .vista tr.req-alerta { border-left: 4px solid var(--warn); }
-            .vista tr.fila-egreso { border-left-color: var(--bad); }
-            .vista tr.fila-externo { border-left-color: var(--ok); }
+            .tabla-wrap, .req-scroll, .tabla-desliza, #efeCTabla, #efeHTabla, #efePorLlegar, #efePorTienda { overflow-x: auto; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; }
+            /* (con !important: algunos módulos fijan el ancho de sus tablas para la PC; en el teléfono manda esto) */
+            .vista table:not(.hortb) { font-size: .8rem; table-layout: auto !important; width: auto !important; min-width: 100%; }
+            .vista table:not(.hortb) th, .vista table:not(.hortb) td { padding: .4rem .5rem !important; white-space: nowrap !important; overflow-wrap: normal !important; width: auto !important; }
+            /* Textos largos (concepto, detalle, avisos) en una línea con "…": al tocarlos o pasar el cursor se ve completo; así las filas no se alargan */
+            .vista table:not(.hortb) td.izq:not(:has(input, select, button, label, textarea)) { max-width: 13rem; overflow: hidden; text-overflow: ellipsis; }
+            .vista table:not(.hortb) td.izq.abierto { white-space: normal !important; max-width: 18rem; }
         }</style>
     <link rel="manifest" href="manifest.webmanifest">
     <meta name="theme-color" content="#FF4000">
@@ -3052,22 +3038,56 @@
     }, true);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) avisarEnLinea(true); });
 
-    // Teléfono: cada celda lleva el nombre de su columna (data-label) para mostrarse como tarjeta sin barras de lado.
-    // Se hace solo, cada vez que se dibuja una tabla en cualquier módulo.
-    function etiquetarTablas() {
-        document.querySelectorAll('.vista table').forEach(t => {
-            const th = t.tHead ? [...t.tHead.rows[t.tHead.rows.length - 1].cells] : [];
-            if (!th.length) return;
-            const nombres = [];
-            th.forEach(c => { const n = (c.childNodes[0] && c.childNodes[0].nodeType === 3 ? c.childNodes[0].textContent : c.textContent).trim(); for (let k = 0; k < (c.colSpan || 1); k++) nombres.push(n); });
-            [...t.tBodies].concat(t.tFoot ? [t.tFoot] : []).forEach(b => [...b.rows].forEach(r => {
-                let col = 0;
-                [...r.cells].forEach(c => { if (!c.hasAttribute('data-label')) c.setAttribute('data-label', c.colSpan > 1 ? '' : (nombres[col] || '')); col += c.colSpan || 1; });
-            }));
-        });
+    // ==========================================
+    // TABLAS Y LISTAS (en todo el sistema, también en lo que se agregue): se preparan solas cada vez que se dibuja una tabla
+    //  - cada tabla de un módulo queda en un recuadro que se desliza de lado si no cabe (en el teléfono se ve como tabla, compacta)
+    //  - las listas de más de 10 filas muestran 10, con "Ver 10 más" y cuántas mostrar (10, 15, 20, 25, 50, 100 o todas). Lo elegido
+    //    se recuerda por lista mientras el panel esté abierto. Una tabla con data-sin-paginar (tiene su propio paginador) o de las de
+    //    PAG_NO (horarios, nómina, desgloses) no se pagina.
+    //  - las etiquetas largas (.chip) se acortan con "…": al pasar el cursor se ve el texto (title) y al tocarlas se abren
+    // ==========================================
+    const PAG_OPCIONES = [10, 15, 20, 25, 50, 100], PAG_BASE = 10, tabLimites = {};
+    const PAG_NO = 'table[data-sin-paginar], .hortb, .hor-tabla, .per-desglose, .per-restr-tabla, .nom-sal, .nom-dias, .nom-gas, .nom-res, .det-tabla';
+    const DESLIZA = '.tabla-wrap, .req-scroll, .tabla-desliza, #efeCTabla, #efeHTabla, #efePorLlegar, #efePorTienda';
+    function tabClave(t) { const con = t.parentElement && t.parentElement.closest('[id]'); return (con ? con.id : 'doc') + ':' + (con ? [...con.querySelectorAll('table')].indexOf(t) : 0); }
+    function tabPaginar(t) {
+        const tb = t.tBodies[0]; if (!tb) return;
+        const filas = [...tb.rows], n = filas.length, k = tabClave(t), lim = tabLimites[k] || PAG_BASE, caja = t.closest(DESLIZA) || t;
+        let pie = caja.nextElementSibling && caja.nextElementSibling.classList.contains('pag-auto') ? caja.nextElementSibling : null;
+        if (n <= PAG_BASE) { filas.forEach(f => f.classList.remove('pag-oculta')); if (pie) pie.remove(); return; }
+        filas.forEach((f, i) => { const o = i >= lim; if (f.classList.contains('pag-oculta') !== o) f.classList.toggle('pag-oculta', o); });
+        if (!pie) { pie = document.createElement('div'); pie.className = 'paginador pag-auto'; caja.after(pie); }
+        const vis = Math.min(lim, n), html = `<span>Mostrando <b>${vis}</b> de <b>${n}</b></span>${vis < n ? `<button type="button" class="btn-ghost btn-mini" data-pag-mas>Ver ${Math.min(PAG_BASE, n - vis)} más</button>` : ''}
+            <label class="pag-cuantos">Mostrar<select data-pag-sel>${PAG_OPCIONES.filter(o => o < n).map(o => `<option value="${o}" ${lim === o ? 'selected' : ''}>${o}</option>`).join('')}
+                <option value="0" ${lim >= n ? 'selected' : ''}>Todos (${n})</option>${!PAG_OPCIONES.includes(lim) && lim < n ? `<option value="${lim}" selected>${lim}</option>` : ''}</select></label>`;
+        pie._tabla = t; pie.dataset.clave = k;
+        if (pie._html !== html) { pie._html = html; pie.innerHTML = html; }   // solo si cambió (si no, el vigía se dispararía sin fin)
     }
-    let etiquetarPendiente = false;
-    new MutationObserver(() => { if (etiquetarPendiente) return; etiquetarPendiente = true; requestAnimationFrame(() => { etiquetarPendiente = false; etiquetarTablas(); }); })
+    function prepararTablas() {
+        document.querySelectorAll('.vista table').forEach(t => {
+            if (t.closest('.req-dlg, .req-dlg-fondo')) return;
+            if (!t.closest(DESLIZA) && t.parentElement) { const d = document.createElement('div'); d.className = 'tabla-desliza'; t.parentElement.insertBefore(d, t); d.appendChild(t); }
+            if (!t.matches(PAG_NO)) tabPaginar(t);
+        });
+        document.querySelectorAll('.chip:not(button):not([title]), .vista table td.izq:not([title])').forEach(c => { if (c.scrollWidth > c.clientWidth + 1) c.title = c.textContent.trim().replace(/\s+/g, ' '); });
+    }
+    document.addEventListener('click', e => {
+        const mas = e.target.closest && e.target.closest('[data-pag-mas]');
+        if (mas) { const pie = mas.closest('.pag-auto'); tabLimites[pie.dataset.clave] = Math.min((tabLimites[pie.dataset.clave] || PAG_BASE) + PAG_BASE, 100000); tabPaginar(pie._tabla); return; }
+        const chip = e.target.closest && e.target.closest('.chip:not(button)');
+        if (chip && !chip.onclick && !chip.closest('button, a')) { chip.classList.toggle('abierto'); return; }
+        const celda = e.target.closest && e.target.closest('.vista table td.izq[title]');
+        if (celda && !e.target.closest('button, a, input, select, label')) { celda.classList.toggle('abierto'); return; }
+        const ban = e.target.closest && e.target.closest('.banner');
+        if (ban && !e.target.closest('button, a, input, select')) ban.classList.toggle('abierto');
+    });
+    document.addEventListener('change', e => {
+        const sel = e.target.closest && e.target.closest('[data-pag-sel]'); if (!sel) return;
+        const pie = sel.closest('.pag-auto'), v = Number(sel.value);
+        tabLimites[pie.dataset.clave] = v || Infinity; tabPaginar(pie._tabla);
+    });
+    let tablasPendiente = false;
+    new MutationObserver(() => { if (tablasPendiente) return; tablasPendiente = true; setTimeout(() => { tablasPendiente = false; prepararTablas(); }, 16); })
         .observe(document.body, { childList: true, subtree: true });
 
     async function precargarModulos() {
@@ -7989,11 +8009,13 @@
         const ws = horTrabajadores(local).filter(w => w.activo && w.local === local), comp = horComp[local] || {};   // los llamados de otra tienda se ponen a mano
         const demanda = i => ['M', 'T'].reduce((s, t) => s + Object.values((comp[HOR_DIAS[i]] || {})[t] || {}).reduce((a, n) => a + Number(n), 0), 0);
         const plan = {}; ws.forEach(w => { plan[w.id] = Array(7).fill(''); });
+        // Días que trabaja en otra tienda: ocupados mientras se arma ('F'); al final quedan vacíos aquí (allá está su turno)
+        const fueraDe = {}; ws.forEach(w => { fueraDe[w.id] = horAfuera(w, local); fueraDe[w.id].forEach((f, i) => { if (f) plan[w.id][i] = 'F'; }); });
         const dias = [0, 1, 2, 3, 4, 5, 6];
         const libresDia = i => ws.filter(x => plan[x.id][i] === 'L').length;
-        const cajaDia = i => ws.filter(x => horEsCaja(x.cargo) && plan[x.id][i] !== 'L').length;
+        const cajaDia = i => ws.filter(x => horEsCaja(x.cargo) && plan[x.id][i] !== 'L' && plan[x.id][i] !== 'F').length;
         // 1) Días que no puede trabajar ni en la mañana ni en la tarde: libres
-        ws.forEach(w => dias.forEach(i => { if (!horPuede(w, i, 'M') && !horPuede(w, i, 'T') && !plan[w.id].includes('L')) plan[w.id][i] = 'L'; }));
+        ws.forEach(w => dias.forEach(i => { if (!plan[w.id][i] && !horPuede(w, i, 'M') && !horPuede(w, i, 'T') && !plan[w.id].includes('L')) plan[w.id][i] = 'L'; }));
         // 2) Un día libre por persona: repartidos (no dos del mismo puesto el mismo día) y sin dejar un día sin gente de caja
         ws.slice().sort((a, b) => horEsCaja(b.cargo) - horEsCaja(a.cargo)).forEach((w, idx) => {
             if (plan[w.id].includes('L')) return;
@@ -8005,6 +8027,7 @@
         });
         // 3) Un día corrido por persona: donde más falta gente y, para los de caja, donde hay menos gente de caja
         ws.forEach((w, idx) => {
+            if (fueraDe[w.id].some(f => f && f.c === 'C')) return;   // ya hace su día corrido en otra tienda
             const cand = dias.filter(i => !plan[w.id][i] && horPuede(w, i, 'M') && horPuede(w, i, 'T'));
             if (!cand.length) return;
             const corridos = i => ws.filter(x => plan[x.id][i] === 'C').length;
@@ -8030,6 +8053,7 @@
                 plan[w.id][i] = op[0];
             });
         });
+        ws.forEach(w => { plan[w.id] = plan[w.id].map(c => c === 'F' ? '' : c); });
         return plan;
     }
     function horGenerarYa() {
@@ -8198,6 +8222,7 @@
     function horVista() {
         if (!horListo()) return horCabecera(true) + cargandoHTML('Cargando el horario...');
         if (horDatos.error) return horCabecera(true) + `<div class="banner error">${esc(horDatos.error)}</div>`;
+        horAjustarAfuera(horLocal);
         const local = horLocal, ws = horTrabajadores(local), plan = horPlan(local), actual = inicioSemana(fechaLocalHoy());
         const guardado = horDatos.horarios.filter(x => x.local === local), sinGuardar = horSinGuardar(local), pasada = sumarDias(horSemana, 6) < fechaLocalHoy();
         const enviado = guardado.map(x => x.enviado).filter(Boolean).sort().pop();
@@ -8277,6 +8302,15 @@
             dias.forEach((c, i) => { if (!out[i] && (c === 'M' || c === 'T' || c === 'C')) out[i] = { local: l, c }; });
         });
         return out;
+    }
+    // Si trabaja ese día en otra tienda, en su tienda no puede figurar como libre: se quita el libre (queda en borrador para guardar)
+    function horAjustarAfuera(local) {
+        const plan = horPlan(local), cambios = [];
+        horTrabajadores(local).filter(w => !horEsPrestado(w)).forEach(w => {
+            const d = plan[w.id]; if (!d) return;
+            horAfuera(w, local).forEach((f, i) => { if (f && d[i] === 'L') { d[i] = ''; cambios.push(`${horCorto(w.nombre)} el ${diaSemana(sumarDias(horSemana, i))} (${HOR_COD[f.c].toLowerCase()} en ${f.local})`); } });
+        });
+        if (cambios.length) mostrarBanner(`Trabaja${cambios.length > 1 ? 'n' : ''} en otra tienda ese día, así que ya no figura${cambios.length > 1 ? 'n' : ''} como libre: ${cambios.join('; ')}. Revise su día libre y pulse Guardar.`, 'warn');
     }
     const horUsadosAfuera = (w, local) => horEsPrestado(w) ? 0 : horUsados(horAfuera(w, local).map(x => x ? x.c : ''));
     // ---------- Llamar a un trabajador de otra tienda (o departamento) para esta semana ----------
@@ -8822,7 +8856,7 @@
         perDeudasVista = 'lista'; perPintar();
     }
     // ---------- Historial completo de una persona: deudas, abonos y descuentos desde el principio, del más reciente al más viejo ----------
-    const PER_HIST_PAGINA = 15;
+    const PER_HIST_PAGINA = 10;
     let perHist = null;   // { nombre, filas, resumen, aviso } · se lee al abrir (todo, desde el principio)
     let perHistLimite = PER_HIST_PAGINA;
     async function perHistAbrir(nombre) {
@@ -8881,14 +8915,14 @@
             : f.mov === 'Descuento' ? '<span class="chip st-info">Descuento</span>'
             : ({ vencido: '<span class="chip st-falta">Vencida</span>', vigente: '<span class="chip st-info">Vigente</span>', pagado: '<span class="chip st-ok">Pagada</span>' })[f.estado] || '<span class="chip st-sobra">Pendiente</span>';
         const ver = filas.slice(0, perHistLimite), mostrados = ver.length;
-        const opciones = [15, 30, 60, 120].filter(n => n < filas.length);
+        const opciones = PAG_OPCIONES.filter(n => n < filas.length);
         pintarVentana(fondo, `<div class="req-dlg per-hist">${cab}
             <div class="kpis">
                 <div class="kpi"><div class="k-label">Le cargaron</div><div class="k-value">${perUsd(rs.cargos)}</div><div class="k-label">${rs.n} deuda(s)</div></div>
                 <div class="kpi ok"><div class="k-label">Abonó</div><div class="k-value">${perUsd(rs.abonos)}</div><div class="k-label">${rs.descuentos ? 'descuentos ' + perUsd(rs.descuentos) : 'sin descuentos'}</div></div>
                 <div class="kpi ${rs.pendiente > 0.004 ? 'bad' : 'ok'}"><div class="k-label">Debe hoy</div><div class="k-value">${perUsd(rs.pendiente)}</div></div>
             </div>
-            ${filas.length ? `<div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">Fecha</th><th class="izq">Movimiento</th><th class="izq">Detalle</th><th>Cargo</th><th>Abono</th><th class="izq">Estado</th></tr></thead><tbody>
+            ${filas.length ? `<div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Fecha</th><th class="izq">Movimiento</th><th class="izq">Detalle</th><th>Cargo</th><th>Abono</th><th class="izq">Estado</th></tr></thead><tbody>
                 ${ver.map(f => `<tr class="${f.estado === 'pagado' ? 'per-pagado' : ''}"><td class="izq">${diaSemana(f.fecha)} ${fechaBonita(f.fecha)}</td>
                     <td class="izq"><b>${f.mov}</b>${f.num ? `<small>${esc(f.num)}</small>` : ''}</td>
                     <td class="izq"><small>${esc(f.detalle)}${f.comprobante ? ` · <a href="${esc(f.comprobante)}" target="_blank" rel="noopener">${f.mov === 'Abono' ? 'comprobante' : 'factura'}</a>` : ''}</small></td>
@@ -11313,7 +11347,7 @@
     }
 
     // Historial por páginas: se dibujan solo los últimos 25 (más rápido); "Ver 25 más" o elegir cuántos mostrar
-    const EFE_PAGINA = 25;
+    const EFE_PAGINA = 10;
     let efeHLimite = EFE_PAGINA;
     function efeFiltrarHistorial() { efeHLimite = EFE_PAGINA; efeRenderHistorial(); }
     function efeVerMas(n) { efeHLimite = n === 'todos' ? Infinity : Number(n) || EFE_PAGINA; efeRenderHistorial(); }
@@ -11342,7 +11376,7 @@
             return ok ? `<button type="button" class="marca ok" title="Desmarcar" onclick="efeMarcar(${f.fila}, '${mon}', false)">Recibido</button>`
                       : `<button type="button" class="marca pend" title="Marcar como recibido" onclick="efeMarcar(${f.fila}, '${mon}', true)">Por llegar</button>`;
         };
-        document.getElementById('efeHTabla').innerHTML = lista.length ? `<table><thead><tr><th class="izq">Fecha</th><th class="izq">Tienda / Concepto</th>
+        document.getElementById('efeHTabla').innerHTML = lista.length ? `<table data-sin-paginar><thead><tr><th class="izq">Fecha</th><th class="izq">Tienda / Concepto</th>
             <th class="izq">Cajero / Responsable</th><th class="izq">Turno</th><th>Bs</th><th></th><th>$</th><th></th><th class="izq">Foto</th><th class="izq">Verificación</th><th></th></tr></thead><tbody>` +
             lista.slice(0, efeHLimite).map(f => `<tr class="${f.tipo === 'EGRESO' ? 'fila-egreso' : f.tipo === 'TRASPASO' ? 'fila-traspaso' : f.tipo === 'EXTERNO' ? 'fila-externo' : ''}"><td class="izq">${fechaBonita(f.fecha)}</td>
                 <td class="izq">${f.tipo === 'TRASPASO' ? esc(f.turno || 'Traspaso a caja chica') : f.tipo === 'EGRESO' ? esc(f.turno || (f.etiqueta && f.etiqueta !== 'EGRESO' ? f.etiqueta : 'Egreso manual')) : f.tipo === 'EXTERNO' ? 'Dinero externo: ' + esc(f.turno) : esc(f.tienda || 'Ingreso manual')}</td><td class="izq">${esc(f.cajero)}</td>
@@ -11355,7 +11389,7 @@
             '</tbody></table>' : '<div class="empty">No hay movimientos con estos filtros.</div>';
         // Paginador (los totales de arriba siempre son de todo lo filtrado)
         const mostrados = Math.min(efeHLimite, lista.length);
-        const opciones = [25, 50, 100, 200].filter(n => n < lista.length);
+        const opciones = PAG_OPCIONES.filter(n => n < lista.length);
         document.getElementById('efeHMas').innerHTML = lista.length > EFE_PAGINA ? `
             <span>Mostrando <b>${mostrados}</b> de <b>${lista.length}</b> movimientos (los más recientes)</span>
             ${mostrados < lista.length ? `<button type="button" class="btn-ghost btn-mini" onclick="efeVerMas(${efeHLimite + EFE_PAGINA})">Ver ${Math.min(EFE_PAGINA, lista.length - mostrados)} más</button>` : ''}
@@ -11619,8 +11653,7 @@
                 <td>${fmtCaja(m.moneda, m.saldo)}</td>
                 <td class="izq">${m.comprobante ? `<a class="link-comprobante" href="${esc(m.comprobante)}" target="_blank" rel="noopener">Ver foto</a>`
                                                 : (m.tipo === 'GASTO' ? '<span class="nota">Sin comprobante</span>' : '')}</td>
-                <td class="izq">${m.tipo !== 'GASTO' ? '' : m.verificado ? `<span class="chip st-ok">Verificado</span><span class="chip-sub">${esc(m.verificado)}</span>`
-                    : `<button type="button" class="btn-recibir" onclick="efeVerificarCaja(${m.fila})">Verificar</button>`}</td>
+                <td class="izq">${m.tipo !== 'GASTO' ? '' : efeSwVerif(m.verificado, `efeVerificarCaja(${m.fila})`)}</td>
                 <td>${borrable(m) ? `<button type="button" class="btn-eliminar" title="Eliminar (pide clave de administrador)" onclick="efeEliminarCaja(${m.fila})">Eliminar</button>` : ''}</td></tr>`).join('') +
             '</tbody></table>' : '<div class="empty">Todavía no hay movimientos de caja chica. Empiece con una recarga.</div>';
     }
@@ -11685,10 +11718,15 @@
     }
     const efeDiasDesde = f => Math.max(0, Math.round((new Date(fechaLocalHoy() + 'T12:00:00') - new Date(f + 'T12:00:00')) / 86400000));
     // Chip de estado en el historial del flujo general
+    // Verificación con interruptor (como en todo el sistema): apagado = por verificar; al encenderlo se verifica (con clave si hace falta).
+    // Se enciende solo si la verificación sale bien (la pantalla se vuelve a dibujar); ya verificado queda encendido con quién y cuándo.
+    function efeSwVerif(verificado, accion) {
+        return verificado ? `<label class="interruptor" title="Verificado: ${esc(verificado)}"><input type="checkbox" checked onclick="return false"><span class="sw-pista"></span>Verificado</label><span class="chip-sub">${esc(verificado)}</span>`
+                          : `<label class="interruptor" title="Encender para verificar"><input type="checkbox" onchange="this.checked = false; ${accion}"><span class="sw-pista"></span>Por verificar</label>`;
+    }
     function efeEstadoVerif(f) {
         if (f.tipo !== 'EGRESO') return '';
-        return efeSinVerificar(f) ? `<button type="button" class="btn-recibir" onclick="efeVerificarEgreso(${f.fila})">Verificar</button>`
-                                  : `<span class="chip st-ok">Verificado</span><span class="chip-sub">${esc(f.verificado)}</span>`;
+        return efeSwVerif(efeSinVerificar(f) ? '' : f.verificado, `efeVerificarEgreso(${f.fila})`);
     }
 
     function efeRenderVerificar() {
@@ -11731,8 +11769,7 @@
                 <td class="izq">${esc(x.concepto)}</td><td class="izq">${esc(x.quien)}</td>
                 <td class="monto-neg">${x.bs ? (x.moneda === 'BsE' ? fmtCaja('BsE', x.bs) : fmtBs(x.bs)) : ''}${x.bs && x.usd ? '<br>' : ''}${x.usd ? fmtUsd(x.usd) : ''}${x.bs ? enDivisas(x.bs, x.fecha) : ''}</td>
                 <td class="izq">${x.foto ? `<a class="link-comprobante" href="${esc(x.foto)}" target="_blank" rel="noopener">Ver foto</a>` : '<span class="nota">Sin foto</span>'}</td>
-                <td>${x.origen === 'Flujo general' ? `<button type="button" class="btn-recibir" onclick="efeVerificarEgreso(${x.fila})">Verificar</button>`
-                    : `<button type="button" class="btn-recibir" onclick="efeVerificarCaja(${x.fila})">Verificar</button>`}</td></tr>`).join('')}
+                <td class="izq">${efeSwVerif('', x.origen === 'Flujo general' ? `efeVerificarEgreso(${x.fila})` : `efeVerificarCaja(${x.fila})`)}</td></tr>`).join('')}
             </tbody></table></div>`;
         caja.innerHTML = k + `<div class="graficos-2">
             <div class="grafico-card"><div class="grafico-head"><h3>Por responsable <small class="nota" style="margin:0">≈ $</small></h3>
