@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="theme-color" content="#FF4000">
+    <link rel="apple-touch-icon" href="iconos/icon-fondo-192.png">
     <title>Dashboard general</title>
     <!-- Tipografía estilo iOS: en iPhone/Mac usa San Francisco (la del sistema); en Windows/Android, Inter (la más parecida) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1217,9 +1220,6 @@
             .vista table:not(.hortb) td.izq:not(:has(input, select, button, label, textarea)) { max-width: 13rem; overflow: hidden; text-overflow: ellipsis; }
             .vista table:not(.hortb) td.izq.abierto { white-space: normal !important; max-width: 18rem; }
         }</style>
-    <link rel="manifest" href="manifest.webmanifest">
-    <meta name="theme-color" content="#FF4000">
-    <link rel="apple-touch-icon" href="iconos/icon-fondo-192.png">
 </head>
 <body>
 <script>
@@ -9902,7 +9902,7 @@
         if (a) v.innerHTML = `<img src="${URL.createObjectURL(a)}" alt="Foto nueva">`;
     }
 
-    // Imprime los carnets verticales (54 × 85,6 mm), 9 por hoja: anversos y detrás reversos
+    // Imprime los carnets verticales (54 × 85,6 mm): cada carnet completo (anverso y reverso juntos, para doblar), 3 por hoja
     async function perImprimirCarnets(ids) {
         const lista = ids.map(id => perDatos.trabajadores.find(t => t.id === id)).filter(t => t && t.carnet);
         if (!lista.length) { mostrarBanner('No hay carnets para imprimir.', 'warn'); return; }
@@ -9939,6 +9939,8 @@
             .hoja{display:grid;grid-template-columns:repeat(3,54mm);grid-template-rows:repeat(3,85.6mm);gap:4mm 6mm;justify-content:center;break-after:page;page-break-after:always}
             .hoja:last-child{break-after:auto;page-break-after:auto}
             .individual{display:flex;justify-content:center;align-items:stretch;margin-top:6mm}.individual .carnet{border-radius:0}
+            .hoja-tres{display:flex;flex-direction:column;align-items:center;gap:3mm;break-after:page;page-break-after:always}
+            .hoja-tres:last-child{break-after:auto;page-break-after:auto}.hoja-tres .individual{margin-top:0;break-inside:avoid}
             .individual .frente{border-radius:3mm 0 0 3mm;border-right:0}.individual .dorso{border-radius:0 3mm 3mm 0;border-left:0}
             .doblez{width:0;border-left:.35mm dashed #94a3b8;position:relative;z-index:2}
             .ayuda{font-size:13px;color:#475569;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;padding:8px 12px;margin:10px auto 14px;max-width:180mm}
@@ -9969,20 +9971,15 @@
             .barras{width:52mm;margin:0 -2mm}.barras svg{width:100%;height:13mm;display:block}
             .barras .num{display:none}   /* sin los números debajo del código de barras */
             .frase{text-align:center;font-size:9pt;font-weight:700;font-style:italic;color:#FF4000}`;
-        // De a 9 por hoja: la hoja de anversos y detrás la de reversos (en espejo: al imprimir a doble cara cada reverso cae detrás de su carnet)
-        const hojas = [];
-        // Un solo carnet: anverso y reverso juntos en la misma hoja (se recorta, se dobla por la línea y queda de dos caras)
-        const individual = lista.length === 1;
-        if (individual) hojas.push(`<div class="titulo-hoja">Carnet de ${esc(lista[0].nombre)}</div><div class="individual">
-            ${anverso(lista[0], 0).replace(/style="grid-row:[^"]*"/, '')}<div class="doblez"></div>${reverso(lista[0], 0).replace(/style="grid-row:[^"]*"/, '')}</div>`);
-        for (let i = 0; i < (individual ? 0 : lista.length); i += 9) {
-            const grupo = lista.slice(i, i + 9), n = Math.floor(i / 9) + 1;
-            hojas.push(`<div class="titulo-hoja">Hoja ${n * 2 - 1} · anverso</div><div class="hoja">${grupo.map(anverso).join('')}</div>`);
-            hojas.push(`<div class="titulo-hoja">Hoja ${n * 2} · reverso</div><div class="hoja">${grupo.map(reverso).join('')}</div>`);
-        }
+        // Cada carnet completo: anverso y reverso juntos (se recorta, se dobla por la línea y queda de dos caras). 3 por hoja carta.
+        const completo = t => `<div class="individual">${anverso(t, 0).replace(/style="grid-row:[^"]*"/, '')}<div class="doblez"></div>${reverso(t, 0).replace(/style="grid-row:[^"]*"/, '')}</div>`;
+        const individual = lista.length === 1, hojas = [];
+        if (individual) hojas.push(`<div class="titulo-hoja">Carnet de ${esc(lista[0].nombre)}</div>${completo(lista[0])}`);
+        else for (let i = 0; i < lista.length; i += 3)
+            hojas.push(`<div class="titulo-hoja">Hoja ${i / 3 + 1} de ${Math.ceil(lista.length / 3)}</div><div class="hoja-tres">${lista.slice(i, i + 3).map(completo).join('')}</div>`);
         w.document.open();
         w.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Carnets</title><style>${estilos}</style></head><body>
-            ${individual ? '<div class="ayuda"><b>Un solo carnet:</b> el anverso y el reverso salen juntos en esta hoja. Recorte por el contorno de los dos, doble por la línea punteada del medio (las caras quedan hacia afuera) y péguelo o plastifíquelo.</div>' : `<div class="ayuda"><b>Imprima a doble cara</b> (voltear por el borde largo). Una hoja es el anverso y la siguiente el reverso: cada reverso ya está acomodado para caer detrás de su carnet. Sin impresora de doble cara: imprima las hojas impares, vuelva a meter el papel y luego las pares.</div>`}
+            ${individual ? '<div class="ayuda"><b>Un solo carnet:</b> el anverso y el reverso salen juntos en esta hoja. Recorte por el contorno de los dos, doble por la línea punteada del medio (las caras quedan hacia afuera) y péguelo o plastifíquelo.</div>' : `<div class="ayuda"><b>3 carnets completos por hoja</b> (${lista.length} carnets, ${Math.ceil(lista.length / 3)} hoja${lista.length > 3 ? 's' : ''}). Imprima a una sola cara en tamaño carta, escala 100 %. Recorte cada carnet por su contorno, doble por la línea punteada del medio (las caras quedan hacia afuera) y péguelo o plastifíquelo.</div>`}
             ${hojas.join('')}
             <script>window.onload=function(){setTimeout(function(){window.print()},600)}<\/script></body></html>`);        w.document.close();
     }
