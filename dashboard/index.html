@@ -3,9 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="manifest" href="manifest.webmanifest">
-    <meta name="theme-color" content="#FF4000">
-    <link rel="apple-touch-icon" href="iconos/icon-192.png">
     <title>Dashboard general</title>
     <!-- Tipografía estilo iOS: en iPhone/Mac usa San Francisco (la del sistema); en Windows/Android, Inter (la más parecida) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1209,6 +1206,9 @@
             .vista tr.fila-egreso { border-left-color: var(--bad); }
             .vista tr.fila-externo { border-left-color: var(--ok); }
         }</style>
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="theme-color" content="#FF4000">
+    <link rel="apple-touch-icon" href="iconos/icon-192.png">
 </head>
 <body>
 <script>
@@ -11872,6 +11872,6 @@
         irA(marcaEquipo() ? 'marcaje' : 'login');   // equipo de marcaje ya autorizado: abre directo en marcar asistencia
     })();
 </script>
-<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});</script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(r => r.update()).catch(() => {});</script>
 </body>
 </html>
