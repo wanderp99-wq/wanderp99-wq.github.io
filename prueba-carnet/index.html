@@ -29,6 +29,7 @@
     .lector-caja video { width: 100%; display: block; max-height: 46vh; object-fit: cover; }   /* el resultado (arriba) siempre a la vista */
     .lector-guia { position: absolute; left: 7%; right: 7%; top: 15%; bottom: 15%; border: 3px solid rgba(255, 255, 255, .9); border-radius: 14px; box-shadow: 0 0 0 999px rgba(0, 0, 0, .35); transition: border-color .15s, transform .15s; }
     .lector-caja.leido .lector-guia { border-color: #22c55e; transform: scale(1.02); }
+    .lector-caja.pausa video { opacity: .55; } .lector-caja.pausa .lector-guia { border-color: #22c55e; }
     .lector-ayuda { position: absolute; left: 0; right: 0; bottom: 6px; text-align: center; color: #fff; font-size: .82rem; font-weight: 600; text-shadow: 0 1px 3px #000; padding: 0 .5rem; }
 
     .resultado { border-radius: 18px; padding: 18px; display: flex; gap: 14px; align-items: center; animation: entra .35s cubic-bezier(.2, .9, .3, 1.1) both; }
@@ -121,7 +122,7 @@
     async function probar(codigo) {
         codigo = String(codigo || '').replace(/\D/g, '');
         if (!codigo || ocupado) return;
-        if (codigo === ultimo.codigo && Date.now() - ultimo.en < 3000) return;   // la cámara lee el mismo carnet varias veces
+        if (codigo === ultimo.codigo && Date.now() - ultimo.en < 10000) return;   // la cámara lee el mismo carnet varias veces
         ultimo = { codigo, en: Date.now() }; ocupado = true;
         pintar({ cargando: true });
         try { const r = await api({ action: 'marca_probar', claveAdmin: clave, codigo }); pintar(r); anotar(r); }
@@ -140,7 +141,7 @@
                 <div class="dato">${esc(r.cargo || 'Sin cargo')} · ${esc(r.local || 'Sin tienda')} · ${esc(r.id)}</div>
                 <span class="chip ${r.activo ? 'ok' : 'mal'}">${r.activo ? 'Carnet válido · activo' : 'Inactivo: no podrá marcar'}</span>${r.aMano ? ' <span class="chip" style="background:var(--border)">número escrito a mano</span>' : ''}
                 ${r.activo ? `<div class="saludo">${esc(r.saludo)}</div>` : ''}</div>`;
-        clearTimeout(pintar.t); pintar.t = setTimeout(() => { caja.className = 'resultado espera'; caja.textContent = 'Pase otro carnet'; }, 9000);
+        clearTimeout(pintar.t); pintar.t = setTimeout(() => { caja.className = 'resultado espera'; caja.textContent = 'Pase otro carnet'; }, 12000);
     }
     function anotar(r) {
         const hora = new Date().toLocaleTimeString('es-VE', { hour: 'numeric', minute: '2-digit', second: '2-digit' });
@@ -158,6 +159,16 @@
     const LECTOR = (() => {
         const ZXING = 'https://cdn.jsdelivr.net/npm/zxing-wasm@2.1.2/dist/iife/reader/index.js';
         let flujo = null, video = null, activo = false, cont = null, alLeer = null, detector = null, vuelta = 0;
+        // Una sola lectura: después de leer, la cámara descansa PAUSA_MS y el mismo carnet se ignora MISMO_MS (no marca una y otra vez)
+        const PAUSA_MS = 4000, MISMO_MS = 60000;
+        let ultimo = { c: '', t: 0 }, pausaHasta = 0;
+        function avisoPausa() {
+            const caja = cont && cont.querySelector('.lector-caja'), ayuda = caja && caja.querySelector('.lector-ayuda');
+            if (!caja) return;
+            const antes = ayuda ? ayuda.textContent : '';
+            caja.classList.add('pausa'); if (ayuda) ayuda.textContent = '✓ Leído. Puede pasar otro carnet en unos segundos';
+            setTimeout(() => { caja.classList.remove('pausa'); if (ayuda) ayuda.textContent = antes; }, PAUSA_MS);
+        }
         const lienzo = document.createElement('canvas'), ctx = lienzo.getContext('2d', { willReadFrequently: true });
         const cargar = src => new Promise((ok, mal) => { if (document.querySelector(`script[src="${src}"]`) && window.ZXingWASM) return ok();
             const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => mal(new Error('No se pudo cargar el lector (¿hay internet?)')); document.head.appendChild(s); });
@@ -182,7 +193,7 @@
         }
         async function ciclo() {
             while (activo) {
-                if (video && video.readyState >= 2 && video.videoWidth) {
+                if (Date.now() >= pausaHasta && video && video.readyState >= 2 && video.videoWidth) {
                     const cw = video.videoWidth, ch = video.videoHeight;
                     if (lienzo.width !== cw || lienzo.height !== ch) { lienzo.width = cw; lienzo.height = ch; }
                     ctx.drawImage(video, 0, 0, cw, ch);   // la imagen completa a resolución completa (la guía es solo una ayuda: el código puede quedar fuera)
@@ -193,7 +204,9 @@
                         try { const r = await ZXingWASM.readBarcodes(ctx.getImageData(0, 0, cw, ch), { formats: ['QRCode', 'Code128'], tryHarder: true, maxNumberOfSymbols: 1 }); if (r.length && r[0].isValid !== false) txt = r[0].text; } catch (e) {}
                     }
                     const c = String(txt || '').replace(/\D/g, '');
-                    if (c && activo) {
+                    const ahora = Date.now();
+                    if (c && activo && !(c === ultimo.c && ahora - ultimo.t < MISMO_MS)) {
+                        ultimo = { c, t: ahora }; pausaHasta = ahora + PAUSA_MS; avisoPausa();
                         try { if (navigator.vibrate) navigator.vibrate(60); } catch (e) {}
                         const caja = cont && cont.querySelector('.lector-caja'); if (caja) { caja.classList.add('leido'); setTimeout(() => caja.classList.remove('leido'), 450); }
                         try { alLeer(c); } catch (e) { console.error(e); }

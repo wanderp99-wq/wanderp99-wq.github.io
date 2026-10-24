@@ -734,6 +734,7 @@
         .lector-caja video { width: 100%; display: block; max-height: 46vh; object-fit: cover; }   /* el resultado (arriba) siempre a la vista */
         .lector-guia { position: absolute; left: 7%; right: 7%; top: 15%; bottom: 15%; border: 3px solid rgba(255, 255, 255, .9); border-radius: 14px; box-shadow: 0 0 0 999px rgba(0, 0, 0, .35); transition: border-color .15s, transform .15s; }
         .lector-caja.leido .lector-guia { border-color: #22c55e; transform: scale(1.02); }
+        .lector-caja.pausa video { opacity: .55; } .lector-caja.pausa .lector-guia { border-color: #22c55e; }
         .lector-ayuda { position: absolute; left: 0; right: 0; bottom: 6px; text-align: center; color: #fff; font-size: .82rem; font-weight: 600; text-shadow: 0 1px 3px #000; padding: 0 .5rem; }
         .marca-resultado { min-height: 150px; border-radius: 14px; border: 2px solid var(--border); background: var(--card-bg); display: flex; align-items: center; justify-content: center; padding: 1.25rem; text-align: left; }
         .marca-resultado.ok { border-color: var(--ok); background: var(--ok-bg); } .marca-resultado.alerta { border-color: var(--warn); background: var(--warn-bg); }
@@ -1468,6 +1469,16 @@
     const LECTOR = (() => {
         const ZXING = 'https://cdn.jsdelivr.net/npm/zxing-wasm@2.1.2/dist/iife/reader/index.js';
         let flujo = null, video = null, activo = false, cont = null, alLeer = null, detector = null, vuelta = 0;
+        // Una sola lectura: después de leer, la cámara descansa PAUSA_MS y el mismo carnet se ignora MISMO_MS (no marca una y otra vez)
+        const PAUSA_MS = 4000, MISMO_MS = 60000;
+        let ultimo = { c: '', t: 0 }, pausaHasta = 0;
+        function avisoPausa() {
+            const caja = cont && cont.querySelector('.lector-caja'), ayuda = caja && caja.querySelector('.lector-ayuda');
+            if (!caja) return;
+            const antes = ayuda ? ayuda.textContent : '';
+            caja.classList.add('pausa'); if (ayuda) ayuda.textContent = '✓ Leído. Puede pasar otro carnet en unos segundos';
+            setTimeout(() => { caja.classList.remove('pausa'); if (ayuda) ayuda.textContent = antes; }, PAUSA_MS);
+        }
         const lienzo = document.createElement('canvas'), ctx = lienzo.getContext('2d', { willReadFrequently: true });
         const cargar = src => new Promise((ok, mal) => { if (document.querySelector(`script[src="${src}"]`) && window.ZXingWASM) return ok();
             const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => mal(new Error('No se pudo cargar el lector (¿hay internet?)')); document.head.appendChild(s); });
@@ -1492,7 +1503,7 @@
         }
         async function ciclo() {
             while (activo) {
-                if (video && video.readyState >= 2 && video.videoWidth) {
+                if (Date.now() >= pausaHasta && video && video.readyState >= 2 && video.videoWidth) {
                     const cw = video.videoWidth, ch = video.videoHeight;
                     if (lienzo.width !== cw || lienzo.height !== ch) { lienzo.width = cw; lienzo.height = ch; }
                     ctx.drawImage(video, 0, 0, cw, ch);   // la imagen completa a resolución completa (la guía es solo una ayuda: el código puede quedar fuera)
@@ -1503,7 +1514,9 @@
                         try { const r = await ZXingWASM.readBarcodes(ctx.getImageData(0, 0, cw, ch), { formats: ['QRCode', 'Code128'], tryHarder: true, maxNumberOfSymbols: 1 }); if (r.length && r[0].isValid !== false) txt = r[0].text; } catch (e) {}
                     }
                     const c = String(txt || '').replace(/\D/g, '');
-                    if (c && activo) {
+                    const ahora = Date.now();
+                    if (c && activo && !(c === ultimo.c && ahora - ultimo.t < MISMO_MS)) {
+                        ultimo = { c, t: ahora }; pausaHasta = ahora + PAUSA_MS; avisoPausa();
                         try { if (navigator.vibrate) navigator.vibrate(60); } catch (e) {}
                         const caja = cont && cont.querySelector('.lector-caja'); if (caja) { caja.classList.add('leido'); setTimeout(() => caja.classList.remove('leido'), 450); }
                         try { alLeer(c); } catch (e) { console.error(e); }
@@ -9954,7 +9967,7 @@
             .dorso-logo{display:flex;flex-direction:column;align-items:center;gap:1mm}.dorso-logo img{width:22mm;height:22mm}.dorso-logo span{font-weight:800;font-size:9pt}
             .qr{width:26mm;height:26mm}.qr svg{width:100%;height:100%}
             .barras{width:52mm;margin:0 -2mm}.barras svg{width:100%;height:13mm;display:block}
-            .barras .num{display:block;text-align:center;font:600 6.2pt 'Courier New',monospace;letter-spacing:.4pt;color:#334155;margin-top:.6mm}   /* el número, por si hay que escribirlo a mano */
+            .barras .num{display:none}   /* sin los números debajo del código de barras */
             .frase{text-align:center;font-size:9pt;font-weight:700;font-style:italic;color:#FF4000}`;
         // De a 9 por hoja: la hoja de anversos y detrás la de reversos (en espejo: al imprimir a doble cara cada reverso cae detrás de su carnet)
         const hojas = [];
@@ -10081,7 +10094,7 @@
         const eq = marcaEquipo();
         if (!eq || marcaOcupado) return;
         // La cámara lee el mismo carnet varias veces seguidas: se ignora lo repetido en 4 segundos
-        if (!paso && codigo === marcaUltimo.codigo && Date.now() - marcaUltimo.en < 4000) return;
+        if (!paso && codigo === marcaUltimo.codigo && Date.now() - marcaUltimo.en < 60000) return;   // el mismo carnet otra vez dentro de 1 minuto: no se marca de nuevo
         marcaUltimo = { codigo, en: Date.now() };
         marcaOcupado = true;
         marcaResultado({ cargando: true });
@@ -10103,7 +10116,7 @@
         if (!r || (!r.pregunta)) document.getElementById('marcaPasos').innerHTML = '';
         if (!r) { caja.className = 'marca-resultado'; caja.innerHTML = '<div class="marca-espera">Pase su carnet por el lector, o muestre a la cámara el código QR (el cuadrado) del carnet</div>'; return; }
         if (r.cargando) { caja.className = 'marca-resultado'; caja.innerHTML = '<div class="marca-espera">Marcando...</div>'; return; }
-        if (r.pendiente) { caja.className = 'marca-resultado alerta'; caja.innerHTML = `<div class="marca-titulo">Marca guardada sin conexión · ${esc(r.hora)}</div><div class="marca-msj">Se registrará sola, con esta hora, cuando vuelva internet. No pase el carnet otra vez.</div>`; marcaLimpiar = setTimeout(() => marcaResultado(null), 7000); return; }
+        if (r.pendiente) { caja.className = 'marca-resultado alerta'; caja.innerHTML = `<div class="marca-titulo">Marca guardada sin conexión · ${esc(r.hora)}</div><div class="marca-msj">Se registrará sola, con esta hora, cuando vuelva internet. No pase el carnet otra vez.</div>`; marcaLimpiar = setTimeout(() => marcaResultado(null), 12000); return; }
         if (r.error) { caja.className = 'marca-resultado mal'; caja.innerHTML = `<div class="marca-titulo">No se marcó</div><div class="marca-msj">${esc(r.error)}</div>`; }
         else {
             const foto = fotoDrive(r.foto, 300);
@@ -10114,7 +10127,7 @@
                 ${r.accion === 'salida' && r.entrada ? `<div class="marca-msj">Entró ${horaAmPm(r.entrada)} · ${reqN(r.horas, 1)} h</div>` : ''}
                 ${(r.mensajes || []).map(m => `<div class="marca-msj">${esc(m)}</div>`).join('')}</div></div>`;
         }
-        marcaLimpiar = setTimeout(() => { marcaResultado(null); marcaEnfocar(); }, r.pregunta ? 20000 : 7000);
+        marcaLimpiar = setTimeout(() => { marcaResultado(null); marcaEnfocar(); }, r.pregunta ? 20000 : 12000);   // 12 s para que alcancen a leerlo
     }
     // Cámara del teléfono o tablet: lee QR y código de barras
     async function marcaCamaraAlternar() {

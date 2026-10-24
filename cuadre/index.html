@@ -328,6 +328,7 @@
         .lector-caja video { width: 100%; display: block; max-height: 46vh; object-fit: cover; }   /* el resultado (arriba) siempre a la vista */
         .lector-guia { position: absolute; left: 7%; right: 7%; top: 15%; bottom: 15%; border: 3px solid rgba(255, 255, 255, .9); border-radius: 14px; box-shadow: 0 0 0 999px rgba(0, 0, 0, .35); transition: border-color .15s, transform .15s; }
         .lector-caja.leido .lector-guia { border-color: #22c55e; transform: scale(1.02); }
+        .lector-caja.pausa video { opacity: .55; } .lector-caja.pausa .lector-guia { border-color: #22c55e; }
         .lector-ayuda { position: absolute; left: 0; right: 0; bottom: 6px; text-align: center; color: #fff; font-size: .82rem; font-weight: 600; text-shadow: 0 1px 3px #000; padding: 0 .5rem; }
         .mf-resultado { min-height: 140px; border-radius: 12px; border: 2px solid var(--border); background: var(--card-bg); display: flex; align-items: center; justify-content: center; padding: 1rem; }
         .mf-resultado.ok { border-color: var(--total-value); background: color-mix(in srgb, var(--total-value) 12%, var(--card-bg)); }
@@ -614,6 +615,16 @@
     const LECTOR = (() => {
         const ZXING = 'https://cdn.jsdelivr.net/npm/zxing-wasm@2.1.2/dist/iife/reader/index.js';
         let flujo = null, video = null, activo = false, cont = null, alLeer = null, detector = null, vuelta = 0;
+        // Una sola lectura: después de leer, la cámara descansa PAUSA_MS y el mismo carnet se ignora MISMO_MS (no marca una y otra vez)
+        const PAUSA_MS = 4000, MISMO_MS = 60000;
+        let ultimo = { c: '', t: 0 }, pausaHasta = 0;
+        function avisoPausa() {
+            const caja = cont && cont.querySelector('.lector-caja'), ayuda = caja && caja.querySelector('.lector-ayuda');
+            if (!caja) return;
+            const antes = ayuda ? ayuda.textContent : '';
+            caja.classList.add('pausa'); if (ayuda) ayuda.textContent = '✓ Leído. Puede pasar otro carnet en unos segundos';
+            setTimeout(() => { caja.classList.remove('pausa'); if (ayuda) ayuda.textContent = antes; }, PAUSA_MS);
+        }
         const lienzo = document.createElement('canvas'), ctx = lienzo.getContext('2d', { willReadFrequently: true });
         const cargar = src => new Promise((ok, mal) => { if (document.querySelector(`script[src="${src}"]`) && window.ZXingWASM) return ok();
             const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => mal(new Error('No se pudo cargar el lector (¿hay internet?)')); document.head.appendChild(s); });
@@ -638,7 +649,7 @@
         }
         async function ciclo() {
             while (activo) {
-                if (video && video.readyState >= 2 && video.videoWidth) {
+                if (Date.now() >= pausaHasta && video && video.readyState >= 2 && video.videoWidth) {
                     const cw = video.videoWidth, ch = video.videoHeight;
                     if (lienzo.width !== cw || lienzo.height !== ch) { lienzo.width = cw; lienzo.height = ch; }
                     ctx.drawImage(video, 0, 0, cw, ch);   // la imagen completa a resolución completa (la guía es solo una ayuda: el código puede quedar fuera)
@@ -649,7 +660,9 @@
                         try { const r = await ZXingWASM.readBarcodes(ctx.getImageData(0, 0, cw, ch), { formats: ['QRCode', 'Code128'], tryHarder: true, maxNumberOfSymbols: 1 }); if (r.length && r[0].isValid !== false) txt = r[0].text; } catch (e) {}
                     }
                     const c = String(txt || '').replace(/\D/g, '');
-                    if (c && activo) {
+                    const ahora = Date.now();
+                    if (c && activo && !(c === ultimo.c && ahora - ultimo.t < MISMO_MS)) {
+                        ultimo = { c, t: ahora }; pausaHasta = ahora + PAUSA_MS; avisoPausa();
                         try { if (navigator.vibrate) navigator.vibrate(60); } catch (e) {}
                         const caja = cont && cont.querySelector('.lector-caja'); if (caja) { caja.classList.add('leido'); setTimeout(() => caja.classList.remove('leido'), 450); }
                         try { alLeer(c); } catch (e) { console.error(e); }
@@ -1528,7 +1541,7 @@
     async function mfMarcar(codigo, paso) {
         const token = mfEquipos()[mfLocalActual];
         if (!token || mfOcupado) return;
-        if (!paso && codigo === mfUltimo.codigo && Date.now() - mfUltimo.en < 4000) return;   // la cámara lee el mismo carnet varias veces
+        if (!paso && codigo === mfUltimo.codigo && Date.now() - mfUltimo.en < 60000) return;   // el mismo carnet otra vez dentro de 1 minuto (cámara o lector USB): no se marca de nuevo
         mfUltimo = { codigo, en: Date.now() }; mfOcupado = true;
         mfResultado({ cargando: true });
         const idem = COLA.nuevoIdem(), datos = Object.assign({ action: 'marca_registrar', equipo: token, codigo, idem }, paso ? { paso } : {});
@@ -1557,7 +1570,7 @@
         if (!r || !r.pregunta) document.getElementById('mfPasos').innerHTML = '';
         if (!r) { caja.className = 'mf-resultado'; caja.innerHTML = '<div class="mf-espera">Pase el carnet por el lector, o muestre a la cámara el código QR (el cuadrado) del carnet</div>'; return; }
         if (r.cargando) { caja.className = 'mf-resultado'; caja.innerHTML = '<div class="mf-espera">Marcando...</div>'; return; }
-        if (r.pendiente) { caja.className = 'mf-resultado alerta'; caja.innerHTML = `<div class="mf-titulo">Marca guardada sin conexión · ${mfHora(r.hora)}</div><div class="mf-msj">Se registrará sola, con esta hora, cuando vuelva internet. No pase el carnet otra vez.</div>`; mfLimpiarId = setTimeout(() => { mfResultado(null); mfEnfocar(); }, 7000); return; }
+        if (r.pendiente) { caja.className = 'mf-resultado alerta'; caja.innerHTML = `<div class="mf-titulo">Marca guardada sin conexión · ${mfHora(r.hora)}</div><div class="mf-msj">Se registrará sola, con esta hora, cuando vuelva internet. No pase el carnet otra vez.</div>`; mfLimpiarId = setTimeout(() => { mfResultado(null); mfEnfocar(); }, 12000); return; }
         if (r.error) { caja.className = 'mf-resultado mal'; caja.innerHTML = `<div class="mf-titulo">No se marcó</div><div class="mf-msj">${escAsis(r.error)}</div>`; }
         else {
             const foto = mfFoto(r.foto);
@@ -1567,7 +1580,7 @@
                 ${r.accion === 'salida' && r.entrada ? `<div class="mf-msj">Entró ${mfHora(r.entrada)} · ${String(r.horas).replace('.', ',')} h</div>` : ''}
                 ${(r.mensajes || []).map(m => `<div class="mf-msj">${escAsis(m)}</div>`).join('')}</div></div>`;
         }
-        mfLimpiarId = setTimeout(() => { mfResultado(null); mfEnfocar(); }, r.pregunta ? 20000 : 7000);
+        mfLimpiarId = setTimeout(() => { mfResultado(null); mfEnfocar(); }, r.pregunta ? 20000 : 12000);   // 12 s para que alcancen a leerlo
     }
     function mfCargarScript(src) {
         return new Promise((ok, mal) => { if (document.querySelector(`script[src="${src}"]`)) return ok();
