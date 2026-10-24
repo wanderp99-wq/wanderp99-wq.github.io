@@ -1,7 +1,7 @@
 // Guarda la página y sus librerías para abrir rápido y sin internet; siempre intenta la versión nueva primero. Los datos (Apps Script) no se guardan:
 // lo que se registra sin conexión queda en la cola del equipo (COLA, IndexedDB) y se envía al volver internet.
-const CACHE = 'dashboard-202610232225';
-self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(['./', './manifest.webmanifest']))); self.skipWaiting(); });
+const CACHE = 'dashboard-202610232240';
+self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(['./', './manifest.webmanifest', './iconos/icon-192.png', './iconos/icon-fondo-192.png']))); self.skipWaiting(); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(k => Promise.all(k.filter(x => x !== CACHE).map(x => caches.delete(x))))); self.clients.claim(); });
 self.addEventListener('fetch', e => {
   const u = new URL(e.request.url);

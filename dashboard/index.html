@@ -105,6 +105,10 @@
         .efe-actualizar { float: right; }
         .paginador { display: flex; align-items: center; justify-content: center; gap: .75rem; flex-wrap: wrap; padding: .75rem 0 .25rem; font-size: .85rem; color: var(--text-muted); }
         .paginador:empty { display: none; }
+        /* Interruptor de dos opciones (ej. Bs | $): las dos son válidas, el lado elegido se resalta */
+        label.interruptor.sw-doble { gap: .45rem; padding: .3rem .2rem; } .sw-doble .lado { color: var(--text-muted); font-weight: 600; }
+        .sw-doble input:not(:checked) ~ .l-izq, .sw-doble input:checked ~ .l-der { color: var(--text-main); font-weight: 800; }
+        .sw-doble .sw-pista { --sw-encendido: var(--primary); --sw-apagado: var(--primary); }
         .tabla-desliza { overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; }
         tr.pag-oculta { display: none !important; }
         .pag-cuantos select { width: auto; padding: .2rem .4rem; margin-left: .3rem; }
@@ -122,8 +126,12 @@
         .link-comprobante { color: var(--accent, #2563eb); font-weight: 600; font-size: .82rem; text-decoration: none; white-space: nowrap; }
         .link-comprobante:hover { text-decoration: underline; }
         #efeCTabla th:nth-child(4) { width: 18%; }
-        #efeCTabla th:nth-child(7) { width: 112px; }
-        #efeCTabla th:nth-child(8) { width: 72px; }
+        #efeCTabla th:nth-child(7) { width: 44px; }
+        #efeCTabla th:nth-child(8) { width: 64px; } #efeCTabla th:nth-child(9) { width: 44px; }
+        /* Listas del efectivo con menos texto: íconos (foto, eliminar), fecha corta y el detalle al pasar el cursor */
+        .efe-ico { background: none; border: 0; cursor: pointer; font-size: 1rem; line-height: 1; text-decoration: none; padding: .2rem .3rem; border-radius: 6px; }
+        .efe-ico:hover { background: var(--list-bg); } .efe-c { text-align: center !important; } .efe-e { font-size: .62rem; color: var(--text-muted); margin-left: .12rem; font-weight: 700; }
+        .efe-falta { color: var(--text-muted); } .efe-tipo { margin-right: .35rem; }
         #efeCTabla th, #efeCTabla td { padding: .35rem .45rem; overflow: hidden; text-overflow: ellipsis; }
         #efeCTabla td.izq { white-space: normal; overflow-wrap: anywhere; }
 
@@ -224,7 +232,10 @@
         input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
         input[type="number"] { -moz-appearance: textfield; text-align: right; font-variant-numeric: tabular-nums; }
 
-        .filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 1.25rem; }
+        /* Filtros: el mismo formato en todos los módulos (orden: Buscar · fechas · tienda · estado/tipo), alineados abajo a la misma altura */
+        .filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: .9rem; margin-bottom: 1.25rem; align-items: end; }
+        .filters > div > label:first-child { display: block; margin-bottom: .3rem; }
+        .act-modulo { display: none !important; }   /* el "⟳ Actualizar" de arriba reemplaza a los de cada módulo */
 
         .banner { padding: 0.75rem 1rem; border-radius: var(--radius); margin-bottom: 1rem; font-size: 0.9rem; border: 1px solid var(--border); background: var(--list-bg); }
         .banner.warn { border-color: var(--warn); color: var(--warn); background: var(--warn-bg); }
@@ -531,21 +542,21 @@
         #vistaEfectivo table { font-size: 0.85rem; table-layout: fixed; width: 100%; }
         #vistaEfectivo th { font-size: 0.7rem; padding: 0.4rem 0.45rem; white-space: normal; }
         #vistaEfectivo td { padding: 0.35rem 0.45rem; white-space: normal; overflow-wrap: anywhere; line-height: 1.3; }
-        #efeHTabla th:nth-child(1) { width: 88px; }   /* Fecha */
+        #efeHTabla th:nth-child(1) { width: 64px; }   /* Fecha */
         #efeHTabla th:nth-child(2) { width: 15%; }    /* Tienda / Concepto */
         #efeHTabla th:nth-child(3) { width: 20%; }    /* Cajero / Responsable */
-        #efeHTabla th:nth-child(9) { width: 72px; }   /* Eliminar */
+        #efeHTabla th:nth-child(9) { width: 48px; } #efeHTabla th:nth-child(10) { width: 60px; } #efeHTabla th:nth-child(11) { width: 44px; }   /* Foto, verificado, eliminar */
         .btn-eliminar { background: none; border: 1px solid transparent; color: var(--danger, #dc2626); font-size: .78rem; font-weight: 600;
                         padding: .15rem .4rem; border-radius: 6px; cursor: pointer; }
         .btn-eliminar:hover { border-color: currentColor; }
         .btn-eliminar:disabled { opacity: .5; cursor: wait; }
-        #efeHTabla th:nth-child(4) { width: 70px; }   /* Turno */
+        #efeHTabla th:nth-child(4) { width: 52px; }   /* Turno */
         #efeHTabla th:nth-child(5), #efeHTabla th:nth-child(7) { width: 120px; }  /* Bs y $ */
-        #efeHTabla th:nth-child(6), #efeHTabla th:nth-child(8) { width: 84px; }   /* Estado */
-        #efePorLlegar th:nth-child(1) { width: 88px; } #efePorLlegar th:nth-child(3) { width: 70px; }
+        #efeHTabla th:nth-child(6), #efeHTabla th:nth-child(8) { width: 60px; }   /* Recibido */
+        #efePorLlegar th:nth-child(1) { width: 64px; } #efePorLlegar th:nth-child(3) { width: 70px; }
         #efePorLlegar th:nth-child(5), #efePorLlegar th:nth-child(7) { width: 120px; }
-        #efePorLlegar th:nth-child(6), #efePorLlegar th:nth-child(8) { width: 84px; }
-        #efePorLlegar th:nth-child(9) { width: 84px; }
+        #efePorLlegar th:nth-child(6), #efePorLlegar th:nth-child(8) { width: 60px; }
+        #efePorLlegar th:nth-child(9) { width: 48px; }
         .btn-modificar { background: none; border: 1px solid var(--border); color: var(--text-main); font-size: .78rem; font-weight: 600;
                          padding: .25rem .55rem; border-radius: 6px; cursor: pointer; }
         .btn-modificar:hover { border-color: var(--text-muted); }
@@ -556,7 +567,7 @@
         .efe-modal-caja .nota { margin: 0; white-space: pre-line; }
         .efe-modal-montos { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
         .efe-modal-caja input { width: 100%; box-sizing: border-box; }
-        #efeCTabla th:nth-child(1) { width: 88px; } #efeCTabla th:nth-child(2) { width: 80px; } #efeCTabla th:nth-child(5), #efeCTabla th:nth-child(6) { width: 150px; }
+        #efeCTabla th:nth-child(1) { width: 64px; } #efeCTabla th:nth-child(2) { width: 80px; } #efeCTabla th:nth-child(5), #efeCTabla th:nth-child(6) { width: 150px; }
         #vistaEfectivo td:nth-child(n+5) { white-space: nowrap; }
         @media (max-width: 900px) { #vistaEfectivo table { table-layout: auto; min-width: 640px; } }
         .efe-gasto-campos { display: grid; grid-template-columns: 150px 2fr 1fr 130px 110px auto; gap: 0.6rem; align-items: end; }
@@ -1194,7 +1205,7 @@
         }</style>
     <link rel="manifest" href="manifest.webmanifest">
     <meta name="theme-color" content="#FF4000">
-    <link rel="apple-touch-icon" href="iconos/icon-192.png">
+    <link rel="apple-touch-icon" href="iconos/icon-fondo-192.png">
 </head>
 <body>
 <script>
@@ -1388,7 +1399,7 @@
         </div>
         <div class="header-actions">
             <span class="bienvenida hidden" id="bienvenida"></span>
-            <button type="button" class="btn-ghost hidden" id="btnActualizar" onclick="cargarDatos(true)">⟳ Actualizar</button>
+            <button type="button" class="btn-ghost hidden" id="btnActualizar" onclick="actualizarModulo()" title="Volver a leer los datos de este módulo">⟳ Actualizar</button>
             <button type="button" class="btn-ghost hidden" id="btnAtras" onclick="irAtras()" title="Volver a la pantalla anterior (Esc)">← Atrás</button>
             <button type="button" class="btn-ghost hidden" id="btnAdelante" onclick="irAdelante()" title="Ir a la pantalla siguiente (Ctrl + Y)">Adelante →</button>
             <button type="button" class="btn-ghost hidden" id="btnClaves" onclick="irInicio()" title="Volver a las áreas">⌂ Inicio</button>
@@ -1502,7 +1513,7 @@
                 </div>
                 <button type="button" class="btn-ghost btn-flecha" id="pagDSemSig" onclick="pagMoverSemana(1)" title="Semana siguiente">▶</button>
                 <button type="button" class="btn-ghost" onclick="pagSemanaActual()">Semana actual</button>
-                <button type="button" class="btn-ghost" id="pagDBtnAct" onclick="pagActualizar()" title="Volver a leer de la hoja (solo se redibuja si hay cambios)">Actualizar</button>
+                <button type="button" class="btn-ghost act-modulo" id="pagDBtnAct" onclick="pagActualizar()" title="Volver a leer de la hoja (solo se redibuja si hay cambios)">Actualizar</button>
             </div>
             <div class="kpis" id="pagDKpis"></div>
             <div class="graf-grid">
@@ -1539,7 +1550,7 @@
                 </div>
                 <button type="button" class="btn-ghost btn-flecha" id="pagCSemSig" onclick="pagMoverSemana(1)" title="Semana siguiente">▶</button>
                 <button type="button" class="btn-ghost" onclick="pagSemanaActual()">Semana actual</button>
-                <button type="button" class="btn-ghost" id="pagCBtnAct" onclick="pagActualizar()" title="Volver a cruzar con la hoja (solo se redibuja si hay cambios)">Actualizar</button>
+                <button type="button" class="btn-ghost act-modulo" id="pagCBtnAct" onclick="pagActualizar()" title="Volver a cruzar con la hoja (solo se redibuja si hay cambios)">Actualizar</button>
             </div>
             <div class="filters">
                 <div><label>Fecha</label><div class="ms" id="pagCFecha" data-todos="Toda la semana"></div></div>
@@ -1609,7 +1620,7 @@
 
     <!-- ============ CONTROL DE EFECTIVO (hoja FLUJO DE EFECTIVO) ============ -->
     <section id="vistaEfectivo" class="vista hidden">
-        <button type="button" class="btn-ghost efe-actualizar" id="efeBtnActualizar" onclick="efeActualizar()">Actualizar</button>
+        <button type="button" class="btn-ghost efe-actualizar act-modulo" id="efeBtnActualizar" onclick="efeActualizar()">Actualizar</button>
         <div class="modo-tabs" role="tablist">
             <button type="button" class="tab active" id="efeTabResumen" onclick="efeModo('resumen')">Flujo general</button>
             <button type="button" class="tab" id="efeTabCaja" onclick="efeModo('caja')">Caja chica</button>
@@ -1972,7 +1983,7 @@
                 <div><label for="asisDesde">Desde</label><input type="date" id="asisDesde" onchange="asisCargarHist()"></div>
                 <div><label for="asisHasta">Hasta</label><input type="date" id="asisHasta" onchange="asisCargarHist()"></div>
                 <div id="asisFiltroPersona" class="hidden"><label for="asisPersona">Persona</label><select id="asisPersona" onchange="asisPintarHist()"><option value="">Todas</option></select></div>
-                <div style="align-self:end"><button type="button" class="btn-ghost" id="asisBtnAct" onclick="asisCargarHist(true)">Actualizar</button></div>
+                <div style="align-self:end" class="act-modulo"><button type="button" class="btn-ghost" id="asisBtnAct" onclick="asisCargarHist(true)">Actualizar</button></div>
             </div>
             <div class="kpis" id="asisKpis"></div>
             <div class="tabla-wrap" id="asisTabla"></div>
@@ -1999,11 +2010,11 @@
             </button>
         </div>
         <div class="filters">
+            <div><label for="asisgBuscar">Buscar</label><input type="search" id="asisgBuscar" list="asisgNombres" placeholder="Nombre del trabajador..." oninput="asisgPintar()"><datalist id="asisgNombres"></datalist></div>
             <div><label for="asisgDesde">Desde</label><input type="date" id="asisgDesde" onchange="asisgCambioFecha()"></div>
             <div><label for="asisgHasta">Hasta</label><input type="date" id="asisgHasta" onchange="asisgCambioFecha()"></div>
-            <div><label for="asisgBuscar">Trabajador</label><input type="search" id="asisgBuscar" list="asisgNombres" placeholder="Nombre..." oninput="asisgPintar()"><datalist id="asisgNombres"></datalist></div>
             <div id="asisgFiltroLocal" class="hidden"><label for="asisgLocal">Local</label><select id="asisgLocal" onchange="asisgPintar()"><option value="">Todos</option></select></div>
-            <div style="align-self:end"><button type="button" class="btn-ghost" id="asisgBtnAct" onclick="asisgCargar(true)">Actualizar</button></div>
+            <div style="align-self:end" class="act-modulo"><button type="button" class="btn-ghost" id="asisgBtnAct" onclick="asisgCargar(true)">Actualizar</button></div>
         </div>
         <div id="asisgContenido"></div>
     </section>
@@ -2013,7 +2024,7 @@
         <div class="filters">
             <div id="perBuscarCaja"><label for="perBuscar">Buscar</label><input type="search" id="perBuscar" placeholder="Nombre, ID, cédula..." oninput="perPintar()"></div>
             <div id="perFiltroEstado"><label for="perEstado">Mostrar</label><select id="perEstado" onchange="perPintar()"><option value="activos">Activos</option><option value="inactivos">Inactivos</option><option value="todos">Todos</option></select></div>
-            <div style="align-self:end;display:flex;gap:.5rem;flex-wrap:wrap"><button type="button" class="btn-ghost" onclick="perLiberarFiltro()">Liberar filtro</button><button type="button" class="btn-ghost" onclick="perCargar()">Actualizar</button></div>
+            <div style="align-self:end;display:flex;gap:.5rem;flex-wrap:wrap"><button type="button" class="btn-ghost" onclick="perLiberarFiltro()">Liberar filtro</button><button type="button" class="btn-ghost act-modulo" onclick="perCargar()">Actualizar</button></div>
         </div>
         <div id="perContenido"></div>
     </section>
@@ -2036,11 +2047,16 @@
                 <div class="chips-tiendas" id="chipsTiendas"></div>
             </div>
             <div>
-                <label>Moneda</label>
-                <div class="segmentado">
-                    <button type="button" id="monUsd" class="activo" onclick="cambiarMoneda('$')">$</button>
-                    <button type="button" id="monBs" onclick="cambiarMoneda('Bs')">Bs</button>
+                <label>Turno</label>
+                <div class="segmentado" id="vTurnoBtns">
+                    <button type="button" class="activo" data-t="" onclick="cambiarTurnoVentas('')">Todos</button>
+                    <button type="button" data-t="Mañana" onclick="cambiarTurnoVentas('Mañana')">Mañana</button>
+                    <button type="button" data-t="Tarde" onclick="cambiarTurnoVentas('Tarde')">Tarde</button>
                 </div>
+            </div>
+            <div>
+                <label>Moneda</label>
+                <label class="interruptor sw-doble" title="Cambiar entre bolívares y dólares"><input type="checkbox" id="monSw" checked onchange="cambiarMoneda(this.checked ? '$' : 'Bs')"><span class="lado l-izq">Bs</span><span class="sw-pista"></span><span class="lado l-der">$</span></label>
             </div>
         </div>
 
@@ -2116,6 +2132,14 @@
             </div>
             <div class="grafico-sub">Orden fijo de las barras en cada día: Santa Rosa, Ricardo Urriera, Isabelica, Parcelas.</div>
             <div class="grafico-wrap" id="vGraficoTiendas"></div>
+        </div>
+
+        <div class="grafico-card" style="margin-top:1.25rem">
+            <div class="grafico-head"><h3>Mañana vs tarde por tienda</h3>
+                <div class="leyenda"><span><i class="sw" style="background:#f59e0b"></i>Mañana</span><span><i class="sw" style="background:#3b82f6"></i>Tarde</span></div></div>
+            <div class="grafico-sub" id="vTurnosSub"></div>
+            <div class="grafico-wrap" id="vGraficoTurnos"></div>
+            <div class="tabla-wrap" id="vTablaTurnos" style="margin-top:.75rem"></div>
         </div>
 
         <div class="grafico-card" style="margin-top:1.25rem">
@@ -2895,7 +2919,7 @@
         document.getElementById('btnClaves').classList.toggle('hidden', vista === 'login' || vista === 'menu' || vista === 'marcaje');
         document.getElementById('menuAcciones').classList.toggle('hidden', !esPrincipal);
         setTimeout(pintarAtras, 0);
-        document.getElementById('btnActualizar').classList.toggle('hidden', vista !== 'cuadre' && vista !== 'ventas');
+        document.getElementById('btnActualizar').classList.toggle('hidden', !ACTUALIZAR[vista]);   // el mismo botón, en el mismo lugar, en todos los módulos
         ocultarBanner();
         mostrarBienvenida();
         if (vista === 'menu' || vista === 'admin') avisarScriptViejo();
@@ -2927,6 +2951,20 @@
         }
     }
 
+    // "⟳ Actualizar" arriba (siempre en el mismo lugar): vuelve a leer los datos del módulo abierto. Un módulo nuevo se agrega aquí.
+    const ACTUALIZAR = {
+        cuadre: () => cargarDatos(true), ventas: () => cargarDatos(true), pagos: () => pagActualizar(),
+        efectivo: () => efeActualizar(), cajachica: () => efeActualizar(), reqcharcu: () => reqCargar(),
+        asistencia: () => asisCargarHist(true), asisgestion: () => asisgCargar(true),
+        nomina: () => perCargar(), talento: () => perCargar(), cxc: () => perCargar(), horarios: () => perCargar()
+    };
+    async function actualizarModulo() {
+        const fn = ACTUALIZAR[vistaActual], btn = document.getElementById('btnActualizar');
+        if (!fn || btn.disabled) return;
+        btn.disabled = true; btnCargando(btn, 'Actualizando...');
+        try { await fn(); } catch (e) { mostrarBanner('No se pudo actualizar: ' + e.message, 'error'); }
+        finally { btn.disabled = false; btn.textContent = '⟳ Actualizar'; }
+    }
     function abrirArea(id) {
         if (id !== areaActual) { recordarVista(); ANIM.pantalla(document.getElementById('vistaMenu'), !id); }   // submenú: entra desde la derecha (o desde la izquierda al salir)
         areaActual = id; renderMenu(); pintarAtras(); window.scrollTo(0, 0);
@@ -3046,7 +3084,7 @@
     //    PAG_NO (horarios, nómina, desgloses) no se pagina.
     //  - las etiquetas largas (.chip) se acortan con "…": al pasar el cursor se ve el texto (title) y al tocarlas se abren
     // ==========================================
-    const PAG_OPCIONES = [10, 15, 20, 25, 50, 100], PAG_BASE = 10, tabLimites = {};
+    const PAG_OPCIONES = [6, 10, 15, 20, 25, 50, 100], PAG_BASE = 6, tabLimites = {};
     const PAG_NO = 'table[data-sin-paginar], .hortb, .hor-tabla, .per-desglose, .per-restr-tabla, .nom-sal, .nom-dias, .nom-gas, .nom-res, .det-tabla';
     const DESLIZA = '.tabla-wrap, .req-scroll, .tabla-desliza, #efeCTabla, #efeHTabla, #efePorLlegar, #efePorTienda';
     function tabClave(t) { const con = t.parentElement && t.parentElement.closest('[id]'); return (con ? con.id : 'doc') + ':' + (con ? [...con.querySelectorAll('table')].indexOf(t) : 0); }
@@ -3057,7 +3095,7 @@
         if (n <= PAG_BASE) { filas.forEach(f => f.classList.remove('pag-oculta')); if (pie) pie.remove(); return; }
         filas.forEach((f, i) => { const o = i >= lim; if (f.classList.contains('pag-oculta') !== o) f.classList.toggle('pag-oculta', o); });
         if (!pie) { pie = document.createElement('div'); pie.className = 'paginador pag-auto'; caja.after(pie); }
-        const vis = Math.min(lim, n), html = `<span>Mostrando <b>${vis}</b> de <b>${n}</b></span>${vis < n ? `<button type="button" class="btn-ghost btn-mini" data-pag-mas>Ver ${Math.min(PAG_BASE, n - vis)} más</button>` : ''}
+        const vis = Math.min(lim, n), html = `<span>Mostrando <b>${vis}</b> de <b>${n}</b></span>${vis < n ? `<button type="button" class="btn-ghost btn-mini" data-pag-mas>Ver ${Math.min(PAG_BASE, n - vis)} más</button>` : ''}${vis > PAG_BASE ? `<button type="button" class="btn-ghost btn-mini" data-pag-menos>Ver menos</button>` : ''}
             <label class="pag-cuantos">Mostrar<select data-pag-sel>${PAG_OPCIONES.filter(o => o < n).map(o => `<option value="${o}" ${lim === o ? 'selected' : ''}>${o}</option>`).join('')}
                 <option value="0" ${lim >= n ? 'selected' : ''}>Todos (${n})</option>${!PAG_OPCIONES.includes(lim) && lim < n ? `<option value="${lim}" selected>${lim}</option>` : ''}</select></label>`;
         pie._tabla = t; pie.dataset.clave = k;
@@ -3074,6 +3112,9 @@
     document.addEventListener('click', e => {
         const mas = e.target.closest && e.target.closest('[data-pag-mas]');
         if (mas) { const pie = mas.closest('.pag-auto'); tabLimites[pie.dataset.clave] = Math.min((tabLimites[pie.dataset.clave] || PAG_BASE) + PAG_BASE, 100000); tabPaginar(pie._tabla); return; }
+        const menos = e.target.closest && e.target.closest('[data-pag-menos]');
+        if (menos) { const pie = menos.closest('.pag-auto'), n = pie._tabla.tBodies[0].rows.length, act = Math.min(tabLimites[pie.dataset.clave] || PAG_BASE, n);
+                     tabLimites[pie.dataset.clave] = Math.max(PAG_BASE, (Math.ceil(act / PAG_BASE) - 1) * PAG_BASE); tabPaginar(pie._tabla); return; }
         const chip = e.target.closest && e.target.closest('.chip:not(button)');
         if (chip && !chip.onclick && !chip.closest('button, a')) { chip.classList.toggle('abierto'); return; }
         const celda = e.target.closest && e.target.closest('.vista table td.izq[title]');
@@ -3862,6 +3903,13 @@
     let ventasTiendas = TIENDAS_ORDEN.map(t => t.cod);   // tiendas seleccionadas
     let ventasMoneda = '$';
     let ventasModo = 'semana';          // 'semana' | 'comparar'
+    let ventasTurno = '';               // '' todos · 'Mañana' · 'Tarde'
+    const turnoDeCaja = t => /^ma/i.test(puntSinTildes(t)) ? 'Mañana' : /^ta/i.test(puntSinTildes(t)) ? 'Tarde' : '';
+    function cambiarTurnoVentas(t) {
+        ventasTurno = t;
+        document.querySelectorAll('#vTurnoBtns button').forEach(b => b.classList.toggle('activo', b.dataset.t === t));
+        renderVentas();
+    }
     let cmpTipo = 'dia';                // 'dia' (mismo día de la semana en un mes) | 'semanas'
     let cmpFechas = [];                 // una fecha dentro de cada semana a comparar
 
@@ -3885,8 +3933,7 @@
     }
     function cambiarMoneda(m) {
         ventasMoneda = m;
-        document.getElementById('monUsd').classList.toggle('activo', m === '$');
-        document.getElementById('monBs').classList.toggle('activo', m === 'Bs');
+        const sw = document.getElementById('monSw'); if (sw) sw.checked = m === '$';
         renderVentas();
     }
 
@@ -3905,7 +3952,7 @@
         filas.forEach(f => {
             const d = porFecha.get(f.fecha);
             const t = d && tiendas.find(x => x.nombre === f.tienda);
-            if (!t) return;
+            if (!t || (ventasTurno && turnoDeCaja(f.turno) !== ventasTurno)) return;   // filtro de turno
             const v = ventaDe(f);
             d.cajas++;
             if (v === null) { d.sinSistema++; return; }
@@ -3961,6 +4008,31 @@
         renderVentasTotal(datos);
         renderVentasTiendas(datos);
         renderVentasTabla(datos);
+        renderVentasTurnos(datos);
+    }
+    // Comparativo de turnos de la semana por tienda: mañana vs tarde (siempre los dos turnos, aunque haya un turno elegido arriba)
+    function renderVentasTurnos({ tiendas }) {
+        const desde = ventasSemana, hasta = sumarDias(ventasSemana, 6);
+        const datos = tiendas.map(t => ({ t, M: 0, T: 0 }));
+        filas.forEach(f => {
+            if (f.fecha < desde || f.fecha > hasta) return;
+            const x = datos.find(d => d.t.nombre === f.tienda), tu = turnoDeCaja(f.turno), v = x && tu ? ventaDe(f) : null;
+            if (v === null || v === undefined) return;
+            x[tu === 'Mañana' ? 'M' : 'T'] += v;
+        });
+        const pct = (a, tot) => tot ? Math.round(a / tot * 100) + '%' : '—';
+        document.getElementById('vTurnosSub').textContent = `Semana ${textoSemana(ventasSemana, true)} · venta de cada turno en ${ventasMoneda === '$' ? 'dólares' : 'bolívares'}.`;
+        barrasSVG('vGraficoTurnos', datos.map(d => ({ etiqueta: d.t.nombre, sub: pct(d.M, d.M + d.T) + ' · ' + pct(d.T, d.M + d.T), d, valores: { M: d.M, T: d.T } })),
+            [{ k: 'M', color: '#f59e0b' }, { k: 'T', color: '#3b82f6' }],
+            { etiquetas: true, tooltip: g => `<div class="tt-title">${g.d.t.nombre}</div>
+                <div class="tt-row"><span><i class="sw" style="background:#f59e0b"></i> Mañana</span><b>${fmtMoneda(g.d.M, ventasMoneda)} · ${pct(g.d.M, g.d.M + g.d.T)}</b></div>
+                <div class="tt-row"><span><i class="sw" style="background:#3b82f6"></i> Tarde</span><b>${fmtMoneda(g.d.T, ventasMoneda)} · ${pct(g.d.T, g.d.M + g.d.T)}</b></div>
+                <div class="tt-row" style="margin-top:.3rem"><span>Total</span><b>${fmtMoneda(g.d.M + g.d.T, ventasMoneda)}</b></div>` });
+        const sM = datos.reduce((a, d) => a + d.M, 0), sT = datos.reduce((a, d) => a + d.T, 0);
+        const fila = (n, m, tt) => `<td>${fmtMoneda(m, ventasMoneda)}</td><td>${fmtMoneda(tt, ventasMoneda)}</td><td>${fmtMoneda(m + tt, ventasMoneda)}</td><td>${pct(m, m + tt)}</td><td>${pct(tt, m + tt)}</td><td>${m === tt ? '=' : m > tt ? 'Mañana +' + fmtMoneda(m - tt, ventasMoneda) : 'Tarde +' + fmtMoneda(tt - m, ventasMoneda)}</td>`;
+        document.getElementById('vTablaTurnos').innerHTML = `<table data-sin-paginar><thead><tr><th class="izq">Tienda</th><th>Mañana</th><th>Tarde</th><th>Total</th><th>% mañana</th><th>% tarde</th><th>Diferencia</th></tr></thead><tbody>` +
+            datos.map(d => `<tr><td class="izq">${d.t.nombre}</td>${fila(d.t.nombre, d.M, d.T)}</tr>`).join('') +
+            `</tbody><tfoot><tr><td class="izq">Semana</td>${fila('', sM, sT)}</tr></tfoot></table>`;
     }
 
     function renderVentasKpis({ dias }) {
@@ -4034,7 +4106,7 @@
 
     function renderVentasTotal({ tiendas, dias }) {
         const nombres = tiendas.length === TIENDAS_ORDEN.length ? 'todas las tiendas' : tiendas.map(t => t.nombre).join(' + ');
-        document.getElementById('vTotalSub').textContent = `Suma de ${nombres}, en ${ventasMoneda === '$' ? 'dólares' : 'bolívares'}.`;
+        document.getElementById('vTotalSub').textContent = `Suma de ${nombres}${ventasTurno ? ', turno de la ' + ventasTurno.toLowerCase() : ''}, en ${ventasMoneda === '$' ? 'dólares' : 'bolívares'}.`;
         barrasSVG('vGraficoTotal', gruposDias(dias), [{ k: 'total', color: 'var(--v-total)' }], { etiquetas: true });
     }
 
@@ -8856,7 +8928,7 @@
         perDeudasVista = 'lista'; perPintar();
     }
     // ---------- Historial completo de una persona: deudas, abonos y descuentos desde el principio, del más reciente al más viejo ----------
-    const PER_HIST_PAGINA = 10;
+    const PER_HIST_PAGINA = 6;
     let perHist = null;   // { nombre, filas, resumen, aviso } · se lee al abrir (todo, desde el principio)
     let perHistLimite = PER_HIST_PAGINA;
     async function perHistAbrir(nombre) {
@@ -8931,6 +9003,7 @@
                 </tbody></table></div>
             <div class="per-hist-mas">Mostrando ${mostrados} de ${filas.length} (del más reciente al más viejo)
                 ${mostrados < filas.length ? `<button type="button" class="btn-ghost btn-mini" onclick="perHistLimite += PER_HIST_PAGINA; perHistPintar()">Ver ${Math.min(PER_HIST_PAGINA, filas.length - mostrados)} más</button>` : ''}
+                ${mostrados > PER_HIST_PAGINA ? `<button type="button" class="btn-ghost btn-mini" onclick="perHistLimite = Math.max(PER_HIST_PAGINA, Math.min(perHistLimite, ${filas.length}) - PER_HIST_PAGINA); perHistPintar()">Ver menos</button>` : ''}
                 ${filas.length > PER_HIST_PAGINA ? `<label>Mostrar <select onchange="perHistLimite = this.value === 'todos' ? Infinity : Number(this.value); perHistPintar()">
                     ${opciones.map(n => `<option value="${n}" ${perHistLimite === n ? 'selected' : ''}>${n}</option>`).join('')}
                     <option value="todos" ${perHistLimite >= filas.length ? 'selected' : ''}>Todos (${filas.length})</option>
@@ -11294,14 +11367,14 @@
             .sort((a, b) => a.fecha.localeCompare(b.fecha) || a.tienda.localeCompare(b.tienda));
         document.getElementById('efePorLlegarTitulo').textContent = `Por llegar (${pend.length})`;
         document.getElementById('efePorLlegar').innerHTML = pend.length ? `<table><thead><tr><th class="izq">Fecha</th><th class="izq">Tienda</th><th class="izq">Turno</th>
-            <th class="izq">Cajero</th><th>Bs</th><th></th><th>$</th><th></th><th></th></tr></thead><tbody>` +
-            pend.map(f => `<tr><td class="izq">${fechaBonita(f.fecha)}</td><td class="izq">${esc(f.tienda || 'Ingreso manual')}</td><td class="izq">${esc(f.turno)}</td>
-                <td class="izq">${esc(f.cajero)}</td>
-                <td>${f.bs ? fmtBs(f.bs) + enDivisas(f.bs, f.fecha) : efeSinEnvio(f) ? '<span class="nota-fila" style="display:inline">Bs 0,00 · sin envío</span>' : '—'}</td>
-                <td>${f.bs > 0 || efeSinEnvio(f) ? (f.bsOk ? '<span class="marca ok">Recibido</span>' : `<button type="button" class="btn-recibir" onclick="efeMarcar(${f.fila}, 'bs', true)">Recibido</button>`) : ''}</td>
+            <th class="izq">Cajero</th><th>Bs</th><th class="efe-c" title="Recibido">Rec.</th><th>$</th><th class="efe-c" title="Recibido">Rec.</th><th></th></tr></thead><tbody>` +
+            pend.map(f => `<tr><td class="izq">${efeFecha(f.fecha)}</td><td class="izq">${esc(f.tienda || 'Ingreso manual')}</td><td class="izq">${esc(f.turno)}</td>
+                <td class="izq">${efeCorto(f.cajero)}</td>
+                <td>${f.bs ? efeMonto('Bs', f.bs, f.fecha) : efeSinEnvio(f) ? '<span title="Caja sin envío">Bs 0</span>' : '—'}</td>
+                <td class="efe-c">${f.bs > 0 || efeSinEnvio(f) ? efeSwRecibido(f, 'bs') : ''}</td>
                 <td>${f.usd ? fmtUsd(f.usd) : '—'}</td>
-                <td>${f.usd > 0 ? (f.usdOk ? '<span class="marca ok">Recibido</span>' : `<button type="button" class="btn-recibir" onclick="efeMarcar(${f.fila}, 'usd', true)">Recibido</button>`) : ''}</td>
-                <td><button type="button" class="btn-modificar" title="Modificar el monto (pide clave de administrador)" onclick="efeAbrirModificar(${f.fila})">Modificar</button></td></tr>`).join('') +
+                <td class="efe-c">${f.usd > 0 ? efeSwRecibido(f, 'usd') : ''}</td>
+                <td class="efe-c"><button type="button" class="efe-ico" title="Modificar el monto (pide clave de administrador)" onclick="efeAbrirModificar(${f.fila})">✏️</button></td></tr>`).join('') +
             '</tbody></table>' : '<div class="empty">No hay envíos pendientes por llegar.</div>';
 
         // Por tienda
@@ -11321,7 +11394,7 @@
     }
 
     async function efeMarcar(fila, moneda, valor) {
-        if (!valor && !confirm('¿Desmarcar? El monto volverá a "por llegar" y saldrá del disponible.')) return;
+        if (!valor && !confirm('¿Desmarcar? El monto volverá a "por llegar" y saldrá del disponible.')) { efeModo(efeModoActual); return; }
         // Al instante en pantalla; se guarda por detrás. Si la hoja lo rechaza, se deshace.
         const f = efeDatos.filas.find(x => x.fila === fila);
         const poner = v => { if (f) { if (moneda === 'usd') f.usdOk = v; else f.bsOk = v; } };
@@ -11347,7 +11420,7 @@
     }
 
     // Historial por páginas: se dibujan solo los últimos 25 (más rápido); "Ver 25 más" o elegir cuántos mostrar
-    const EFE_PAGINA = 10;
+    const EFE_PAGINA = 6;
     let efeHLimite = EFE_PAGINA;
     function efeFiltrarHistorial() { efeHLimite = EFE_PAGINA; efeRenderHistorial(); }
     function efeVerMas(n) { efeHLimite = n === 'todos' ? Infinity : Number(n) || EFE_PAGINA; efeRenderHistorial(); }
@@ -11368,24 +11441,23 @@
             kpi('Recibidos', t.ingBs - t.pendBs, t.ingUsd - t.pendUsd) + kpi('Por llegar', t.pendBs, t.pendUsd) + kpi('Egresos (gastos de oficina)', -t.egrBs, -t.egrUsd) + kpi('Traspasos a caja chica', -t.trasBs, -t.trasUsd) +
             (t.extBs || t.extUsd ? kpi('Dinero externo', t.extBs, t.extUsd) : '');
         const marca = (f, mon) => {
-            const v = mon === 'bs' ? f.bs : f.usd, ok = mon === 'bs' ? f.bsOk : f.usdOk;
-            if (!v && !(mon === 'bs' && efeSinEnvio(f))) return '';   // caja sin envío: se confirma en la columna de Bs
-            if (f.tipo === 'EGRESO') return '<span class="marca egr">Egreso</span>';
-            if (f.tipo === 'TRASPASO') return '<span class="marca tras">A caja chica</span>';
-            if (f.tipo === 'EXTERNO') return '<span class="marca ext">Externo</span>';
-            return ok ? `<button type="button" class="marca ok" title="Desmarcar" onclick="efeMarcar(${f.fila}, '${mon}', false)">Recibido</button>`
-                      : `<button type="button" class="marca pend" title="Marcar como recibido" onclick="efeMarcar(${f.fila}, '${mon}', true)">Por llegar</button>`;
+            const v = mon === 'bs' ? f.bs : f.usd;
+            if (f.tipo !== 'INGRESO' || (!v && !(mon === 'bs' && efeSinEnvio(f)))) return '';   // caja sin envío: se confirma en la columna de Bs
+            return efeSwRecibido(f, mon);
         };
-        document.getElementById('efeHTabla').innerHTML = lista.length ? `<table data-sin-paginar><thead><tr><th class="izq">Fecha</th><th class="izq">Tienda / Concepto</th>
-            <th class="izq">Cajero / Responsable</th><th class="izq">Turno</th><th>Bs</th><th></th><th>$</th><th></th><th class="izq">Foto</th><th class="izq">Verificación</th><th></th></tr></thead><tbody>` +
-            lista.slice(0, efeHLimite).map(f => `<tr class="${f.tipo === 'EGRESO' ? 'fila-egreso' : f.tipo === 'TRASPASO' ? 'fila-traspaso' : f.tipo === 'EXTERNO' ? 'fila-externo' : ''}"><td class="izq">${fechaBonita(f.fecha)}</td>
-                <td class="izq">${f.tipo === 'TRASPASO' ? esc(f.turno || 'Traspaso a caja chica') : f.tipo === 'EGRESO' ? esc(f.turno || (f.etiqueta && f.etiqueta !== 'EGRESO' ? f.etiqueta : 'Egreso manual')) : f.tipo === 'EXTERNO' ? 'Dinero externo: ' + esc(f.turno) : esc(f.tienda || 'Ingreso manual')}</td><td class="izq">${esc(f.cajero)}</td>
-                <td class="izq">${f.tipo !== 'INGRESO' ? '' : esc(f.turno)}</td>
-                <td class="${f.bs < 0 ? 'monto-neg' : ''}">${f.bs ? fmtBs(f.bs) + enDivisas(f.bs, f.fecha) : efeSinEnvio(f) ? '<span class="nota-fila" style="display:inline">Bs 0,00 · sin envío</span>' : ''}</td><td>${marca(f, 'bs')}</td>
-                <td class="${f.usd < 0 ? 'monto-neg' : ''}">${f.usd ? fmtUsd(f.usd) : ''}</td><td>${marca(f, 'usd')}</td>
-                <td class="izq">${f.foto ? `<a class="link-comprobante" href="${esc(f.foto)}" target="_blank" rel="noopener">Ver foto</a>` : ''}</td>
-                <td class="izq">${efeEstadoVerif(f)}</td>
-                <td>${f.tipo !== 'INGRESO' ? `<button type="button" class="btn-eliminar" title="${f.tipo === 'TRASPASO' ? 'Eliminar este traspaso (también se quita de la caja chica)' : f.tipo === 'EXTERNO' ? 'Eliminar este dinero externo' : 'Eliminar este gasto'}" onclick="efeEliminar(${f.fila})">Eliminar</button>` : ''}</td></tr>`).join('') +
+        const tipoChip = f => f.tipo === 'EGRESO' ? '<span class="chip st-falta efe-tipo" title="Gasto de oficina">Gasto</span>' : f.tipo === 'TRASPASO' ? '<span class="chip st-sobra efe-tipo" title="Traspaso a caja chica">A caja chica</span>'
+                            : f.tipo === 'EXTERNO' ? '<span class="chip st-ok efe-tipo" title="Dinero externo">Externo</span>' : '';
+        const turnoCorto = t => /^ma/i.test(t || '') ? 'M' : /^ta/i.test(t || '') ? 'T' : esc(t || '');
+        document.getElementById('efeHTabla').innerHTML = lista.length ? `<table data-sin-paginar><thead><tr><th class="izq">Fecha</th><th class="izq">Concepto</th>
+            <th class="izq">Responsable</th><th class="izq">Turno</th><th>Bs</th><th class="efe-c" title="Recibido">Rec.</th><th>$</th><th class="efe-c" title="Recibido">Rec.</th><th class="efe-c" title="Foto">📎</th><th class="efe-c" title="Verificado">Verif.</th><th></th></tr></thead><tbody>` +
+            lista.slice(0, efeHLimite).map(f => `<tr class="${f.tipo === 'EGRESO' ? 'fila-egreso' : f.tipo === 'TRASPASO' ? 'fila-traspaso' : f.tipo === 'EXTERNO' ? 'fila-externo' : ''}"><td class="izq">${efeFecha(f.fecha)}</td>
+                <td class="izq">${tipoChip(f)}${f.tipo === 'TRASPASO' ? esc(f.turno || 'Traspaso a caja chica') : f.tipo === 'EGRESO' ? esc(f.turno || (f.etiqueta && f.etiqueta !== 'EGRESO' ? f.etiqueta : 'Egreso manual')) : f.tipo === 'EXTERNO' ? esc(f.turno) : esc(f.tienda || 'Ingreso manual')}</td><td class="izq">${efeCorto(f.cajero)}</td>
+                <td class="izq"><span title="${esc(f.tipo === 'INGRESO' ? f.turno : '')}">${f.tipo !== 'INGRESO' ? '' : turnoCorto(f.turno)}</span></td>
+                <td class="${f.bs < 0 ? 'monto-neg' : ''}">${f.bs ? efeMonto('Bs', f.bs, f.fecha) : efeSinEnvio(f) ? '<span title="Caja sin envío">Bs 0</span>' : ''}</td><td class="efe-c">${marca(f, 'bs')}</td>
+                <td class="${f.usd < 0 ? 'monto-neg' : ''}">${f.usd ? fmtUsd(f.usd) : ''}</td><td class="efe-c">${marca(f, 'usd')}</td>
+                <td class="efe-c">${efeFoto(f.foto)}</td>
+                <td class="efe-c">${efeEstadoVerif(f)}</td>
+                <td class="efe-c">${f.tipo !== 'INGRESO' ? efeBorrar(`efeEliminar(${f.fila})`, f.tipo === 'TRASPASO' ? 'Eliminar este traspaso (también se quita de la caja chica)' : f.tipo === 'EXTERNO' ? 'Eliminar este dinero externo' : 'Eliminar este gasto') : ''}</td></tr>`).join('') +
             '</tbody></table>' : '<div class="empty">No hay movimientos con estos filtros.</div>';
         // Paginador (los totales de arriba siempre son de todo lo filtrado)
         const mostrados = Math.min(efeHLimite, lista.length);
@@ -11393,6 +11465,7 @@
         document.getElementById('efeHMas').innerHTML = lista.length > EFE_PAGINA ? `
             <span>Mostrando <b>${mostrados}</b> de <b>${lista.length}</b> movimientos (los más recientes)</span>
             ${mostrados < lista.length ? `<button type="button" class="btn-ghost btn-mini" onclick="efeVerMas(${efeHLimite + EFE_PAGINA})">Ver ${Math.min(EFE_PAGINA, lista.length - mostrados)} más</button>` : ''}
+            ${mostrados > EFE_PAGINA ? `<button type="button" class="btn-ghost btn-mini" onclick="efeVerMas(${Math.max(EFE_PAGINA, mostrados - EFE_PAGINA)})">Ver menos</button>` : ''}
             <label class="pag-cuantos">Mostrar
                 <select onchange="efeVerMas(this.value === 'todos' ? 'todos' : Number(this.value))">
                     ${opciones.map(n => `<option value="${n}" ${efeHLimite === n ? 'selected' : ''}>${n}</option>`).join('')}
@@ -11645,16 +11718,15 @@
             .filter(m => !fm || m.moneda === fm).reverse();
         const borrable = m => m.tipo === 'GASTO' || (m.tipo === 'RECARGA' && m.origen === 'externo');
         document.getElementById('efeCTabla').innerHTML = lista.length ? `<table><thead><tr><th class="izq">Fecha</th><th class="izq">Tipo</th><th class="izq">Concepto</th>
-            <th class="izq">Responsable</th><th>Monto</th><th>Saldo</th><th class="izq">Comprobante</th><th class="izq">Verificación</th><th></th></tr></thead><tbody>` +
-            lista.map(m => `<tr class="${m.tipo === 'GASTO' && !m.verificado ? 'cc-sinverificar' : ''}"><td class="izq">${fechaBonita(m.fecha)}</td>
-                <td class="izq"><span class="chip ${m.tipo === 'RECARGA' ? 'st-ok' : 'st-falta'}">${m.tipo === 'RECARGA' ? 'Recarga' : 'Gasto'}</span>${m.tipo === 'RECARGA' ? `<span class="chip-sub">${m.origen === 'externo' ? 'Externa' : 'Del flujo general'}</span>` : ''}</td>
-                <td class="izq">${esc(m.concepto)}</td><td class="izq">${esc(m.responsable)}</td>
-                <td class="${m.tipo === 'GASTO' ? 'monto-neg' : ''}">${m.tipo === 'GASTO' ? '−' : '+'}${fmtCaja(m.moneda, m.monto)}${m.moneda !== '$' ? enDivisas(m.monto, m.fecha) : ''}</td>
-                <td>${fmtCaja(m.moneda, m.saldo)}</td>
-                <td class="izq">${m.comprobante ? `<a class="link-comprobante" href="${esc(m.comprobante)}" target="_blank" rel="noopener">Ver foto</a>`
-                                                : (m.tipo === 'GASTO' ? '<span class="nota">Sin comprobante</span>' : '')}</td>
-                <td class="izq">${m.tipo !== 'GASTO' ? '' : efeSwVerif(m.verificado, `efeVerificarCaja(${m.fila})`)}</td>
-                <td>${borrable(m) ? `<button type="button" class="btn-eliminar" title="Eliminar (pide clave de administrador)" onclick="efeEliminarCaja(${m.fila})">Eliminar</button>` : ''}</td></tr>`).join('') +
+            <th class="izq">Responsable</th><th>Monto</th><th>Saldo</th><th class="efe-c" title="Comprobante">📎</th><th class="efe-c" title="Verificado">Verif.</th><th></th></tr></thead><tbody>` +
+            lista.map(m => `<tr class="${m.tipo === 'GASTO' && !m.verificado ? 'cc-sinverificar' : ''}"><td class="izq">${efeFecha(m.fecha)}</td>
+                <td class="izq"><span class="chip ${m.tipo === 'RECARGA' ? (m.origen === 'externo' ? 'st-info' : 'st-ok') : 'st-falta'}" title="${m.tipo === 'RECARGA' ? (m.origen === 'externo' ? 'Recarga externa (no afecta el flujo general)' : 'Recarga desde el flujo general') : 'Gasto'}">${m.tipo === 'RECARGA' ? 'Recarga' : 'Gasto'}</span></td>
+                <td class="izq">${esc(m.concepto)}</td><td class="izq">${efeCorto(m.responsable)}</td>
+                <td class="${m.tipo === 'GASTO' ? 'monto-neg' : ''}">${m.tipo === 'GASTO' ? '−' : '+'}${efeMonto(m.moneda, m.monto, m.fecha)}</td>
+                <td>${efeMonto(m.moneda, m.saldo)}</td>
+                <td class="efe-c">${efeFoto(m.comprobante) || (m.tipo === 'GASTO' ? '<span class="efe-falta" title="Sin comprobante">—</span>' : '')}</td>
+                <td class="efe-c">${m.tipo !== 'GASTO' ? '' : efeSwVerif(m.verificado, `efeVerificarCaja(${m.fila})`, `efeDesverificar('caja', ${m.fila})`)}</td>
+                <td class="efe-c">${borrable(m) ? efeBorrar(`efeEliminarCaja(${m.fila})`, 'Eliminar (pide clave de administrador)') : ''}</td></tr>`).join('') +
             '</tbody></table>' : '<div class="empty">Todavía no hay movimientos de caja chica. Empiece con una recarga.</div>';
     }
 
@@ -11719,14 +11791,39 @@
     const efeDiasDesde = f => Math.max(0, Math.round((new Date(fechaLocalHoy() + 'T12:00:00') - new Date(f + 'T12:00:00')) / 86400000));
     // Chip de estado en el historial del flujo general
     // Verificación con interruptor (como en todo el sistema): apagado = por verificar; al encenderlo se verifica (con clave si hace falta).
-    // Se enciende solo si la verificación sale bien (la pantalla se vuelve a dibujar); ya verificado queda encendido con quién y cuándo.
-    function efeSwVerif(verificado, accion) {
-        return verificado ? `<label class="interruptor" title="Verificado: ${esc(verificado)}"><input type="checkbox" checked onclick="return false"><span class="sw-pista"></span>Verificado</label><span class="chip-sub">${esc(verificado)}</span>`
-                          : `<label class="interruptor" title="Encender para verificar"><input type="checkbox" onchange="this.checked = false; ${accion}"><span class="sw-pista"></span>Por verificar</label>`;
+    // Se enciende solo si la verificación sale bien (la pantalla se vuelve a dibujar). Verificado: quién y cuándo al pasar el cursor;
+    // al apagarlo vuelve a "por verificar" (con clave de administrador).
+    function efeSwVerif(verificado, accion, desAccion) {
+        return verificado ? `<label class="interruptor interruptor-solo" title="Verificado: ${esc(verificado)}${desAccion ? ' · apagar para marcarlo como no verificado' : ''}"><input type="checkbox" checked onchange="this.checked = true; ${desAccion || ''}"><span class="sw-pista"></span></label>`
+                          : `<label class="interruptor interruptor-solo" title="Por verificar: encender para verificar"><input type="checkbox" onchange="this.checked = false; ${accion}"><span class="sw-pista"></span></label>`;
     }
+    // Marcar como NO verificado (vuelve a "por verificar"): clave de administrador; queda registrado quién lo hizo
+    async function efeDesverificar(tipo, fila) {
+        const x = tipo === 'caja' ? efeDatos.cajaChica.find(m => m.fila === fila) : efeDatos.filas.find(f => f.fila === fila);
+        if (!x) return;
+        const concepto = tipo === 'caja' ? x.concepto : x.turno;
+        const claveAdm = efeClaveVerif || await efePedirClave('Marcar como no verificado', `${concepto}: volverá a "por verificar". Un administrador lo autoriza con su clave.`);
+        if (!claveAdm) return;
+        try {
+            const r = await llamarApi({ action: tipo === 'caja' ? 'cc_desverificar' : 'efe_desverificar', fila, claveAdmin: claveAdm, concepto });
+            efeClaveVerif = claveAdm;
+            mostrarBanner(`${concepto}: marcado como no verificado.`, 'ok');
+            await efeUsarRespuesta(r);
+        } catch (e) { if (/clave/i.test(e.message)) efeClaveVerif = ''; mostrarBanner('No se pudo marcar como no verificado: ' + e.message, 'error'); efeModo(efeModoActual); }
+    }
+    // Listas más fáciles de leer: fecha corta (completa al pasar el cursor), íconos en vez de palabras y los detalles en el cursor
+    const efeFecha = f => !f ? '—' : `<span title="${fechaBonita(f)}">${f.slice(8, 10)}/${f.slice(5, 7)}${f.slice(0, 4) !== fechaLocalHoy().slice(0, 4) ? '/' + f.slice(2, 4) : ''}</span>`;
+    const efeFoto = url => url ? `<a class="efe-ico" href="${esc(url)}" target="_blank" rel="noopener" title="Ver foto">📎</a>` : '';
+    const efeBorrar = (accion, titulo) => `<button type="button" class="efe-ico" title="${esc(titulo)}" onclick="${accion}">🗑</button>`;
+    const efeCorto = n => { const s = String(n || '').trim(); return `<span title="${esc(s)}">${esc(s.split(/\s+/).slice(0, 2).join(' '))}</span>`; };
+    function efeAprox(bs, fecha) { const t = tasaBCVdel(fecha || fechaLocalHoy()); return t && bs ? ' · ≈ ' + fmtUsd(Math.abs(bs) / t[1]) : ''; }
+    const efeMonto = (moneda, v, fecha) => `<span title="${moneda === 'BsE' ? 'Bs electrónicos' : moneda === '$' ? '$ efectivo' : 'Bs efectivo'}${moneda !== '$' ? efeAprox(v, fecha) : ''}">${moneda === '$' ? fmtUsd(v) : fmtBs(v)}${moneda === 'BsE' ? '<span class="efe-e">e</span>' : ''}</span>`;
+    // Recibido / por llegar con interruptor
+    const efeSwRecibido = (f, mon) => { const ok = mon === 'usd' ? f.usdOk : f.bsOk;
+        return `<label class="interruptor interruptor-solo" title="${ok ? 'Recibido · apagar si todavía no llegó' : 'Por llegar · encender cuando llegue'}"><input type="checkbox" ${ok ? 'checked' : ''} onchange="efeMarcar(${f.fila}, '${mon}', this.checked)"><span class="sw-pista"></span></label>`; };
     function efeEstadoVerif(f) {
         if (f.tipo !== 'EGRESO') return '';
-        return efeSwVerif(efeSinVerificar(f) ? '' : f.verificado, `efeVerificarEgreso(${f.fila})`);
+        return efeSwVerif(efeSinVerificar(f) ? '' : f.verificado, `efeVerificarEgreso(${f.fila})`, `efeDesverificar('flujo', ${f.fila})`);
     }
 
     function efeRenderVerificar() {
