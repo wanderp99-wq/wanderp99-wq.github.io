@@ -23,7 +23,14 @@
     .secundario { background: transparent; color: var(--primary); border-color: var(--border); }
     button:disabled { opacity: .5; cursor: default; }
     .hidden { display: none !important; }
-    #video { width: 100%; border-radius: 14px; overflow: hidden; margin-top: 12px; }
+    #video { width: 100%; margin-top: 12px; }
+    /* ===== Lector de carnets con la cámara (el mismo en el Dashboard, la ficha y la prueba de carnets) ===== */
+    .lector-caja { position: relative; border-radius: 14px; overflow: hidden; background: #000; max-width: 640px; margin: 0 auto; }
+    .lector-caja video { width: 100%; display: block; max-height: 46vh; object-fit: cover; }   /* el resultado (arriba) siempre a la vista */
+    .lector-guia { position: absolute; left: 7%; right: 7%; top: 15%; bottom: 15%; border: 3px solid rgba(255, 255, 255, .9); border-radius: 14px; box-shadow: 0 0 0 999px rgba(0, 0, 0, .35); transition: border-color .15s, transform .15s; }
+    .lector-caja.leido .lector-guia { border-color: #22c55e; transform: scale(1.02); }
+    .lector-ayuda { position: absolute; left: 0; right: 0; bottom: 6px; text-align: center; color: #fff; font-size: .82rem; font-weight: 600; text-shadow: 0 1px 3px #000; padding: 0 .5rem; }
+
     .resultado { border-radius: 18px; padding: 18px; display: flex; gap: 14px; align-items: center; animation: entra .35s cubic-bezier(.2, .9, .3, 1.1) both; }
     @keyframes entra { from { opacity: 0; transform: translateY(8px) scale(.98); } }
     .resultado.ok { background: var(--ok-bg); } .resultado.mal { background: var(--bad-bg); } .resultado.aviso { background: var(--warn-bg); }
@@ -64,9 +71,9 @@
                 <button type="button" class="secundario" id="btnCamara">Usar la cámara</button>
                 <button type="button" class="secundario" id="btnSalir">Cambiar clave</button>
             </div>
-            <div id="video" class="hidden"></div>
         </div>
         <div id="resultado" class="resultado espera">Pase un carnet por el lector, o muestre a la cámara el código QR (el cuadrado) del carnet</div>
+        <div id="video" class="hidden"></div>
         <div class="card" style="margin-top:14px">
             <label>Últimas pruebas</label>
             <ul class="historial" id="historial"><li><small>Todavía no ha probado ningún carnet.</small></li></ul>
@@ -141,26 +148,76 @@
         historial.length = Math.min(historial.length, 10);
         $('historial').innerHTML = historial.map(h => `<li><span class="${h.ok ? 'h-ok' : 'h-mal'}">${h.ok ? '✓' : '✗'} ${esc(h.texto)}</span><small>${h.hora}</small></li>`).join('');
     }
-    function cargarScript(src) {
-        return new Promise((ok, mal) => { if (document.querySelector(`script[src="${src}"]`)) return ok();
+    // ==========================================
+    // LECTOR DE CARNETS CON LA CÁMARA (el mismo en el Dashboard, la ficha y la prueba de carnets)
+    // Video de la cámara trasera en alta resolución (1920×1080) y con enfoque continuo, SIN achicarlo: el código de barras del carnet
+    // tiene barras muy finas y necesita detalle. Cada 120 ms se lee la imagen completa con el detector nativo del teléfono
+    // (Android/Chrome) y, si no lee, con zxing-cpp (zxing-wasm), que es mucho más fuerte que el lector anterior. El QR se lee mejor.
+    // LECTOR.iniciar(contenedor, alLeer) · LECTOR.detener()
+    // ==========================================
+    const LECTOR = (() => {
+        const ZXING = 'https://cdn.jsdelivr.net/npm/zxing-wasm@2.1.2/dist/iife/reader/index.js';
+        let flujo = null, video = null, activo = false, cont = null, alLeer = null, detector = null, vuelta = 0;
+        const lienzo = document.createElement('canvas'), ctx = lienzo.getContext('2d', { willReadFrequently: true });
+        const cargar = src => new Promise((ok, mal) => { if (document.querySelector(`script[src="${src}"]`) && window.ZXingWASM) return ok();
             const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => mal(new Error('No se pudo cargar el lector (¿hay internet?)')); document.head.appendChild(s); });
-    }
+        async function motores() {
+            if (!detector && 'BarcodeDetector' in window) {
+                try { const f = await BarcodeDetector.getSupportedFormats(), q = ['qr_code', 'code_128'].filter(x => f.includes(x)); if (q.length) detector = new BarcodeDetector({ formats: q }); } catch (e) {}
+            }
+            if (!window.ZXingWASM) { try { await cargar(ZXING); } catch (e) { if (!detector) throw e; } }
+        }
+        async function iniciar(contenedor, cb) {
+            await detener();
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('Este navegador no permite usar la cámara (abra la app desde https o desde Chrome)');
+            await motores();
+            flujo = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } } });
+            const pista = flujo.getVideoTracks()[0];
+            try { const cap = pista.getCapabilities ? pista.getCapabilities() : {}; if (cap.focusMode && cap.focusMode.includes('continuous')) await pista.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); } catch (e) {}
+            cont = contenedor; alLeer = cb;
+            cont.innerHTML = '<div class="lector-caja"><video playsinline muted autoplay></video><div class="lector-guia"></div><div class="lector-ayuda">Acerque el código QR (el cuadrado) del carnet hasta que llene el recuadro</div></div>';
+            video = cont.querySelector('video'); video.srcObject = flujo;
+            try { await video.play(); } catch (e) {}
+            activo = true; ciclo();
+        }
+        async function ciclo() {
+            while (activo) {
+                if (video && video.readyState >= 2 && video.videoWidth) {
+                    const cw = video.videoWidth, ch = video.videoHeight;
+                    if (lienzo.width !== cw || lienzo.height !== ch) { lienzo.width = cw; lienzo.height = ch; }
+                    ctx.drawImage(video, 0, 0, cw, ch);   // la imagen completa a resolución completa (la guía es solo una ayuda: el código puede quedar fuera)
+                    let txt = '';
+                    if (detector) { try { const r = await detector.detect(lienzo); if (r.length) txt = r[0].rawValue; } catch (e) {} }
+                    // zxing-cpp: siempre si no hay detector nativo; si lo hay, una vuelta de cada dos (para no cargar el teléfono)
+                    if (!txt && window.ZXingWASM && (!detector || vuelta++ % 2 === 0)) {
+                        try { const r = await ZXingWASM.readBarcodes(ctx.getImageData(0, 0, cw, ch), { formats: ['QRCode', 'Code128'], tryHarder: true, maxNumberOfSymbols: 1 }); if (r.length && r[0].isValid !== false) txt = r[0].text; } catch (e) {}
+                    }
+                    const c = String(txt || '').replace(/\D/g, '');
+                    if (c && activo) {
+                        try { if (navigator.vibrate) navigator.vibrate(60); } catch (e) {}
+                        const caja = cont && cont.querySelector('.lector-caja'); if (caja) { caja.classList.add('leido'); setTimeout(() => caja.classList.remove('leido'), 450); }
+                        try { alLeer(c); } catch (e) { console.error(e); }
+                    }
+                }
+                await new Promise(r => setTimeout(r, 120));
+            }
+        }
+        async function detener() {
+            activo = false;
+            if (flujo) flujo.getTracks().forEach(t => { try { t.stop(); } catch (e) {} });
+            flujo = null; if (video) video.srcObject = null; video = null;
+            if (cont) cont.innerHTML = ''; cont = null;
+        }
+        return { iniciar, detener, get activo() { return activo; } };
+    })();
     async function camara() {
-        if (cam) { detenerCamara(); return; }
+        if (LECTOR.activo) { detenerCamara(); return; }
         const btn = $('btnCamara'); btn.disabled = true; btn.textContent = 'Abriendo cámara...';
-        try {
-            await cargarScript('https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js');
-            $('video').classList.remove('hidden');
-            cam = new Html5Qrcode('video', { formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.CODE_128], verbose: false, experimentalFeatures: { useBarCodeDetectorIfSupported: true } });
-            await cam.start({ facingMode: 'environment' }, { fps: 15, qrbox: (w, h) => ({ width: Math.floor(w * 0.92), height: Math.floor(Math.min(h * 0.6, w * 0.55)) }), videoConstraints: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 }, advanced: [{ focusMode: 'continuous' }] } }, t => probar(t), () => {});
-            btn.textContent = 'Cerrar cámara';
-        } catch (e) { detenerCamara(); pintar({ error: 'No se pudo abrir la cámara: ' + (e && e.message ? e.message : e) + '. Permita el uso de la cámara en el navegador.' }); }
+        try { $('video').classList.remove('hidden'); await LECTOR.iniciar($('video'), c => probar(c)); btn.textContent = 'Cerrar cámara'; }
+        catch (e) { detenerCamara(); pintar({ error: 'No se pudo abrir la cámara: ' + (e && e.message ? e.message : e) + '. Permita el uso de la cámara en el navegador.' }); }
         finally { btn.disabled = false; }
     }
-    function detenerCamara() {
-        if (cam) { const c = cam; cam = null; c.stop().catch(() => {}).finally(() => { try { c.clear(); } catch (e) {} }); }
-        $('video').classList.add('hidden'); $('btnCamara').textContent = 'Usar la cámara';
-    }
+    function detenerCamara() { LECTOR.detener(); $('video').classList.add('hidden'); $('btnCamara').textContent = 'Usar la cámara'; }
     $('btnEntrar').onclick = entrar;
     $('clave').addEventListener('keydown', e => { if (e.key === 'Enter') entrar(); });
     $('codigo').addEventListener('keydown', e => { if (e.key === 'Enter') { const v = $('codigo').value; $('codigo').value = ''; probar(v); } });
