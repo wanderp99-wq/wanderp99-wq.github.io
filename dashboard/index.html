@@ -9999,7 +9999,10 @@
         const yaEmpezo = desde && fechaLocalHoy() >= desde;
         const estado = !desde ? 'Ahora funcionan los dos a la vez: la ficha sigue pidiendo la asistencia, y si un trabajador marca con su carnet (cámara o lector), esa marca reemplaza la de la ficha para él ese día.'
             : yaEmpezo ? 'La ficha ya no pide la asistencia: se marca solo con el carnet.' : `Hasta el ${fechaBonita(desde)} funcionan los dos a la vez; desde ese día la ficha ya no pide la asistencia.`;
+        const pausa = perDatos.config.pausaAsistencia !== false;
         return `<div class="grafico-card" style="margin-top:1rem"><div class="grafico-head"><h3>Asistencia con carnet</h3></div>
+            <div class="per-config"><div><b>Asistencia en pausa</b><small>${pausa ? 'La ficha se envía sin pedir la asistencia y no salen los avisos de Telegram de atrasos ni de faltas.' : 'La ficha pide la asistencia y salen los avisos de atrasos y faltas.'}</small></div>
+                <label class="interruptor"><input type="checkbox" id="perAsisPausa" ${pausa ? 'checked' : ''} onchange="perPausaAsistencia(this)"><span class="sw-pista"></span> ${pausa ? 'En pausa' : 'Activa'}</label></div>
             <form class="per-config" onsubmit="perGuardarCarnetDesde(event)">
                 <div><b>Carnet y ficha</b><small>${estado}</small></div>
                 <div class="per-config-campo"><label for="perCDesde">Dejar de pedirla en la ficha desde (opcional)</label><input type="date" id="perCDesde" value="${desde}"></div>
@@ -10019,6 +10022,13 @@
         try { perUsar(await llamarApi({ action: 'per_carnet_desde', fecha: document.getElementById('perCDesde').value }));
               mostrarBanner(perDatos.config.carnetDesde ? `Desde el ${fechaBonita(perDatos.config.carnetDesde)} la ficha ya no pide la asistencia.` : 'Carnet y ficha a la vez: la ficha sigue pidiendo la asistencia.', 'ok'); }
         catch (e) { mostrarBanner(e.message, 'error'); btn.disabled = false; btn.textContent = 'Guardar'; }
+    }
+    async function perPausaAsistencia(chk) {
+        const pausa = chk.checked;
+        if (!confirm(pausa ? '¿Poner la asistencia en pausa? La ficha se enviará sin pedirla y no saldrán avisos de atrasos ni faltas.' : '¿Reactivar la asistencia? La ficha volverá a pedirla y saldrán los avisos de atrasos y faltas.')) { chk.checked = !pausa; return; }
+        chk.disabled = true;
+        try { perUsar(await llamarApi({ action: 'per_asis_pausa', pausa })); mostrarBanner(pausa ? 'Asistencia en pausa: la ficha no la pide y no salen avisos.' : 'Asistencia reactivada.', 'ok'); }
+        catch (e) { chk.checked = !pausa; chk.disabled = false; mostrarBanner(e.message, 'error'); }
     }
     async function perQuitarEquipo(token, nombre) {
         if (!confirm(`¿Quitar la autorización de "${nombre}"? Ese equipo ya no podrá marcar asistencia.`)) return;

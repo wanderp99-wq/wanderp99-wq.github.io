@@ -1786,7 +1786,7 @@
     async function cargarTrabajadores() {
         try { aplicarTrabajadores(JSON.parse(localStorage.getItem('caja_trabajadores') || 'null')); } catch (e) {}
         try { const h = JSON.parse(localStorage.getItem('caja_horarios') || 'null'); if (h && h.length) PUNT_HORARIOS = h; } catch (e) {}
-        try { CARNET_DESDE = localStorage.getItem('caja_carnet_desde') || ''; pintarEstadoAsis(); } catch (e) {}
+        try { CARNET_DESDE = localStorage.getItem('caja_carnet_desde') || ''; PAUSA_ASIS = localStorage.getItem('caja_asis_pausa') !== '0'; pintarEstadoAsis(); } catch (e) {}
         try {
             const resp = await fetch(URL_HOJA, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                 body: JSON.stringify({ consultaFicha: 'trabajadores' }) });
@@ -1794,9 +1794,11 @@
             if (r && r.resultado === 'exito' && aplicarTrabajadores(r.trabajadores)) {
                 try { localStorage.setItem('caja_trabajadores', JSON.stringify(r.trabajadores)); } catch (e) {}
             }
-            if (r && /^\d{4}-\d{2}-\d{2}$/.test(r.carnetDesde || '')) {
-                CARNET_DESDE = r.carnetDesde;
-                try { localStorage.setItem('caja_carnet_desde', r.carnetDesde); } catch (e) {}
+            if (r && r.resultado === 'exito') {
+                // La fecha del carnet también se puede quitar (vacía = carnet y ficha a la vez)
+                CARNET_DESDE = /^\d{4}-\d{2}-\d{2}$/.test(r.carnetDesde || '') ? r.carnetDesde : '';
+                if ('pausaAsistencia' in r) PAUSA_ASIS = !!r.pausaAsistencia;
+                try { localStorage.setItem('caja_carnet_desde', CARNET_DESDE); localStorage.setItem('caja_asis_pausa', PAUSA_ASIS ? '1' : '0'); } catch (e) {}
                 pintarEstadoAsis();
             }
             if (r && Array.isArray(r.horarios) && r.horarios.length) {
@@ -1818,10 +1820,17 @@
 
     // Desde esta fecha la asistencia se marca con el carnet en el equipo de marcaje: la ficha ya no la pide
     var CARNET_DESDE = '';
-    const conCarnet = () => !!CARNET_DESDE && !!datosAsis().fecha && datosAsis().fecha >= CARNET_DESDE;
+    // Asistencia en pausa (se decide en el panel, mientras no se usen los carnets): la ficha se envía sin pedirla
+    var PAUSA_ASIS = true;
+    const conCarnet = () => !PAUSA_ASIS && !!CARNET_DESDE && !!datosAsis().fecha && datosAsis().fecha >= CARNET_DESDE;
     function pintarEstadoAsis() {
         const d = datosAsis(), tarjeta = document.getElementById('asisTarjeta');
         let txt, ok = true;
+        if (PAUSA_ASIS && !asistencia.length) {
+            document.getElementById('asisEstado').textContent = 'Opcional por ahora';
+            tarjeta.classList.add('ok'); tarjeta.classList.remove('falta');
+            return;
+        }
         if (conCarnet()) {
             // Para enviar la ficha, al menos una entrada marcada con carnet en esta tienda y turno
             const n = yaRegistrada() ? asisRegistrada.trabajadores.length : 0;
@@ -2133,7 +2142,7 @@
             }
         }
         // Control de asistencia obligatorio, salvo que el turno ya lo tenga registrado en la hoja
-        if (!conCarnet() && !asistenciaCompleta()) {
+        if (!PAUSA_ASIS && !conCarnet() && !asistenciaCompleta()) {
             try { await consultarAsistencia(); } catch (errAsis) {}
             if (!asistenciaCompleta()) {
                 document.getElementById('asisTarjeta').classList.add('falta');
