@@ -1056,6 +1056,9 @@
         .alm-pos-top { display: grid; grid-template-columns: minmax(180px, 260px) 1fr minmax(200px, 280px); gap: .75rem; align-items: stretch; }
         #almContenido input[type=text], #almContenido input[type=search], #almDlg input[type=text], #almDlg input[type=search] { text-transform: uppercase; }
         #almContenido input::placeholder, #almDlg input::placeholder { text-transform: none; }
+        .alm-cod { position: relative; }
+        .alm-sug { position: absolute; left: 0; top: 100%; margin-top: .3rem; z-index: 20; width: min(560px, calc(100vw - 2rem)); display: flex; flex-direction: column; gap: .25rem; padding: .35rem; max-height: 340px; overflow-y: auto;
+                   background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 12px 30px var(--shadow); }
         .alm-cod input { font-size: 1.35rem; font-weight: 700; letter-spacing: .5px; padding: .7rem .8rem; font-family: ui-monospace, Consolas, monospace; }
         .alm-ultimo { background: var(--list-bg); border: 1px solid var(--border); border-radius: 12px; padding: .8rem 1rem; display: flex; align-items: center; font-size: 1.15rem; font-weight: 700; color: var(--title); min-height: 64px; }
         .alm-ultimo span { color: var(--text-muted); font-weight: 500; font-size: .95rem; }
@@ -1098,6 +1101,24 @@
         .alm-ing-cab { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; margin-bottom: .75rem; } .alm-ing-cab small { color: var(--text-muted); }
         .alm-ing-num { margin-left: auto; color: var(--text-muted); font-size: .85rem; }
         .alm-prov-elegido { flex: 1; cursor: default; }
+        .alm-traer-op { float: right; display: inline-flex; gap: .4rem; align-items: center; } .alm-traer-op kbd { font: 700 .7rem ui-monospace, Consolas, monospace; border: 1px solid var(--border); border-radius: 5px; padding: 0 .3rem; }
+        /* Nómina: tasa, selección y barra pagado / por pagar */
+        .nom-tasa span { display: flex; align-items: center; gap: .4rem; } .nom-tasa input { width: 140px; } .nom-tasa small { color: var(--text-muted); }
+        .nom-col-check { width: 2.2rem; text-align: center; } .nom-check { width: 1.1rem; height: 1.1rem; cursor: pointer; }
+        tr.nom-sel td { background: rgba(68, 172, 0, .08); }
+        .nom-pagar { align-items: center; gap: .8rem; flex-wrap: wrap; }
+        .nom-grafico { margin-bottom: 1rem; }
+        .nom-barra { display: flex; gap: 2px; height: 26px; border-radius: 6px; overflow: hidden; background: var(--list-bg); margin-top: .5rem; }
+        .nom-barra-seg { display: flex; align-items: center; justify-content: center; min-width: 2px; font-size: .74rem; font-weight: 700; color: var(--card-bg); }   /* texto oscuro sobre los tonos claros del modo oscuro */
+        .nom-barra-seg.pag, .nom-sw-pag { background: var(--ok) !important; } .nom-barra-seg.pend, .nom-sw-pend { background: var(--warn) !important; }
+        .nom-barra-seg span { white-space: nowrap; overflow: hidden; padding: 0 .4rem; } .nom-barra-seg:focus-visible { outline: 2px solid var(--text-main); outline-offset: 1px; }
+        .nom-barra-pie { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-top: .45rem; font-size: .85rem; color: var(--text-muted); } .nom-barra-pie b { color: var(--text-main); }
+        .alm-guardando { display: none; } .alm-guardando.activo { display: inline-flex; margin-right: .6rem; padding: .1rem .55rem; border-radius: 999px; background: var(--warn-bg); color: var(--warn); font-weight: 600; }
+        .alm-falta, .alm-falta b { color: var(--bad); } .alm-sobra, .alm-sobra b { color: var(--ok); }
+        .alm-total-falta { background: linear-gradient(135deg, #f87171, #dc2626 45%, #b91c1c); box-shadow: 0 6px 18px rgba(185, 28, 28, .25); }
+        .alm-conteo { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; margin: .7rem 0 .4rem; }
+        .alm-conteo > div { background: var(--list-bg); border: 1px solid var(--border); border-radius: 10px; padding: .5rem .7rem; }
+        .alm-conteo small { display: block; color: var(--text-muted); font-size: .74rem; } .alm-conteo b { font-size: 1.05rem; }
         .alm-semana { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; margin-bottom: 1rem; } .alm-semana b { font-size: 1rem; }
         .alm-kpi { text-align: left; cursor: pointer; font: inherit; color: inherit; display: flex; flex-direction: column; gap: .15rem; } .alm-kpi:hover { border-color: var(--alm-verde); }
         .alm-kpi small { color: var(--text-muted); font-size: .74rem; }
@@ -2963,7 +2984,7 @@
         { id: 'horarios',   area: 'rrhh',    titulo: 'Horarios de trabajo',   desc: 'Horario semanal de cada tienda: generarlo, ajustarlo y enviarlo por Telegram.', listo: true },
         { id: 'reqcharcu',  area: 'almacen', titulo: 'Requerimientos de charcutería', desc: 'Cuánto enviar a cada local según ventas, exhibición y la existencia de la cava.', listo: true },
         { id: 'inventario', area: 'almacen', titulo: 'Productos e inventario', desc: 'Catálogo de productos, existencia del almacén y movimientos.', listo: true },
-        { id: 'movalmacen', area: 'almacen', titulo: 'Entradas y salidas',    desc: 'Facturar notas de entrega e ingresar mercancía.', listo: true }
+        { id: 'movalmacen', area: 'almacen', titulo: 'Entradas y salidas',    desc: 'Facturar notas de entrega y operaciones de inventario.', listo: true }
     ];
     MODULOS.forEach(m => { if (!m.area) m.area = 'admin'; });
     let areaActual = null;   // área abierta en el menú (null = menú de áreas)
@@ -3407,6 +3428,10 @@
             if (r.toleranciaMin) PUNT_TOLERANCIA = Number(r.toleranciaMin) || 5;
             const nombres = [...new Set(asisgDatos.oficina.map(x => x.persona).concat(asisgDatos.locales.map(x => x.trabajador)))].sort();
             document.getElementById('asisgNombres').innerHTML = nombres.map(n => `<option value="${esc(n)}">`).join('');
+        }]);
+        // Almacén: productos, clientes y proveedores (así Facturar abre al instante)
+        if (tiene('inventario') || tiene('movalmacen')) tareas.push([['inventario', 'movalmacen'], async () => {
+            if (!almDatos) almUsar(await llamarApi({ action: 'alm_datos' }));
         }]);
         if (tiene('nomina') || tiene('talento') || tiene('cxc') || tiene('horarios')) tareas.push([['nomina', 'talento', 'cxc', 'horarios'], async () => {
             if (!perDatos) perUsar(await llamarApi({ action: 'per_listar' }));
@@ -7915,6 +7940,24 @@
         return perDatos.trabajadores.filter(t => (t.activo || conAsis.has(asisgClave(t.nombre)) || cobro.has(t.id)) && (!nomLugar || t.local === nomLugar) && perPasa(t.nombre, t.id, t.cargo, t.local, t.perfil))
             .map(nomCalcular).sort((a, b) => a.t.nombre.localeCompare(b.t.nombre, 'es', { sensitivity: 'base' }));
     }
+    // Tasa con la que se paga en Bs: la BCV del día en que se paga (hoy); se puede cambiar a mano
+    let nomTasaManual = 0, nomSel = new Set();
+    const nomTasaBcv = () => { const x = TASAS_BCV ? tasaBCVdel(fechaLocalHoy()) : null; return x ? x[1] : 0; };
+    const nomTasa = () => nomTasaManual > 0 ? nomTasaManual : nomTasaBcv();
+    const nomBs = (usd, tasa) => { const t = tasa != null ? tasa : nomTasa(); return t ? 'Bs ' + fmt(r2(usd * t)) : ''; };
+    function nomCambiarTasa(v) { const n = almNum ? almNum(v) : Number(v); nomTasaManual = n > 0 ? n : 0; perPintar(); }
+    function nomMarcar(id, si) { if (si) nomSel.add(id); else nomSel.delete(id); perPintar(); }
+    function nomMarcarTodos(si) { const pend = nomLista().filter(n => !n.cerrada && !n.avisos.length); nomSel = si ? new Set(pend.map(n => n.t.id)) : new Set(); perPintar(); }
+    // Barra: lo pagado y lo que falta por pagar de la semana (montos a cobrar)
+    function nomGrafico(pagado, porPagar, nPag, nPend, bsPagado) {
+        const total = pagado + porPagar; if (!total) return '';
+        const pct = v => Math.max(0, Math.min(100, v / total * 100));
+        const seg = (cls, v, n, txt) => v > 0 ? `<div class="nom-barra-seg ${cls}" style="width:${pct(v)}%" tabindex="0" title="${txt}: ${perUsd(v)} · ${cls === 'pag' && bsPagado != null ? 'Bs ' + fmt(bsPagado) : nomBs(v)} · ${n} trabajador(es) · ${fmt(pct(v))} %"><span>${fmt(pct(v))} %</span></div>` : '';
+        return `<div class="grafico-card nom-grafico"><div class="grafico-head"><h3>Pagado y por pagar de la semana</h3>
+                <div class="leyenda"><span><i class="sw nom-sw-pag"></i>Pagado ${perUsd(pagado)} (${nPag})</span><span><i class="sw nom-sw-pend"></i>Por pagar ${perUsd(porPagar)} (${nPend})</span></div></div>
+            <div class="nom-barra" role="img" aria-label="Pagado ${perUsd(pagado)}, por pagar ${perUsd(porPagar)}">${seg('pag', pagado, nPag, 'Pagado')}${seg('pend', porPagar, nPend, 'Por pagar')}</div>
+            <div class="nom-barra-pie"><span>Pagado: <b>${perUsd(pagado)}</b> <small>${bsPagado != null ? 'Bs ' + fmt(bsPagado) : nomBs(pagado)}</small></span><span>Por pagar: <b>${perUsd(porPagar)}</b> <small>${nomBs(porPagar)}</small></span></div></div>`;
+    }
     function nomCabecera() {
         const actual = inicioSemana(fechaLocalHoy());
         return `<div class="nom-cab">
@@ -7923,6 +7966,8 @@
                         <small>${nomSemana === actual ? 'semana en curso (todavía no termina)' : nomSemana > actual ? 'semana futura' : 'sábado a viernes'}</small></div>
                     <button type="button" class="btn-ghost" title="Semana siguiente" onclick="nomMoverSemana(7)" ${nomSemana >= actual ? 'disabled' : ''}>▶</button></div>
                 <label>Departamento o local <select onchange="nomElegirLugar(this.value)"><option value="">Todos</option>${perOpciones(perLugares(), nomLugar)}</select></label>
+                <label class="nom-tasa">Tasa para pagar (Bs por $) <span><input type="number" id="nomTasa" step="0.0001" min="0" value="${nomTasa() || ''}" onchange="nomCambiarTasa(this.value)">
+                    ${nomTasaManual ? `<button type="button" class="btn-ghost btn-mini" onclick="nomTasaManual=0;perPintar()" title="Volver a la tasa BCV de hoy">BCV ${fmt(nomTasaBcv())}</button>` : '<small>BCV de hoy</small>'}</span></label>
             </div>`;
     }
     function nomVista() {
@@ -7932,29 +7977,39 @@
             return nomCabecera() + cargandoHTML('Cargando la asistencia y las deudas de la semana...');
         }
         if (nomDatos.error) return nomCabecera() + `<div class="banner error">${esc(nomDatos.error)}</div>`;
+        if (!TASAS_BCV && !nomPidioTasa) { nomPidioTasa = true; cargarTasasBCV().then(() => { if (perTab === 'semanal') perPintar(); }).catch(() => {}); }
         const lista = nomLista(), pend = lista.filter(n => !n.cerrada), cerr = lista.filter(n => n.cerrada);
         const suma = (arr, k) => r2(arr.reduce((s, n) => s + n[k], 0));
+        [...nomSel].forEach(id => { if (!pend.some(n => n.t.id === id && !n.avisos.length)) nomSel.delete(id); });   // solo los que se pueden pagar
+        const sel = pend.filter(n => nomSel.has(n.t.id)), pagables = pend.filter(n => !n.avisos.length);
+        const netoCerr = cerr.reduce((s, n) => s + n.cerrada.neto, 0);
+        const bsCerr = r2(cerr.reduce((s, n) => s + (n.cerrada.netoBs || n.cerrada.neto * nomTasa()), 0));   // lo pagado, en los Bs con que se pagó
         const fila = n => {
             const c = n.cerrada, gen = c ? c.generado : n.generado, des = c ? c.descontado : n.descontar, neto = c ? c.neto : n.neto;
-            const estado = c ? `<span class="chip st-ok">Cerrada</span><small>${esc(c.id)}</small>`
-                : n.avisos.length ? n.avisos.map(a => `<span class="chip st-falta">${esc(a)}</span>`).join(' ') : '<span class="chip st-pend">Por cerrar</span>';
-            return `<tr class="${c ? 'per-pagado' : ''}"><td class="izq"><button type="button" class="chip st-pend chip-nombre" onclick="nomAbrir('${esc(n.t.id)}')">${esc(n.t.nombre)}</button>
+            const estado = c ? `<span class="chip st-ok">Pagado</span><small>${esc(c.id)}</small>`
+                : n.avisos.length ? n.avisos.map(a => `<span class="chip st-falta">${esc(a)}</span>`).join(' ') : '<span class="chip st-pend">Por pagar</span>';
+            const marca = c ? '' : `<input type="checkbox" class="nom-check" aria-label="Pagar a ${esc(n.t.nombre)}" ${nomSel.has(n.t.id) ? 'checked' : ''} ${n.avisos.length ? 'disabled title="Corrija los avisos antes de pagar"' : ''} onchange="nomMarcar('${esc(n.t.id)}', this.checked)">`;
+            return `<tr class="${c ? 'per-pagado' : nomSel.has(n.t.id) ? 'nom-sel' : ''}"><td class="nom-col-check">${marca}</td><td class="izq"><button type="button" class="chip st-pend chip-nombre" onclick="nomAbrir('${esc(n.t.id)}')">${esc(n.t.nombre)}</button>
                     <small>${esc(n.t.id)}${n.p ? ' · ' + esc(n.p.nombre) : ''}</small></td><td class="izq">${esc(n.t.local || '—')}</td>
                 <td>${c ? c.turnos : n.normales.length}${(c ? c.horasExtra : n.horasExtra) ? `<small>+ ${reqN(c ? c.horasExtra : n.horasExtra, 2)} h extra</small>` : ''}</td>
                 <td>${perUsd(gen)}</td><td>${des ? perUsd(des) : '—'}${!c && n.aDebitar > n.descontar + 0.004 ? `<small>quedan ${perUsd(n.aDebitar - n.descontar)} en CxC</small>` : ''}</td>
-                <td><b>${perUsd(neto)}</b></td><td class="izq">${estado}</td></tr>`;
+                <td><b>${perUsd(neto)}</b><small>${c ? (c.netoBs ? 'Bs ' + fmt(c.netoBs) + ' · tasa ' + fmt(c.tasa) : '') : nomBs(neto)}</small></td><td class="izq">${estado}</td></tr>`;
         };
         return nomCabecera() + `<div class="kpis">
-                <div class="kpi"><div class="k-label">Trabajadores</div><div class="k-value">${lista.length}</div><div class="k-label">${cerr.length} cerrado(s) · ${pend.length} por cerrar</div></div>
-                <div class="kpi"><div class="k-label">Generado (por cerrar)</div><div class="k-value">${perUsd(suma(pend, 'generado'))}</div><div class="k-label">incluye bonos y horas extra</div></div>
+                <div class="kpi"><div class="k-label">Trabajadores</div><div class="k-value">${lista.length}</div><div class="k-label">${cerr.length} pagado(s) · ${pend.length} por pagar</div></div>
+                <div class="kpi"><div class="k-label">Generado (por pagar)</div><div class="k-value">${perUsd(suma(pend, 'generado'))}</div><div class="k-label">incluye bonos y horas extra</div></div>
                 <div class="kpi bad"><div class="k-label">Gastos a debitar</div><div class="k-value">${perUsd(suma(pend, 'descontar'))}</div></div>
-                <div class="kpi ok"><div class="k-label">A pagar</div><div class="k-value">${perUsd(suma(pend, 'neto'))}</div><div class="k-label">por cerrar</div></div>
+                <div class="kpi ok"><div class="k-label">Por pagar</div><div class="k-value">${perUsd(suma(pend, 'neto'))}</div><div class="k-label">${nomBs(suma(pend, 'neto')) || 'sin tasa'}${nomTasa() ? ' · tasa ' + fmt(nomTasa()) : ''}</div></div>
             </div>
-            ${pend.length ? `<div class="req-acciones" style="margin-top:0"><button type="button" class="btn-save" onclick="nomAbrir('*')">Cerrar nómina de la semana (${pend.length})</button></div>` : ''}
-            ${lista.length ? `<div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">Trabajador</th><th class="izq">Local o departamento</th><th>Turnos</th>
+            ${nomGrafico(r2(netoCerr), suma(pend, 'neto'), cerr.length, pend.length, bsCerr)}
+            ${pend.length ? `<div class="req-acciones nom-pagar" style="margin-top:0">
+                <button type="button" class="btn-save" ${sel.length ? '' : 'disabled'} onclick="nomAbrir('*')">Pagar seleccionados (${sel.length})${sel.length ? ' · ' + perUsd(suma(sel, 'neto')) + ' · ' + nomBs(suma(sel, 'neto')) : ''}</button>
+                <span class="nota" style="margin:0">${sel.length ? 'Los demás quedan por pagar y se pagan cuando quiera.' : 'Marque a quién se le paga ahora (casilla a la izquierda).'}</span></div>` : ''}
+            ${lista.length ? `<div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="nom-col-check">${pagables.length ? `<input type="checkbox" aria-label="Marcar todos" ${sel.length && sel.length === pagables.length ? 'checked' : ''} onchange="nomMarcarTodos(this.checked)">` : ''}</th><th class="izq">Trabajador</th><th class="izq">Local o departamento</th><th>Turnos</th>
                 <th>Generado</th><th>Gastos a debitar</th><th>A cobrar</th><th class="izq">Estado</th></tr></thead><tbody>${lista.map(fila).join('')}</tbody>
-                <tfoot><tr><td class="izq" colspan="3"><b>Total (${lista.length})</b></td><td><b>${perUsd(suma(pend, 'generado') + cerr.reduce((s, n) => s + n.cerrada.generado, 0))}</b></td>
-                <td><b>${perUsd(suma(pend, 'descontar') + cerr.reduce((s, n) => s + n.cerrada.descontado, 0))}</b></td><td><b>${perUsd(suma(pend, 'neto') + cerr.reduce((s, n) => s + n.cerrada.neto, 0))}</b></td><td></td></tr></tfoot></table></div>`
+                <tfoot><tr><td></td><td class="izq" colspan="3"><b>Total (${lista.length})</b></td><td><b>${perUsd(suma(pend, 'generado') + cerr.reduce((s, n) => s + n.cerrada.generado, 0))}</b></td>
+                <td><b>${perUsd(suma(pend, 'descontar') + cerr.reduce((s, n) => s + n.cerrada.descontado, 0))}</b></td><td><b>${perUsd(suma(pend, 'neto') + netoCerr)}</b><small>${nomTasa() || bsCerr ? 'Bs ' + fmt(r2(bsCerr + suma(pend, 'neto') * nomTasa())) : ''}</small></td><td></td></tr>
+                ${pend.length ? `<tr><td></td><td class="izq" colspan="5"><small>Por pagar</small></td><td><b>${perUsd(suma(pend, 'neto'))}</b><small>${nomBs(suma(pend, 'neto'))}</small></td><td></td></tr>` : ''}</tfoot></table></div>`
               : '<div class="empty">No hay trabajadores con estos filtros.</div>'}
             <div class="nota">Toque un trabajador para ver su detalle: turnos, horas extra, bonos y gastos. Pago por turnos según su perfil; un turno que no estaba en su horario de la semana (o, sin horario, distinto al de su perfil) o trabajar su día libre cuenta como hora extra.
                 Se descuenta todo lo que debe, sin pasar de lo que generó; lo que falte (y lo excluido) queda pendiente en Cuentas por cobrar.</div>`;
@@ -8086,7 +8141,7 @@
         if (!t) return nomCab('Trabajador') + '<div class="empty">No se encontró el trabajador.</div>';
         const n = nomCalcular(t), id = esc(t.id), c = n.cerrada, editable = !c;
         if (!TASAS_BCV && !nomPidioTasa && typeof cargarTasasBCV === 'function') { nomPidioTasa = true; cargarTasasBCV().then(() => nomPintarDlg()).catch(() => {}); }
-        const tasa = TASAS_BCV ? (tasaBCVdel(fechaLocalHoy()) || [])[1] : null;
+        const tasa = c && c.tasa ? c.tasa : nomTasa() || null;   // pagado: la tasa con que se pagó
         const x = n.x || { ganado: 0, base: 0, ayuda: 0, punt: 0, prod: 0, cumple: false, minTurnos: 0, minimo: 0 };
         const pago = n.p ? Number(n.p.pago) || 0 : 0, porHora = !!(n.p && perPorHora(n.p));
         // Los montos: los de ahora, o los que quedaron guardados al cerrar
@@ -8171,20 +8226,20 @@
             <h4 class="per-sub">Resumen</h4>${resumen}
             ${!c && n.avisos.length ? `<div class="banner warn">Antes de cerrar: ${n.avisos.map(esc).join(' · ')}.</div>` : ''}
             <div class="req-acciones nom-pie">${c ? '' : nomClaveCampo()}<button type="button" class="btn-ghost" onclick="nomCerrarDlg()">Cerrar</button>
-                ${c ? '' : `<button type="button" class="btn-save" id="nomBtnCerrar" onclick="nomCerrar(['${id}'], this)">Cerrar la nómina de ${esc(t.nombre.split(' ')[0])}</button>`}</div>`;
+                ${c ? '' : `<button type="button" class="btn-save" id="nomBtnCerrar" onclick="nomCerrar(['${id}'], this)">Pagar a ${esc(t.nombre.split(' ')[0])}</button>`}</div>`;
     }
     function nomDlgTodos() {
-        const pend = nomLista().filter(n => !n.cerrada), conAviso = pend.filter(n => n.avisos.length);
-        return nomCab('Cerrar la nómina de la semana') + `<div class="req-sub">${fechaBonita(nomSemana)} – ${fechaBonita(sumarDias(nomSemana, 6))} · ${pend.length} trabajador(es)${nomLugar ? ' de ' + esc(nomLugar) : ''}</div>
+        const pend = nomLista().filter(n => !n.cerrada && nomSel.has(n.t.id)), conAviso = pend.filter(n => n.avisos.length);
+        return nomCab('Pagar la nómina de los seleccionados') + `<div class="req-sub">${fechaBonita(nomSemana)} – ${fechaBonita(sumarDias(nomSemana, 6))} · ${pend.length} trabajador(es)${nomLugar ? ' de ' + esc(nomLugar) : ''} · tasa ${fmt(nomTasa())} Bs por $</div>
             <div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">Trabajador</th><th>Generado</th><th>Gastos</th><th>A cobrar</th><th class="izq"></th></tr></thead><tbody>
-            ${pend.map(n => `<tr><td class="izq">${esc(n.t.nombre)}</td><td>${perUsd(n.generado)}</td><td>${perUsd(n.descontar)}</td><td><b>${perUsd(n.neto)}</b></td>
+            ${pend.map(n => `<tr><td class="izq">${esc(n.t.nombre)}</td><td>${perUsd(n.generado)}</td><td>${perUsd(n.descontar)}</td><td><b>${perUsd(n.neto)}</b><small>${nomBs(n.neto)}</small></td>
                 <td class="izq">${n.avisos.map(a => `<span class="chip st-falta">${esc(a)}</span>`).join(' ')}</td></tr>`).join('')}
             </tbody><tfoot><tr><td class="izq"><b>Total</b></td><td><b>${perUsd(pend.reduce((s, n) => s + n.generado, 0))}</b></td><td><b>${perUsd(pend.reduce((s, n) => s + n.descontar, 0))}</b></td>
-                <td><b>${perUsd(pend.reduce((s, n) => s + n.neto, 0))}</b></td><td></td></tr></tfoot></table></div>
+                <td><b>${perUsd(pend.reduce((s, n) => s + n.neto, 0))}</b><small>${nomBs(pend.reduce((s, n) => s + n.neto, 0))}</small></td><td></td></tr></tfoot></table></div>
             ${conAviso.length ? `<div class="banner warn">${conAviso.length} trabajador(es) con avisos: revíselos antes de cerrar (tóquelos en la lista).</div>` : ''}
             <div class="nota">Al cerrar se guarda la nómina con su ID en BD PAGOS NOMINA y los gastos quedan descontados en Cuentas por cobrar ("Descuento de nómina"). No se puede cerrar dos veces la misma semana para el mismo trabajador.</div>
             <div class="req-acciones nom-pie">${nomClaveCampo()}<button type="button" class="btn-ghost" onclick="nomCerrarDlg()">Cancelar</button>
-                <button type="button" class="btn-save" id="nomBtnCerrar" ${pend.length && !conAviso.length ? '' : 'disabled'} onclick="nomCerrar([${pend.map(n => `'${esc(n.t.id)}'`).join(',')}], this)">Cerrar nómina (${pend.length})</button></div>`;
+                <button type="button" class="btn-save" id="nomBtnCerrar" ${pend.length && !conAviso.length ? '' : 'disabled'} onclick="nomCerrar([${pend.map(n => `'${esc(n.t.id)}'`).join(',')}], this)">Pagar (${pend.length})</button></div>`;
     }
     // Lo que se guarda de cada trabajador
     function nomItem(n) {
@@ -8204,22 +8259,25 @@
         const clave = (document.getElementById('nomClave') || {}).value || nomClave;
         if (!clave) { mostrarBanner('Escriba la clave de administrador para cerrar la nómina.', 'warn'); return; }
         const neto = lista.reduce((s, n) => s + n.neto, 0), gastos = lista.reduce((s, n) => s + n.descontar, 0);
-        if (!confirm(`¿Cerrar la nómina de ${lista.length === 1 ? lista[0].t.nombre : lista.length + ' trabajadores'}?\n\nA pagar: ${perUsd(neto)}\nGastos que se descuentan en Cuentas por cobrar: ${perUsd(gastos)}`)) return;
+        const tasa = nomTasa();
+        if (!tasa && !confirm('No hay tasa del dólar para pasar a Bs. ¿Pagar de todas formas (solo en $)?')) return;
+        if (!confirm(`¿Pagar la nómina de ${lista.length === 1 ? lista[0].t.nombre : lista.length + ' trabajadores'}?\n\nA pagar: ${perUsd(neto)}${tasa ? ' · ' + nomBs(neto, tasa) + ' (tasa ' + fmt(tasa) + ')' : ''}\nGastos que se descuentan en Cuentas por cobrar: ${perUsd(gastos)}`)) return;
         btnCargando(btn, 'Cerrando...');
         try {
-            const r = await llamarApi({ action: 'nom_cerrar', semana: nomSemana, claveAdmin: clave, items: lista.map(nomItem) });
+            const r = await llamarApi({ action: 'nom_cerrar', semana: nomSemana, claveAdmin: clave, tasa, items: lista.map(nomItem) });
+            lista.forEach(n => nomSel.delete(n.t.id));
             nomDatos.cerradas = r.pagos || nomDatos.cerradas; nomDatos.deudas = r.deudas || nomDatos.deudas;
             perDeudasPend = null; perDeudasHistDatos = null; nomHist = null;   // Cuentas por cobrar y las nóminas cerradas se vuelven a leer
             Object.keys(nomCache).forEach(k => { if (k !== nomSemana) delete nomCache[k]; });   // las otras semanas precargadas tenían las deudas de antes
             nomClave = '';
             const s = nomAjSemana(); lista.forEach(n => delete s[n.t.id]); try { localStorage.setItem('nom_aj_' + nomSemana, JSON.stringify(s)); } catch (e) {}
-            mostrarBanner(`Nómina ${r.nomina} cerrada: ${r.cerrados} trabajador(es) · a pagar ${perUsd(r.neto)}.`, 'ok');
+            mostrarBanner(`Nómina ${r.nomina} pagada: ${r.cerrados} trabajador(es) · ${perUsd(r.neto)}${tasa ? ' · ' + nomBs(r.neto, tasa) : ''}.`, 'ok');
             if (nomAbierto === '*') nomCerrarDlg(); else nomPintarDlg();
             perPintar();
         } catch (e) {
             if (/clave/i.test(e.message)) nomClave = '';
             mostrarBanner('No se pudo cerrar la nómina: ' + e.message, 'error');
-            btn.disabled = false; btn.textContent = 'Cerrar nómina';
+            btn.disabled = false; btn.textContent = 'Pagar';
         }
     }
     // ---------- Nóminas cerradas (BD PAGOS NOMINA), por ID ----------
@@ -10125,8 +10183,8 @@
     let almDatos = null, almVista = '', almTab = '', almNotas = null, almIngresos = null, almRango = null;
     let almVenta = { items: [], sel: -1, descuento: 0, claveDesc: '', claveStock: '', ultimo: '' };
     let almIng = { operacion: '', proveedorId: '', documento: '', clienteId: '', nota: '', items: [], sel: -1, listo: false, ultimo: '' };
-    const ALM_TABS = { inventario: [['productos', 'Productos']], movalmacen: [['facturar', 'Facturar'], ['ingresar', 'Ingresar mercancía'], ['notas', 'Notas emitidas'], ['ingresos', 'Ingresos'], ['tiendas', 'Inversión por tienda']] };
-    const ALM_OPS = [['COMPRA', 'Compra a proveedor'], ['SIN_FACTURA', 'Ingreso sin factura'], ['DEVOLUCION', 'Devolución de cliente'], ['AJUSTE', 'Ajuste de inventario']];
+    const ALM_TABS = { inventario: [['productos', 'Productos']], movalmacen: [['facturar', 'Facturar'], ['ingresar', 'Operaciones de inventario'], ['notas', 'Notas emitidas'], ['ingresos', 'Historial de operaciones'], ['tiendas', 'Inversión por tienda']] };
+    const ALM_OPS = [['COMPRA', 'Compra a proveedor'], ['SIN_FACTURA', 'Ingreso sin factura'], ['DEVOLUCION', 'Devolución de cliente'], ['AJUSTE', 'Ajuste de inventario'], ['DESCUENTO', 'Descuento de inventario']];
     const ALM_EMPRESA = { nombre: 'DISTRIBUIDORA PLAZA VALENCIA 20, C.A.', rif: 'J-50076678-5', direccion: 'Av. Carabobo C/C Rocío e Infante, Casa Nro 84-15, Zona Candelaria, Valencia, Carabobo', telefono: '0414-9403766' };
     const almCant = (n, tipo) => new Intl.NumberFormat('es-VE', { minimumFractionDigits: tipo === 'Pesado' ? 3 : 0, maximumFractionDigits: 3 }).format(Number(n) || 0);
     const almUnidad = tipo => tipo === 'Pesado' ? 'kg' : 'und';
@@ -10144,7 +10202,7 @@
         tabs.classList.toggle('hidden', ALM_TABS[vista].length < 2);
         cargarTasasBCV().then(() => { if (vistaActual === almVista) almPintar(); });
         if (almDatos) almPintar(); else document.getElementById('almContenido').innerHTML = cargandoHTML('Cargando productos...');
-        await almCargar(!almDatos);
+        if (!almDatos || Date.now() - almDatosEn > 120000) await almCargar(!almDatos);
         almEnfocar();
     }
     async function almCargar(primera) {
@@ -10155,7 +10213,9 @@
             almUsar(await llamarApi({ action: 'alm_datos' }));
         } catch (e) { if (primera || !almDatos) document.getElementById('almContenido').innerHTML = `<div class="banner error">${esc(e.message)}</div>`; else mostrarBanner(e.message, 'error'); }
     }
+    let almDatosEn = 0;   // cuándo se leyó el almacén (al entrar no se vuelve a leer si tiene menos de 2 minutos)
     function almUsar(r) {
+        almDatosEn = Date.now();
         almDatos = { productos: r.productos || [], clientes: r.clientes || [], categorias: r.categorias || [], proveedores: r.proveedores || [],
                      proximaNota: r.proximaNota || '', proximoIngreso: r.proximoIngreso || '' };
         almPintar();
@@ -10249,6 +10309,7 @@
         }
         if (document.querySelector('.req-dlg-fondo:not(.hidden):not(#almDlg)')) return;   // otra ventana (p. ej. la clave de administrador)
         const pos = almTab === 'facturar' || (almTab === 'ingresar' && almIng.listo);
+        if (!pos && almTab === 'ingresar' && e.key === 'F7') { e.preventDefault(); e.stopPropagation(); almTraerOperacion(); return; }   // también antes de elegir la operación
         if (!pos) return;
         let cod = document.getElementById('almCod');
         const doc = almTab === 'facturar' ? almVenta : almIng;
@@ -10261,8 +10322,8 @@
         if (e.key === 'Escape' && !(enCod && !vacio) && doc.items.length) return tecla(() => mostrarBanner('Hay ' + doc.items.length + ' renglón(es) sin terminar. Para salir, termine o quite los renglones (Supr).', 'warn'));
         if (e.key === 'F2') return tecla(() => almBuscar());
         if (e.key === 'F3' && almTab === 'facturar') return tecla(() => almDescuento());
-        if (e.key === 'F6' && almTab === 'facturar') return tecla(() => almGuardarEspera());
-        if (e.key === 'F7' && almTab === 'facturar') return tecla(() => almTraerEspera());
+        if (e.key === 'F6') return tecla(() => almTab === 'facturar' ? almGuardarEspera() : almGuardarOperacion());
+        if (e.key === 'F7') return tecla(() => almTab === 'facturar' ? almTraerEspera() : almTraerOperacion());
         if (!enCod) return;
         if (e.key === ' ' && vacio) return tecla(() => almTab === 'facturar' ? almTotalizar() : almFinalizarIngreso());
         if (e.key === 'Delete' && vacio) return tecla(() => almQuitar());
@@ -10270,6 +10331,7 @@
             const n = doc.items.length, s = doc.sel < 0 ? n - 1 : doc.sel;
             doc.sel = Math.max(0, Math.min(n - 1, s + (e.key === 'ArrowUp' ? -1 : 1))); almPintar();
         });
+        if (e.key === 'Escape' && almSug.lista.length) return tecla(() => almSugCerrar());   // primero cierra las sugerencias
         if (e.key === 'Escape' && !vacio) return tecla(() => { cod.value = ''; almCodTexto = ''; });
     }, true);
 
@@ -10278,24 +10340,30 @@
         const tasa = almTasa();
         const sub = almR(doc.items.reduce((s, x) => s + x.cantidad * (ingreso ? x.costo : x.precio), 0));
         const desc = ingreso ? 0 : Math.min(doc.descuento || 0, sub), total = almR(sub - desc);
-        const espera = ingreso ? 0 : almEspera().length;
+        const espera = ingreso ? almOpsEspera().length : almEspera().length, ajuste = ingreso && almIng.operacion === 'AJUSTE', descuentoInv = ingreso && almIng.operacion === 'DESCUENTO';
+        const falta = ajuste ? almR(doc.items.filter(x => x.cantidad < 0).reduce((s, x) => s + x.cantidad * x.costo, 0)) : 0, sobra = ajuste ? almR(sub - falta) : 0;
+        const dinero = v => (v < 0 ? '−' : '') + fmt(Math.abs(v));
         const teclas = ingreso
-            ? [['Enter', 'Agregar'], ['F2', 'Buscar', 'almBuscar()'], ['Supr', 'Quitar renglón', 'almQuitar()'], ['Espacio', 'Terminar ingreso', 'almFinalizarIngreso()']]
+            ? [['Enter', 'Agregar'], ['F2', 'Buscar', 'almBuscar()'], ['F6', 'Guardar operación', 'almGuardarOperacion()'], ['F7', 'Traer operación' + (espera ? ` (${espera})` : ''), 'almTraerOperacion()'],
+               ['Supr', 'Quitar renglón', 'almQuitar()'], ['Espacio', 'Terminar operación', 'almFinalizarIngreso()']]
             : [['Enter', 'Agregar'], ['F2', 'Buscar', 'almBuscar()'], ['F3', 'Descuento', 'almDescuento()'], ['F6', 'Guardar venta', 'almGuardarEspera()'],
                ['F7', 'Traer venta' + (espera ? ` (${espera})` : ''), 'almTraerEspera()'], ['Supr', 'Quitar renglón', 'almQuitar()'], ['Espacio', 'Totalizar', 'almTotalizar()']];
         const filas = doc.items.map((x, i) => `<tr class="${i === (doc.sel < 0 ? doc.items.length - 1 : doc.sel) ? 'sel' : ''}${x.sinExistencia ? ' alm-sin' : ''}" onclick="almMarcar(${i})">
                 <td class="izq"><b>${esc(x.codigo)}</b></td><td class="izq">${esc(x.descripcion)}${x.sinExistencia ? ' <span class="chip st-sobra">sin existencia</span>' : ''}</td>
-                <td>${almCant(x.cantidad, x.tipo)} <small>${almUnidad(x.tipo)}</small></td><td>${fmt(ingreso ? x.costo : x.precio)}</td><td><b>${fmt(x.cantidad * (ingreso ? x.costo : x.precio))}</b></td></tr>`).join('');
+                ${ajuste ? `<td>${almCant(x.existencia, x.tipo)} <small>${almUnidad(x.tipo)}</small></td><td>${almCant(x.contado, x.tipo)} <small>${almUnidad(x.tipo)}</small></td>
+                    <td class="${x.cantidad < 0 ? 'alm-falta' : 'alm-sobra'}"><b>${x.cantidad > 0 ? '+' : '−'}${almCant(Math.abs(x.cantidad), x.tipo)}</b> <small>${almUnidad(x.tipo)}</small></td>` : `<td>${almCant(x.cantidad, x.tipo)} <small>${almUnidad(x.tipo)}</small></td>`}
+                <td>${fmt(ingreso ? x.costo : x.precio)}</td><td class="${ajuste ? (x.cantidad < 0 ? 'alm-falta' : 'alm-sobra') : ''}"><b>${dinero(x.cantidad * (ingreso ? x.costo : x.precio))}</b></td></tr>`).join('');
         return `<div class="alm-pos">
             <form class="alm-pos-top" onsubmit="event.preventDefault(); almEnter()">
-                <div class="alm-cod"><label for="almCod">Código ${almBotonTeclado('almCod')}</label><input type="text" id="almCod" autocomplete="off" spellcheck="false" placeholder="${almTab === 'facturar' ? 'Código · 3*código · 520*código (g)' : 'Código · 3*código'}" inputmode="${almTeclado()}" value="${esc(almCodTexto)}" oninput="almCodTexto=this.value"></div>
+                <div class="alm-cod"><label for="almCod">Código ${almBotonTeclado('almCod')}</label><input type="text" id="almCod" autocomplete="off" spellcheck="false" placeholder="${almTab === 'facturar' ? 'Código · 3*código · 520*código (g)' : 'Código · 3*código'}" inputmode="${almTeclado()}" value="${esc(almCodTexto)}" oninput="almCodTexto=this.value;almSugerir()" onkeydown="almSugTecla(event)" onblur="setTimeout(() => { if (document.activeElement && document.activeElement.id !== 'almCod') almSugCerrar(); }, 150)" role="combobox" aria-autocomplete="list" aria-expanded="${almSug.lista.length ? 'true' : 'false'}">
+                    ${almSugHTML()}</div>
                 <div class="alm-ultimo">${doc.ultimo ? esc(doc.ultimo) : `<span>${ingreso ? 'Marque el código y presione Enter para escribir la cantidad' : 'Marque el código y presione Enter'}</span>`}</div>
-                <div class="alm-total"><small>${ingreso ? 'Total costo' : 'Total a pagar'}</small><b>$ ${fmt(total)}</b>
-                    <small>${tasa ? `Bs ${fmt(total * tasa)} · tasa ${fmt(tasa)}` : 'Tasa BCV no disponible'}${desc ? ` · desc. $ ${fmt(desc)}` : ''}</small></div>
+                <div class="alm-total${(ajuste && total < 0) || descuentoInv ? ' alm-total-falta' : ''}"><small>${ajuste ? (total < 0 ? 'Valor de lo que falta' : 'Valor del ajuste') : descuentoInv ? 'Valor descontado' : ingreso ? 'Total de la factura (costo)' : 'Total a pagar'}</small><b>$ ${dinero(total)}</b>
+                    <small>${ajuste && falta && sobra ? `falta $ ${fmt(Math.abs(falta))} · sobra $ ${fmt(sobra)} · ` : ''}${tasa ? `Bs ${dinero(total * tasa)} · tasa ${fmt(tasa)}` : 'Tasa BCV no disponible'}${desc ? ` · desc. $ ${fmt(desc)}` : ''}</small></div>
             </form>
-            <div class="tabla-wrap alm-carrito"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Código</th><th class="izq">Descripción</th><th>Cantidad</th><th>${ingreso ? 'Costo $' : 'Precio $'}</th><th>Subtotal $</th></tr></thead>
-                <tbody>${filas || `<tr><td colspan="5"><div class="alm-vacio">${ingreso ? 'Sin productos todavía' : 'Venta vacía'}</div></td></tr>`}</tbody></table></div>
-            <div class="alm-pie"><span>${doc.items.length} renglón(es)${doc.items.length ? ' · ' + doc.items.reduce((s, x) => s + (x.tipo === 'Unidad' ? x.cantidad : 0), 0) + ' und · ' + almCant(doc.items.reduce((s, x) => s + (x.tipo === 'Pesado' ? x.cantidad : 0), 0), 'Pesado') + ' kg' : ''}</span>
+            <div class="tabla-wrap alm-carrito"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Código</th><th class="izq">Descripción</th>${ajuste ? '<th>Existencia</th><th>Contado</th><th>Ajuste</th>' : '<th>Cantidad</th>'}<th>${ingreso ? 'Costo $' : 'Precio $'}</th><th>Subtotal $</th></tr></thead>
+                <tbody>${filas || `<tr><td colspan="${ajuste ? 7 : 5}"><div class="alm-vacio">${ajuste ? 'Marque el código y escriba lo que contó (0 si no hay)' : ingreso ? 'Sin productos todavía' : 'Venta vacía'}</div></td></tr>`}</tbody></table></div>
+            <div class="alm-pie"><span><span class="alm-guardando${almGuardando ? ' activo' : ''}">${almGuardando ? `Guardando ${almGuardando} documento(s)...` : ''}</span>${doc.items.length} renglón(es)${doc.items.length ? ' · ' + doc.items.reduce((s, x) => s + (x.tipo === 'Unidad' ? x.cantidad : 0), 0) + ' und · ' + almCant(doc.items.reduce((s, x) => s + (x.tipo === 'Pesado' ? x.cantidad : 0), 0), 'Pesado') + ' kg' : ''}</span>
                 <span class="alm-teclas">${teclas.map(([k, t, fn]) => fn ? `<button type="button" class="alm-tecla" onclick="${fn}"><kbd>${k}</kbd>${t}</button>` : `<span class="alm-tecla"><kbd>${k}</kbd>${t}</span>`).join('')}</span></div>
         </div>`;
     }
@@ -10310,9 +10378,59 @@
         almPintar(); almEnfocar();
     }
     // Enter en el código: "3*026" = 3 unidades del 026. Un producto pesado pide el peso (o lo toma de "0,5*001").
+    // ---------- Sugerencias al escribir en el código: por código o por nombre (flechas para elegir, Enter para agregar) ----------
+    let almSug = { lista: [], idx: 0 };
+    const almSugPartes = txt => { const m = /^(\d+(?:[.,]\d+)?)\s*\*\s*(.*)$/.exec(txt); return m ? { pre: m[1] + '*', q: m[2] } : { pre: '', q: txt }; };
+    function almSugerir() {
+        const { q } = almSugPartes((document.getElementById('almCod') || {}).value || '');
+        const s = q.trim().toUpperCase(), n = asisgClave(q);
+        if (s.length < 2 || !almDatos) { almSugCerrar(); return; }
+        const exacto = [], prefijo = [], nombre = [];
+        almDatos.productos.forEach(p => {
+            if (!p.activo) return;
+            const c = p.codigo.toUpperCase();
+            if (c === s) exacto.push(p);
+            else if (c.startsWith(s)) prefijo.push(p);
+            else if (n.length >= 2 && n.split(' ').every(w => asisgClave(p.descripcion).includes(w))) nombre.push(p);   // todas las palabras, en cualquier orden
+        });
+        nombre.sort((a, b) => a.descripcion.localeCompare(b.descripcion, 'es'));
+        const lista = exacto.concat(prefijo, nombre).slice(0, 8);
+        // Un código exacto sin nada más que sugerir: no se muestra la lista (el lector de códigos sigue igual de rápido)
+        almSug = { lista: lista.length === 1 && exacto.length === 1 ? [] : lista, idx: 0 };
+        almSugPintar();
+    }
+    function almSugHTML() {
+        if (!almSug.lista.length) return '';
+        return `<div class="alm-sug" role="listbox">${almSug.lista.map((p, i) => `<button type="button" role="option" class="alm-op${i === almSug.idx ? ' sel' : ''}" onmousedown="event.preventDefault()" onclick="almSugElegir(${i})">
+            <b>${esc(p.codigo)}</b><span>${esc(p.descripcion)}</span><small>$ ${fmt(almTab === 'ingresar' ? p.costo : p.precio)} · ${almCant(p.existencia, p.tipo)} ${almUnidad(p.tipo)}</small></button>`).join('')}</div>`;
+    }
+    function almSugPintar() {
+        const cod = document.getElementById('almCod'); if (!cod) return;
+        const viejo = cod.parentElement.querySelector('.alm-sug'); if (viejo) viejo.remove();
+        cod.insertAdjacentHTML('afterend', almSugHTML());
+        cod.setAttribute('aria-expanded', almSug.lista.length ? 'true' : 'false');
+        const s = cod.parentElement.querySelector('.alm-sug .sel'); if (s) s.scrollIntoView({ block: 'nearest' });
+    }
+    function almSugCerrar() { if (!almSug.lista.length) return; almSug = { lista: [], idx: 0 }; almSugPintar(); }
+    function almSugTecla(e) {
+        if (!almSug.lista.length || (e.key !== 'ArrowDown' && e.key !== 'ArrowUp')) return;
+        e.preventDefault(); e.stopPropagation();
+        almSug.idx = Math.max(0, Math.min(almSug.lista.length - 1, almSug.idx + (e.key === 'ArrowDown' ? 1 : -1)));
+        almSugPintar();
+    }
+    // Elegir una sugerencia: queda su código (con el 3* si lo había) y se agrega como si se hubiera marcado
+    function almSugElegir(i) {
+        const p = almSug.lista[i], cod = document.getElementById('almCod'); if (!p || !cod) return;
+        cod.value = almSugPartes(cod.value).pre + p.codigo; almCodTexto = cod.value;
+        almSug = { lista: [], idx: 0 }; almSugPintar();
+        almEnter();
+    }
     function almEnter() {
         const cod = document.getElementById('almCod'), txt = cod.value.trim();
         if (!txt) return;
+        // Escribió un nombre (o parte del código): Enter toma la sugerencia marcada, salvo que lo escrito sea un código exacto
+        if (almSug.lista.length && !almProducto(almSugPartes(txt).q)) { almSugElegir(almSug.idx); return; }
+        almSug = { lista: [], idx: 0 }; almSugPintar();
         const m = /^(\d+(?:[.,]\d+)?)\s*\*\s*(\S+)$/.exec(txt);
         const codigo = m ? m[2] : txt;
         let mult = m ? Number(m[1].replace(',', '.')) : null;
@@ -10552,25 +10670,46 @@
         if (!almCliSel) { err.textContent = 'Elija el cliente (escriba el nombre, flechas y Enter).'; document.getElementById('almCliBus').focus(); return; }
         const credito = document.getElementById('almCredito').checked, dias = almNum(document.getElementById('almDias').value);
         if (credito && !(dias >= 0)) { err.textContent = 'Escriba los días de crédito'; return; }
-        btnCargando(btn, 'Emitiendo...');
-        try {
-            const r = await llamarApi({ action: 'alm_facturar', clienteId: almCliSel, condicion: credito ? 'Crédito' : 'Contado', diasCredito: dias, tasa: almTasa(),
-                                        descuento: almVenta.descuento || 0, claveAdmin: almVenta.claveDesc || almVenta.claveStock || '',
-                                        items: almVenta.items.map(x => ({ codigo: x.codigo, cantidad: x.cantidad })) });
-            if (r.yaRegistrado && !r.nota) { almCerrar(); mostrarBanner('Esa nota ya estaba emitida. Búsquela en Notas emitidas.', 'warn'); almVenta = { items: [], sel: -1, descuento: 0, claveDesc: '', claveStock: '', ultimo: '' }; almNotas = null; await almCargar(); return; }
-            almUsar(r); almNotas = null;
-            almVenta = { items: [], sel: -1, descuento: 0, claveDesc: '', claveStock: '', ultimo: `Nota ${r.nota.numero} emitida · ${r.nota.cliente} · $ ${fmt(r.nota.total)}` };
-            almCliSel = '';
-            almPintar();
-            almPreguntarImprimir('nota', r.nota);
-        } catch (e) {
-            if (/clave/i.test(e.message)) { almVenta.claveDesc = ''; almVenta.claveStock = ''; }
-            err.textContent = e.message; btn.disabled = false; btn.textContent = 'Emitir nota (Enter)';
-        }
+        if (almVenta.items.some(x => !(x.precio > 0))) { err.textContent = 'Hay productos sin precio de venta: póngales precio en Productos e inventario'; return; }
+        // La nota se arma aquí mismo (mismos cálculos que Google) para imprimir al instante; Google la guarda en segundo plano
+        const cli = almDatos.clientes.find(c => c.id === almCliSel), tienda = cli.tipo === 'Tienda', venta = almVenta, tasa = almTasa();
+        const detalle = venta.items.map(x => ({ codigo: x.codigo, descripcion: x.descripcion, tipo: x.tipo, cantidad: x.cantidad, precio: x.precio, total: almR(x.cantidad * x.precio) }));
+        const subtotal = almR(detalle.reduce((s, x) => s + x.total, 0)), descuento = Math.min(venta.descuento || 0, subtotal), total = almR(subtotal - descuento);
+        if (!(total > 0)) { err.textContent = 'El total de la nota debe ser mayor que cero (¿productos sin precio?)'; return; }
+        const condicion = tienda ? 'Tienda' : credito ? 'Crédito' : 'Contado', ahora = new Date();
+        const nota = { numero: almDatos.proximaNota || '—', fecha: fechaLocalHoy(), hora: ahora.toTimeString().slice(0, 5), clienteId: cli.id, cliente: cli.nombre, cedula: cli.cedula, telefono: cli.telefono, direccion: cli.direccion,
+                       condicion, vence: credito && !tienda ? sumarDias(fechaLocalHoy(), dias) : '', subtotal, descuento, total, tasa, totalBs: tasa ? almR(total * tasa) : 0, estado: 'Emitida',
+                       usuario: nombreUsuario, renglones: detalle.length, detalle };
+        const pedido = { action: 'alm_facturar', clienteId: cli.id, condicion, diasCredito: dias, tasa, descuento: venta.descuento || 0, claveAdmin: venta.claveDesc || venta.claveStock || '',
+                         items: venta.items.map(x => ({ codigo: x.codigo, cantidad: x.cantidad })) };
+        // La pantalla queda lista para la siguiente venta
+        almMoverLocal(venta.items, -1);
+        almDatos.proximaNota = almNumeroTxt((Number(nota.numero) || 0) + 1);
+        almVenta = { items: [], sel: -1, descuento: 0, claveDesc: '', claveStock: '', ultimo: `Nota ${nota.numero} · ${nota.cliente} · $ ${fmt(total)}` };
+        almCliSel = '';
+        almPintar();
+        almPreguntarImprimir('nota', nota);
+        almEnSegundoPlano(async () => {
+            try {
+                const r = await llamarApi(pedido);
+                almNotas = null; almTiendas = null;
+                if (!r.nota) { await almCargar(); return; }   // ya estaba guardada (reintento): se vuelve a leer
+                almAplicarCambios(r.cambios);
+                if (r.proximaNota && Number(r.proximaNota) > Number(almDatos.proximaNota)) almDatos.proximaNota = r.proximaNota;
+                if (almUltimaNota === nota) almUltimaNota = r.nota;
+                if (r.nota.numero !== nota.numero) mostrarBanner(`La nota de ${nota.cliente} quedó guardada con el N° ${r.nota.numero} (no ${nota.numero}). Si ya la imprimió, reimprímala desde Notas emitidas.`, 'warn');
+                almPintar();
+            } catch (e) {
+                // No se guardó: la venta vuelve a "ventas en espera" (F7) y se vuelve a leer la existencia
+                const l = almEspera(); l.push({ hora: 'NO GUARDADA ' + nota.hora, items: venta.items.map(x => Object.assign({}, x, { sinExistencia: false })), descuento: 0, total: subtotal }); almEsperaGuardar(l);
+                mostrarBanner(`La nota N° ${nota.numero} de ${nota.cliente} NO se guardó: ${e.message}. La venta quedó en espera (F7) para emitirla otra vez; si la imprimió, ese papel no vale.`, 'error');
+                await almCargar();
+            }
+        });
     }
     function almPreguntarImprimir(tipo, doc) {
         almVentana(`<form class="req-dlg" onsubmit="event.preventDefault(); almCerrar(); almImprimir('${tipo}', ${tipo === 'nota' ? 'almUltimaNota' : 'almUltimoIngreso'})">
-            <h3>${tipo === 'nota' ? 'Nota de entrega N° ' + esc(doc.numero) + ' emitida' : 'Ingreso N° ' + esc(doc.numero) + ' guardado'}</h3>
+            <h3>${tipo === 'nota' ? 'Nota de entrega N° ' + esc(doc.numero) : 'Operación de inventario N° ' + esc(doc.numero)}</h3>
             <div class="req-sub">${tipo === 'nota' ? `${esc(doc.cliente)} · ${esc(doc.condicion)}${doc.vence ? ' (vence ' + fechaBonita(doc.vence) + ')' : ''}` : esc(doc.operacion + (doc.tercero ? ' · ' + doc.tercero : ''))} · $ ${fmt(doc.total)}</div>
             <p style="margin:.75rem 0 0">¿Desea imprimirlo (media carta)?</p>
             <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-ghost" onclick="almCerrar()">No (Esc)</button><button type="submit" class="btn-primary" autofocus>Imprimir (Enter)</button></div></form>`);
@@ -10584,19 +10723,22 @@
             const op = ALM_OPS.find(o => o[0] === almIng.operacion)[1];
             const quien = almIng.operacion === 'DEVOLUCION' ? (almDatos.clientes.find(c => c.id === almIng.clienteId) || {}).nombre : (almProveedor(almIng.proveedorId) || {}).nombre;
             return `<div class="alm-ing-cab"><span class="chip st-info">${esc(op)}</span>${quien ? `<b>${esc(quien)}</b>` : ''}${almIng.documento ? `<small>Doc. ${esc(almIng.documento)}</small>` : ''}
-                <span class="alm-ing-num">Ingreso N° ${esc(almDatos.proximoIngreso)}</span><button type="button" class="btn-ghost btn-mini" onclick="almCambiarOperacion()">Cambiar operación</button></div>` + almPosVista(almIng, true);
+                <span class="alm-ing-num">Operación N° ${esc(almDatos.proximoIngreso)}</span><button type="button" class="btn-ghost btn-mini" onclick="almCambiarOperacion()">Cambiar operación</button></div>` + almPosVista(almIng, true);
         }
         const op = almIng.operacion;
         return `<form class="grafico-card alm-ing-form" data-enter onsubmit="almComenzarIngreso(event)">
-            <h3 style="margin-top:0">Ingreso de mercancía · N° ${esc(almDatos.proximoIngreso)}</h3>
-            <label>Tipo de operación <small>(teclas 1 a 4)</small></label>
+            <h3 style="margin-top:0">Operación de inventario · N° ${esc(almDatos.proximoIngreso)}</h3>
+            ${almOpsEspera().length ? `<button type="button" class="btn-ghost alm-traer-op" onclick="almTraerOperacion()"><kbd>F7</kbd> Traer operación guardada (${almOpsEspera().length})</button>` : ''}
+            <label>Tipo de operación <small>(teclas 1 a 5)</small></label>
             <div class="alm-ops">${ALM_OPS.map(([k, t], i) => `<button type="button" class="alm-opbtn${op === k ? ' activo' : ''}" onclick="almElegirOperacion('${k}')"><kbd>${i + 1}</kbd>${t}</button>`).join('')}</div>
-            ${!op ? '<div class="nota">Elija el tipo de operación para continuar.</div><input type="text" id="almOpTecla" data-primero data-enter-propio autocomplete="off" class="alm-oculto" aria-label="Tipo de operación (1 a 4)" onkeydown="almTeclaOperacion(event)">' : `
+            ${!op ? '<div class="nota">Elija el tipo de operación para continuar.</div><input type="text" id="almOpTecla" data-primero data-enter-propio autocomplete="off" class="alm-oculto" aria-label="Tipo de operación (1 a 5)" onkeydown="almTeclaOperacion(event)">' : `
             <div class="per-grid">
                 ${op === 'DEVOLUCION' ? `<div class="per-ancho"><label for="almIngCli">Cliente que devuelve</label><select id="almIngCli" data-primero required onchange="almIng.clienteId=this.value"><option value="">Elija el cliente</option>${almDatos.clientes.map(c => `<option value="${esc(c.id)}"${c.id === almIng.clienteId ? ' selected' : ''}>${esc(c.nombre)} · ${esc(c.id)}</option>`).join('')}</select></div>
                     <div class="per-ancho"><label for="almIngDoc">N° de la nota de entrega <small>(opcional; si fue a crédito, se rebaja de la deuda)</small></label><input type="text" id="almIngDoc" autocomplete="off" maxlength="20" value="${esc(almIng.documento)}" inputmode="numeric" oninput="almIng.documento=this.value"></div>`
                 : op === 'AJUSTE' ? `<div class="per-ancho"><label for="almIngNota">Motivo del ajuste</label><input type="text" id="almIngNota" autocomplete="off" data-primero maxlength="150" required value="${esc(almIng.nota)}" placeholder="Ej.: conteo físico del 25/10" oninput="almIng.nota=this.value"></div>
-                    <div class="per-ancho nota" style="margin-top:0">Cantidad positiva = sobra (suma); negativa = falta (resta). Al terminar se pide la clave de administrador.</div>`
+                    <div class="per-ancho nota" style="margin-top:0">Por cada producto escriba lo que contó (0 si no hay): el sistema calcula lo que falta o sobra contra la existencia y su valor. Al terminar se pide la clave de administrador.</div>`
+                : op === 'DESCUENTO' ? `<div class="per-ancho"><label for="almIngNota">Motivo del descuento</label><input type="text" id="almIngNota" autocomplete="off" data-primero maxlength="150" required value="${esc(almIng.nota)}" placeholder="Ej.: merma, vencido, consumo interno" oninput="almIng.nota=this.value"></div>
+                    <div class="per-ancho nota" style="margin-top:0">Por cada producto escriba cuánto se descuenta: sale de la existencia (nunca más de lo que hay). Al terminar se pide la clave de administrador.</div>`
                 : `<div class="per-ancho"><label for="almIngProv">Proveedor${op === 'SIN_FACTURA' ? ' (opcional)' : ''} <small>(escriba, flechas y Enter; si no está, regístrelo)</small></label>
                         <div class="alm-cli-fila">${almIng.proveedorId && almProveedor(almIng.proveedorId)
                             ? `<div class="alm-op sel alm-prov-elegido"><b>${esc(almIng.proveedorId)}</b><span>${esc(almProveedor(almIng.proveedorId).nombre)}</span><small>${esc(almProveedor(almIng.proveedorId).rif || '')}</small></div>
@@ -10678,13 +10820,17 @@
         almPintar(); almEnfocar();
     }
     function almCambiarOperacion() {
-        if (almIng.items.length && !confirm('Se perderán los ' + almIng.items.length + ' renglón(es) de este ingreso. ¿Cambiar de operación?')) return;
+        if (almIng.items.length) {
+            if (confirm('¿Guardar esta operación (' + almIng.items.length + ' renglón(es)) para seguirla después con F7?\n\nAceptar = guardarla · Cancelar = seguir en ella')) { almGuardarOperacion(true); mostrarBanner('Operación guardada. Tráigala con F7.', 'ok'); }
+            else return;
+        }
         almIng = { operacion: '', proveedorId: '', documento: '', clienteId: '', nota: '', items: [], sel: -1, listo: false, ultimo: '' };
         almPintar(); almEnfocar();
     }
     function almPedirCantidadIngreso(p, mult) {
         // Los pesados se escriben en gramos (al guardar pasan a kg); el costo sigue siendo por kg
         const compra = almIng.operacion === 'COMPRA', ajuste = almIng.operacion === 'AJUSTE', pesado = p.tipo === 'Pesado', paso = '1', medida = pesado ? 'gramos' : 'und';
+        if (ajuste) { almPedirConteo(p); return; }
         almVentana(`<form class="req-dlg" data-enter onsubmit="almCantidadListo(event, '${esc(p.codigo).replace(/'/g, '&#39;')}')">
             <h3>${esc(p.descripcion)}</h3><div class="req-sub">${esc(p.codigo)} · existencia ${almCant(p.existencia, p.tipo)} ${almUnidad(p.tipo)}${p.bulto ? ' · ' + almCant(p.bulto, p.tipo) + ' por bulto' : ''}</div>
             <div class="per-grid"><div class="${compra ? '' : 'per-ancho'}"><label for="almIngCant">${ajuste ? 'Cantidad (+ sobra / − falta)' : 'Cantidad'} (${medida})</label>
@@ -10700,6 +10846,41 @@
             c.addEventListener('input', ver); ver();
         }
     }
+    // Ajuste de inventario: se escribe lo que se CONTÓ (0 = no hay); el sistema calcula lo que falta o sobra contra la existencia
+    function almPedirConteo(p) {
+        const pesado = p.tipo === 'Pesado', medida = pesado ? 'gramos' : 'und', previo = almIng.items.find(x => x.codigo === p.codigo);
+        almVentana(`<form class="req-dlg" data-enter onsubmit="almConteoListo(event, '${esc(p.codigo).replace(/'/g, '&#39;')}')">
+            <h3>${esc(p.descripcion)}</h3><div class="req-sub">${esc(p.codigo)} · costo $ ${fmt(p.costo)} el ${pesado ? 'kg' : 'und'}</div>
+            <div class="alm-conteo"><div><small>Existencia en el sistema</small><b>${almCant(p.existencia, p.tipo)} ${almUnidad(p.tipo)}</b></div><div id="almConteoDif"><small>Ajuste</small><b>—</b></div></div>
+            <label for="almIngCant">Cantidad contada (${medida})</label>
+            <input type="number" id="almIngCant" step="1" min="0" required autofocus value="${previo ? (pesado ? Math.round(previo.contado * 1000) : previo.contado) : ''}" placeholder="0 si no hay">
+            ${p.bulto ? `<button type="button" class="btn-ghost btn-mini" style="margin-top:.5rem" onclick="almPorBulto(${pesado ? p.bulto * 1000 : p.bulto})">Bultos → ${medida}</button>` : ''}
+            <div class="login-error" id="almCantError"></div>
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-ghost" onclick="almCerrar()">Cancelar (Esc)</button><button type="submit" class="btn-primary">Ajustar (Enter)</button></div></form>`);
+        const c = document.getElementById('almIngCant'), dif = document.getElementById('almConteoDif');
+        const ver = () => {
+            const v = almNum(c.value);
+            if (!isFinite(v)) { dif.innerHTML = '<small>Ajuste</small><b>—</b>'; return; }
+            const d = almR((pesado ? v / 1000 : v) - p.existencia, 3);
+            dif.className = d < 0 ? 'alm-falta' : d > 0 ? 'alm-sobra' : '';
+            dif.innerHTML = `<small>${d < 0 ? 'Falta' : d > 0 ? 'Sobra' : 'Sin diferencia'}</small><b>${d ? (d > 0 ? '+' : '−') + almCant(Math.abs(d), p.tipo) + ' ' + almUnidad(p.tipo) + ' · $ ' + fmt(Math.abs(d) * p.costo) : '0'}</b>`;
+        };
+        c.addEventListener('input', ver); ver();
+    }
+    function almConteoListo(ev, codigo) {
+        ev.preventDefault();
+        const p = almProducto(codigo), err = document.getElementById('almCantError'), escrito = almNum(document.getElementById('almIngCant').value);
+        if (!isFinite(escrito) || escrito < 0) { err.textContent = 'Escriba lo que contó (0 si no hay)'; return; }
+        if (escrito !== Math.round(escrito)) { err.textContent = p.tipo === 'Pesado' ? 'Escriba el peso en gramos, sin decimales' : 'Sin decimales'; return; }
+        const contado = almR(p.tipo === 'Pesado' ? escrito / 1000 : escrito, 3), dif = almR(contado - p.existencia, 3);
+        if (!dif) { err.textContent = 'Coincide con la existencia: no hay nada que ajustar'; return; }
+        // El mismo producto otra vez: se corrige su renglón (no se suma)
+        const i = almIng.items.findIndex(x => x.codigo === p.codigo), renglon = { codigo: p.codigo, descripcion: p.descripcion, tipo: p.tipo, cantidad: dif, costo: p.costo, existencia: p.existencia, contado };
+        if (i >= 0) almIng.items[i] = renglon; else almIng.items.push(renglon);
+        almIng.sel = i >= 0 ? i : -1;
+        almIng.ultimo = `${p.descripcion}: ${almCant(p.existencia, p.tipo)} → ${almCant(contado, p.tipo)} ${almUnidad(p.tipo)} (${dif > 0 ? 'sobra' : 'falta'} ${almCant(Math.abs(dif), p.tipo)})`;
+        almCerrar(); almPintar();
+    }
     // Escribió bultos: lo pasa a unidades o gramos
     function almPorBulto(bulto) { const c = document.getElementById('almIngCant'), v = almNum(c.value); if (v) { c.value = almR(v * bulto, 3); c.dispatchEvent(new Event('input')); } c.focus(); }
     function almCantidadListo(ev, codigo) {
@@ -10708,42 +10889,127 @@
         const cant = almR(p.tipo === 'Pesado' ? escrito / 1000 : escrito, 3);   // pesado: gramos -> kg
         const costo = costoEl ? almR(almNum(costoEl.value), 4) : p.costo, err = document.getElementById('almCantError');
         if (!cant || (almIng.operacion !== 'AJUSTE' && cant < 0)) { err.textContent = 'Escriba la cantidad'; return; }
+        if (almIng.operacion === 'DESCUENTO') {   // no se descuenta más de lo que hay (contando lo que ya lleva esta operación)
+            const lleva = almIng.items.filter(x => x.codigo === p.codigo).reduce((s, x) => s - x.cantidad, 0);
+            if (cant + lleva > p.existencia + 0.0005) { err.textContent = `Solo hay ${almCant(p.existencia - lleva, p.tipo)} ${almUnidad(p.tipo)} para descontar`; return; }
+        }
         if (escrito !== Math.round(escrito)) { err.textContent = p.tipo === 'Pesado' ? 'Escriba el peso en gramos, sin decimales' : 'Este producto es por unidad: sin decimales'; return; }
         if (costoEl && !(costo >= 0)) { err.textContent = 'Escriba el costo'; return; }
-        almIng.items.push({ codigo: p.codigo, descripcion: p.descripcion, tipo: p.tipo, cantidad: cant, costo });
-        almIng.sel = -1; almIng.ultimo = `${p.descripcion} ${cant > 0 ? '+' : ''}${almCant(cant, p.tipo)} ${almUnidad(p.tipo)}`;
+        const cantidad = almIng.operacion === 'DESCUENTO' ? -cant : cant;   // el descuento resta
+        almIng.items.push({ codigo: p.codigo, descripcion: p.descripcion, tipo: p.tipo, cantidad, costo });
+        almIng.sel = -1; almIng.ultimo = `${p.descripcion} ${cantidad > 0 ? '+' : ''}${almCant(cantidad, p.tipo)} ${almUnidad(p.tipo)}`;
         almCerrar(); almPintar();
     }
+    // ---------- F6 / F7: operaciones guardadas (en este equipo) para seguirlas después ----------
+    // Al traerla, todo se pone al día con la existencia de ese momento: un ajuste recalcula lo que falta o sobra con lo contado.
+    const almOpsEspera = () => { try { return JSON.parse(localStorage.getItem('alm_ops_espera') || '[]') || []; } catch (e) { return []; } };
+    const almOpsGuardar = l => { try { localStorage.setItem('alm_ops_espera', JSON.stringify(l)); } catch (e) {} };
+    const almNombreOp = k => (ALM_OPS.find(o => o[0] === k) || [k, k])[1];
+    function almGuardarOperacion(silencio) {
+        if (!almIng.items.length) { if (!silencio) mostrarBanner('No hay operación para guardar.', 'warn'); return false; }
+        const l = almOpsEspera();
+        l.push({ hora: new Date().toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' }), op: { operacion: almIng.operacion, proveedorId: almIng.proveedorId, documento: almIng.documento, clienteId: almIng.clienteId, nota: almIng.nota, items: almIng.items } });
+        almOpsGuardar(l);
+        almIng = { operacion: '', proveedorId: '', documento: '', clienteId: '', nota: '', items: [], sel: -1, listo: false, ultimo: '' };
+        if (!silencio) { mostrarBanner('Operación guardada. Tráigala con F7 cuando quiera seguirla.', 'ok'); almPintar(); almEnfocar(); }
+        return true;
+    }
+    function almTraerOperacion() {
+        const l = almOpsEspera();
+        if (!l.length) { mostrarBanner('No hay operaciones guardadas.', 'warn'); return; }
+        almVentana(`<div class="req-dlg alm-dlg-ancho"><h3>Operaciones guardadas</h3><div class="alm-lista">
+            ${l.map((v, i) => `<button type="button" class="alm-op" ${i === l.length - 1 ? 'autofocus' : ''} onclick="almTraerOp(${i})"><b>${esc(v.hora)}</b><span>${esc(almNombreOp(v.op.operacion))}${v.op.nota ? ' · ' + esc(v.op.nota) : ''} · ${v.op.items.length} renglón(es): ${esc(v.op.items.slice(0, 3).map(x => x.descripcion).join(', '))}${v.op.items.length > 3 ? '…' : ''}</span><small>${esc(v.op.documento || '')}</small></button>`).join('')}</div>
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-ghost" onclick="almCerrar()">Cerrar (Esc)</button></div></div>`);
+    }
+    function almTraerOp(i) {
+        const l = almOpsEspera(), v = l[i]; if (!v) return;
+        l.splice(i, 1); almOpsGuardar(l);
+        if (almIng.items.length) almGuardarOperacion(true);   // la que estaba en pantalla queda guardada
+        const op = v.op, cambios = [];
+        const items = op.items.filter(x => almProducto(x.codigo)).map(x => {
+            const p = almProducto(x.codigo), y = Object.assign({}, x, { descripcion: p.descripcion, tipo: p.tipo });
+            if (op.operacion === 'AJUSTE') {   // lo contado se mantiene; la existencia y la diferencia, al día
+                if (Math.abs(p.existencia - x.existencia) > 0.0005) cambios.push(p.descripcion);
+                y.existencia = p.existencia; y.cantidad = almR(x.contado - p.existencia, 3); y.costo = p.costo;
+            } else if (op.operacion !== 'COMPRA') y.costo = p.costo;
+            return y;
+        }).filter(x => x.cantidad);
+        almIng = Object.assign({}, op, { items, sel: -1, listo: true, ultimo: 'Operación de las ' + v.hora + ' recuperada' + (cambios.length ? ' · existencia actualizada en: ' + cambios.join(', ') : '') });
+        almCerrar(); almPintar(); almEnfocar();
+    }
     function almFinalizarIngreso() {
-        if (!almIng.items.length) { mostrarBanner('El ingreso no tiene productos.', 'warn'); return; }
+        if (!almIng.items.length) { mostrarBanner('La operación no tiene productos.', 'warn'); return; }
         const op = ALM_OPS.find(o => o[0] === almIng.operacion)[1], total = almR(almIng.items.reduce((s, x) => s + x.cantidad * x.costo, 0));
-        almVentana(`<form class="req-dlg" onsubmit="almGuardarIngreso(event)"><h3>Terminar ingreso N° ${esc(almDatos.proximoIngreso)}</h3>
-            <div class="req-sub">${esc(op)} · ${almIng.items.length} renglón(es) · costo $ ${fmt(total)}</div>
-            ${almIng.operacion === 'AJUSTE' ? '<div class="nota">Se pedirá la clave de administrador.</div>' : ''}
+        almVentana(`<form class="req-dlg" onsubmit="almGuardarIngreso(event)"><h3>Terminar operación N° ${esc(almDatos.proximoIngreso)}</h3>
+            <div class="req-sub">${esc(op)} · ${almIng.items.length} renglón(es) · ${almIng.operacion === 'AJUSTE' ? (total < 0 ? 'valor de lo que falta $ ' + fmt(Math.abs(total)) : 'valor del ajuste $ ' + fmt(total)) : almIng.operacion === 'DESCUENTO' ? 'valor descontado $ ' + fmt(Math.abs(total)) : 'total de la factura (costo) $ ' + fmt(total)}</div>
+            ${almIng.operacion === 'AJUSTE' || almIng.operacion === 'DESCUENTO' ? '<div class="nota">Se pedirá la clave de administrador.</div>' : ''}
             <div class="login-error" id="almIngError"></div>
-            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-ghost" onclick="almCerrar()">Volver (Esc)</button><button type="submit" class="btn-primary" id="almBtnIng" autofocus>Guardar ingreso (Enter)</button></div></form>`);
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-ghost" onclick="almCerrar()">Volver (Esc)</button><button type="submit" class="btn-primary" id="almBtnIng" autofocus>Guardar operación (Enter)</button></div></form>`);
     }
     async function almGuardarIngreso(ev) {
         ev.preventDefault();
         const err = document.getElementById('almIngError'), btn = document.getElementById('almBtnIng');
         let claveAdmin = '';
-        if (almIng.operacion === 'AJUSTE') {
-            claveAdmin = await efePedirClave('Ajuste de inventario', 'Un administrador debe autorizar el ajuste.');
+        if (almIng.operacion === 'AJUSTE' || almIng.operacion === 'DESCUENTO') {
+            const aj = almIng.operacion === 'AJUSTE';
+            claveAdmin = await efePedirClave(aj ? 'Ajuste de inventario' : 'Descuento de inventario', 'Un administrador debe autorizar ' + (aj ? 'el ajuste.' : 'el descuento.'));
             if (!claveAdmin) return;
         }
-        btnCargando(btn, 'Guardando...');
-        try {
-            const r = await llamarApi({ action: 'alm_ingresar', operacion: almIng.operacion, proveedorId: almIng.proveedorId, documento: almIng.documento, clienteId: almIng.clienteId,
-                                        nota: almIng.nota, claveAdmin, items: almIng.items.map(x => ({ codigo: x.codigo, cantidad: x.cantidad, costo: x.costo })) });
-            if (r.yaRegistrado && !r.ingreso) { almCerrar(); mostrarBanner('Ese ingreso ya estaba guardado. Búsquelo en Ingresos.', 'warn'); almIng = { operacion: '', proveedorId: '', documento: '', clienteId: '', nota: '', items: [], sel: -1, listo: false, ultimo: '' }; await almCargar(); return; }
-            almUsar(r); almIngresos = null;
-            almIng = { operacion: almIng.operacion, proveedorId: '', documento: '', clienteId: '', nota: '', items: [], sel: -1, listo: false, ultimo: '' };
-            almPintar();
-            if (r.rebajado) mostrarBanner(`Se rebajó $ ${fmt(r.rebajado)} de la deuda del cliente en Cuentas por cobrar.`, 'ok');
-            almPreguntarImprimir('ingreso', r.ingreso);
-        } catch (e) { err.textContent = e.message; btn.disabled = false; btn.textContent = 'Guardar ingreso (Enter)'; }
+        // Se arma aquí para imprimir al instante; Google la guarda en segundo plano
+        const op = almIng, nombreOp = ALM_OPS.find(o => o[0] === op.operacion)[1], ahora = new Date();
+        const prov = almProveedor(op.proveedorId), cli = almDatos.clientes.find(c => c.id === op.clienteId);
+        const detalle = op.items.map(x => ({ codigo: x.codigo, descripcion: x.descripcion, tipo: x.tipo, cantidad: x.cantidad, costo: x.costo, total: almR(x.cantidad * x.costo) }));
+        const doc = { numero: almDatos.proximoIngreso || '—', fecha: fechaLocalHoy(), hora: ahora.toTimeString().slice(0, 5), operacion: nombreOp,
+                      tercero: op.operacion === 'DEVOLUCION' ? (cli ? cli.nombre : '') : prov ? prov.nombre + (prov.rif ? ' · ' + prov.rif : '') : '',
+                      documento: op.operacion === 'DEVOLUCION' && op.documento ? 'NE ' + almNumeroTxt(String(op.documento).replace(/\D/g, '')) : op.documento, nota: op.nota,
+                      renglones: detalle.length, total: almR(detalle.reduce((s, x) => s + x.total, 0)), usuario: nombreUsuario, detalle };
+        const pedido = { action: 'alm_ingresar', operacion: op.operacion, proveedorId: op.proveedorId, documento: op.documento, clienteId: op.clienteId,
+                         nota: op.nota, claveAdmin, items: op.items.map(x => ({ codigo: x.codigo, cantidad: x.cantidad, costo: x.costo })) };
+        almMoverLocal(op.items, 1, op.operacion === 'COMPRA');
+        almDatos.proximoIngreso = almNumeroTxt((Number(doc.numero) || 0) + 1);
+        almIng = { operacion: op.operacion, proveedorId: '', documento: '', clienteId: '', nota: '', items: [], sel: -1, listo: false, ultimo: '' };
+        almPintar();
+        almPreguntarImprimir('ingreso', doc);
+        almEnSegundoPlano(async () => {
+            try {
+                const r = await llamarApi(pedido);
+                almIngresos = null; almTiendas = null;
+                if (!r.ingreso) { await almCargar(); return; }
+                almAplicarCambios(r.cambios);
+                if (r.proximoIngreso && Number(r.proximoIngreso) > Number(almDatos.proximoIngreso)) almDatos.proximoIngreso = r.proximoIngreso;
+                if (almUltimoIngreso === doc) almUltimoIngreso = r.ingreso;
+                if (r.ingreso.numero !== doc.numero) mostrarBanner(`La operación quedó guardada con el N° ${r.ingreso.numero} (no ${doc.numero}). Si ya la imprimió, reimprímala desde Historial de operaciones.`, 'warn');
+                else if (r.rebajado) mostrarBanner(`Se rebajó $ ${fmt(r.rebajado)} de la cuenta del cliente en Cuentas por cobrar.`, 'ok');
+                almPintar();
+            } catch (e) {
+                // No se guardó: si la pantalla está libre, la operación vuelve tal cual para corregirla y guardarla otra vez
+                const libre = !almIng.items.length;
+                if (libre) almIng = Object.assign({}, op, { listo: true, ultimo: 'NO SE GUARDÓ: ' + e.message });
+                mostrarBanner(`La operación N° ${doc.numero} NO se guardó: ${e.message}.` + (libre ? ' Quedó otra vez en pantalla para corregirla.' : ' Vuelva a cargarla.') + ' Si la imprimió, ese papel no vale.', 'error');
+                await almCargar();
+            }
+        });
     }
     function almFacturarVista() { return almPosVista(almVenta, false); }
+
+    // ---------- Guardado en segundo plano: se imprime y se sigue trabajando mientras Google guarda (en orden, sin repetir) ----------
+    let almCola = Promise.resolve(), almGuardando = 0;
+    const almNumeroTxt = n => String(n).padStart(6, '0');
+    function almEnSegundoPlano(tarea) {
+        almGuardando++; almPintarGuardando();
+        almCola = almCola.then(tarea).catch(e => console.error(e)).finally(() => { almGuardando--; almPintarGuardando(); });
+    }
+    function almPintarGuardando() {
+        document.querySelectorAll('.alm-guardando').forEach(el => { el.textContent = almGuardando ? `Guardando ${almGuardando} documento(s)...` : ''; el.classList.toggle('activo', !!almGuardando); });
+    }
+    // Lo que respondió Google: existencia y costo de los productos tocados
+    function almAplicarCambios(cambios) {
+        (cambios || []).forEach(c => { const p = almProducto(c.codigo); if (p) { p.existencia = c.existencia; p.costo = c.costo; } });
+    }
+    // Antes de que responda Google: la existencia de la pantalla ya refleja la nota u operación
+    function almMoverLocal(items, signo, actualizarCosto) {
+        items.forEach(x => { const p = almProducto(x.codigo); if (!p) return; p.existencia = almR(p.existencia + signo * x.cantidad, 3); if (actualizarCosto && x.costo > 0) p.costo = x.costo; });
+    }
 
     // ---------- Notas emitidas e ingresos ----------
     function almRangoActual() { if (!almRango) almRango = { desde: sumarDias(fechaLocalHoy(), -30), hasta: fechaLocalHoy() }; return almRango; }
@@ -10786,13 +11052,13 @@
     }
     function almIngresosVista() {
         const f = almFiltrosLista('almIngresos=null;almPintar()');
-        if (!almIngresos) return f + cargandoHTML('Cargando ingresos...');
+        if (!almIngresos) return f + cargandoHTML('Cargando operaciones...');
         const l = almIngresos.filter(n => almPasaLista(n.numero, n.tercero, n.documento, n.operacion));
         return f + (l.length ? `<div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">N°</th><th class="izq">Fecha</th><th class="izq">Operación</th><th class="izq">Proveedor / cliente</th><th class="izq">Documento</th><th>Renglones</th><th>Costo $</th><th></th></tr></thead><tbody>
             ${l.map(n => `<tr><td class="izq"><b>${esc(n.numero)}</b></td><td class="izq">${fechaCorta(n.fecha)}<small>${esc(n.hora)}</small></td><td class="izq">${esc(n.operacion)}<small>${esc(n.usuario)}</small></td>
                 <td class="izq">${esc(n.tercero) || '—'}${n.nota ? `<small>${esc(n.nota)}</small>` : ''}</td><td class="izq">${esc(n.documento) || '—'}</td><td>${n.renglones}</td><td>${fmt(n.total)}</td>
                 <td><button type="button" class="btn-ghost btn-mini" onclick="almImprimir('ingreso', almIngresos.find(x => x.numero === '${esc(n.numero)}'))">Imprimir</button></td></tr>`).join('')}
-            </tbody></table></div>` : '<div class="empty">No hay ingresos en esas fechas.</div>');
+            </tbody></table></div>` : '<div class="empty">No hay operaciones en esas fechas.</div>');
     }
     // ---------- Inversión por tienda (semana de sábado a viernes): gastos de la tienda + mercancía del almacén ----------
     let almTiendas = null, almTiendasSemana = '';
@@ -10883,7 +11149,7 @@
                 <td><b style="${p.existencia < 0 ? 'color:var(--bad)' : ''}">${almCant(p.existencia, p.tipo)}</b> <small>${almUnidad(p.tipo)}</small>${bajo(p) ? '<span class="chip st-sobra">bajo mínimo</span>' : ''}</td>
                 <td class="alm-acc"><button type="button" class="btn-ghost btn-mini" onclick="almEditarProducto('${esc(p.codigo).replace(/'/g, '&#39;')}')">Modificar</button><button type="button" class="btn-ghost btn-mini" onclick="almKardex('${esc(p.codigo).replace(/'/g, '&#39;')}')">Movimientos</button></td></tr>`).join('')}
             </tbody></table></div>` : `<div class="empty">${ps.length ? 'Ningún producto con estos filtros.' : 'Todavía no hay productos. Cárguelos con "Importar Excel" (el catálogo corregido) o uno por uno con "+ Nuevo producto".'}</div>`}
-            <div class="nota">El código se guarda tal cual, como texto: 051 y 0051 son productos distintos y ningún código se puede repetir. La existencia cambia sola con cada nota, ingreso o ajuste.</div>`;
+            <div class="nota">El código se guarda tal cual, como texto: 051 y 0051 son productos distintos y ningún código se puede repetir. La existencia cambia sola con cada nota de entrega u operación de inventario.</div>`;
     }
     // Formulario del producto: Enter pasa de un campo al siguiente; en el último guarda. Margen y precio se calculan entre sí.
     function almEditarProducto(codigo, codigoNuevo) {
@@ -11049,7 +11315,7 @@
         const nota = tipo === 'nota', E = ALM_EMPRESA;
         const cant = x => almCant(x.cantidad, x.tipo) + ' ' + almUnidad(x.tipo);
         const filas = d.detalle.map(x => `<tr><td class="c">${cant(x)}</td><td class="cod">${esc(x.codigo)}</td><td class="des">${esc(x.descripcion)}</td><td class="n">${fmt(nota ? x.precio : x.costo)}</td><td class="n">${fmt(x.total)}</td></tr>`).join('');
-        const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>${nota ? 'Nota de entrega ' : 'Ingreso '}${esc(d.numero)}</title><style>
+        const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>${nota ? 'Nota de entrega ' : 'Operación de inventario '}${esc(d.numero)}</title><style>
             @page{size:5.5in 8.5in;margin:7mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
             body{margin:0;font-family:Arial,Helvetica,sans-serif;color:#0f172a;font-size:8.6pt}
             .cab{display:flex;gap:2.5mm;align-items:center;border-bottom:.5mm solid #44AC00;padding-bottom:1.5mm}
@@ -11072,7 +11338,7 @@
             .anulada{color:#b91c1c;font-weight:800;text-align:center;border:.5mm solid #b91c1c;padding:1mm;margin-top:2mm}
 </style></head><body>
             <div class="cab">${logo ? `<img src="${logo}" alt="">` : ''}<div class="emp"><b>${esc(E.nombre)}</b><span>RIF ${esc(E.rif)} · Tel. ${esc(E.telefono)}</span><span>${esc(E.direccion)}</span></div>
-                <div class="num"><small>${nota ? 'NOTA DE ENTREGA' : 'INGRESO DE MERCANCÍA'}</small><b>N° ${esc(d.numero)}</b></div></div>
+                <div class="num"><small>${nota ? 'NOTA DE ENTREGA' : 'OPERACIÓN DE INVENTARIO'}</small><b>N° ${esc(d.numero)}</b></div></div>
             <div class="datos"><div>${nota ? `<b>${esc(d.cliente)}</b> <span class="gris">${esc([d.cedula ? 'RIF ' + d.cedula : '', d.telefono ? 'Tel. ' + d.telefono : ''].filter(Boolean).join(' · '))}</span>${d.direccion ? `<br><span class="gris">${esc(d.direccion)}</span>` : ''}`
                     : `<b>${esc(d.operacion)}</b>${d.tercero ? ' · ' + esc(d.tercero) : ''}${d.documento || d.nota ? `<br><span class="gris">${esc([d.documento ? 'Doc. ' + d.documento : '', d.nota].filter(Boolean).join(' · '))}</span>` : ''}`}</div>
                 <div class="der"><b>${fechaBonita(d.fecha)}</b> ${esc(d.hora)}${nota ? `<br><b>${d.condicion === 'Tienda' ? 'DESPACHO A TIENDA' : esc(d.condicion.toUpperCase())}</b>${d.vence ? ' · vence ' + fechaBonita(d.vence) : ''}${d.tasa ? '<br><span class="gris">Tasa BCV ' + fmt(d.tasa) + '</span>' : ''}` : ''}</div></div>
