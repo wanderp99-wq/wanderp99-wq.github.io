@@ -1103,6 +1103,14 @@
         .alm-ing-cab { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; margin-bottom: .75rem; } .alm-ing-cab small { color: var(--text-muted); }
         .alm-ing-num { margin-left: auto; color: var(--text-muted); font-size: .85rem; }
         .alm-prov-elegido { flex: 1; cursor: default; }
+        .alm-aj-pie td { position: sticky; bottom: 0; background: var(--list-bg); }   /* totales del ajuste siempre a la vista */
+        .alm-carrito tfoot tr:first-child td { box-shadow: inset 0 1px 0 var(--border); }
+        .alm-pendientes { display: flex; flex-wrap: wrap; gap: .4rem; margin: -.4rem 0 .9rem; }
+        .alm-pend { display: inline-flex; align-items: baseline; gap: .3rem; border: 1px solid var(--border); background: var(--amar-bg); color: var(--text-main); border-radius: 999px; padding: .25rem .7rem; font: inherit; font-size: .82rem; cursor: pointer; }
+        .alm-pend b { color: var(--amar-txt); } .alm-pend small { color: var(--text-muted); }
+        .alm-lista-acc { margin-top: -.3rem; align-items: center; gap: .8rem; flex-wrap: wrap; }
+        .alm-marcas { display: flex; flex-direction: column; gap: .4rem; margin-top: .7rem; } .alm-marcas div { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; } .alm-marcas small { color: var(--text-muted); }
+        .alm-mod-in { width: 92px; text-align: right; }
         .pnom-grupo { margin-bottom: 1rem; } .pnom-acc { display: flex; gap: .4rem; flex-wrap: wrap; }
         .pnom-lista { border: 1px solid var(--border); border-radius: 10px; padding: .4rem .7rem; margin: .6rem 0; max-height: 180px; overflow-y: auto; }
         .pnom-lista div { display: flex; justify-content: space-between; gap: .6rem; padding: .2rem 0; font-size: .88rem; }
@@ -3453,6 +3461,12 @@
         // Almacén: productos, clientes y proveedores (así Facturar abre al instante)
         if (tiene('inventario') || tiene('movalmacen')) tareas.push([['inventario', 'movalmacen'], async () => {
             if (!almDatos) almUsar(await llamarApi({ action: 'alm_datos' }));
+            if (tiene('movalmacen')) {
+                const [n, o] = await Promise.all([almNotas ? null : llamarApi({ action: 'alm_notas', ultimas: true }), almIngresos ? null : llamarApi({ action: 'alm_ingresos', ultimas: true })]);
+                if (n && !almNotas) almNotas = n.notas || [];
+                if (o && !almIngresos) almIngresos = o.ingresos || [];
+                if (!almTiendas) { almTiendasSemana = almTiendasSemana || inicioSemana(fechaLocalHoy()); almTiendas = await llamarApi({ action: 'alm_tiendas', semana: almTiendasSemana }); }
+            }
         }]);
         if (tiene('nomina') || tiene('talento') || tiene('cxc') || tiene('horarios')) tareas.push([['nomina', 'talento', 'cxc', 'horarios'], async () => {
             if (!perDatos) perUsar(await llamarApi({ action: 'per_listar' }));
@@ -9486,7 +9500,8 @@
         perPintar();
     }
     const perDeudasDe = (x, quien) => quien === 'gastos' ? x.tipoPersona === 'Gasto de tienda'
-        : quien === 'trabajadores' ? x.tipoPersona === 'Trabajador' : (x.tipoPersona === 'Cliente' || x.tipoPersona === 'Almacén' || x.tipoPersona === 'Sin registrar');
+        // Clientes: solo clientes (de los locales y del almacén). Un nombre sin registrar viene de la ficha (crédito a un trabajador): va con los trabajadores
+        : quien === 'trabajadores' ? (x.tipoPersona === 'Trabajador' || x.tipoPersona === 'Sin registrar') : (x.tipoPersona === 'Cliente' || x.tipoPersona === 'Almacén');
     function perDeudas() {
         if (!perDeudasPend) { if (!perDeudasCargandoHist) setTimeout(perCargarDeudas, 0); return cargandoHTML('Cargando deudas de BD NOMINA...'); }
         // Histórico listo para esas fechas, o (mientras llega) lo pendiente
@@ -10048,37 +10063,42 @@
             if (!it) return;
             perRegALaCola(it);
         }
-        const total = perRegCola.length;
-        let r = null, hechos = 0, cubiertas = 0, aFavor = 0;
-        btn.disabled = true;
-        try {
-            while (perRegCola.length) {
-                const c = perRegCola[0], cual = total > 1 ? ` ${hechos + 1} de ${total}` : '';
-                let comprobante = null;
-                if (c.archivo) { btnCargando(btn, `Subiendo foto${cual}...`); comprobante = await efeLeerComprobante(c.archivo); }
-                btnCargando(btn, `Registrando${cual}...`);
-                r = await llamarApi({ action: 'cxc_registrar', tipo: 'ABONO', cuentaId: p.id, local: '', fecha: c.fecha, moneda: c.moneda, monto: c.monto, tasa: c.tasa,
-                    descripcion: c.desc, comprobante, claveAdmin: c.claveAdmin, refs: c.refs, vence: '' });
-                perRegCola.shift(); hechos++;
-                cubiertas += r.cubiertas || 0; aFavor += r.sinAplicar || 0;
-            }
-        } catch (err) {
-            // Los ya registrados salen de la lista; el que falló y los siguientes se quedan para volver a intentar
-            if (r) { perDeudasPend = r; perDeudasHistDatos = null; }
-            mostrarBanner((hechos ? `Se registraron ${hechos} de ${total} abonos. ` : '') + 'No se pudo registrar ' + (hechos ? 'el siguiente' : 'el abono') + ': ' + err.message +
-                          (perRegCola.length ? ` (${perRegCola.length} siguen en la lista).` : ''), 'error');
-            perRegPintar();
-            return;
-        }
+        // La ventana se cierra al instante y los abonos se registran en segundo plano, uno por uno y en orden
+        const lista = perRegCola.splice(0), total = lista.length, personaAntes = perReg.perRegPersona;
         perRegSel = new Set();
-        perDeudasPend = r; perDeudasHistDatos = null;
-        mostrarBanner(total > 1 ? `${total} abonos registrados: pagaron ${cubiertas} deuda(s) completa(s)${aFavor > 0.004 ? ` y quedan ${perUsd(aFavor)} a favor` : ''}.`
-                                : `Abono registrado (${r.registrado}): pagó ${r.cubiertas} deuda(s) completa(s)${r.sinAplicar > 0 ? ` y quedan ${perUsd(r.sinAplicar)} a favor` : ''}.`, 'ok');
         perReg = { perRegLocal: perReg.perRegLocal, perRegFecha: perReg.perRegFecha, perRegTasa: perReg.perRegTasa };
         perRegCerrar(); perRegArchivo = null; perReg.perRegPersona = ''; perReg.perRegDesc = ''; perReg.perRegBs = ''; perReg.perRegUsd = ''; perReg.perRegDias = ''; perReg.perRegVence = '';
         if (perTab === 'registrar') perTab = 'deudas';
         perPintar();
+        mostrarBanner(`Registrando ${total > 1 ? total + ' abonos' : 'el abono'} de ${p.nombre} en segundo plano... puede seguir trabajando.`, 'cargando');
+        perEnSegundoPlano(async () => {
+            let r = null, hechos = 0, cubiertas = 0, aFavor = 0;
+            try {
+                while (lista.length) {
+                    const c = lista[0];
+                    const comprobante = c.archivo ? await efeLeerComprobante(c.archivo) : null;
+                    r = await llamarApi({ action: 'cxc_registrar', tipo: 'ABONO', cuentaId: p.id, local: '', fecha: c.fecha, moneda: c.moneda, monto: c.monto, tasa: c.tasa,
+                        descripcion: c.desc, comprobante, claveAdmin: c.claveAdmin, refs: c.refs, vence: '' });
+                    lista.shift(); hechos++;
+                    cubiertas += r.cubiertas || 0; aFavor += r.sinAplicar || 0;
+                }
+            } catch (err) {
+                // Los que no se registraron vuelven a la lista de la ventana para reintentarlos
+                if (r) { perDeudasPend = r; perDeudasHistDatos = null; }
+                perRegCola = lista.concat(perRegCola); perReg.perRegPersona = personaAntes;
+                mostrarBanner((hechos ? `Se registraron ${hechos} de ${total} abonos. ` : '') + 'No se pudo registrar ' + (hechos ? 'el siguiente' : 'el abono') + ` de ${p.nombre}: ` + err.message +
+                              ' Abra "Registrar" otra vez: quedó en la lista para reintentarlo.', 'error');
+                perPintar(); return;
+            }
+            perDeudasPend = r; perDeudasHistDatos = null;
+            mostrarBanner(total > 1 ? `${total} abonos de ${p.nombre} registrados: pagaron ${cubiertas} deuda(s) completa(s)${aFavor > 0.004 ? ` y quedan ${perUsd(aFavor)} a favor` : ''}.`
+                                    : `Abono de ${p.nombre} registrado (${r.registrado}): pagó ${r.cubiertas} deuda(s) completa(s)${r.sinAplicar > 0 ? ` y quedan ${perUsd(r.sinAplicar)} a favor` : ''}.`, 'ok');
+            perPintar();
+        });
     }
+    // Guardados de Cuentas por cobrar en segundo plano, uno detrás de otro
+    let perCola = Promise.resolve();
+    function perEnSegundoPlano(tarea) { perCola = perCola.then(tarea).catch(e => console.error(e)); }
     // Monto = lo que suman las deudas marcadas (en la moneda elegida)
     function perRegUsarMonto(usd) {
         document.getElementById('perRegUsd').value = usd;
@@ -10098,22 +10118,29 @@
         const archivo = document.getElementById('perRegFoto').files[0] || perRegArchivo;
         const sinComp = t === 'ABONO' && document.getElementById('perRegSinComp').checked;
         if (!archivo && !sinComp) { mostrarBanner(t === 'ABONO' ? 'Adjunte la captura del comprobante del pago.' : 'Adjunte la foto de la factura.', 'warn'); return; }
-        btn.disabled = true;
-        try {
-            let comprobante = null;
-            if (archivo) { btnCargando(btn, 'Subiendo foto...'); comprobante = await efeLeerComprobante(archivo); }
-            btnCargando(btn, 'Registrando...');
-            const r = await llamarApi({ action: 'cxc_registrar', tipo: t, cuentaId: p ? p.id : '', local: t === 'GASTO' ? perReg.perRegLocal : '',
-                fecha: perReg.perRegFecha, moneda: perRegMoneda, monto: Number(perRegMoneda === 'Bs' ? perReg.perRegBs : perReg.perRegUsd), tasa: Number(perReg.perRegTasa) || 0,
-                descripcion: perReg.perRegDesc || '', comprobante, claveAdmin: sinComp ? perReg.perRegAdm : '', refs: t === 'ABONO' ? [...perRegSel] : [], vence: t === 'DEUDA' ? perReg.perRegVence : '' });
-            perRegSel = new Set();
-            perDeudasPend = r; perDeudasHistDatos = null;
-            mostrarBanner(t === 'ABONO' ? `Abono registrado (${r.registrado}): pagó ${r.cubiertas} deuda(s) completa(s)${r.sinAplicar > 0 ? ` y quedan ${perUsd(r.sinAplicar)} a favor` : ''}.` : `${t === 'GASTO' ? 'Gasto registrado' : 'Deuda registrada'} (${r.registrado})${t === 'DEUDA' && perReg.perRegVence ? ', vence el ' + fechaBonita(perReg.perRegVence) : ''}.`, 'ok');
-            perReg = { perRegLocal: perReg.perRegLocal, perRegFecha: perReg.perRegFecha, perRegTasa: perReg.perRegTasa };
-            perRegCerrar(); perRegArchivo = null; perReg.perRegPersona = ''; perReg.perRegDesc = ''; perReg.perRegBs = ''; perReg.perRegUsd = ''; perReg.perRegDias = ''; perReg.perRegVence = '';
-            if (perTab === 'registrar') perTab = 'deudas';
-            perPintar();
-        } catch (err) { mostrarBanner('No se pudo registrar: ' + err.message, 'error'); btn.disabled = false; btn.textContent = 'Registrar'; }
+        // La ventana se cierra al instante y se registra en segundo plano; si falla, se avisa y los datos vuelven a la ventana
+        const pedido = { action: 'cxc_registrar', tipo: t, cuentaId: p ? p.id : '', local: t === 'GASTO' ? perReg.perRegLocal : '',
+            fecha: perReg.perRegFecha, moneda: perRegMoneda, monto: Number(perRegMoneda === 'Bs' ? perReg.perRegBs : perReg.perRegUsd), tasa: Number(perReg.perRegTasa) || 0,
+            descripcion: perReg.perRegDesc || '', claveAdmin: sinComp ? perReg.perRegAdm : '', refs: t === 'ABONO' ? [...perRegSel] : [], vence: t === 'DEUDA' ? perReg.perRegVence : '' };
+        const copia = Object.assign({}, perReg), quien = p ? p.nombre : 'la tienda ' + perReg.perRegLocal, vence = perReg.perRegVence;
+        perRegSel = new Set();
+        perReg = { perRegLocal: perReg.perRegLocal, perRegFecha: perReg.perRegFecha, perRegTasa: perReg.perRegTasa };
+        perRegCerrar(); perRegArchivo = null; perReg.perRegPersona = ''; perReg.perRegDesc = ''; perReg.perRegBs = ''; perReg.perRegUsd = ''; perReg.perRegDias = ''; perReg.perRegVence = '';
+        if (perTab === 'registrar') perTab = 'deudas';
+        perPintar();
+        mostrarBanner(`Registrando ${t === 'GASTO' ? 'el gasto' : t === 'DEUDA' ? 'la deuda' : 'el abono'} de ${quien} en segundo plano... puede seguir trabajando.`, 'cargando');
+        perEnSegundoPlano(async () => {
+            try {
+                pedido.comprobante = archivo ? await efeLeerComprobante(archivo) : null;
+                const r = await llamarApi(pedido);
+                perDeudasPend = r; perDeudasHistDatos = null;
+                mostrarBanner(t === 'ABONO' ? `Abono de ${quien} registrado (${r.registrado}): pagó ${r.cubiertas} deuda(s) completa(s)${r.sinAplicar > 0 ? ` y quedan ${perUsd(r.sinAplicar)} a favor` : ''}.` : `${t === 'GASTO' ? 'Gasto registrado' : 'Deuda registrada'} (${r.registrado}) · ${quien}${t === 'DEUDA' && vence ? ', vence el ' + fechaBonita(vence) : ''}.`, 'ok');
+                perPintar();
+            } catch (err) {
+                perReg = copia; perRegArchivo = archivo;
+                mostrarBanner(`No se pudo registrar ${t === 'GASTO' ? 'el gasto' : t === 'DEUDA' ? 'la deuda' : 'el abono'} de ${quien}: ${err.message}. Abra "Registrar" otra vez: los datos siguen ahí.`, 'error');
+            }
+        });
     }
 
     // ---------- Clientes ----------
@@ -10335,7 +10362,7 @@
     // Las notas y los ingresos se imprimen a media carta (5,5 × 8,5 pulgadas).
     // ==========================================
     let almCodTexto = '';   // lo escrito en el código (se conserva si la pantalla se vuelve a dibujar)
-    let almDatos = null, almVista = '', almTab = '', almNotas = null, almIngresos = null, almRango = null;
+    let almDatos = null, almVista = '', almTab = '', almNotas = null, almIngresos = null;
     let almVenta = { items: [], sel: -1, descuento: 0, claveDesc: '', claveStock: '', ultimo: '' };
     let almIng = { operacion: '', proveedorId: '', documento: '', clienteId: '', nota: '', items: [], sel: -1, listo: false, ultimo: '' };
     const ALM_TABS = { inventario: [['productos', 'Productos']], movalmacen: [['facturar', 'Facturar'], ['ingresar', 'Operaciones de inventario'], ['notas', 'Notas emitidas'], ['ingresos', 'Historial de operaciones'], ['tiendas', 'Inversión por tienda']] };
@@ -10372,7 +10399,7 @@
     function almUsar(r) {
         almDatosEn = Date.now();
         almDatos = { productos: r.productos || [], clientes: r.clientes || [], categorias: r.categorias || [], proveedores: r.proveedores || [],
-                     proximaNota: r.proximaNota || '', proximoIngreso: r.proximoIngreso || '' };
+                     proximaNota: r.proximaNota || '', proximoIngreso: r.proximoIngreso || '', telegram: !!r.telegram, pendientes: r.pendientes || null };
         almPintar();
     }
     function almModo(t) {
@@ -10384,8 +10411,8 @@
     function almPintar() {
         if (!almDatos || (vistaActual !== 'inventario' && vistaActual !== 'movalmacen')) return;
         const out = document.getElementById('almContenido');
-        pintarConservando(out, almTab === 'productos' ? almProductosVista() : almTab === 'facturar' ? almFacturarVista() : almTab === 'ingresar' ? almIngresarVista()
-                              : almTab === 'notas' ? almNotasVista() : almTab === 'tiendas' ? almTiendasVista() : almIngresosVista());
+        pintarConservando(out, (almVista === 'movalmacen' ? almPendientesHTML() : '') + (almTab === 'productos' ? almProductosVista() : almTab === 'facturar' ? almFacturarVista() : almTab === 'ingresar' ? almIngresarVista()
+                              : almTab === 'notas' ? almNotasVista() : almTab === 'tiendas' ? almTiendasVista() : almIngresosVista()));
         if (almTab === 'notas' && !almNotas) almCargarNotas();
         if (almTab === 'tiendas' && !almTiendas) almCargarTiendas();
         if (almTab === 'ingresos' && !almIngresos) almCargarIngresos();
@@ -10517,6 +10544,8 @@
                     <small>${ajuste && falta && sobra ? `falta $ ${fmt(Math.abs(falta))} · sobra $ ${fmt(sobra)} · ` : ''}${tasa ? `Bs ${dinero(total * tasa)} · tasa ${fmt(tasa)}` : 'Tasa BCV no disponible'}${desc ? ` · desc. $ ${fmt(desc)}` : ''}</small></div>
             </form>
             <div class="tabla-wrap alm-carrito"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Código</th><th class="izq">Descripción</th>${ajuste ? '<th>Existencia</th><th>Contado</th><th>Ajuste</th>' : '<th>Cantidad</th>'}<th>${ingreso ? 'Costo $' : 'Precio $'}</th><th>Subtotal $</th></tr></thead>
+                ${ajuste && doc.items.length ? `<tfoot class="alm-aj-pie"><tr class="alm-sobra"><td class="izq" colspan="6">Total sobrante (+) · ${doc.items.filter(x => x.cantidad > 0).length} producto(s)</td><td><b>+ ${fmt(sobra)}</b></td></tr>
+                    <tr class="alm-falta"><td class="izq" colspan="6">Total faltante (−) · ${doc.items.filter(x => x.cantidad < 0).length} producto(s)</td><td><b>− ${fmt(Math.abs(falta))}</b></td></tr></tfoot>` : ''}
                 <tbody>${filas || `<tr><td colspan="${ajuste ? 7 : 5}"><div class="alm-vacio">${ajuste ? 'Marque el código y escriba lo que contó (0 si no hay)' : ingreso ? 'Sin productos todavía' : 'Venta vacía'}</div></td></tr>`}</tbody></table></div>
             <div class="alm-pie"><span><span class="alm-guardando${almGuardando ? ' activo' : ''}">${almGuardando ? `Guardando ${almGuardando} documento(s)...` : ''}</span>${doc.items.length} renglón(es)${doc.items.length ? ' · ' + doc.items.reduce((s, x) => s + (x.tipo === 'Unidad' ? x.cantidad : 0), 0) + ' und · ' + almCant(doc.items.reduce((s, x) => s + (x.tipo === 'Pesado' ? x.cantidad : 0), 0), 'Pesado') + ' kg' : ''}</span>
                 <span class="alm-teclas">${teclas.map(([k, t, fn]) => fn ? `<button type="button" class="alm-tecla" onclick="${fn}"><kbd>${k}</kbd>${t}</button>` : `<span class="alm-tecla"><kbd>${k}</kbd>${t}</span>`).join('')}</span></div>
@@ -10749,6 +10778,7 @@
                 <button type="button" class="btn-ghost" onclick="almNuevoCliente()">+ Nuevo</button></div>
             <div class="alm-lista corta" id="almCliLista"></div>
             <div class="nota alm-tienda-aviso" id="almTiendaAviso"></div>
+            <label for="almComentario">Comentario <small>(opcional, sale en la nota)</small></label><input type="text" id="almComentario" autocomplete="off" maxlength="300" placeholder="Ej.: entregar en la mañana">
             <div class="alm-cond" id="almCondCaja">
                 <label class="interruptor"><input type="checkbox" id="almCredito" onchange="document.getElementById('almDiasCaja').classList.toggle('hidden', !this.checked)"><span class="sw-pista"></span> A crédito</label>
                 <div id="almDiasCaja" class="hidden"><label for="almDias">Días de crédito</label><input type="number" id="almDias" step="1" min="0" max="120" value="7"></div>
@@ -10781,7 +10811,7 @@
         if (almCliSel) { const c = almDatos.clientes.find(x => x.id === almCliSel); el.innerHTML = `<div class="alm-op sel"><b>${esc(c.id)}</b><span>${esc(c.nombre)}</span><small>${esc(c.cedula || c.telefono || '')}</small></div>`; return; }
         const l = almCliResultados();
         const txt = ((document.getElementById('almCliBus') || {}).value || '').trim();
-        el.innerHTML = l.length ? l.map((c, i) => `<button type="button" class="alm-op${i === almCliIdx ? ' sel' : ''}" onclick="almCliElegir('${esc(c.id)}')"><b>${esc(c.id)}</b><span>${esc(c.nombre)}</span><small>${c.tipo === 'Tienda' ? '<span class="chip st-ok">Tienda</span>' : esc(c.cedula || c.telefono || '')}</small></button>`).join('')
+        el.innerHTML = l.length ? l.map((c, i) => `<button type="button" class="alm-op${i === almCliIdx ? ' sel' : ''}" onclick="almCliElegir('${esc(c.id)}')"><b>${esc(c.id)}</b><span>${esc(c.nombre)}</span><small>${c.tipo === 'Tienda' ? '<span class="chip st-ok">Tienda</span>' : esc(c.cedula || c.telefono || '') + (c.origen === 'Cuentas por cobrar' ? ' <span class="chip st-info">CxC</span>' : '')}</small></button>`).join('')
             : txt ? `<div class="empty">"${esc(txt)}" no está registrado. Pulse Enter o "+ Nuevo" para registrarlo.</div>` : '';
         const s = el.querySelector('.sel'); if (s) s.scrollIntoView({ block: 'nearest' });
     }
@@ -10834,8 +10864,8 @@
         const condicion = tienda ? 'Tienda' : credito ? 'Crédito' : 'Contado', ahora = new Date();
         const nota = { numero: almDatos.proximaNota || '—', fecha: fechaLocalHoy(), hora: ahora.toTimeString().slice(0, 5), clienteId: cli.id, cliente: cli.nombre, cedula: cli.cedula, telefono: cli.telefono, direccion: cli.direccion,
                        condicion, vence: credito && !tienda ? sumarDias(fechaLocalHoy(), dias) : '', subtotal, descuento, total, tasa, totalBs: tasa ? almR(total * tasa) : 0, estado: 'Emitida',
-                       usuario: nombreUsuario, renglones: detalle.length, detalle };
-        const pedido = { action: 'alm_facturar', clienteId: cli.id, condicion, diasCredito: dias, tasa, descuento: venta.descuento || 0, claveAdmin: venta.claveDesc || venta.claveStock || '',
+                       usuario: nombreUsuario, renglones: detalle.length, detalle, comentario: (document.getElementById('almComentario') || {}).value ? document.getElementById('almComentario').value.trim() : '', ingresada: '', verificada: '', modificaciones: '' };
+        const pedido = { action: 'alm_facturar', clienteId: cli.id, condicion, diasCredito: dias, tasa, descuento: venta.descuento || 0, claveAdmin: venta.claveDesc || venta.claveStock || '', comentario: nota.comentario,
                          items: venta.items.map(x => ({ codigo: x.codigo, cantidad: x.cantidad })) };
         // La pantalla queda lista para la siguiente venta
         almMoverLocal(venta.items, -1);
@@ -10847,8 +10877,10 @@
         almEnSegundoPlano(async () => {
             try {
                 const r = await llamarApi(pedido);
-                almNotas = null; almTiendas = null;
-                if (!r.nota) { await almCargar(); return; }   // ya estaba guardada (reintento): se vuelve a leer
+                almTiendas = null;
+                if (!r.nota) { almNotas = null; await almCargar(); return; }   // ya estaba guardada (reintento): se vuelve a leer
+                if (almNotas && almNotasF.modo === 'ultimas') almReemplazarNota(r.nota);
+                if (almDatos.pendientes) { almDatos.pendientes.notasPorVerificar++; if (r.nota.condicion === 'Tienda') { almDatos.pendientes.porIngresar++; almDatos.pendientes.porIngresarUsd = almR(almDatos.pendientes.porIngresarUsd + r.nota.total); } }
                 almAplicarCambios(r.cambios);
                 if (r.proximaNota && Number(r.proximaNota) > Number(almDatos.proximaNota)) almDatos.proximaNota = r.proximaNota;
                 if (almUltimaNota === nota) almUltimaNota = r.nota;
@@ -11119,7 +11151,7 @@
                       documento: op.operacion === 'DEVOLUCION' && op.documento ? 'NE ' + almNumeroTxt(String(op.documento).replace(/\D/g, '')) : op.documento, nota: op.nota,
                       renglones: detalle.length, total: almR(detalle.reduce((s, x) => s + x.total, 0)), usuario: nombreUsuario, detalle };
         const pedido = { action: 'alm_ingresar', operacion: op.operacion, proveedorId: op.proveedorId, documento: op.documento, clienteId: op.clienteId,
-                         nota: op.nota, claveAdmin, items: op.items.map(x => ({ codigo: x.codigo, cantidad: x.cantidad, costo: x.costo })) };
+                         nota: op.nota, claveAdmin, items: op.items.map(x => ({ codigo: x.codigo, cantidad: x.cantidad, costo: x.costo, contado: op.operacion === 'AJUSTE' ? x.contado : undefined })) };
         almMoverLocal(op.items, 1, op.operacion === 'COMPRA');
         almDatos.proximoIngreso = almNumeroTxt((Number(doc.numero) || 0) + 1);
         almIng = { operacion: op.operacion, proveedorId: '', documento: '', clienteId: '', nota: '', items: [], sel: -1, listo: false, ultimo: '' };
@@ -11128,8 +11160,10 @@
         almEnSegundoPlano(async () => {
             try {
                 const r = await llamarApi(pedido);
-                almIngresos = null; almTiendas = null;
-                if (!r.ingreso) { await almCargar(); return; }
+                almTiendas = null;
+                if (!r.ingreso) { almIngresos = null; await almCargar(); return; }
+                if (almIngresos && almOpsF.modo === 'ultimas') almIngresos.unshift(r.ingreso);
+                if (almDatos.pendientes) almDatos.pendientes.opsPorVerificar++;
                 almAplicarCambios(r.cambios);
                 if (r.proximoIngreso && Number(r.proximoIngreso) > Number(almDatos.proximoIngreso)) almDatos.proximoIngreso = r.proximoIngreso;
                 if (almUltimoIngreso === doc) almUltimoIngreso = r.ingreso;
@@ -11166,54 +11200,226 @@
         items.forEach(x => { const p = almProducto(x.codigo); if (!p) return; p.existencia = almR(p.existencia + signo * x.cantidad, 3); if (actualizarCosto && x.costo > 0) p.costo = x.costo; });
     }
 
-    // ---------- Notas emitidas e ingresos ----------
-    function almRangoActual() { if (!almRango) almRango = { desde: sumarDias(fechaLocalHoy(), -30), hasta: fechaLocalHoy() }; return almRango; }
-    function almFiltrosLista(fn) {
-        const r = almRangoActual();
-        return `<div class="filters alm-filtros"><div><label for="almDesde">Desde</label><input type="date" id="almDesde" value="${r.desde}" onchange="almRango.desde=this.value;${fn}"></div>
-            <div><label for="almHasta">Hasta</label><input type="date" id="almHasta" value="${r.hasta}" onchange="almRango.hasta=this.value;${fn}"></div>
-            <div><label for="almListaBus">Buscar</label><input type="search" id="almListaBus" autocomplete="off" placeholder="N°, cliente, proveedor..." oninput="almPintar()" value="${esc((document.getElementById('almListaBus') || {}).value || '')}"></div></div>`;
-    }
+    // ---------- Notas emitidas y operaciones de inventario ----------
+    // Al entrar: las últimas 100 (precargadas). También por fechas, cliente o tienda, estado y búsqueda; se exportan a Excel tal como se ven.
+    // Cada nota se ve, se imprime, se modifica (clave), se marca "ingresada en tienda" y "recepción verificada" (clave de supervisor).
+    // Cada operación se ve, se reimprime y se verifica (clave de supervisor). Arriba, siempre: lo que falta por ingresar y por verificar.
+    let almNotasF = { modo: 'ultimas', desde: '', hasta: '', cliente: '', estado: '' }, almOpsF = { modo: 'ultimas', desde: '', hasta: '', tipo: '', estado: '' };
     const almPasaLista = (...t) => { const q = asisgClave((document.getElementById('almListaBus') || {}).value || ''); return !q || t.some(x => asisgClave(x).includes(q)); };
+    const almPedido = f => f.modo === 'fechas' ? { desde: f.desde || sumarDias(fechaLocalHoy(), -30), hasta: f.hasta || fechaLocalHoy() } : { ultimas: true };
     async function almCargarNotas() {
-        const r = almRangoActual();
-        try { almNotas = (await llamarApi({ action: 'alm_notas', desde: r.desde, hasta: r.hasta })).notas || []; }
+        try { const r = await llamarApi(Object.assign({ action: 'alm_notas' }, almPedido(almNotasF))); almNotas = r.notas || []; if (r.pendientes && almDatos) almDatos.pendientes = r.pendientes; }
         catch (e) { almNotas = []; mostrarBanner(e.message, 'error'); }
         almPintar();
     }
     async function almCargarIngresos() {
-        const r = almRangoActual();
-        try { almIngresos = (await llamarApi({ action: 'alm_ingresos', desde: r.desde, hasta: r.hasta })).ingresos || []; }
+        try { const r = await llamarApi(Object.assign({ action: 'alm_ingresos' }, almPedido(almOpsF))); almIngresos = r.ingresos || []; if (r.pendientes && almDatos) almDatos.pendientes = r.pendientes; }
         catch (e) { almIngresos = []; mostrarBanner(e.message, 'error'); }
         almPintar();
     }
-    function almNotasVista() {
-        const f = almFiltrosLista('almNotas=null;almPintar()');
-        if (!almNotas) return f + cargandoHTML('Cargando notas...');
-        const l = almNotas.filter(n => almPasaLista(n.numero, n.cliente, n.clienteId, n.cedula));
-        const vig = l.filter(n => n.estado !== 'Anulada');
-        return f + `<div class="kpis"><div class="kpi"><div class="k-label">Notas</div><div class="k-value">${vig.length}</div></div>
-                <div class="kpi"><div class="k-label">Total $</div><div class="k-value">${fmt(vig.reduce((s, n) => s + n.total, 0))}</div></div>
-                <div class="kpi"><div class="k-label">A crédito $</div><div class="k-value">${fmt(vig.filter(n => n.condicion === 'Crédito').reduce((s, n) => s + n.total, 0))}</div></div>
-                <div class="kpi"><div class="k-label">Anuladas</div><div class="k-value">${l.length - vig.length}</div></div></div>
-            ${l.length ? `<div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">N°</th><th class="izq">Fecha</th><th class="izq">Cliente</th><th class="izq">Condición</th><th>Total $</th><th>Total Bs</th><th class="izq">Estado</th><th></th></tr></thead><tbody>
-            ${l.map(n => `<tr class="${n.estado === 'Anulada' ? 'alm-anulada' : ''}"><td class="izq"><b>${esc(n.numero)}</b></td><td class="izq">${fechaCorta(n.fecha)}<small>${esc(n.hora)}</small></td>
-                <td class="izq">${esc(n.cliente)}<small>${esc(n.usuario)}</small></td><td class="izq">${esc(n.condicion)}${n.vence ? `<small>vence ${fechaCorta(n.vence)}</small>` : ''}</td>
-                <td>${fmt(n.total)}${n.descuento ? `<small>desc. ${fmt(n.descuento)}</small>` : ''}</td><td>${n.totalBs ? fmt(n.totalBs) : '—'}</td>
-                <td class="izq"><span class="chip ${n.estado === 'Anulada' ? 'st-sobra' : 'st-ok'}" title="${esc(n.anulacion)}">${esc(n.estado)}</span></td>
-                <td class="alm-acc"><button type="button" class="btn-ghost btn-mini" onclick="almImprimir('nota', almNotas.find(x => x.numero === '${esc(n.numero)}'))">Imprimir</button>
-                ${n.estado !== 'Anulada' ? `<button type="button" class="btn-eliminar btn-mini" onclick="almAnular('${esc(n.numero)}')">Anular</button>` : ''}</td></tr>`).join('')}
-            </tbody></table></div>` : '<div class="empty">No hay notas en esas fechas.</div>'}`;
+    // Lo que falta (arriba en Entradas y salidas): toque para ir a esa lista
+    function almPendientesHTML() {
+        const p = almDatos && almDatos.pendientes; if (!p) return '';
+        const item = (n, txt, fn, extra) => n ? `<button type="button" class="alm-pend" onclick="${fn}"><b>${n}</b> ${txt}${extra || ''}</button>` : '';
+        const h = item(p.porIngresar, 'nota(s) por ingresar en tienda', "almIrPendiente('notas','ingresar')", p.porIngresarUsd ? ` <small>$ ${fmt(p.porIngresarUsd)}</small>` : '') +
+                  item(p.notasPorVerificar, 'nota(s) por verificar', "almIrPendiente('notas','verificar')") + item(p.opsPorVerificar, 'operación(es) por verificar', "almIrPendiente('ingresos','verificar')");
+        return h ? `<div class="alm-pendientes">${h}</div>` : '';
     }
+    function almIrPendiente(tab, estado) {
+        if (tab === 'notas') { almNotasF.estado = estado; if (almNotasF.modo !== 'ultimas') { almNotasF.modo = 'ultimas'; almNotas = null; } }
+        else { almOpsF.estado = estado; if (almOpsF.modo !== 'ultimas') { almOpsF.modo = 'ultimas'; almIngresos = null; } }
+        almModo(tab);
+    }
+    function almFiltrosHTML(f, recargar, extra, tipo) {
+        return `<div class="filters alm-filtros alm-filtros-${tipo}">
+            <div><label for="almFMod">Mostrar</label><select id="almFMod" onchange="${tipo}.modo=this.value;${recargar}"><option value="ultimas"${f.modo === 'ultimas' ? ' selected' : ''}>Últimas 100</option><option value="fechas"${f.modo === 'fechas' ? ' selected' : ''}>Por fechas</option></select></div>
+            ${f.modo === 'fechas' ? `<div><label for="almDesde">Desde</label><input type="date" id="almDesde" value="${f.desde || sumarDias(fechaLocalHoy(), -30)}" onchange="${tipo}.desde=this.value;${recargar}"></div>
+                <div><label for="almHasta">Hasta</label><input type="date" id="almHasta" value="${f.hasta || fechaLocalHoy()}" onchange="${tipo}.hasta=this.value;${recargar}"></div>` : ''}
+            ${extra}
+            <div><label for="almListaBus">Buscar</label><input type="search" id="almListaBus" autocomplete="off" placeholder="N°, nombre, documento..." oninput="almPintar()" value="${esc((document.getElementById('almListaBus') || {}).value || '')}"></div></div>`;
+    }
+    const almChipMarca = (v, si, no, cls) => v ? `<span class="chip st-ok" title="${esc(v)}">${si}</span>` : `<span class="chip ${cls || 'st-pend'}">${no}</span>`;
+    function almNotasFiltradas() {
+        const f = almNotasF;
+        return (almNotas || []).filter(n => (!f.cliente || n.clienteId === f.cliente) && almPasaLista(n.numero, n.cliente, n.clienteId, n.cedula, n.comentario)
+            && (!f.estado || (f.estado === 'ingresar' ? n.estado !== 'Anulada' && n.condicion === 'Tienda' && !n.ingresada : f.estado === 'verificar' ? n.estado !== 'Anulada' && !n.verificada : f.estado === 'anuladas' ? n.estado === 'Anulada' : true)));
+    }
+    function almNotasVista() {
+        const f = almNotasF, todos = almNotas || [];
+        const clientes = [...new Map(todos.map(n => [n.clienteId, n.cliente])).entries()].sort((a, b) => a[1].localeCompare(b[1], 'es'));
+        const extra = `<div><label for="almFCli">Cliente o tienda</label><select id="almFCli" onchange="almNotasF.cliente=this.value;almPintar()"><option value="">Todos</option>${clientes.map(([id, nom]) => `<option value="${esc(id)}"${id === f.cliente ? ' selected' : ''}>${esc(nom)}</option>`).join('')}</select></div>
+            <div><label for="almFEst">Estado</label><select id="almFEst" onchange="almNotasF.estado=this.value;almPintar()">${[['', 'Todas'], ['ingresar', 'Por ingresar en tienda'], ['verificar', 'Por verificar'], ['anuladas', 'Anuladas']].map(([v, x]) => `<option value="${v}"${v === f.estado ? ' selected' : ''}>${x}</option>`).join('')}</select></div>`;
+        const filtros = almFiltrosHTML(f, 'almNotas=null;almPintar()', extra, 'almNotasF');
+        const acciones = `<div class="req-acciones alm-lista-acc"><button type="button" class="btn-ghost" onclick="almExportarNotas()">Exportar a Excel</button>
+            <label class="interruptor" title="Cada nota emitida se envía al grupo de Telegram (la de una tienda, al grupo de esa tienda)"><input type="checkbox" ${almDatos && almDatos.telegram ? 'checked' : ''} onchange="almCambiarTelegram(this)"><span class="sw-pista"></span> Enviar notas a Telegram</label></div>`;
+        if (!almNotas) return filtros + acciones + cargandoHTML('Cargando notas...');
+        const l = almNotasFiltradas(), vig = l.filter(n => n.estado !== 'Anulada');
+        return filtros + acciones + `<div class="kpis"><div class="kpi"><div class="k-label">Notas</div><div class="k-value">${vig.length}</div><div class="k-label">${l.length - vig.length} anulada(s)</div></div>
+                <div class="kpi"><div class="k-label">Total $</div><div class="k-value">${fmt(vig.reduce((s, n) => s + n.total, 0))}</div></div>
+                <div class="kpi amar"><div class="k-label">Por ingresar en tienda</div><div class="k-value">${vig.filter(n => n.condicion === 'Tienda' && !n.ingresada).length}</div></div>
+                <div class="kpi"><div class="k-label">Por verificar</div><div class="k-value">${vig.filter(n => !n.verificada).length}</div></div></div>
+            ${l.length ? `<div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">N°</th><th class="izq">Fecha</th><th class="izq">Cliente</th><th class="izq">Condición</th><th>Total $</th><th class="izq">Tienda</th><th class="izq">Verificada</th><th></th></tr></thead><tbody>
+            ${l.map(n => `<tr class="${n.estado === 'Anulada' ? 'alm-anulada' : ''}"><td class="izq"><b>${esc(n.numero)}</b>${n.modificaciones ? '<small>modificada</small>' : ''}</td><td class="izq">${fechaCorta(n.fecha)}<small>${esc(n.hora)}</small></td>
+                <td class="izq">${esc(n.cliente)}<small>${esc(n.comentario || n.usuario)}</small></td><td class="izq">${n.condicion === 'Tienda' ? 'Despacho a tienda' : esc(n.condicion)}${n.vence ? `<small>vence ${fechaCorta(n.vence)}</small>` : ''}</td>
+                <td>${fmt(n.total)}${n.totalBs ? `<small>Bs ${fmt(n.totalBs)}</small>` : ''}</td>
+                <td class="izq">${n.estado === 'Anulada' ? '<span class="chip st-sobra">Anulada</span>' : n.condicion === 'Tienda' ? almChipMarca(n.ingresada, 'Ingresada', 'Por ingresar', 'st-amar') : '—'}</td>
+                <td class="izq">${n.estado === 'Anulada' ? '' : almChipMarca(n.verificada, 'Verificada', 'Sin verificar')}</td>
+                <td class="alm-acc"><button type="button" class="btn-ghost btn-mini" onclick="almVerNota('${esc(n.numero)}')">Ver</button><button type="button" class="btn-ghost btn-mini" onclick="almImprimir('nota', almNotaDe('${esc(n.numero)}'))">Imprimir</button></td></tr>`).join('')}
+            </tbody></table></div>` : '<div class="empty">No hay notas con estos filtros.</div>'}`;
+    }
+    const almNotaDe = numero => (almNotas || []).find(x => x.numero === numero) || (almUltimaNota && almUltimaNota.numero === numero ? almUltimaNota : null);
+    // Ver una nota: detalle, comentario, cambios, marcas y acciones
+    function almVerNota(numero) {
+        const n = almNotaDe(numero); if (!n) return;
+        const anulada = n.estado === 'Anulada', tienda = n.condicion === 'Tienda';
+        almVentana(`<div class="req-dlg alm-dlg-ancho"><h3>Nota de entrega N° ${esc(n.numero)} ${anulada ? '<span class="chip st-sobra">Anulada</span>' : ''}</h3>
+            <div class="req-sub">${esc(n.cliente)} · ${tienda ? 'despacho a tienda' : esc(n.condicion)}${n.vence ? ' (vence ' + fechaBonita(n.vence) + ')' : ''} · ${fechaBonita(n.fecha)} ${esc(n.hora)} · ${esc(n.usuario)}</div>
+            ${n.comentario ? `<div class="nota" style="margin-top:.4rem"><b>Comentario:</b> ${esc(n.comentario)}</div>` : ''}
+            <div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th>Cant.</th><th class="izq">Código</th><th class="izq">Descripción</th><th>Precio $</th><th>Total $</th></tr></thead><tbody>
+                ${n.detalle.map(x => `<tr><td>${almCant(x.cantidad, x.tipo)} <small>${almUnidad(x.tipo)}</small></td><td class="izq">${esc(x.codigo)}</td><td class="izq">${esc(x.descripcion)}</td><td>${fmt(x.precio)}</td><td><b>${fmt(x.total)}</b></td></tr>`).join('')}</tbody>
+                <tfoot><tr><td colspan="4" class="izq">${n.descuento ? `Subtotal $ ${fmt(n.subtotal)} · descuento $ ${fmt(n.descuento)} · ` : ''}<b>Total</b></td><td><b>$ ${fmt(n.total)}</b>${n.totalBs ? `<small>Bs ${fmt(n.totalBs)}</small>` : ''}</td></tr></tfoot></table></div>
+            ${n.modificaciones ? `<div class="nota"><b>Modificaciones:</b> ${esc(n.modificaciones).replace(/ \| /g, '<br>')}</div>` : ''}
+            ${anulada ? `<div class="nota">${esc(n.anulacion)}</div>` : `<div class="alm-marcas">
+                ${tienda ? `<div>${almChipMarca(n.ingresada, 'Ingresada en tienda', 'Por ingresar en tienda', 'st-amar')}<small>${esc(n.ingresada)}</small>
+                    <button type="button" class="btn-ghost btn-mini" onclick="almMarcarNota('${esc(n.numero)}','ingresada',${!n.ingresada})">${n.ingresada ? 'Quitar' : 'Marcar ingresada'}</button></div>` : ''}
+                <div>${almChipMarca(n.verificada, 'Recepción verificada', 'Sin verificar')}<small>${esc(n.verificada)}</small>
+                    <button type="button" class="btn-ghost btn-mini" onclick="almMarcarNota('${esc(n.numero)}','verificada',${!n.verificada})">${n.verificada ? 'Quitar verificación' : 'Verificar (clave)'}</button></div></div>`}
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0;flex-wrap:wrap">
+                ${anulada ? '' : `<button type="button" class="btn-eliminar" onclick="almAnular('${esc(n.numero)}')">Anular</button><button type="button" class="btn-ghost" onclick="almModificarNota('${esc(n.numero)}')">Modificar (clave)</button>`}
+                <button type="button" class="btn-ghost" onclick="almImprimir('nota', almNotaDe('${esc(n.numero)}'))">Imprimir</button><button type="button" class="btn-primary" onclick="almCerrar()" autofocus>Cerrar</button></div></div>`);
+    }
+    function almReemplazarNota(n) {
+        if (!almNotas) return; const i = almNotas.findIndex(x => x.numero === n.numero);
+        if (i >= 0) almNotas[i] = n; else almNotas.unshift(n);
+    }
+    async function almMarcarNota(numero, campo, valor) {
+        let claveAdmin = '';
+        if (campo === 'verificada') { claveAdmin = await efePedirClave(valor ? 'Verificar la recepción' : 'Quitar la verificación', 'Nota N° ' + numero + ': un supervisor debe autorizarlo.'); if (!claveAdmin) return; }
+        try {
+            const r = await llamarApi({ action: 'alm_nota_marcar', numero, campo, valor, claveAdmin });
+            almReemplazarNota(r.nota); if (r.pendientes) almDatos.pendientes = r.pendientes;
+            almPintar(); almVerNota(numero);
+        } catch (e) { mostrarBanner(e.message, 'error'); }
+    }
+    // Modificar una nota (clave): cantidades y precios; quitar o agregar renglones con su código
+    let almMod = null;
+    function almModificarNota(numero) {
+        const n = almNotaDe(numero); if (!n) return;
+        almMod = { numero, items: n.detalle.map(x => ({ codigo: x.codigo, descripcion: x.descripcion, tipo: x.tipo, cantidad: x.cantidad, precio: x.precio })) };
+        almModPintar();
+    }
+    function almModPintar() {
+        const n = almNotaDe(almMod.numero), total = almR(almMod.items.reduce((s, x) => s + x.cantidad * x.precio, 0));
+        almVentana(`<form class="req-dlg alm-dlg-ancho" onsubmit="almModGuardar(event)"><h3>Modificar nota N° ${esc(almMod.numero)}</h3>
+            <div class="req-sub">${esc(n.cliente)} · total actual $ ${fmt(n.total)} · nuevo $ <b id="almModTotal">${fmt(total)}</b>. La existencia${n.condicion === 'Crédito' ? ', la deuda del cliente' : n.condicion === 'Tienda' ? ', el gasto de la tienda' : ''} se corrige${n.condicion === 'Contado' ? '' : 'n'} con la diferencia.</div>
+            <div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Producto</th><th>Cantidad</th><th>Precio $</th><th>Total $</th><th></th></tr></thead><tbody>
+            ${almMod.items.map((x, i) => `<tr><td class="izq"><b>${esc(x.codigo)}</b><small>${esc(x.descripcion)}</small></td>
+                <td><input type="number" class="alm-mod-in" step="${x.tipo === 'Pesado' ? '0.001' : '1'}" min="0" value="${x.cantidad}" onchange="almMod.items[${i}].cantidad=almR(almNum(this.value),3)||0;almModTotal()"> <small>${almUnidad(x.tipo)}</small></td>
+                <td><input type="number" class="alm-mod-in" step="0.0001" min="0" value="${x.precio}" onchange="almMod.items[${i}].precio=almR(almNum(this.value),4)||0;almModTotal()"></td>
+                <td id="almModT${i}">${fmt(x.cantidad * x.precio)}</td><td><button type="button" class="btn-eliminar btn-mini" onclick="almMod.items.splice(${i},1);almModPintar()">Quitar</button></td></tr>`).join('')}</tbody></table></div>
+            <div class="alm-cli-fila" style="margin-top:.5rem"><input type="text" id="almModCod" autocomplete="off" placeholder="Agregar producto: código y Enter" data-enter-propio onkeydown="if(event.key==='Enter'){event.preventDefault();almModAgregar(this.value)}"></div>
+            <div class="per-grid"><div class="per-ancho"><label for="almModMot">Motivo</label><input type="text" id="almModMot" maxlength="150" autocomplete="off" required></div>
+                <div class="per-ancho"><label for="almModClave">Clave de administrador</label><input type="password" id="almModClave" autocomplete="off" required></div></div>
+            <div class="login-error" id="almModError"></div>
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-ghost" onclick="almVerNota('${esc(almMod.numero)}')">Volver</button><button type="submit" class="btn-save" id="almModBtn">Guardar cambios</button></div></form>`);
+    }
+    function almModTotal() {
+        almMod.items.forEach((x, i) => { const c = document.getElementById('almModT' + i); if (c) c.textContent = fmt(x.cantidad * x.precio); });
+        const t = document.getElementById('almModTotal'); if (t) t.textContent = fmt(almMod.items.reduce((s, x) => s + x.cantidad * x.precio, 0));
+    }
+    function almModAgregar(cod) {
+        const p = almProducto(cod); if (!p) { document.getElementById('almModError').textContent = 'El código ' + cod + ' no está registrado'; return; }
+        almMod.items.push({ codigo: p.codigo, descripcion: p.descripcion, tipo: p.tipo, cantidad: p.tipo === 'Pesado' ? 0 : 1, precio: p.precio });
+        almModPintar();
+    }
+    async function almModGuardar(ev) {
+        ev.preventDefault();
+        const err = document.getElementById('almModError'), btn = document.getElementById('almModBtn'), items = almMod.items.filter(x => x.cantidad > 0);
+        if (!items.length) { err.textContent = 'La nota debe tener al menos un producto (para eliminarla, anúlela)'; return; }
+        if (items.some(x => !(x.precio > 0))) { err.textContent = 'Hay productos sin precio'; return; }
+        btnCargando(btn, 'Guardando...');
+        try {
+            const r = await llamarApi({ action: 'alm_nota_modificar', numero: almMod.numero, motivo: document.getElementById('almModMot').value.trim(), claveAdmin: document.getElementById('almModClave').value,
+                                        items: items.map(x => ({ codigo: x.codigo, cantidad: x.cantidad, precio: x.precio })) });
+            almReemplazarNota(r.nota); almAplicarCambios(r.cambios); if (r.pendientes) almDatos.pendientes = r.pendientes; almTiendas = null;
+            mostrarBanner(`Nota ${r.nota.numero} modificada: total $ ${fmt(r.nota.total)}.`, 'ok');
+            almPintar(); almVerNota(r.nota.numero);
+        } catch (e) { err.textContent = e.message; btn.disabled = false; btn.textContent = 'Guardar cambios'; }
+    }
+    async function almCambiarTelegram(chk) {
+        const activo = chk.checked, c = await efePedirClave(activo ? 'Enviar notas a Telegram' : 'Dejar de enviar notas a Telegram', 'Un administrador debe autorizarlo.');
+        if (!c) { chk.checked = !activo; return; }
+        try { const r = await llamarApi({ action: 'alm_config', activo, claveAdmin: c }); almDatos.telegram = r.telegram; mostrarBanner(r.telegram ? 'Las notas emitidas se enviarán a Telegram.' : 'Las notas ya no se envían a Telegram.', 'ok'); }
+        catch (e) { chk.checked = !activo; mostrarBanner(e.message, 'error'); }
+    }
+    // ---------- Historial de operaciones ----------
+    const almOpsFiltradas = () => (almIngresos || []).filter(o => (!almOpsF.tipo || o.operacion === almOpsF.tipo) && (!almOpsF.estado || (almOpsF.estado === 'verificar' ? !o.verificada : !!o.verificada))
+        && almPasaLista(o.numero, o.tercero, o.documento, o.operacion, o.nota));
     function almIngresosVista() {
-        const f = almFiltrosLista('almIngresos=null;almPintar()');
-        if (!almIngresos) return f + cargandoHTML('Cargando operaciones...');
-        const l = almIngresos.filter(n => almPasaLista(n.numero, n.tercero, n.documento, n.operacion));
-        return f + (l.length ? `<div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">N°</th><th class="izq">Fecha</th><th class="izq">Operación</th><th class="izq">Proveedor / cliente</th><th class="izq">Documento</th><th>Renglones</th><th>Costo $</th><th></th></tr></thead><tbody>
+        const f = almOpsF;
+        const extra = `<div><label for="almFTipo">Operación</label><select id="almFTipo" onchange="almOpsF.tipo=this.value;almPintar()"><option value="">Todas</option>${ALM_OPS.map(([, x]) => `<option${x === f.tipo ? ' selected' : ''}>${x}</option>`).join('')}</select></div>
+            <div><label for="almFEst">Estado</label><select id="almFEst" onchange="almOpsF.estado=this.value;almPintar()">${[['', 'Todas'], ['verificar', 'Por verificar'], ['verificadas', 'Verificadas']].map(([v, x]) => `<option value="${v}"${v === f.estado ? ' selected' : ''}>${x}</option>`).join('')}</select></div>`;
+        const filtros = almFiltrosHTML(f, 'almIngresos=null;almPintar()', extra, 'almOpsF') + `<div class="req-acciones alm-lista-acc"><button type="button" class="btn-ghost" onclick="almExportarOps()">Exportar a Excel</button></div>`;
+        if (!almIngresos) return filtros + cargandoHTML('Cargando operaciones...');
+        const l = almOpsFiltradas();
+        return filtros + (l.length ? `<div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">N°</th><th class="izq">Fecha</th><th class="izq">Operación</th><th class="izq">Proveedor / cliente</th><th class="izq">Documento</th><th>Valor $</th><th class="izq">Verificada</th><th></th></tr></thead><tbody>
             ${l.map(n => `<tr><td class="izq"><b>${esc(n.numero)}</b></td><td class="izq">${fechaCorta(n.fecha)}<small>${esc(n.hora)}</small></td><td class="izq">${esc(n.operacion)}<small>${esc(n.usuario)}</small></td>
-                <td class="izq">${esc(n.tercero) || '—'}${n.nota ? `<small>${esc(n.nota)}</small>` : ''}</td><td class="izq">${esc(n.documento) || '—'}</td><td>${n.renglones}</td><td>${fmt(n.total)}</td>
-                <td><button type="button" class="btn-ghost btn-mini" onclick="almImprimir('ingreso', almIngresos.find(x => x.numero === '${esc(n.numero)}'))">Imprimir</button></td></tr>`).join('')}
-            </tbody></table></div>` : '<div class="empty">No hay operaciones en esas fechas.</div>');
+                <td class="izq">${esc(n.tercero) || '—'}${n.nota ? `<small>${esc(n.nota)}</small>` : ''}</td><td class="izq">${esc(n.documento) || '—'}</td><td class="${n.total < 0 ? 'alm-falta' : ''}">${n.total < 0 ? '−' : ''}${fmt(Math.abs(n.total))}<small>${n.renglones} renglón(es)</small></td>
+                <td class="izq">${almChipMarca(n.verificada, 'Verificada', 'Por verificar')}</td>
+                <td class="alm-acc"><button type="button" class="btn-ghost btn-mini" onclick="almVerOperacion('${esc(n.numero)}')">Ver</button><button type="button" class="btn-ghost btn-mini" onclick="almImprimir('ingreso', almOpDe('${esc(n.numero)}'))">Imprimir</button></td></tr>`).join('')}
+            </tbody></table></div>` : '<div class="empty">No hay operaciones con estos filtros.</div>');
+    }
+    const almOpDe = numero => (almIngresos || []).find(x => x.numero === numero) || (almUltimoIngreso && almUltimoIngreso.numero === numero ? almUltimoIngreso : null);
+    // Totales de un ajuste: lo que sobra (+) y lo que falta (−), en unidades de valor
+    const almTotalesAjuste = det => ({ sobra: almR(det.filter(x => x.cantidad > 0).reduce((s, x) => s + x.cantidad * x.costo, 0)), falta: almR(det.filter(x => x.cantidad < 0).reduce((s, x) => s + x.cantidad * x.costo, 0)),
+                                       nSobra: det.filter(x => x.cantidad > 0).length, nFalta: det.filter(x => x.cantidad < 0).length });
+    function almVerOperacion(numero) {
+        const o = almOpDe(numero); if (!o) return;
+        const ajuste = o.operacion === 'Ajuste de inventario', t = almTotalesAjuste(o.detalle);
+        almVentana(`<div class="req-dlg alm-dlg-ancho"><h3>Operación N° ${esc(o.numero)} · ${esc(o.operacion)}</h3>
+            <div class="req-sub">${[o.tercero, o.documento ? 'Doc. ' + o.documento : '', fechaBonita(o.fecha) + ' ' + o.hora, o.usuario].filter(Boolean).map(esc).join(' · ')}</div>
+            ${o.nota ? `<div class="nota" style="margin-top:.4rem">${esc(o.nota)}</div>` : ''}
+            <div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Producto</th>${ajuste ? '<th>Existencia</th><th>Contado</th>' : ''}<th>Cantidad</th><th>Costo $</th><th>Total $</th></tr></thead><tbody>
+            ${o.detalle.map(x => `<tr><td class="izq"><b>${esc(x.codigo)}</b><small>${esc(x.descripcion)}</small></td>${ajuste ? `<td>${x.existencia != null ? almCant(x.existencia, x.tipo) : '—'}</td><td>${x.contado != null ? almCant(x.contado, x.tipo) : '—'}</td>` : ''}
+                <td class="${x.cantidad < 0 ? 'alm-falta' : ajuste ? 'alm-sobra' : ''}">${x.cantidad > 0 && ajuste ? '+' : ''}${almCant(x.cantidad, x.tipo)} <small>${almUnidad(x.tipo)}</small></td><td>${fmt(x.costo)}</td><td>${x.total < 0 ? '−' : ''}${fmt(Math.abs(x.total))}</td></tr>`).join('')}</tbody>
+            <tfoot>${ajuste ? `<tr class="alm-sobra"><td class="izq" colspan="5">Total sobrante (+) · ${t.nSobra} producto(s)</td><td><b>+ ${fmt(t.sobra)}</b></td></tr>
+                <tr class="alm-falta"><td class="izq" colspan="5">Total faltante (−) · ${t.nFalta} producto(s)</td><td><b>− ${fmt(Math.abs(t.falta))}</b></td></tr>` : ''}
+                <tr><td class="izq" colspan="${ajuste ? 5 : 3}"><b>${ajuste ? 'Neto del ajuste' : 'Total'}</b></td><td><b>${o.total < 0 ? '−' : ''}$ ${fmt(Math.abs(o.total))}</b></td></tr></tfoot></table></div>
+            <div class="alm-marcas"><div>${almChipMarca(o.verificada, 'Verificada por el supervisor', 'Por verificar')}<small>${esc(o.verificada)}</small>
+                <button type="button" class="btn-ghost btn-mini" onclick="almVerificarOp('${esc(o.numero)}',${!o.verificada})">${o.verificada ? 'Quitar verificación' : 'Verificar (clave)'}</button></div></div>
+            <div class="nota">Las operaciones de inventario no se modifican: si algo quedó mal, haga un ajuste.</div>
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-ghost" onclick="almImprimir('ingreso', almOpDe('${esc(o.numero)}'))">Reimprimir</button><button type="button" class="btn-primary" onclick="almCerrar()" autofocus>Cerrar</button></div></div>`);
+    }
+    async function almVerificarOp(numero, valor) {
+        const claveAdmin = await efePedirClave(valor ? 'Verificar la operación' : 'Quitar la verificación', 'Operación N° ' + numero + ': un supervisor debe autorizarlo.');
+        if (!claveAdmin) return;
+        try {
+            const r = await llamarApi({ action: 'alm_ingreso_verificar', numero, valor, claveAdmin });
+            const i = (almIngresos || []).findIndex(x => x.numero === numero); if (i >= 0) almIngresos[i] = r.ingreso;
+            if (r.pendientes) almDatos.pendientes = r.pendientes;
+            almPintar(); almVerOperacion(numero);
+        } catch (e) { mostrarBanner(e.message, 'error'); }
+    }
+    // ---------- Exportar a Excel (lo que se ve con los filtros) ----------
+    async function almExportarNotas() {
+        const l = almNotasFiltradas(); if (!l.length) { mostrarBanner('No hay notas para exportar con estos filtros.', 'warn'); return; }
+        const X = await libXLSX(), wb = X.utils.book_new();
+        X.utils.book_append_sheet(wb, X.utils.json_to_sheet(l.map(n => ({ 'N°': n.numero, Fecha: fechaBonita(n.fecha), Hora: n.hora, Cliente: n.cliente, 'RIF/C.I.': n.cedula, Condición: n.condicion === 'Tienda' ? 'Despacho a tienda' : n.condicion,
+            Vence: n.vence ? fechaBonita(n.vence) : '', Renglones: n.renglones, 'Subtotal $': n.subtotal, 'Descuento $': n.descuento, 'Total $': n.total, Tasa: n.tasa || '', 'Total Bs': n.totalBs || '', Estado: n.estado,
+            'Ingresada en tienda': n.ingresada, Verificada: n.verificada, Comentario: n.comentario, Usuario: n.usuario, Modificaciones: n.modificaciones }))), 'Notas');
+        X.utils.book_append_sheet(wb, X.utils.json_to_sheet(l.flatMap(n => n.detalle.map(x => ({ 'N°': n.numero, Fecha: fechaBonita(n.fecha), Cliente: n.cliente, Estado: n.estado, Código: x.codigo, Descripción: x.descripcion,
+            Cantidad: x.cantidad, Unidad: almUnidad(x.tipo), 'Precio $': x.precio, 'Total $': x.total })))), 'Detalle');
+        const cli = almNotasF.cliente ? ' ' + ((almNotas.find(n => n.clienteId === almNotasF.cliente) || {}).cliente || '') : '';
+        X.writeFile(wb, `Notas de entrega${cli} ${almNotasF.modo === 'fechas' ? (almNotasF.desde || '') + ' a ' + (almNotasF.hasta || '') : 'ultimas 100'}.xlsx`.replace(/[\\/:*?"<>|]/g, ''));
+    }
+    async function almExportarOps() {
+        const l = almOpsFiltradas(); if (!l.length) { mostrarBanner('No hay operaciones para exportar con estos filtros.', 'warn'); return; }
+        const X = await libXLSX(), wb = X.utils.book_new();
+        X.utils.book_append_sheet(wb, X.utils.json_to_sheet(l.map(o => ({ 'N°': o.numero, Fecha: fechaBonita(o.fecha), Hora: o.hora, Operación: o.operacion, 'Proveedor / cliente': o.tercero, Documento: o.documento,
+            Renglones: o.renglones, 'Valor $': o.total, Nota: o.nota, Usuario: o.usuario, Verificada: o.verificada }))), 'Operaciones');
+        X.utils.book_append_sheet(wb, X.utils.json_to_sheet(l.flatMap(o => o.detalle.map(x => ({ 'N°': o.numero, Fecha: fechaBonita(o.fecha), Operación: o.operacion, Código: x.codigo, Descripción: x.descripcion,
+            Existencia: x.existencia != null ? x.existencia : '', Contado: x.contado != null ? x.contado : '', Cantidad: x.cantidad, Unidad: almUnidad(x.tipo), 'Costo $': x.costo, 'Total $': x.total })))), 'Detalle');
+        X.writeFile(wb, `Operaciones de inventario ${almOpsF.modo === 'fechas' ? (almOpsF.desde || '') + ' a ' + (almOpsF.hasta || '') : 'ultimas 100'}.xlsx`);
     }
     // ---------- Inversión por tienda (semana de sábado a viernes): gastos de la tienda + mercancía del almacén ----------
     let almTiendas = null, almTiendasSemana = '';
@@ -11394,13 +11600,19 @@
         if (!original && !almRevisarCodigo()) { err.textContent = almProducto(v('almFCod')) ? 'El código ' + v('almFCod') + ' ya está en uso: ' + almProducto(v('almFCod')).descripcion : 'Revise el código'; document.getElementById('almFCod').focus(); return; }
         if (!almRevisarCategoria(true)) { err.textContent = 'Elija la categoría (01 a 04)'; document.getElementById('almFCat').focus(); return; }
         const act = document.getElementById('almFAct');
-        btnCargando(btn, 'Guardando...');
-        try {
-            const r = await llamarApi({ action: 'alm_producto_guardar', original, codigo: original || v('almFCod'), descripcion: v('almFDes'), categoria: v('almFCat'), tipo: v('almFTipo'),
-                                        costo: v('almFCos'), precio: v('almFPre'), bulto: v('almFBul'), minimo: v('almFMin'), proveedor: v('almFProv'), iva: v('almFIva'), activo: act ? act.checked : undefined });
-            almCerrar(); almUsar(r);
-            mostrarBanner(`Producto ${original ? 'modificado' : 'registrado'}: ${r.producto}.`, 'ok');
-        } catch (e) { err.textContent = e.message; btn.disabled = false; btn.textContent = 'Guardar'; }
+        if (!v('almFDes')) { err.textContent = 'Escriba la descripción'; document.getElementById('almFDes').focus(); return; }
+        // Se ve al instante en la lista y Google lo guarda en segundo plano
+        const pedido = { action: 'alm_producto_guardar', original, codigo: (original || v('almFCod')).toUpperCase(), descripcion: v('almFDes'), categoria: v('almFCat'), tipo: v('almFTipo'),
+                         costo: v('almFCos'), precio: v('almFPre'), bulto: v('almFBul'), minimo: v('almFMin'), proveedor: v('almFProv'), iva: v('almFIva'), activo: act ? act.checked : undefined };
+        const cat = almBuscarCategoria(pedido.categoria), previo = original ? almProducto(original) : null;
+        const local = Object.assign({}, previo || { existencia: 0, activo: true }, { codigo: pedido.codigo, descripcion: pedido.descripcion.toUpperCase(), categoria: cat ? cat.nombre : '', tipo: pedido.tipo,
+                         costo: almNum(pedido.costo) || 0, precio: almNum(pedido.precio) || 0, bulto: almNum(pedido.bulto) || 0, minimo: almNum(pedido.minimo) || 0, proveedor: pedido.proveedor, iva: pedido.iva }, act ? { activo: act.checked } : {});
+        if (previo) Object.assign(previo, local); else almDatos.productos.push(local);
+        almCerrar(); almPintar();
+        almEnSegundoPlano(async () => {
+            try { const r = await llamarApi(pedido); almUsar(r); mostrarBanner(`Producto ${original ? 'modificado' : 'registrado'}: ${r.producto}.`, 'ok'); }
+            catch (e) { mostrarBanner(`El producto ${pedido.codigo} NO se guardó: ${e.message}`, 'error'); await almCargar(); }
+        });
     }
     async function almKardex(codigo) {
         const p = almProducto(codigo);
@@ -11499,7 +11711,9 @@
                 <div class="der"><b>${fechaBonita(d.fecha)}</b> ${esc(d.hora)}${nota ? `<br><b>${d.condicion === 'Tienda' ? 'DESPACHO A TIENDA' : esc(d.condicion.toUpperCase())}</b>${d.vence ? ' · vence ' + fechaBonita(d.vence) : ''}${d.tasa ? '<br><span class="gris">Tasa BCV ' + fmt(d.tasa) + '</span>' : ''}` : ''}</div></div>
             <table><colgroup><col class="c1"><col class="c2"><col><col class="c4"><col class="c5"></colgroup><thead><tr><th>Cant.</th><th>Cód.</th><th>Descripción</th><th class="n">${nota ? 'Precio $' : 'Costo $'}</th><th class="n">Total $</th></tr></thead><tbody>${filas}</tbody></table>
             <div class="tot">${nota ? `${d.descuento ? `<span>Subtotal ${fmt(d.subtotal)}</span><span>Desc. ${fmt(d.descuento)}</span>` : ''}${d.totalBs ? `<span>Bs ${fmt(d.totalBs)}</span>` : ''}<span class="g">TOTAL USD ${fmt(d.total)}</span>`
+                : d.operacion === 'Ajuste de inventario' ? (() => { const a = almTotalesAjuste(d.detalle); return `<span>Sobrante + ${fmt(a.sobra)}</span><span>Faltante − ${fmt(Math.abs(a.falta))}</span><span class="g">NETO USD ${d.total < 0 ? '−' : ''}${fmt(Math.abs(d.total))}</span>`; })()
                 : `<span class="g">TOTAL COSTO USD ${fmt(d.total)}</span>`}</div>
+            ${nota && d.comentario ? `<div class="leyenda" style="text-align:left"><b>Comentario:</b> ${esc(d.comentario)}</div>` : ''}
             ${nota && d.estado === 'Anulada' ? `<div class="anulada">NOTA ANULADA</div>` : ''}
             <div class="leyenda">${nota && d.condicion !== 'Tienda' ? 'Monto exento. Debe pagarse al tipo de cambio vigente para el momento del pago · ' : ''}${d.detalle.length} renglón(es) · ${esc(d.usuario || '')}</div>
             <div class="firmas"><div>${nota ? 'Despachado por' : 'Recibido por'}</div><div>${nota ? 'Recibido conforme (cliente)' : 'Entregado por'}</div></div></body></html>`;
