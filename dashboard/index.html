@@ -39,9 +39,11 @@
             --none-bg: rgba(148, 163, 184, 0.12);
             --shadow: rgba(0, 0, 0, 0.3);
             --radius: 8px;
+            --amar: #facc15; --amar-txt: #facc15; --amar-bg: rgba(250, 204, 21, 0.14);   /* "por pagar" */
             color-scheme: dark;
         }
         :root[data-theme="light"] {
+            --amar: #eab308; --amar-txt: #a16207; --amar-bg: rgba(234, 179, 8, 0.14);
             --bg-color: #e2e8f0;
             --card-bg: #ffffff;
             --border: #cbd5e1;
@@ -1101,8 +1103,18 @@
         .alm-ing-cab { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; margin-bottom: .75rem; } .alm-ing-cab small { color: var(--text-muted); }
         .alm-ing-num { margin-left: auto; color: var(--text-muted); font-size: .85rem; }
         .alm-prov-elegido { flex: 1; cursor: default; }
+        .pnom-grupo { margin-bottom: 1rem; } .pnom-acc { display: flex; gap: .4rem; flex-wrap: wrap; }
+        .pnom-lista { border: 1px solid var(--border); border-radius: 10px; padding: .4rem .7rem; margin: .6rem 0; max-height: 180px; overflow-y: auto; }
+        .pnom-lista div { display: flex; justify-content: space-between; gap: .6rem; padding: .2rem 0; font-size: .88rem; }
         .alm-traer-op { float: right; display: inline-flex; gap: .4rem; align-items: center; } .alm-traer-op kbd { font: 700 .7rem ui-monospace, Consolas, monospace; border: 1px solid var(--border); border-radius: 5px; padding: 0 .3rem; }
         /* Nómina: tasa, selección y barra pagado / por pagar */
+        /* Lista de la nómina en un recuadro que baja: títulos arriba y totales abajo siempre a la vista */
+        .nom-scroll { max-height: min(62vh, 640px); overflow: auto; border: 1px solid var(--border); border-radius: 12px; overscroll-behavior: contain; }
+        .nom-scroll table { margin: 0; }
+        .nom-scroll thead th { position: sticky; top: 0; z-index: 2; background: var(--card-bg); box-shadow: inset 0 -1px 0 var(--border); }
+        .nom-scroll tfoot { position: sticky; bottom: 0; z-index: 2; }
+        .nom-scroll tfoot td { background: var(--list-bg); }
+        .nom-scroll tfoot tr:first-child td { box-shadow: inset 0 1px 0 var(--border), 0 -6px 12px -8px var(--shadow); }
         .nom-tasa span { display: flex; align-items: center; gap: .4rem; } .nom-tasa input { width: 140px; } .nom-tasa small { color: var(--text-muted); }
         .nom-col-check { width: 2.2rem; text-align: center; } .nom-check { width: 1.1rem; height: 1.1rem; cursor: pointer; }
         tr.nom-sel td { background: rgba(68, 172, 0, .08); }
@@ -1110,7 +1122,9 @@
         .nom-grafico { margin-bottom: 1rem; }
         .nom-barra { display: flex; gap: 2px; height: 26px; border-radius: 6px; overflow: hidden; background: var(--list-bg); margin-top: .5rem; }
         .nom-barra-seg { display: flex; align-items: center; justify-content: center; min-width: 2px; font-size: .74rem; font-weight: 700; color: var(--card-bg); }   /* texto oscuro sobre los tonos claros del modo oscuro */
-        .nom-barra-seg.pag, .nom-sw-pag { background: var(--ok) !important; } .nom-barra-seg.pend, .nom-sw-pend { background: var(--warn) !important; }
+        .nom-barra-seg.pag, .nom-sw-pag { background: var(--ok) !important; } .nom-barra-seg.pend, .nom-sw-pend { background: var(--amar) !important; }
+        .nom-barra-seg.pend { color: #1f2937; }   /* texto oscuro sobre el amarillo */
+        .kpi.amar .k-value { color: var(--amar-txt); } .chip.st-amar { background: var(--amar-bg); color: var(--amar-txt); }
         .nom-barra-seg span { white-space: nowrap; overflow: hidden; padding: 0 .4rem; } .nom-barra-seg:focus-visible { outline: 2px solid var(--text-main); outline-offset: 1px; }
         .nom-barra-pie { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-top: .45rem; font-size: .85rem; color: var(--text-muted); } .nom-barra-pie b { color: var(--text-main); }
         .alm-guardando { display: none; } .alm-guardando.activo { display: inline-flex; margin-right: .6rem; padding: .1rem .55rem; border-radius: 999px; background: var(--warn-bg); color: var(--warn); font-weight: 600; }
@@ -2064,6 +2078,9 @@
     </section>
 
     <!-- ============ ALMACÉN · PRODUCTOS E INVENTARIO / ENTRADAS Y SALIDAS (almIniciar) ============ -->
+    <!-- ============ RECURSOS HUMANOS · PAGOS DE NÓMINA (pnomIniciar) ============ -->
+    <section id="vistaPnom" class="vista hidden"><div id="pnomContenido"></div></section>
+
     <section id="vistaAlm" class="vista hidden">
         <div class="modo-tabs" role="tablist" id="almTabs"></div>
         <div id="almContenido"></div>
@@ -2834,7 +2851,7 @@
         if (TIEMPOS.length > 60) TIEMPOS.pop();
     }
     // Solo lectura: si la respuesta de Google no llega, se reintenta una vez sola (no cambia nada en la hoja)
-    const SOLO_LECTURA = /^(login|list|cuadre_detalle|cuadre_detalle_lote|mov_listar|cuentas_listar|conc_listar|efe_listar|cc_listar|req_datos|req_ventas|req_historial|asis_hoy|asis_listar|asisg_listar|per_listar|cxc_deudas|nom_historial|nom_autorizar|hor_datos|alm_datos|alm_notas|alm_ingresos|alm_kardex|alm_tiendas|ping|enlinea|marca_estado)$/;
+    const SOLO_LECTURA = /^(login|list|cuadre_detalle|cuadre_detalle_lote|mov_listar|cuentas_listar|conc_listar|efe_listar|cc_listar|req_datos|req_ventas|req_historial|asis_hoy|asis_listar|asisg_listar|per_listar|cxc_deudas|nom_historial|nom_autorizar|hor_datos|alm_datos|alm_notas|alm_ingresos|alm_kardex|alm_tiendas|pnom_listar|ping|enlinea|marca_estado)$/;
     // Guardados sin repetir: cada cambio lleva un "idem". Si no llegó la respuesta y se vuelve a pulsar el MISMO cambio,
     // se manda el mismo idem y Google responde "ya estaba registrado" en vez de guardarlo otra vez.
     const idemPendientes = new Map();   // contenido del cambio -> idem del intento sin respuesta
@@ -2954,6 +2971,7 @@
         area_almacen: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 4l9 5.5V20H3z"/><rect x="7" y="13" width="10" height="7"/><path d="M7 16.5h10"/></svg>',
         asisgestion: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6"/><rect x="13" y="12" width="8" height="8" rx="1.5"/><path d="M15 16l1.5 1.5L19 15"/></svg>',
         asistencia: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/><path d="m9 15 2 2 4-4"/></svg>',
+        pagonomina: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="13" rx="2"/><circle cx="12" cy="12.5" r="2.5"/><path d="m16 17.5 1.5 1.5 3-3"/></svg>',
         nomina: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18H6z"/><path d="M9 7h6M9 11h6M9 15h3"/><path d="M15 15.5h1.5"/></svg>',
         inventario: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9z"/><path d="m4 7.5 8 4.5 8-4.5M12 12v9"/></svg>',
         reqcharcu: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 3v2h6V3"/><path d="M8.5 10h7M8.5 13.5h7M8.5 17h4"/></svg>',
@@ -2981,6 +2999,7 @@
         { id: 'asisgestion', area: 'rrhh',   titulo: 'Gestión de asistencia', desc: 'Ver y modificar la asistencia de todos los trabajadores: oficina y locales.', listo: true },
         { id: 'talento',    area: 'rrhh',    titulo: 'Talento humano',        desc: 'Trabajadores, perfiles de sueldo y horarios por departamento.', listo: true },
         { id: 'nomina',     area: 'rrhh',    titulo: 'Nómina',                desc: 'Nómina semanal (sueldo, horas extra, bonos y gastos) y nóminas cerradas.', listo: true },
+        { id: 'pagonomina', area: 'rrhh',    titulo: 'Pagos de nómina',       desc: 'Nóminas cerradas por pagar: registrar el pago con su comprobante e imprimirlas.', listo: true },
         { id: 'horarios',   area: 'rrhh',    titulo: 'Horarios de trabajo',   desc: 'Horario semanal de cada tienda: generarlo, ajustarlo y enviarlo por Telegram.', listo: true },
         { id: 'reqcharcu',  area: 'almacen', titulo: 'Requerimientos de charcutería', desc: 'Cuánto enviar a cada local según ventas, exhibición y la existencia de la cava.', listo: true },
         { id: 'inventario', area: 'almacen', titulo: 'Productos e inventario', desc: 'Catálogo de productos, existencia del almacén y movimientos.', listo: true },
@@ -3142,8 +3161,8 @@
         vistaActual = vista;
         // login, menu, cuadre, ventas y admin tienen su propia sección; el resto usa la genérica "en construcción"
         // Caja chica usa la misma sección de Control de efectivo, mostrando solo la caja chica
-        const seccion = vista === 'cajachica' ? 'efectivo' : vista === 'reqcharcu' ? 'req' : vista === 'asistencia' ? 'asis' : vista === 'asisgestion' ? 'asisg' : (vista === 'nomina' || vista === 'talento' || vista === 'cxc' || vista === 'horarios') ? 'per' : (vista === 'inventario' || vista === 'movalmacen') ? 'alm' : vista === 'marcaje' ? 'marca' : ['login', 'menu', 'cuadre', 'ventas', 'admin', 'pagos', 'efectivo'].includes(vista) ? vista : 'modulo';
-        ['login', 'menu', 'cuadre', 'ventas', 'admin', 'pagos', 'efectivo', 'req', 'asis', 'asisg', 'per', 'alm', 'marca', 'modulo'].forEach(v => {
+        const seccion = vista === 'cajachica' ? 'efectivo' : vista === 'reqcharcu' ? 'req' : vista === 'asistencia' ? 'asis' : vista === 'asisgestion' ? 'asisg' : (vista === 'nomina' || vista === 'talento' || vista === 'cxc' || vista === 'horarios') ? 'per' : (vista === 'inventario' || vista === 'movalmacen') ? 'alm' : vista === 'pagonomina' ? 'pnom' : vista === 'marcaje' ? 'marca' : ['login', 'menu', 'cuadre', 'ventas', 'admin', 'pagos', 'efectivo'].includes(vista) ? vista : 'modulo';
+        ['login', 'menu', 'cuadre', 'ventas', 'admin', 'pagos', 'efectivo', 'req', 'asis', 'asisg', 'per', 'alm', 'pnom', 'marca', 'modulo'].forEach(v => {
             const el = document.getElementById('vista' + v[0].toUpperCase() + v.slice(1));
             el.dataset.pantalla = '';   // al aparecer entra deslizándose (ANIM)
             el.classList.toggle('hidden', v !== seccion);
@@ -3176,6 +3195,7 @@
         if (vista === 'nomina' || vista === 'talento' || vista === 'cxc' || vista === 'horarios') perIniciar(vista);
         if (vista === 'marcaje') marcaIniciar();
         if (vista === 'inventario' || vista === 'movalmacen') almIniciar(vista);
+        if (vista === 'pagonomina') pnomIniciar();
         if (vista !== 'login' && vista !== 'marcaje') setTimeout(() => avisarEnLinea(true), 500);
         if (vista === 'efectivo' || vista === 'cajachica') efeIniciar(vista === 'cajachica');
         // Cuadre y Visor de ventas comparten los mismos datos (filas de la hoja de cuadres)
@@ -3203,7 +3223,7 @@
         efectivo: () => efeActualizar(), cajachica: () => efeActualizar(), reqcharcu: () => reqCargar(),
         asistencia: () => asisCargarHist(true), asisgestion: () => asisgCargar(true),
         nomina: () => perCargar(), talento: () => perCargar(), cxc: () => perCargar(), horarios: () => perCargar(),
-        inventario: () => almCargar(), movalmacen: () => almCargar()
+        inventario: () => almCargar(), movalmacen: () => almCargar(), pagonomina: () => pnomCargar()
     };
     async function actualizarModulo() {
         // Los módulos sin datos propios (en construcción) se vuelven a dibujar
@@ -7949,14 +7969,14 @@
     function nomMarcar(id, si) { if (si) nomSel.add(id); else nomSel.delete(id); perPintar(); }
     function nomMarcarTodos(si) { const pend = nomLista().filter(n => !n.cerrada && !n.avisos.length); nomSel = si ? new Set(pend.map(n => n.t.id)) : new Set(); perPintar(); }
     // Barra: lo pagado y lo que falta por pagar de la semana (montos a cobrar)
-    function nomGrafico(pagado, porPagar, nPag, nPend, bsPagado) {
+    function nomGrafico(pagado, porPagar, nPag, nPend, bsPagado, bsPorPagar, cerradoSinPagar) {
         const total = pagado + porPagar; if (!total) return '';
         const pct = v => Math.max(0, Math.min(100, v / total * 100));
-        const seg = (cls, v, n, txt) => v > 0 ? `<div class="nom-barra-seg ${cls}" style="width:${pct(v)}%" tabindex="0" title="${txt}: ${perUsd(v)} · ${cls === 'pag' && bsPagado != null ? 'Bs ' + fmt(bsPagado) : nomBs(v)} · ${n} trabajador(es) · ${fmt(pct(v))} %"><span>${fmt(pct(v))} %</span></div>` : '';
+        const seg = (cls, v, n, txt) => v > 0 ? `<div class="nom-barra-seg ${cls}" style="width:${pct(v)}%" tabindex="0" title="${txt}: ${perUsd(v)} · ${cls === 'pag' && bsPagado != null ? 'Bs ' + fmt(bsPagado) : bsPorPagar != null ? 'Bs ' + fmt(bsPorPagar) : nomBs(v)} · ${n} trabajador(es) · ${fmt(pct(v))} %"><span>${fmt(pct(v))} %</span></div>` : '';
         return `<div class="grafico-card nom-grafico"><div class="grafico-head"><h3>Pagado y por pagar de la semana</h3>
                 <div class="leyenda"><span><i class="sw nom-sw-pag"></i>Pagado ${perUsd(pagado)} (${nPag})</span><span><i class="sw nom-sw-pend"></i>Por pagar ${perUsd(porPagar)} (${nPend})</span></div></div>
             <div class="nom-barra" role="img" aria-label="Pagado ${perUsd(pagado)}, por pagar ${perUsd(porPagar)}">${seg('pag', pagado, nPag, 'Pagado')}${seg('pend', porPagar, nPend, 'Por pagar')}</div>
-            <div class="nom-barra-pie"><span>Pagado: <b>${perUsd(pagado)}</b> <small>${bsPagado != null ? 'Bs ' + fmt(bsPagado) : nomBs(pagado)}</small></span><span>Por pagar: <b>${perUsd(porPagar)}</b> <small>${nomBs(porPagar)}</small></span></div></div>`;
+            <div class="nom-barra-pie"><span>Pagado: <b>${perUsd(pagado)}</b> <small>${bsPagado != null ? 'Bs ' + fmt(bsPagado) : nomBs(pagado)}</small></span><span>Por pagar: <b>${perUsd(porPagar)}</b> <small>${bsPorPagar != null ? 'Bs ' + fmt(bsPorPagar) : nomBs(porPagar)}</small>${cerradoSinPagar ? `<small> · ${perUsd(cerradoSinPagar)} ya cerrado, esperando el pago</small>` : ''}</span></div></div>`;
     }
     function nomCabecera() {
         const actual = inicioSemana(fechaLocalHoy());
@@ -7966,7 +7986,7 @@
                         <small>${nomSemana === actual ? 'semana en curso (todavía no termina)' : nomSemana > actual ? 'semana futura' : 'sábado a viernes'}</small></div>
                     <button type="button" class="btn-ghost" title="Semana siguiente" onclick="nomMoverSemana(7)" ${nomSemana >= actual ? 'disabled' : ''}>▶</button></div>
                 <label>Departamento o local <select onchange="nomElegirLugar(this.value)"><option value="">Todos</option>${perOpciones(perLugares(), nomLugar)}</select></label>
-                <label class="nom-tasa">Tasa para pagar (Bs por $) <span><input type="number" id="nomTasa" step="0.0001" min="0" value="${nomTasa() || ''}" onchange="nomCambiarTasa(this.value)">
+                <label class="nom-tasa">Tasa (Bs por $) <span><input type="number" id="nomTasa" step="0.0001" min="0" value="${nomTasa() || ''}" onchange="nomCambiarTasa(this.value)">
                     ${nomTasaManual ? `<button type="button" class="btn-ghost btn-mini" onclick="nomTasaManual=0;perPintar()" title="Volver a la tasa BCV de hoy">BCV ${fmt(nomTasaBcv())}</button>` : '<small>BCV de hoy</small>'}</span></label>
             </div>`;
     }
@@ -7983,12 +8003,17 @@
         [...nomSel].forEach(id => { if (!pend.some(n => n.t.id === id && !n.avisos.length)) nomSel.delete(id); });   // solo los que se pueden pagar
         const sel = pend.filter(n => nomSel.has(n.t.id)), pagables = pend.filter(n => !n.avisos.length);
         const netoCerr = cerr.reduce((s, n) => s + n.cerrada.neto, 0);
-        const bsCerr = r2(cerr.reduce((s, n) => s + (n.cerrada.netoBs || n.cerrada.neto * nomTasa()), 0));   // lo pagado, en los Bs con que se pagó
+        const bsCerr = r2(cerr.reduce((s, n) => s + (n.cerrada.netoBs || n.cerrada.neto * nomTasa()), 0));   // lo cerrado, en los Bs con que se cerró
+        const pag = cerr.filter(n => n.cerrada.pagado), cerrSinPagar = cerr.filter(n => !n.cerrada.pagado);
+        const netoPag = r2(pag.reduce((s, n) => s + n.cerrada.neto, 0)), bsPag = r2(pag.reduce((s, n) => s + (n.cerrada.netoBs || 0), 0));
+        const netoCerrSin = r2(cerrSinPagar.reduce((s, n) => s + n.cerrada.neto, 0)), bsCerrSin = r2(cerrSinPagar.reduce((s, n) => s + (n.cerrada.netoBs || n.cerrada.neto * nomTasa()), 0));
+        const porPagar = r2(suma(pend, 'neto') + netoCerrSin), porPagarBs = r2(suma(pend, 'neto') * nomTasa() + bsCerrSin);
         const fila = n => {
             const c = n.cerrada, gen = c ? c.generado : n.generado, des = c ? c.descontado : n.descontar, neto = c ? c.neto : n.neto;
-            const estado = c ? `<span class="chip st-ok">Pagado</span><small>${esc(c.id)}</small>`
-                : n.avisos.length ? n.avisos.map(a => `<span class="chip st-falta">${esc(a)}</span>`).join(' ') : '<span class="chip st-pend">Por pagar</span>';
-            const marca = c ? '' : `<input type="checkbox" class="nom-check" aria-label="Pagar a ${esc(n.t.nombre)}" ${nomSel.has(n.t.id) ? 'checked' : ''} ${n.avisos.length ? 'disabled title="Corrija los avisos antes de pagar"' : ''} onchange="nomMarcar('${esc(n.t.id)}', this.checked)">`;
+            const estado = c ? (c.pagado ? `<span class="chip st-ok">Pagado</span><small>${esc(c.fechaPago ? fechaBonita(c.fechaPago) : c.id)}${c.comprobante ? ` · <a href="${esc(c.comprobante)}" target="_blank" rel="noopener">comprobante</a>` : ''}</small>`
+                                     : `<span class="chip st-amar">Cerrada · por pagar</span><small>${esc(c.id)}</small>`)
+                : n.avisos.length ? n.avisos.map(a => `<span class="chip st-falta">${esc(a)}</span>`).join(' ') : '<span class="chip st-pend">Por cerrar</span>';
+            const marca = c ? '' : `<input type="checkbox" class="nom-check" aria-label="Cerrar la nómina de ${esc(n.t.nombre)}" ${nomSel.has(n.t.id) ? 'checked' : ''} ${n.avisos.length ? 'disabled title="Corrija los avisos antes de cerrar"' : ''} onchange="nomMarcar('${esc(n.t.id)}', this.checked)">`;
             return `<tr class="${c ? 'per-pagado' : nomSel.has(n.t.id) ? 'nom-sel' : ''}"><td class="nom-col-check">${marca}</td><td class="izq"><button type="button" class="chip st-pend chip-nombre" onclick="nomAbrir('${esc(n.t.id)}')">${esc(n.t.nombre)}</button>
                     <small>${esc(n.t.id)}${n.p ? ' · ' + esc(n.p.nombre) : ''}</small></td><td class="izq">${esc(n.t.local || '—')}</td>
                 <td>${c ? c.turnos : n.normales.length}${(c ? c.horasExtra : n.horasExtra) ? `<small>+ ${reqN(c ? c.horasExtra : n.horasExtra, 2)} h extra</small>` : ''}</td>
@@ -7996,16 +8021,16 @@
                 <td><b>${perUsd(neto)}</b><small>${c ? (c.netoBs ? 'Bs ' + fmt(c.netoBs) + ' · tasa ' + fmt(c.tasa) : '') : nomBs(neto)}</small></td><td class="izq">${estado}</td></tr>`;
         };
         return nomCabecera() + `<div class="kpis">
-                <div class="kpi"><div class="k-label">Trabajadores</div><div class="k-value">${lista.length}</div><div class="k-label">${cerr.length} pagado(s) · ${pend.length} por pagar</div></div>
-                <div class="kpi"><div class="k-label">Generado (por pagar)</div><div class="k-value">${perUsd(suma(pend, 'generado'))}</div><div class="k-label">incluye bonos y horas extra</div></div>
+                <div class="kpi"><div class="k-label">Trabajadores</div><div class="k-value">${lista.length}</div><div class="k-label">${pag.length} pagado(s) · ${cerrSinPagar.length} cerrado(s) sin pagar · ${pend.length} por cerrar</div></div>
+                <div class="kpi"><div class="k-label">Generado (por cerrar)</div><div class="k-value">${perUsd(suma(pend, 'generado'))}</div><div class="k-label">incluye bonos y horas extra</div></div>
                 <div class="kpi bad"><div class="k-label">Gastos a debitar</div><div class="k-value">${perUsd(suma(pend, 'descontar'))}</div></div>
-                <div class="kpi ok"><div class="k-label">Por pagar</div><div class="k-value">${perUsd(suma(pend, 'neto'))}</div><div class="k-label">${nomBs(suma(pend, 'neto')) || 'sin tasa'}${nomTasa() ? ' · tasa ' + fmt(nomTasa()) : ''}</div></div>
+                <div class="kpi amar"><div class="k-label">Por pagar</div><div class="k-value">${perUsd(porPagar)}</div><div class="k-label">${porPagarBs ? 'Bs ' + fmt(porPagarBs) : 'sin tasa'}${nomTasa() ? ' · tasa ' + fmt(nomTasa()) : ''}</div></div>
             </div>
-            ${nomGrafico(r2(netoCerr), suma(pend, 'neto'), cerr.length, pend.length, bsCerr)}
+            ${nomGrafico(netoPag, porPagar, pag.length, cerrSinPagar.length + pend.length, bsPag, porPagarBs, netoCerrSin)}
             ${pend.length ? `<div class="req-acciones nom-pagar" style="margin-top:0">
-                <button type="button" class="btn-save" ${sel.length ? '' : 'disabled'} onclick="nomAbrir('*')">Pagar seleccionados (${sel.length})${sel.length ? ' · ' + perUsd(suma(sel, 'neto')) + ' · ' + nomBs(suma(sel, 'neto')) : ''}</button>
-                <span class="nota" style="margin:0">${sel.length ? 'Los demás quedan por pagar y se pagan cuando quiera.' : 'Marque a quién se le paga ahora (casilla a la izquierda).'}</span></div>` : ''}
-            ${lista.length ? `<div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="nom-col-check">${pagables.length ? `<input type="checkbox" aria-label="Marcar todos" ${sel.length && sel.length === pagables.length ? 'checked' : ''} onchange="nomMarcarTodos(this.checked)">` : ''}</th><th class="izq">Trabajador</th><th class="izq">Local o departamento</th><th>Turnos</th>
+                <button type="button" class="btn-save" ${sel.length ? '' : 'disabled'} onclick="nomAbrir('*')">Cerrar seleccionados (${sel.length})${sel.length ? ' · ' + perUsd(suma(sel, 'neto')) + ' · ' + nomBs(suma(sel, 'neto')) : ''}</button>
+                <span class="nota" style="margin:0">${sel.length ? 'Pasan a Pagos de nómina, donde se registra el pago con su comprobante. Los demás quedan por cerrar.' : 'Marque a quién se le cierra la nómina (casilla a la izquierda).'}</span></div>` : ''}
+            ${lista.length ? `<div class="tabla-wrap nom-scroll"><table class="req-tabla" data-sin-paginar><thead><tr><th class="nom-col-check">${pagables.length ? `<input type="checkbox" aria-label="Marcar todos" ${sel.length && sel.length === pagables.length ? 'checked' : ''} onchange="nomMarcarTodos(this.checked)">` : ''}</th><th class="izq">Trabajador</th><th class="izq">Local o departamento</th><th>Turnos</th>
                 <th>Generado</th><th>Gastos a debitar</th><th>A cobrar</th><th class="izq">Estado</th></tr></thead><tbody>${lista.map(fila).join('')}</tbody>
                 <tfoot><tr><td></td><td class="izq" colspan="3"><b>Total (${lista.length})</b></td><td><b>${perUsd(suma(pend, 'generado') + cerr.reduce((s, n) => s + n.cerrada.generado, 0))}</b></td>
                 <td><b>${perUsd(suma(pend, 'descontar') + cerr.reduce((s, n) => s + n.cerrada.descontado, 0))}</b></td><td><b>${perUsd(suma(pend, 'neto') + netoCerr)}</b><small>${nomTasa() || bsCerr ? 'Bs ' + fmt(r2(bsCerr + suma(pend, 'neto') * nomTasa())) : ''}</small></td><td></td></tr>
@@ -8226,20 +8251,20 @@
             <h4 class="per-sub">Resumen</h4>${resumen}
             ${!c && n.avisos.length ? `<div class="banner warn">Antes de cerrar: ${n.avisos.map(esc).join(' · ')}.</div>` : ''}
             <div class="req-acciones nom-pie">${c ? '' : nomClaveCampo()}<button type="button" class="btn-ghost" onclick="nomCerrarDlg()">Cerrar</button>
-                ${c ? '' : `<button type="button" class="btn-save" id="nomBtnCerrar" onclick="nomCerrar(['${id}'], this)">Pagar a ${esc(t.nombre.split(' ')[0])}</button>`}</div>`;
+                ${c ? '' : `<button type="button" class="btn-save" id="nomBtnCerrar" onclick="nomCerrar(['${id}'], this)">Cerrar la nómina de ${esc(t.nombre.split(' ')[0])}</button>`}</div>`;
     }
     function nomDlgTodos() {
         const pend = nomLista().filter(n => !n.cerrada && nomSel.has(n.t.id)), conAviso = pend.filter(n => n.avisos.length);
-        return nomCab('Pagar la nómina de los seleccionados') + `<div class="req-sub">${fechaBonita(nomSemana)} – ${fechaBonita(sumarDias(nomSemana, 6))} · ${pend.length} trabajador(es)${nomLugar ? ' de ' + esc(nomLugar) : ''} · tasa ${fmt(nomTasa())} Bs por $</div>
+        return nomCab('Cerrar la nómina de los seleccionados') + `<div class="req-sub">${fechaBonita(nomSemana)} – ${fechaBonita(sumarDias(nomSemana, 6))} · ${pend.length} trabajador(es)${nomLugar ? ' de ' + esc(nomLugar) : ''} · tasa ${fmt(nomTasa())} Bs por $</div>
             <div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">Trabajador</th><th>Generado</th><th>Gastos</th><th>A cobrar</th><th class="izq"></th></tr></thead><tbody>
             ${pend.map(n => `<tr><td class="izq">${esc(n.t.nombre)}</td><td>${perUsd(n.generado)}</td><td>${perUsd(n.descontar)}</td><td><b>${perUsd(n.neto)}</b><small>${nomBs(n.neto)}</small></td>
                 <td class="izq">${n.avisos.map(a => `<span class="chip st-falta">${esc(a)}</span>`).join(' ')}</td></tr>`).join('')}
             </tbody><tfoot><tr><td class="izq"><b>Total</b></td><td><b>${perUsd(pend.reduce((s, n) => s + n.generado, 0))}</b></td><td><b>${perUsd(pend.reduce((s, n) => s + n.descontar, 0))}</b></td>
                 <td><b>${perUsd(pend.reduce((s, n) => s + n.neto, 0))}</b><small>${nomBs(pend.reduce((s, n) => s + n.neto, 0))}</small></td><td></td></tr></tfoot></table></div>
             ${conAviso.length ? `<div class="banner warn">${conAviso.length} trabajador(es) con avisos: revíselos antes de cerrar (tóquelos en la lista).</div>` : ''}
-            <div class="nota">Al cerrar se guarda la nómina con su ID en BD PAGOS NOMINA y los gastos quedan descontados en Cuentas por cobrar ("Descuento de nómina"). No se puede cerrar dos veces la misma semana para el mismo trabajador.</div>
+            <div class="nota">Al cerrar se guarda la nómina con su ID en BD PAGOS NOMINA, los gastos quedan descontados en Cuentas por cobrar ("Descuento de nómina") y pasa a <b>Pagos de nómina</b>, donde se registra el pago con su comprobante. No se puede cerrar dos veces la misma semana para el mismo trabajador.</div>
             <div class="req-acciones nom-pie">${nomClaveCampo()}<button type="button" class="btn-ghost" onclick="nomCerrarDlg()">Cancelar</button>
-                <button type="button" class="btn-save" id="nomBtnCerrar" ${pend.length && !conAviso.length ? '' : 'disabled'} onclick="nomCerrar([${pend.map(n => `'${esc(n.t.id)}'`).join(',')}], this)">Pagar (${pend.length})</button></div>`;
+                <button type="button" class="btn-save" id="nomBtnCerrar" ${pend.length && !conAviso.length ? '' : 'disabled'} onclick="nomCerrar([${pend.map(n => `'${esc(n.t.id)}'`).join(',')}], this)">Cerrar (${pend.length})</button></div>`;
     }
     // Lo que se guarda de cada trabajador
     function nomItem(n) {
@@ -8260,8 +8285,8 @@
         if (!clave) { mostrarBanner('Escriba la clave de administrador para cerrar la nómina.', 'warn'); return; }
         const neto = lista.reduce((s, n) => s + n.neto, 0), gastos = lista.reduce((s, n) => s + n.descontar, 0);
         const tasa = nomTasa();
-        if (!tasa && !confirm('No hay tasa del dólar para pasar a Bs. ¿Pagar de todas formas (solo en $)?')) return;
-        if (!confirm(`¿Pagar la nómina de ${lista.length === 1 ? lista[0].t.nombre : lista.length + ' trabajadores'}?\n\nA pagar: ${perUsd(neto)}${tasa ? ' · ' + nomBs(neto, tasa) + ' (tasa ' + fmt(tasa) + ')' : ''}\nGastos que se descuentan en Cuentas por cobrar: ${perUsd(gastos)}`)) return;
+        if (!tasa && !confirm('No hay tasa del dólar para pasar a Bs. ¿Cerrar de todas formas (solo en $)?')) return;
+        if (!confirm(`¿Cerrar la nómina de ${lista.length === 1 ? lista[0].t.nombre : lista.length + ' trabajadores'}?\n\nA pagar: ${perUsd(neto)}${tasa ? ' · ' + nomBs(neto, tasa) + ' (tasa ' + fmt(tasa) + ')' : ''}\nGastos que se descuentan en Cuentas por cobrar: ${perUsd(gastos)}`)) return;
         btnCargando(btn, 'Cerrando...');
         try {
             const r = await llamarApi({ action: 'nom_cerrar', semana: nomSemana, claveAdmin: clave, tasa, items: lista.map(nomItem) });
@@ -8271,13 +8296,13 @@
             Object.keys(nomCache).forEach(k => { if (k !== nomSemana) delete nomCache[k]; });   // las otras semanas precargadas tenían las deudas de antes
             nomClave = '';
             const s = nomAjSemana(); lista.forEach(n => delete s[n.t.id]); try { localStorage.setItem('nom_aj_' + nomSemana, JSON.stringify(s)); } catch (e) {}
-            mostrarBanner(`Nómina ${r.nomina} pagada: ${r.cerrados} trabajador(es) · ${perUsd(r.neto)}${tasa ? ' · ' + nomBs(r.neto, tasa) : ''}.`, 'ok');
+            mostrarBanner(`Nómina ${r.nomina} cerrada: ${r.cerrados} trabajador(es) · ${perUsd(r.neto)}${tasa ? ' · ' + nomBs(r.neto, tasa) : ''}. Pasó a Pagos de nómina.`, 'ok');
             if (nomAbierto === '*') nomCerrarDlg(); else nomPintarDlg();
             perPintar();
         } catch (e) {
             if (/clave/i.test(e.message)) nomClave = '';
             mostrarBanner('No se pudo cerrar la nómina: ' + e.message, 'error');
-            btn.disabled = false; btn.textContent = 'Pagar';
+            btn.disabled = false; btn.textContent = 'Cerrar';
         }
     }
     // ---------- Nóminas cerradas (BD PAGOS NOMINA), por ID ----------
@@ -8293,15 +8318,145 @@
         nomHist.filter(p => perPasa(p.id, p.trabajador, p.trabajadorId, p.local)).forEach(p => { const g = grupos.get(p.id) || (grupos.set(p.id, []), grupos.get(p.id)); g.push(p); });
         if (!grupos.size) return '<div class="empty">No hay nóminas cerradas' + (document.getElementById('perBuscar').value ? ' con esa búsqueda' : '') + '.</div>';
         const s = (arr, k) => arr.reduce((a, p) => a + p[k], 0);
-        return [...grupos.entries()].map(([id, ps]) => `<details class="grafico-card nom-cerrada"><summary><b>${esc(id)}</b> · semana ${fechaBonita(ps[0].desde)} – ${fechaBonita(ps[0].hasta)} · ${ps.length} trabajador(es) ·
-                a pagar <b>${perUsd(s(ps, 'neto'))}</b> · gastos descontados ${perUsd(s(ps, 'descontado'))}<small>cerró ${esc(ps[0].cerro)} el ${esc(ps[0].fechaCierre)}</small></summary>
-            <div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">Trabajador</th><th>Turnos</th><th>Horas extra</th><th>Bonos</th><th>Generado</th><th>Descontado</th><th>Cobró</th><th class="izq">Movimiento CxC</th></tr></thead><tbody>
+        return [...grupos.entries()].map(([id, ps]) => { const nPag = ps.filter(p => p.pagado).length; return `<details class="grafico-card nom-cerrada"><summary><b>${esc(id)}</b> · semana ${fechaBonita(ps[0].desde)} – ${fechaBonita(ps[0].hasta)} · ${ps.length} trabajador(es) ·
+                a pagar <b>${perUsd(s(ps, 'neto'))}</b>${s(ps, 'netoBs') ? ` (Bs ${fmt(s(ps, 'netoBs'))})` : ''} · gastos descontados ${perUsd(s(ps, 'descontado'))}
+                <span class="chip ${nPag === ps.length ? 'st-ok' : 'st-amar'}">${nPag === ps.length ? 'Pagada' : nPag + ' de ' + ps.length + ' pagados'}</span>
+                <button type="button" class="btn-ghost btn-mini" onclick="event.preventDefault(); event.stopPropagation(); nomImprimir('${esc(id)}')">Imprimir</button>
+                <small>cerró ${esc(ps[0].cerro)} el ${esc(ps[0].fechaCierre)}</small></summary>
+            <div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">Trabajador</th><th>Turnos</th><th>Horas extra</th><th>Bonos</th><th>Generado</th><th>Descontado</th><th>Cobró</th><th class="izq">Pago</th><th class="izq">Movimiento CxC</th></tr></thead><tbody>
             ${ps.map(p => `<tr><td class="izq"><b>${esc(p.trabajador)}</b><small>${esc(p.trabajadorId)} · ${esc(p.local)}</small></td><td>${p.turnos}</td>
                 <td>${p.horasExtra ? reqN(p.horasExtra, 2) + ' h' : '—'}${p.pagoExtra ? `<small>${perUsd(p.pagoExtra)}</small>` : ''}</td>
                 <td>${perUsd(p.bonoPuntualidad + p.bonoProductividad + p.bonoAdicional)}${p.bonoAdicional ? `<small>adicional ${perUsd(p.bonoAdicional)}: ${esc(p.motivoBono)}</small>` : ''}</td>
-                <td>${perUsd(p.generado)}</td><td>${perUsd(p.descontado)}${p.deudasExcluidas ? `<small>excluidas: ${esc(p.deudasExcluidas)}</small>` : ''}</td><td><b>${perUsd(p.neto)}</b></td>
+                <td>${perUsd(p.generado)}</td><td>${perUsd(p.descontado)}${p.deudasExcluidas ? `<small>excluidas: ${esc(p.deudasExcluidas)}</small>` : ''}</td><td><b>${perUsd(p.neto)}</b>${p.netoBs ? `<small>Bs ${fmt(p.netoBs)} · tasa ${fmt(p.tasa)}</small>` : ''}</td>
+                <td class="izq">${p.pagado ? `<span class="chip st-ok">Pagado</span><small>${fechaBonita(p.fechaPago)}${p.referencia ? ' · ref. ' + esc(p.referencia) : ''}${p.comprobante ? ` · <a href="${esc(p.comprobante)}" target="_blank" rel="noopener">comprobante</a>` : ''}</small>` : '<span class="chip st-amar">Por pagar</span>'}</td>
                 <td class="izq">${esc(p.movimiento || '—')}</td></tr>`).join('')}
-            </tbody></table></div></details>`).join('') + '<div class="nota">Cada nómina cerrada queda en BD PAGOS NOMINA con su ID. Los gastos descontados aparecen en Cuentas por cobrar como "Descuento de nómina" con el mismo ID (también en el historial completo de cada trabajador).</div>';
+            </tbody></table></div></details>`; }).join('') + '<div class="nota">Cada nómina cerrada queda en BD PAGOS NOMINA con su ID. Los gastos descontados aparecen en Cuentas por cobrar como "Descuento de nómina" con el mismo ID (también en el historial completo de cada trabajador).</div>';
+    }
+
+    // ==========================================
+    // PAGOS DE NÓMINA (Personal.gs · pnom_*): lo que se cerró en Nómina y falta pagar. Quien paga (permiso "pagonomina")
+    // solo ve esto: marca a quién le pagó, sube el comprobante (foto o PDF) y queda registrado. También se imprime cada nómina.
+    // ==========================================
+    let pnomDatos = null, pnomSel = new Set(), pnomVer = 'pend', pnomBus = '';
+    async function pnomIniciar() {
+        if (pnomDatos) pnomPintar(); else document.getElementById('pnomContenido').innerHTML = cargandoHTML('Cargando las nóminas por pagar...');
+        await pnomCargar();
+    }
+    async function pnomCargar() {
+        try { pnomDatos = (await llamarApi({ action: 'pnom_listar' })).pagos || []; pnomPintar(); }
+        catch (e) { document.getElementById('pnomContenido').innerHTML = `<div class="banner error">${esc(e.message)}</div>`; }
+    }
+    const pnomBs = p => p.netoBs ? 'Bs ' + fmt(p.netoBs) : '';
+    function pnomPintar() {
+        if (!pnomDatos || vistaActual !== 'pagonomina') return;
+        const q = asisgClave(pnomBus);
+        const l = pnomDatos.filter(p => (pnomVer === 'todos' || (pnomVer === 'pend' ? !p.pagado : p.pagado)) && (!q || asisgClave(p.trabajador + ' ' + p.trabajadorId + ' ' + p.id + ' ' + p.local).includes(q)));
+        [...pnomSel].forEach(f => { if (!pnomDatos.some(p => p.fila === f && !p.pagado)) pnomSel.delete(f); });
+        const pend = pnomDatos.filter(p => !p.pagado), sel = pend.filter(p => pnomSel.has(p.fila));
+        const s = (arr, k) => r2(arr.reduce((a, p) => a + (p[k] || 0), 0));
+        const grupos = new Map(); l.forEach(p => { if (!grupos.has(p.id)) grupos.set(p.id, []); grupos.get(p.id).push(p); });
+        const fila = p => `<tr class="${p.pagado ? 'per-pagado' : pnomSel.has(p.fila) ? 'nom-sel' : ''}">
+                <td class="nom-col-check">${p.pagado ? '' : `<input type="checkbox" class="nom-check" aria-label="Pagar a ${esc(p.trabajador)}" ${pnomSel.has(p.fila) ? 'checked' : ''} onchange="pnomMarcar(${p.fila}, this.checked)">`}</td>
+                <td class="izq"><b>${esc(p.trabajador)}</b><small>${esc(p.trabajadorId)} · ${esc(p.local)}</small></td>
+                <td><b>${perUsd(p.neto)}</b></td><td><b>${pnomBs(p) || '—'}</b>${p.tasa ? `<small>tasa ${fmt(p.tasa)}</small>` : ''}</td>
+                <td class="izq">${p.pagado ? `<span class="chip st-ok">Pagado</span><small>${fechaBonita(p.fechaPago)}${p.referencia ? ' · ref. ' + esc(p.referencia) : ''} · ${esc(String(p.pagadoPor).split(' · ')[0])}</small>${p.comprobante ? `<small><a href="${esc(p.comprobante)}" target="_blank" rel="noopener">Ver comprobante</a></small>` : ''}`
+                    : '<span class="chip st-amar">Por pagar</span>'}</td>
+                <td>${p.pagado ? `<button type="button" class="btn-ghost btn-mini" onclick="pnomDeshacer(${p.fila})">Deshacer</button>` : ''}</td></tr>`;
+        pintarConservando(document.getElementById('pnomContenido'), `<div class="filters alm-filtros">
+                <div><label for="pnomBus">Buscar</label><input type="search" id="pnomBus" placeholder="Trabajador, ID, nómina..." value="${esc(pnomBus)}" oninput="pnomBus=this.value;pnomPintar()"></div>
+                <div><label for="pnomVer">Mostrar</label><select id="pnomVer" onchange="pnomVer=this.value;pnomPintar()">${[['pend', 'Por pagar'], ['pag', 'Pagados (últimos 90 días)'], ['todos', 'Todos']].map(([v, x]) => `<option value="${v}"${v === pnomVer ? ' selected' : ''}>${x}</option>`).join('')}</select></div></div>
+            <div class="kpis"><div class="kpi amar"><div class="k-label">Por pagar</div><div class="k-value">${perUsd(s(pend, 'neto'))}</div><div class="k-label">${s(pend, 'netoBs') ? 'Bs ' + fmt(s(pend, 'netoBs')) + ' · ' : ''}${pend.length} trabajador(es)</div></div>
+                <div class="kpi ok"><div class="k-label">Pagado (últimos 90 días)</div><div class="k-value">${perUsd(s(pnomDatos.filter(p => p.pagado), 'neto'))}</div><div class="k-label">${pnomDatos.filter(p => p.pagado).length} pago(s)</div></div></div>
+            ${pend.length ? `<div class="req-acciones nom-pagar" style="margin-top:0"><button type="button" class="btn-save" ${sel.length ? '' : 'disabled'} onclick="pnomPagar()">Registrar pago (${sel.length})${sel.length ? ' · ' + perUsd(s(sel, 'neto')) + (s(sel, 'netoBs') ? ' · Bs ' + fmt(s(sel, 'netoBs')) : '') : ''}</button>
+                <span class="nota" style="margin:0">${sel.length ? 'Se pide el comprobante (foto o PDF) de la transferencia.' : 'Marque a quién le pagó (casilla a la izquierda).'}</span></div>` : ''}
+            ${grupos.size ? [...grupos.entries()].map(([id, ps]) => { const pp = ps.filter(p => !p.pagado); return `<div class="grafico-card pnom-grupo">
+                <div class="grafico-head"><h3>${esc(id)} · semana ${fechaBonita(ps[0].desde)} – ${fechaBonita(ps[0].hasta)}</h3>
+                    <div class="pnom-acc">${pp.length ? `<button type="button" class="btn-ghost btn-mini" onclick="pnomMarcarGrupo('${esc(id)}')">Marcar los ${pp.length} por pagar</button>` : ''}<button type="button" class="btn-ghost btn-mini" onclick="nomImprimir('${esc(id)}')">Imprimir</button></div></div>
+                <div class="tabla-wrap nom-scroll"><table class="req-tabla" data-sin-paginar><thead><tr><th class="nom-col-check"></th><th class="izq">Trabajador</th><th>A pagar $</th><th>A pagar Bs</th><th class="izq">Estado</th><th></th></tr></thead>
+                <tbody>${ps.map(fila).join('')}</tbody>
+                <tfoot><tr><td></td><td class="izq"><b>Total (${ps.length})</b></td><td><b>${perUsd(s(ps, 'neto'))}</b></td><td><b>${s(ps, 'netoBs') ? 'Bs ' + fmt(s(ps, 'netoBs')) : '—'}</b></td><td colspan="2"><small>cerró ${esc(ps[0].cerro)} el ${esc(ps[0].fechaCierre)}</small></td></tr></tfoot></table></div></div>`; }).join('')
+              : `<div class="empty">${pnomVer === 'pend' ? 'No hay nóminas por pagar.' : 'No hay pagos con estos filtros.'}</div>`}
+            <div class="nota">Aquí llegan las nóminas que se cierran en Nómina. Los montos en Bs son con la tasa del día del cierre. Al registrar el pago queda el comprobante, quién lo registró y la fecha.</div>`);
+    }
+    function pnomMarcar(fila, si) { if (si) pnomSel.add(fila); else pnomSel.delete(fila); pnomPintar(); }
+    function pnomMarcarGrupo(id) { pnomDatos.filter(p => p.id === id && !p.pagado).forEach(p => pnomSel.add(p.fila)); pnomPintar(); }
+    function pnomVentana(html) {
+        let fondo = document.getElementById('pnomDlg');
+        if (!fondo) { fondo = document.createElement('div'); fondo.id = 'pnomDlg'; fondo.className = 'req-dlg-fondo'; fondo.onclick = e => { if (e.target === fondo) fondo.classList.add('hidden'); }; document.body.appendChild(fondo); }
+        pintarVentana(fondo, html); fondo.classList.remove('hidden');
+    }
+    const pnomCerrar = () => { const f = document.getElementById('pnomDlg'); if (f) f.classList.add('hidden'); };
+    function pnomPagar() {
+        const sel = pnomDatos.filter(p => pnomSel.has(p.fila) && !p.pagado); if (!sel.length) return;
+        const usd = r2(sel.reduce((a, p) => a + p.neto, 0)), bs = r2(sel.reduce((a, p) => a + (p.netoBs || 0), 0));
+        pnomVentana(`<form class="req-dlg" onsubmit="pnomGuardar(event)"><h3>Registrar pago</h3>
+            <div class="req-sub">${sel.length} trabajador(es) · <b>${perUsd(usd)}</b>${bs ? ` · <b>Bs ${fmt(bs)}</b>` : ''}</div>
+            <div class="pnom-lista">${sel.map(p => `<div><span>${esc(p.trabajador)}</span><b>${perUsd(p.neto)}${p.netoBs ? ' · Bs ' + fmt(p.netoBs) : ''}</b></div>`).join('')}</div>
+            <label for="pnomArch">Comprobante del pago (foto o PDF)</label><input type="file" id="pnomArch" accept="image/*,application/pdf" required>
+            <div class="per-grid"><div><label for="pnomRef">Referencia (opcional)</label><input type="text" id="pnomRef" maxlength="60" autocomplete="off"></div>
+                <div><label for="pnomFecha">Fecha del pago</label><input type="date" id="pnomFecha" value="${fechaLocalHoy()}" max="${fechaLocalHoy()}" required></div></div>
+            <div class="login-error" id="pnomError"></div>
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-ghost" onclick="pnomCerrar()">Cancelar</button><button type="submit" class="btn-save" id="pnomBtn">Registrar pago</button></div></form>`);
+    }
+    async function pnomGuardar(ev) {
+        ev.preventDefault();
+        const btn = document.getElementById('pnomBtn'), err = document.getElementById('pnomError'), arch = document.getElementById('pnomArch').files[0];
+        if (!arch) { err.textContent = 'Adjunte el comprobante'; return; }
+        btnCargando(btn, 'Subiendo el comprobante...');
+        try {
+            const comprobante = await efeLeerComprobante(arch);
+            const r = await llamarApi({ action: 'pnom_pagar', filas: [...pnomSel], comprobante, referencia: document.getElementById('pnomRef').value.trim(), fecha: document.getElementById('pnomFecha').value });
+            pnomSel = new Set(); pnomDatos = r.pagos || pnomDatos; nomHist = null; Object.keys(nomCache || {}).forEach(k => delete nomCache[k]); nomDatos = null;
+            pnomCerrar(); pnomPintar();
+            mostrarBanner(`Pago registrado: ${r.pagados} trabajador(es) · ${perUsd(r.total)}${r.totalBs ? ' · Bs ' + fmt(r.totalBs) : ''}.`, 'ok');
+        } catch (e) { err.textContent = e.message; btn.disabled = false; btn.textContent = 'Registrar pago'; }
+    }
+    function pnomDeshacer(fila) {
+        const p = pnomDatos.find(x => x.fila === fila); if (!p) return;
+        pnomVentana(`<form class="req-dlg" onsubmit="pnomDeshacerListo(event, ${fila})"><h3>Deshacer el pago de ${esc(p.trabajador)}</h3>
+            <div class="req-sub">${perUsd(p.neto)} · pagado el ${fechaBonita(p.fechaPago)}. Vuelve a quedar por pagar.</div>
+            <label for="pnomMot">Motivo</label><input type="text" id="pnomMot" maxlength="150" required autocomplete="off">
+            <label for="pnomClave">Clave de administrador</label><input type="password" id="pnomClave" autocomplete="off" required>
+            <div class="login-error" id="pnomError"></div>
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-ghost" onclick="pnomCerrar()">Cancelar</button><button type="submit" class="btn-eliminar" id="pnomBtn">Deshacer</button></div></form>`);
+    }
+    async function pnomDeshacerListo(ev, fila) {
+        ev.preventDefault();
+        const btn = document.getElementById('pnomBtn'); btnCargando(btn, 'Deshaciendo...');
+        try {
+            const r = await llamarApi({ action: 'pnom_deshacer', fila, motivo: document.getElementById('pnomMot').value.trim(), claveAdmin: document.getElementById('pnomClave').value });
+            pnomDatos = r.pagos || pnomDatos; nomHist = null; nomDatos = null; pnomCerrar(); pnomPintar();
+            mostrarBanner('Pago deshecho: ' + r.deshecho + ' vuelve a quedar por pagar.', 'ok');
+        } catch (e) { document.getElementById('pnomError').textContent = e.message; btn.disabled = false; btn.textContent = 'Deshacer'; }
+    }
+    // Imprimir una nómina cerrada (carta horizontal): montos en $ y Bs, estado del pago y firma de cada trabajador
+    function nomImprimir(id) {
+        const vistos = new Set(), ps = [].concat(Array.isArray(nomHist) ? nomHist : [], pnomDatos || []).filter(p => p.id === id && !vistos.has(p.fila) && vistos.add(p.fila))
+            .sort((a, b) => a.trabajador.localeCompare(b.trabajador, 'es'));
+        if (!ps.length) { mostrarBanner('No encontré la nómina ' + id + '.', 'warn'); return; }
+        const s = k => r2(ps.reduce((a, p) => a + (p[k] || 0), 0)), logo = (document.querySelector('link[rel="icon"]') || {}).href || '';
+        const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Nómina ${esc(id)}</title><style>
+            @page{size:letter landscape;margin:9mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+            body{margin:0;font-family:Arial,Helvetica,sans-serif;color:#0f172a;font-size:8.6pt}
+            .cab{display:flex;align-items:center;gap:3mm;border-bottom:.6mm solid #44AC00;padding-bottom:2mm;margin-bottom:2mm}.cab img{width:11mm;height:11mm}
+            .cab div{flex:1}.cab b{font-size:11pt;display:block}.cab span{color:#475569;font-size:7.5pt}.num{text-align:right}.num b{font-size:12pt;color:#44AC00}
+            table{width:100%;border-collapse:collapse}th{font-size:6.8pt;text-transform:uppercase;color:#475569;border-bottom:.3mm solid #0f172a;padding:1.2mm 1mm;text-align:right}
+            th.i,td.i{text-align:left}td{padding:1.4mm 1mm;border-bottom:.2mm solid #e2e8f0;text-align:right;vertical-align:top}td small{display:block;color:#64748b;font-size:6.6pt}
+            tbody tr:nth-child(even) td{background:#f8fafc}tfoot td{font-weight:700;border-top:.4mm solid #0f172a;border-bottom:0}
+            .firma{width:34mm;border-bottom:.2mm solid #94a3b8}.pie{margin-top:4mm;font-size:7pt;color:#64748b}</style></head><body>
+            <div class="cab">${logo ? `<img src="${logo}" alt="">` : ''}<div><b>${esc(ALM_EMPRESA.nombre)} · NÓMINA</b><span>Semana del ${fechaBonita(ps[0].desde)} al ${fechaBonita(ps[0].hasta)} · cerró ${esc(ps[0].cerro)} el ${esc(ps[0].fechaCierre)}</span></div>
+                <div class="num"><span>N°</span><br><b>${esc(id)}</b></div></div>
+            <table><thead><tr><th class="i">Trabajador</th><th class="i">Local</th><th>Turnos</th><th>H. extra</th><th>Generado $</th><th>Gastos $</th><th>Neto $</th><th>Tasa</th><th>Neto Bs</th><th class="i">Pago</th><th class="i">Firma</th></tr></thead><tbody>
+            ${ps.map(p => `<tr><td class="i"><b>${esc(p.trabajador)}</b><small>${esc(p.trabajadorId)} · ${esc(p.perfil)}</small></td><td class="i">${esc(p.local)}</td><td>${p.turnos}</td><td>${p.horasExtra ? reqN(p.horasExtra, 2) : '—'}</td>
+                <td>${fmt(p.generado)}</td><td>${p.descontado ? fmt(p.descontado) : '—'}</td><td><b>${fmt(p.neto)}</b></td><td>${p.tasa ? fmt(p.tasa) : '—'}</td><td><b>${p.netoBs ? fmt(p.netoBs) : '—'}</b></td>
+                <td class="i">${p.pagado ? `Pagado ${fechaBonita(p.fechaPago)}${p.referencia ? '<small>ref. ' + esc(p.referencia) + '</small>' : ''}` : 'Por pagar'}</td><td class="i"><div class="firma">&nbsp;</div></td></tr>`).join('')}
+            </tbody><tfoot><tr><td class="i" colspan="4">Total · ${ps.length} trabajador(es)</td><td>${fmt(s('generado'))}</td><td>${fmt(s('descontado'))}</td><td>${fmt(s('neto'))}</td><td></td><td>${s('netoBs') ? fmt(s('netoBs')) : '—'}</td><td class="i" colspan="2">${ps.filter(p => p.pagado).length} de ${ps.length} pagados</td></tr></tfoot></table>
+            <div class="pie">Impreso el ${new Date().toLocaleString('es-VE')} · ${esc(nombreUsuario || '')}</div></body></html>`;
+        let fr = document.getElementById('nomImprimeMarco'); if (fr) fr.remove();
+        fr = document.createElement('iframe'); fr.id = 'nomImprimeMarco'; fr.setAttribute('aria-hidden', 'true'); fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+        document.body.appendChild(fr);
+        const w = fr.contentWindow; w.document.open(); w.document.write(html); w.document.close();
+        setTimeout(() => { try { w.focus(); w.print(); } catch (e) { mostrarBanner('No se pudo abrir la impresión: ' + e.message, 'error'); } }, 250);
     }
 
     // ==========================================
