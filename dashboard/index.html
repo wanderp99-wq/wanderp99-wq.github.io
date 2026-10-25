@@ -1111,6 +1111,25 @@
         .alm-lista-acc { margin-top: -.3rem; align-items: center; gap: .8rem; flex-wrap: wrap; }
         .alm-marcas { display: flex; flex-direction: column; gap: .4rem; margin-top: .7rem; } .alm-marcas div { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; } .alm-marcas small { color: var(--text-muted); }
         .alm-mod-in { width: 92px; text-align: right; }
+        .req-alm-btn { margin-top: .45rem; align-self: flex-start; position: relative; z-index: 1; }
+        /* Ver nota: amplia, como la pantalla de facturar, con el total en verde */
+        .req-dlg.alm-dlg-grande { width: min(1100px, 96vw); }
+        .alm-ver-top { display: grid; grid-template-columns: 1fr minmax(220px, 300px); gap: .75rem; margin-bottom: .75rem; }
+        .alm-ver-info { background: var(--list-bg); border: 1px solid var(--border); border-radius: 12px; padding: .8rem 1rem; display: flex; flex-direction: column; gap: .2rem; }
+        .alm-ver-num { font-weight: 700; color: var(--subtitle); display: flex; gap: .4rem; align-items: center; flex-wrap: wrap; }
+        .alm-ver-cli { font-size: 1.25rem; font-weight: 800; color: var(--title); } .alm-ver-info small { color: var(--text-muted); }
+        .alm-ver-com { margin-top: .2rem; font-size: .9rem; }
+        .alm-ver-tabla { max-height: 46vh; } .alm-ver-tabla tr { cursor: default; }
+        .alm-ver-mod { max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .alm-marcas-fila { display: flex; gap: .6rem; flex-wrap: wrap; margin-top: .7rem; }
+        .alm-marca { display: flex; align-items: center; gap: .6rem; padding: .55rem .9rem; border-radius: 12px; border: 1px solid var(--border); background: var(--list-bg); color: var(--text-main); font: inherit; cursor: pointer; text-align: left; transition: border-color .15s; }
+        .alm-marca:hover { border-color: var(--alm-verde); }
+        .alm-marca b { display: block; font-size: .92rem; } .alm-marca small { color: var(--text-muted); font-size: .74rem; }
+        .alm-marca-ico { width: 1.6rem; height: 1.6rem; border-radius: 50%; display: grid; place-items: center; font-weight: 800; background: var(--none-bg); color: var(--text-muted); }
+        .alm-marca.si { border-color: var(--ok); background: var(--ok-bg); } .alm-marca.si .alm-marca-ico { background: var(--ok); color: var(--card-bg); }
+        .alm-marca.amar { background: var(--amar-bg); } .alm-marca.amar .alm-marca-ico { background: var(--amar); color: #1f2937; }
+        .alm-que-hacer { display: flex; flex-direction: column; gap: .6rem; margin: .9rem 0 .2rem; }
+        @media (max-width: 760px) { .alm-ver-top { grid-template-columns: 1fr; } }
         .pnom-grupo { margin-bottom: 1rem; } .pnom-acc { display: flex; gap: .4rem; flex-wrap: wrap; }
         .pnom-lista { border: 1px solid var(--border); border-radius: 10px; padding: .4rem .7rem; margin: .6rem 0; max-height: 180px; overflow-y: auto; }
         .pnom-lista div { display: flex; justify-content: space-between; gap: .6rem; padding: .2rem 0; font-size: .88rem; }
@@ -2143,6 +2162,7 @@
                     <span class="req-arch-t">1. Existencia de la cava</span>
                     <span class="req-arch-s" id="reqEstCava">Excel de Bigsoft (CODIGO · DESCRIPC1 · EXISTENCIA)</span>
                     <input type="file" accept=".xls,.xlsx,.csv" onchange="reqSubirExistencia(this.files[0], 'cava'); this.value=''">
+                    <button type="button" class="btn-ghost btn-mini req-alm-btn" id="reqBtnAlm" onclick="event.preventDefault(); event.stopPropagation(); reqUsarAlmacen()">Usar existencia del almacén</button>
                 </label>
                 <label class="req-arch">
                     <span class="req-arch-t">2. Existencia del local</span>
@@ -2860,7 +2880,7 @@
         if (TIEMPOS.length > 60) TIEMPOS.pop();
     }
     // Solo lectura: si la respuesta de Google no llega, se reintenta una vez sola (no cambia nada en la hoja)
-    const SOLO_LECTURA = /^(login|list|cuadre_detalle|cuadre_detalle_lote|mov_listar|cuentas_listar|conc_listar|efe_listar|cc_listar|req_datos|req_ventas|req_historial|asis_hoy|asis_listar|asisg_listar|per_listar|cxc_deudas|nom_historial|nom_autorizar|hor_datos|alm_datos|alm_notas|alm_ingresos|alm_kardex|alm_tiendas|pnom_listar|ping|enlinea|marca_estado)$/;
+    const SOLO_LECTURA = /^(login|list|cuadre_detalle|cuadre_detalle_lote|mov_listar|cuentas_listar|conc_listar|efe_listar|cc_listar|req_datos|req_ventas|req_historial|asis_hoy|asis_listar|asisg_listar|per_listar|cxc_deudas|nom_historial|nom_autorizar|hor_datos|alm_datos|alm_notas|alm_ingresos|alm_kardex|alm_tiendas|alm_existencias|pnom_listar|ping|enlinea|marca_estado)$/;
     // Guardados sin repetir: cada cambio lleva un "idem". Si no llegó la respuesta y se vuelve a pulsar el MISMO cambio,
     // se manda el mismo idem y Google responde "ya estaba registrado" en vez de guardarlo otra vez.
     const idemPendientes = new Map();   // contenido del cambio -> idem del intento sin respuesta
@@ -6208,6 +6228,22 @@
             el.textContent = `${file.name}: ${e.message}`;
             el.parentElement.classList.remove('listo');
         }
+    }
+
+    // Existencia de la cava tomada del Almacén del sistema (Productos e inventario), en lugar de subir el Excel de Bigsoft
+    async function reqUsarAlmacen() {
+        if (!(await reqListo())) return;
+        const btn = document.getElementById('reqBtnAlm'), el = document.getElementById('reqEstCava');
+        btnCargando(btn, 'Leyendo el almacén...');
+        try {
+            const r = await llamarApi({ action: 'alm_existencias' });
+            const items = (r.productos || []).map(p => ({ codigo: p.codigo, nombre: p.descripcion, cantidad: Number(p.existencia) || 0, presentac: p.tipo === 'Pesado' ? '2' : '1', departa: /charcut/i.test(p.categoria || '') ? '01' : '' }));
+            if (!items.length) throw new Error('El almacén no tiene productos registrados');
+            reqCava = { archivo: 'Almacén del sistema · ' + fechaBonita(r.hora.slice(0, 10)) + ' ' + r.hora.slice(11), items, local: '', almacen: true };
+            reqRes = null; document.getElementById('reqResultado').innerHTML = '';
+            reqPintarArchivos();
+        } catch (e) { el.textContent = 'No se pudo leer el almacén: ' + e.message; el.parentElement.classList.remove('listo'); }
+        finally { btn.disabled = false; btn.textContent = 'Usar existencia del almacén'; }
     }
 
     // ---------- Cálculo ----------
@@ -10883,18 +10919,32 @@
                 if (almDatos.pendientes) { almDatos.pendientes.notasPorVerificar++; if (r.nota.condicion === 'Tienda') { almDatos.pendientes.porIngresar++; almDatos.pendientes.porIngresarUsd = almR(almDatos.pendientes.porIngresarUsd + r.nota.total); } }
                 almAplicarCambios(r.cambios);
                 if (r.proximaNota && Number(r.proximaNota) > Number(almDatos.proximaNota)) almDatos.proximaNota = r.proximaNota;
+                nota._guardada = r.nota;
                 if (almUltimaNota === nota) almUltimaNota = r.nota;
                 if (r.nota.numero !== nota.numero) mostrarBanner(`La nota de ${nota.cliente} quedó guardada con el N° ${r.nota.numero} (no ${nota.numero}). Si ya la imprimió, reimprímala desde Notas emitidas.`, 'warn');
                 almPintar();
             } catch (e) {
                 // No se guardó: la venta vuelve a "ventas en espera" (F7) y se vuelve a leer la existencia
+                nota._fallo = true;
                 const l = almEspera(); l.push({ hora: 'NO GUARDADA ' + nota.hora, items: venta.items.map(x => Object.assign({}, x, { sinExistencia: false })), descuento: 0, total: subtotal }); almEsperaGuardar(l);
                 mostrarBanner(`La nota N° ${nota.numero} de ${nota.cliente} NO se guardó: ${e.message}. La venta quedó en espera (F7) para emitirla otra vez; si la imprimió, ese papel no vale.`, 'error');
                 await almCargar();
             }
         });
     }
+    const almPrefTelegram = () => { try { return localStorage.getItem('alm_tg') !== '0'; } catch (e) { return true; } };
     function almPreguntarImprimir(tipo, doc) {
+        if (tipo === 'nota') {   // nota: imprimir y/o enviarla al grupo de Telegram
+            almUltimaNota = doc;
+            almVentana(`<form class="req-dlg" onsubmit="almDespuesDeEmitir(event)">
+                <h3>Nota de entrega N° ${esc(doc.numero)}</h3>
+                <div class="req-sub">${esc(doc.cliente)} · ${doc.condicion === 'Tienda' ? 'despacho a tienda' : esc(doc.condicion)}${doc.vence ? ' (vence ' + fechaBonita(doc.vence) + ')' : ''} · $ ${fmt(doc.total)}</div>
+                <div class="alm-que-hacer">
+                    <label class="interruptor"><input type="checkbox" id="almQImp" checked><span class="sw-pista"></span> Imprimir (media carta)</label>
+                    <label class="interruptor"><input type="checkbox" id="almQTg" ${almPrefTelegram() ? 'checked' : ''}><span class="sw-pista"></span> Enviar a Telegram · Control de depósito</label></div>
+                <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-ghost" onclick="almCerrar()">Ninguno (Esc)</button><button type="submit" class="btn-primary" autofocus>Aceptar (Enter)</button></div></form>`);
+            return;
+        }
         almVentana(`<form class="req-dlg" onsubmit="event.preventDefault(); almCerrar(); almImprimir('${tipo}', ${tipo === 'nota' ? 'almUltimaNota' : 'almUltimoIngreso'})">
             <h3>${tipo === 'nota' ? 'Nota de entrega N° ' + esc(doc.numero) : 'Operación de inventario N° ' + esc(doc.numero)}</h3>
             <div class="req-sub">${tipo === 'nota' ? `${esc(doc.cliente)} · ${esc(doc.condicion)}${doc.vence ? ' (vence ' + fechaBonita(doc.vence) + ')' : ''}` : esc(doc.operacion + (doc.tercero ? ' · ' + doc.tercero : ''))} · $ ${fmt(doc.total)}</div>
@@ -10903,6 +10953,14 @@
         if (tipo === 'nota') almUltimaNota = doc; else almUltimoIngreso = doc;
     }
     let almUltimaNota = null, almUltimoIngreso = null;
+    function almDespuesDeEmitir(ev) {
+        ev.preventDefault();
+        const imp = document.getElementById('almQImp').checked, tg = document.getElementById('almQTg').checked, n = almUltimaNota;
+        try { localStorage.setItem('alm_tg', tg ? '1' : '0'); } catch (e) {}
+        almCerrar();
+        if (imp) almImprimir('nota', n._guardada || n);
+        if (tg) almEnviarTelegram(n);
+    }
 
     // ---------- Ingresar mercancía: primero el tipo de operación, luego código + Enter + cantidad ----------
     function almIngresarVista() {
@@ -11251,7 +11309,7 @@
             <div><label for="almFEst">Estado</label><select id="almFEst" onchange="almNotasF.estado=this.value;almPintar()">${[['', 'Todas'], ['ingresar', 'Por ingresar en tienda'], ['verificar', 'Por verificar'], ['anuladas', 'Anuladas']].map(([v, x]) => `<option value="${v}"${v === f.estado ? ' selected' : ''}>${x}</option>`).join('')}</select></div>`;
         const filtros = almFiltrosHTML(f, 'almNotas=null;almPintar()', extra, 'almNotasF');
         const acciones = `<div class="req-acciones alm-lista-acc"><button type="button" class="btn-ghost" onclick="almExportarNotas()">Exportar a Excel</button>
-            <label class="interruptor" title="Cada nota emitida se envía al grupo de Telegram (la de una tienda, al grupo de esa tienda)"><input type="checkbox" ${almDatos && almDatos.telegram ? 'checked' : ''} onchange="almCambiarTelegram(this)"><span class="sw-pista"></span> Enviar notas a Telegram</label></div>`;
+</div>`;
         if (!almNotas) return filtros + acciones + cargandoHTML('Cargando notas...');
         const l = almNotasFiltradas(), vig = l.filter(n => n.estado !== 'Anulada');
         return filtros + acciones + `<div class="kpis"><div class="kpi"><div class="k-label">Notas</div><div class="k-value">${vig.length}</div><div class="k-label">${l.length - vig.length} anulada(s)</div></div>
@@ -11271,21 +11329,26 @@
     // Ver una nota: detalle, comentario, cambios, marcas y acciones
     function almVerNota(numero) {
         const n = almNotaDe(numero); if (!n) return;
-        const anulada = n.estado === 'Anulada', tienda = n.condicion === 'Tienda';
-        almVentana(`<div class="req-dlg alm-dlg-ancho"><h3>Nota de entrega N° ${esc(n.numero)} ${anulada ? '<span class="chip st-sobra">Anulada</span>' : ''}</h3>
-            <div class="req-sub">${esc(n.cliente)} · ${tienda ? 'despacho a tienda' : esc(n.condicion)}${n.vence ? ' (vence ' + fechaBonita(n.vence) + ')' : ''} · ${fechaBonita(n.fecha)} ${esc(n.hora)} · ${esc(n.usuario)}</div>
-            ${n.comentario ? `<div class="nota" style="margin-top:.4rem"><b>Comentario:</b> ${esc(n.comentario)}</div>` : ''}
-            <div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th>Cant.</th><th class="izq">Código</th><th class="izq">Descripción</th><th>Precio $</th><th>Total $</th></tr></thead><tbody>
-                ${n.detalle.map(x => `<tr><td>${almCant(x.cantidad, x.tipo)} <small>${almUnidad(x.tipo)}</small></td><td class="izq">${esc(x.codigo)}</td><td class="izq">${esc(x.descripcion)}</td><td>${fmt(x.precio)}</td><td><b>${fmt(x.total)}</b></td></tr>`).join('')}</tbody>
-                <tfoot><tr><td colspan="4" class="izq">${n.descuento ? `Subtotal $ ${fmt(n.subtotal)} · descuento $ ${fmt(n.descuento)} · ` : ''}<b>Total</b></td><td><b>$ ${fmt(n.total)}</b>${n.totalBs ? `<small>Bs ${fmt(n.totalBs)}</small>` : ''}</td></tr></tfoot></table></div>
-            ${n.modificaciones ? `<div class="nota"><b>Modificaciones:</b> ${esc(n.modificaciones).replace(/ \| /g, '<br>')}</div>` : ''}
-            ${anulada ? `<div class="nota">${esc(n.anulacion)}</div>` : `<div class="alm-marcas">
-                ${tienda ? `<div>${almChipMarca(n.ingresada, 'Ingresada en tienda', 'Por ingresar en tienda', 'st-amar')}<small>${esc(n.ingresada)}</small>
-                    <button type="button" class="btn-ghost btn-mini" onclick="almMarcarNota('${esc(n.numero)}','ingresada',${!n.ingresada})">${n.ingresada ? 'Quitar' : 'Marcar ingresada'}</button></div>` : ''}
-                <div>${almChipMarca(n.verificada, 'Recepción verificada', 'Sin verificar')}<small>${esc(n.verificada)}</small>
-                    <button type="button" class="btn-ghost btn-mini" onclick="almMarcarNota('${esc(n.numero)}','verificada',${!n.verificada})">${n.verificada ? 'Quitar verificación' : 'Verificar (clave)'}</button></div></div>`}
+        const anulada = n.estado === 'Anulada', tienda = n.condicion === 'Tienda', und = n.detalle.reduce((s, x) => s + (x.tipo === 'Unidad' ? x.cantidad : 0), 0), kg = n.detalle.reduce((s, x) => s + (x.tipo === 'Pesado' ? x.cantidad : 0), 0);
+        const marca = (campo, v, si, no, cls) => `<button type="button" class="alm-marca ${v ? 'si' : cls || ''}" onclick="almMarcarNota('${esc(n.numero)}','${campo}',${!v})" title="${v ? esc(v) + ' · toque para desmarcar (clave)' : 'Marcar (clave de administrador)'}">
+            <span class="alm-marca-ico">${v ? '✓' : '○'}</span><span><b>${v ? si : no}</b><small>${v ? esc(v) : 'clave de administrador'}</small></span></button>`;
+        almVentana(`<div class="req-dlg alm-dlg-grande">
+            <div class="alm-ver-top">
+                <div class="alm-ver-info"><div class="alm-ver-num">Nota de entrega N° ${esc(n.numero)} ${anulada ? '<span class="chip st-sobra">Anulada</span>' : ''}${n.modificaciones ? '<span class="chip st-info">Modificada</span>' : ''}</div>
+                    <div class="alm-ver-cli">${esc(n.cliente)}</div>
+                    <small>${tienda ? 'Despacho a tienda' : esc(n.condicion)}${n.vence ? ' · vence ' + fechaBonita(n.vence) : ''} · ${fechaBonita(n.fecha)} ${esc(n.hora)} · ${esc(n.usuario)}${n.cedula ? ' · RIF ' + esc(n.cedula) : ''}</small>
+                    ${n.comentario ? `<div class="alm-ver-com">💬 ${esc(n.comentario)}</div>` : ''}</div>
+                <div class="alm-total"><small>${anulada ? 'Total (anulada)' : 'Total'}</small><b>$ ${fmt(n.total)}</b><small>${n.totalBs ? 'Bs ' + fmt(n.totalBs) + (n.tasa ? ' · tasa ' + fmt(n.tasa) : '') : ''}${n.descuento ? ' · desc. $ ' + fmt(n.descuento) : ''}</small></div>
+            </div>
+            <div class="tabla-wrap alm-carrito alm-ver-tabla"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Código</th><th class="izq">Descripción</th><th>Cantidad</th><th>Precio $</th><th>Subtotal $</th></tr></thead><tbody>
+                ${n.detalle.map(x => `<tr><td class="izq"><b>${esc(x.codigo)}</b></td><td class="izq">${esc(x.descripcion)}</td><td>${almCant(x.cantidad, x.tipo)} <small>${almUnidad(x.tipo)}</small></td><td>${fmt(x.precio)}</td><td><b>${fmt(x.total)}</b></td></tr>`).join('')}</tbody></table></div>
+            <div class="alm-pie"><span>${n.detalle.length} renglón(es) · ${und} und · ${almCant(kg, 'Pesado')} kg</span>
+                ${n.modificaciones ? `<span class="alm-ver-mod" title="${esc(n.modificaciones)}">Modificaciones: ${esc(n.modificaciones.split(' | ').pop())}</span>` : ''}</div>
+            ${anulada ? `<div class="banner error" style="display:block;margin-top:.6rem">${esc(n.anulacion)}</div>` : `<div class="alm-marcas-fila">
+                ${tienda ? marca('ingresada', n.ingresada, 'Ingresada en tienda', 'Por ingresar en tienda', 'amar') : ''}${marca('verificada', n.verificada, 'Recepción verificada', 'Sin verificar')}</div>`}
             <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0;flex-wrap:wrap">
                 ${anulada ? '' : `<button type="button" class="btn-eliminar" onclick="almAnular('${esc(n.numero)}')">Anular</button><button type="button" class="btn-ghost" onclick="almModificarNota('${esc(n.numero)}')">Modificar (clave)</button>`}
+                <button type="button" class="btn-ghost" onclick="almEnviarTelegram(almNotaDe('${esc(n.numero)}'))">Enviar a Telegram</button>
                 <button type="button" class="btn-ghost" onclick="almImprimir('nota', almNotaDe('${esc(n.numero)}'))">Imprimir</button><button type="button" class="btn-primary" onclick="almCerrar()" autofocus>Cerrar</button></div></div>`);
     }
     function almReemplazarNota(n) {
@@ -11293,8 +11356,8 @@
         if (i >= 0) almNotas[i] = n; else almNotas.unshift(n);
     }
     async function almMarcarNota(numero, campo, valor) {
-        let claveAdmin = '';
-        if (campo === 'verificada') { claveAdmin = await efePedirClave(valor ? 'Verificar la recepción' : 'Quitar la verificación', 'Nota N° ' + numero + ': un supervisor debe autorizarlo.'); if (!claveAdmin) return; }
+        const titulo = campo === 'verificada' ? (valor ? 'Verificar la recepción' : 'Quitar la verificación') : (valor ? 'Marcar ingresada en tienda' : 'Quitar "ingresada en tienda"');
+        const claveAdmin = await efePedirClave(titulo, 'Nota N° ' + numero + ': un administrador debe autorizarlo.'); if (!claveAdmin) return;
         try {
             const r = await llamarApi({ action: 'alm_nota_marcar', numero, campo, valor, claveAdmin });
             almReemplazarNota(r.nota); if (r.pendientes) almDatos.pendientes = r.pendientes;
@@ -11376,7 +11439,7 @@
     function almVerOperacion(numero) {
         const o = almOpDe(numero); if (!o) return;
         const ajuste = o.operacion === 'Ajuste de inventario', t = almTotalesAjuste(o.detalle);
-        almVentana(`<div class="req-dlg alm-dlg-ancho"><h3>Operación N° ${esc(o.numero)} · ${esc(o.operacion)}</h3>
+        almVentana(`<div class="req-dlg alm-dlg-grande"><h3>Operación N° ${esc(o.numero)} · ${esc(o.operacion)}</h3>
             <div class="req-sub">${[o.tercero, o.documento ? 'Doc. ' + o.documento : '', fechaBonita(o.fecha) + ' ' + o.hora, o.usuario].filter(Boolean).map(esc).join(' · ')}</div>
             ${o.nota ? `<div class="nota" style="margin-top:.4rem">${esc(o.nota)}</div>` : ''}
             <div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Producto</th>${ajuste ? '<th>Existencia</th><th>Contado</th>' : ''}<th>Cantidad</th><th>Costo $</th><th>Total $</th></tr></thead><tbody>
@@ -11678,6 +11741,62 @@
     // ---------- Impresión a media carta (nota de entrega y comprobante de ingreso) ----------
     function almImprimir(tipo, d) {
         if (!d) return;
+        const html = almDocumentoHTML(tipo, d);
+        let fr = document.getElementById('almImprimeMarco');
+        if (fr) fr.remove();
+        fr = document.createElement('iframe'); fr.id = 'almImprimeMarco'; fr.setAttribute('aria-hidden', 'true');
+        fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+        document.body.appendChild(fr);
+        const w = fr.contentWindow;
+        w.document.open(); w.document.write(html); w.document.close();
+        const imprimir = () => { try { w.focus(); w.print(); } catch (e) { mostrarBanner('No se pudo abrir la impresión: ' + e.message, 'error'); } almEnfocar(); };
+        const img = w.document.querySelector('img');
+        if (img && !img.complete) { img.onload = imprimir; img.onerror = imprimir; } else setTimeout(imprimir, 150);
+    }
+    // La nota tal como se imprime, como imagen PNG (para Telegram): se dibuja en una hoja de 5,5 pulgadas con sus márgenes
+    // html2canvas no dibuja bien el logo SVG: se pasa antes a PNG
+    async function almLogoPNG() {
+        const svg = (document.querySelector('link[rel="icon"]') || {}).href;
+        if (!svg) return '';
+        const im = new Image(); im.src = svg;
+        await new Promise(r => { im.onload = r; im.onerror = r; });
+        const c = document.createElement('canvas'); c.width = c.height = 240;
+        try { c.getContext('2d').drawImage(im, 0, 0, 240, 240); return c.toDataURL('image/png'); } catch (e) { return ''; }
+    }
+    async function almImagenNota(n) {
+        const logo = (document.querySelector('link[rel="icon"]') || {}).href || '', png = await almLogoPNG();
+        // En la imagen: letra Arial con números alineados (la Courier se ve tosca en pantalla) y sin las líneas de firma
+        let html = almDocumentoHTML('nota', n).replace('</style>', `html,body{background:#fff}body{width:5.5in;padding:6mm 7mm 2mm}
+            td,.tot,.num b{font-family:Arial,Helvetica,sans-serif;font-variant-numeric:tabular-nums}td{padding:.9mm .8mm}td.cod{font-size:6.6pt}
+            .cab img{width:12mm;height:12mm}.num b{letter-spacing:.3pt}.tot{gap:1.5mm 5mm;padding-top:1.5mm}.tot .g{color:#2f7a00}.firmas{display:none}</style>`);
+        if (logo && png) html = html.split(`src="${logo}"`).join(`src="${png}"`);
+        const fr = document.createElement('iframe');
+        fr.style.cssText = 'position:fixed;left:-10000px;top:0;width:5.5in;height:2000px;border:0';
+        document.body.appendChild(fr);
+        try {
+            const w = fr.contentWindow;
+            w.document.open(); w.document.write(html); w.document.close();
+            await new Promise((ok, mal) => { const s = w.document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'; s.onload = ok; s.onerror = () => mal(new Error('No se pudo cargar el dibujador de la nota (¿hay internet?)')); w.document.head.appendChild(s); });
+            const img = w.document.querySelector('img'); if (img && !img.complete) await new Promise(r => { img.onload = r; img.onerror = r; });
+            // Solo lo que ocupa la nota (sin hoja en blanco debajo)
+            const alto = Math.ceil(Math.max(...[...w.document.body.children].map(el => el.getBoundingClientRect().bottom)) + w.scrollY) + 18;
+            const lienzo = await w.html2canvas(w.document.body, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false, height: alto, windowHeight: alto });
+            return lienzo.toDataURL('image/png');
+        } finally { fr.remove(); }
+    }
+    // Enviar la nota al grupo "Control de depósito Plaza Valencia" (después de que Google la guarde, en orden)
+    function almEnviarTelegram(nLocal) {
+        almEnSegundoPlano(async () => {
+            const n = nLocal._guardada || nLocal;
+            if (nLocal._fallo) { mostrarBanner(`La nota ${nLocal.numero} no se envió a Telegram porque no se guardó.`, 'warn'); return; }
+            try {
+                const imagen = await almImagenNota(n);
+                await llamarApi({ action: 'alm_telegram_nota', numero: n.numero, imagen });
+                mostrarBanner(`Nota ${n.numero} enviada a Telegram (Control de depósito).`, 'ok');
+            } catch (e) { mostrarBanner(`La nota ${n.numero} no se pudo enviar a Telegram: ${e.message}`, 'error'); }
+        });
+    }
+    function almDocumentoHTML(tipo, d) {
         const logo = (document.querySelector('link[rel="icon"]') || {}).href || '';
         const nota = tipo === 'nota', E = ALM_EMPRESA;
         const cant = x => almCant(x.cantidad, x.tipo) + ' ' + almUnidad(x.tipo);
@@ -11695,7 +11814,7 @@
             td{padding:.55mm .8mm;vertical-align:top;font-family:'Courier New',monospace;font-size:7.8pt;line-height:1.2}
             td.des{font-family:Arial,Helvetica,sans-serif;font-size:7.4pt;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
             td.cod{font-size:7pt;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-            col.c1{width:17%}col.c2{width:11%}col.c4{width:14%}col.c5{width:15%}
+            col.c1{width:15%}col.c2{width:16%}col.c4{width:13%}col.c5{width:14%}
             tbody tr:nth-child(even) td{background:#f8fafc}
             .c{white-space:nowrap}.n{text-align:right;white-space:nowrap}th.n{text-align:right}
             .tot{display:flex;justify-content:flex-end;align-items:baseline;flex-wrap:wrap;gap:1.5mm 4mm;margin-top:1.2mm;padding-top:1mm;border-top:.4mm solid #0f172a;font-size:7.4pt;font-family:'Courier New',monospace}
@@ -11717,16 +11836,7 @@
             ${nota && d.estado === 'Anulada' ? `<div class="anulada">NOTA ANULADA</div>` : ''}
             <div class="leyenda">${nota && d.condicion !== 'Tienda' ? 'Monto exento. Debe pagarse al tipo de cambio vigente para el momento del pago · ' : ''}${d.detalle.length} renglón(es) · ${esc(d.usuario || '')}</div>
             <div class="firmas"><div>${nota ? 'Despachado por' : 'Recibido por'}</div><div>${nota ? 'Recibido conforme (cliente)' : 'Entregado por'}</div></div></body></html>`;
-        let fr = document.getElementById('almImprimeMarco');
-        if (fr) fr.remove();
-        fr = document.createElement('iframe'); fr.id = 'almImprimeMarco'; fr.setAttribute('aria-hidden', 'true');
-        fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
-        document.body.appendChild(fr);
-        const w = fr.contentWindow;
-        w.document.open(); w.document.write(html); w.document.close();
-        const imprimir = () => { try { w.focus(); w.print(); } catch (e) { mostrarBanner('No se pudo abrir la impresión: ' + e.message, 'error'); } almEnfocar(); };
-        const img = w.document.querySelector('img');
-        if (img && !img.complete) { img.onload = imprimir; img.onerror = imprimir; } else setTimeout(imprimir, 150);
+        return html;
     }
 
     // ==========================================
