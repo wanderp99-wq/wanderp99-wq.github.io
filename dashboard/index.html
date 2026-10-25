@@ -1094,11 +1094,14 @@
         .alm-ing-form { max-width: 760px; }
         .alm-ing-cab { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; margin-bottom: .75rem; } .alm-ing-cab small { color: var(--text-muted); }
         .alm-ing-num { margin-left: auto; color: var(--text-muted); font-size: .85rem; }
+        .alm-prov-elegido { flex: 1; cursor: default; }
         .alm-oculto { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
         .alm-filtros { grid-template-columns: repeat(3, minmax(0, 1fr)); }
         .alm-acc { white-space: nowrap; } .alm-acc .btn-mini + .btn-mini { margin-left: .3rem; }
         tr.alm-anulada td { opacity: .55; text-decoration: line-through; } tr.alm-anulada td:last-child, tr.alm-anulada td:nth-last-child(2) { text-decoration: none; }
-        .alm-aviso { color: var(--bad); font-size: .75rem; } input.alm-mal { border-color: var(--bad) !important; }
+        .alm-aviso { color: var(--bad); font-size: .78rem; margin-top: .25rem; line-height: 1.35; } .alm-aviso .btn-mini { margin-left: .3rem; } .alm-ok { color: var(--ok); font-weight: 600; }
+        .alm-teclado { float: right; font: 700 .68rem ui-monospace, Consolas, monospace; background: var(--list-bg); border: 1px solid var(--border); border-radius: 6px; padding: .05rem .4rem; color: var(--text-muted); cursor: pointer; }
+        @media (hover: hover) and (pointer: fine) { .alm-teclado { display: none; } }   /* solo en teléfonos y tabletas */ input.alm-mal { border-color: var(--bad) !important; }
         @media (max-width: 760px) {
             .alm-pos-top { grid-template-columns: 1fr; }
             .alm-total b { font-size: 1.5rem; }
@@ -10112,7 +10115,7 @@
     let almCodTexto = '';   // lo escrito en el código (se conserva si la pantalla se vuelve a dibujar)
     let almDatos = null, almVista = '', almTab = '', almNotas = null, almIngresos = null, almRango = null;
     let almVenta = { items: [], sel: -1, descuento: 0, claveDesc: '', claveStock: '', ultimo: '' };
-    let almIng = { operacion: '', proveedor: '', documento: '', clienteId: '', nota: '', items: [], sel: -1, listo: false, ultimo: '' };
+    let almIng = { operacion: '', proveedorId: '', documento: '', clienteId: '', nota: '', items: [], sel: -1, listo: false, ultimo: '' };
     const ALM_TABS = { inventario: [['productos', 'Productos']], movalmacen: [['facturar', 'Facturar'], ['ingresar', 'Ingresar mercancía'], ['notas', 'Notas emitidas'], ['ingresos', 'Ingresos']] };
     const ALM_OPS = [['COMPRA', 'Compra a proveedor'], ['SIN_FACTURA', 'Ingreso sin factura'], ['DEVOLUCION', 'Devolución de cliente'], ['AJUSTE', 'Ajuste de inventario']];
     const ALM_EMPRESA = { nombre: 'DISTRIBUIDORA PLAZA VALENCIA 20, C.A.', rif: 'J-50076678-5', direccion: 'Av. Carabobo C/C Rocío e Infante, Casa Nro 84-15, Zona Candelaria, Valencia, Carabobo', telefono: '0414-9403766' };
@@ -10186,7 +10189,7 @@
         almAlCerrar = alCerrar || null;
         pintarVentana(fondo, html); fondo.classList.remove('hidden');
         // El cursor va al campo marcado (o al primero), salvo que ya esté escribiendo dentro de esta misma ventana
-        if (!fondo.contains(document.activeElement) || document.activeElement === fondo) { const p = fondo.querySelector('[autofocus]') || fondo.querySelector('input:not([type=checkbox]):not([type=hidden]), select'); if (p) { p.focus(); if (p.select) p.select(); } }
+        if (!fondo.contains(document.activeElement) || document.activeElement === fondo) { const p = fondo.querySelector('[autofocus]') || fondo.querySelector('input:not([type=checkbox]):not([type=hidden]), select'); if (p) { p.focus(); try { if (p._num) p.select(); else if (p.value && p.setSelectionRange) p.setSelectionRange(p.value.length, p.value.length); } catch (e) {} } }   // un texto ya escrito no se borra al seguir escribiendo
     }
     const almDlgAbierta = () => { const d = document.getElementById('almDlg'); return !!d && !d.classList.contains('hidden'); };
     function almCerrar() {
@@ -10208,7 +10211,7 @@
         const falta = campos.find(x => !x.checkValidity());
         if (falta) {
             falta.focus();
-            const err = form.querySelector('.login-error'), nombre = (form.querySelector(`label[for="${falta.id}"]`) || {}).textContent || 'este dato';
+            const err = form.querySelector('.login-error'), nombre = falta.dataset.falta || (form.querySelector(`label[for="${falta.id}"]`) || {}).textContent || 'este dato';
             if (err) err.textContent = 'Falta: ' + nombre.replace(/\s*\(.*\)\s*$/, '').trim();
             return;
         }
@@ -10263,7 +10266,7 @@
                 <td>${almCant(x.cantidad, x.tipo)} <small>${almUnidad(x.tipo)}</small></td><td>${fmt(ingreso ? x.costo : x.precio)}</td><td><b>${fmt(x.cantidad * (ingreso ? x.costo : x.precio))}</b></td></tr>`).join('');
         return `<div class="alm-pos">
             <form class="alm-pos-top" onsubmit="event.preventDefault(); almEnter()">
-                <div class="alm-cod"><label for="almCod">Código</label><input type="text" id="almCod" autocomplete="off" spellcheck="false" placeholder="Código · 3*código" inputmode="text" value="${esc(almCodTexto)}" oninput="almCodTexto=this.value"></div>
+                <div class="alm-cod"><label for="almCod">Código ${almBotonTeclado('almCod')}</label><input type="text" id="almCod" autocomplete="off" spellcheck="false" placeholder="Código · 3*código" inputmode="${almTeclado()}" value="${esc(almCodTexto)}" oninput="almCodTexto=this.value"></div>
                 <div class="alm-ultimo">${doc.ultimo ? esc(doc.ultimo) : `<span>${ingreso ? 'Marque el código y presione Enter para escribir la cantidad' : 'Marque el código y presione Enter'}</span>`}</div>
                 <div class="alm-total"><small>${ingreso ? 'Total costo' : 'Total a pagar'}</small><b>$ ${fmt(total)}</b>
                     <small>${tasa ? `Bs ${fmt(total * tasa)} · tasa ${fmt(tasa)}` : 'Tasa BCV no disponible'}${desc ? ` · desc. $ ${fmt(desc)}` : ''}</small></div>
@@ -10538,7 +10541,7 @@
     function almIngresarVista() {
         if (almIng.listo) {
             const op = ALM_OPS.find(o => o[0] === almIng.operacion)[1];
-            const quien = almIng.operacion === 'DEVOLUCION' ? (almDatos.clientes.find(c => c.id === almIng.clienteId) || {}).nombre : almIng.proveedor;
+            const quien = almIng.operacion === 'DEVOLUCION' ? (almDatos.clientes.find(c => c.id === almIng.clienteId) || {}).nombre : (almProveedor(almIng.proveedorId) || {}).nombre;
             return `<div class="alm-ing-cab"><span class="chip st-info">${esc(op)}</span>${quien ? `<b>${esc(quien)}</b>` : ''}${almIng.documento ? `<small>Doc. ${esc(almIng.documento)}</small>` : ''}
                 <span class="alm-ing-num">Ingreso N° ${esc(almDatos.proximoIngreso)}</span><button type="button" class="btn-ghost btn-mini" onclick="almCambiarOperacion()">Cambiar operación</button></div>` + almPosVista(almIng, true);
         }
@@ -10553,31 +10556,88 @@
                     <div class="per-ancho"><label for="almIngDoc">N° de la nota de entrega <small>(opcional; si fue a crédito, se rebaja de la deuda)</small></label><input type="text" id="almIngDoc" autocomplete="off" maxlength="20" value="${esc(almIng.documento)}" inputmode="numeric" oninput="almIng.documento=this.value"></div>`
                 : op === 'AJUSTE' ? `<div class="per-ancho"><label for="almIngNota">Motivo del ajuste</label><input type="text" id="almIngNota" autocomplete="off" data-primero maxlength="150" required value="${esc(almIng.nota)}" placeholder="Ej.: conteo físico del 25/10" oninput="almIng.nota=this.value"></div>
                     <div class="per-ancho nota" style="margin-top:0">Cantidad positiva = sobra (suma); negativa = falta (resta). Al terminar se pide la clave de administrador.</div>`
-                : `<div><label for="almIngProv">Proveedor${op === 'SIN_FACTURA' ? ' u origen (opcional)' : ''}</label><input type="text" id="almIngProv" autocomplete="off" data-primero list="almProvLista" maxlength="80" ${op === 'COMPRA' ? 'required' : ''} value="${esc(almIng.proveedor)}" oninput="almIng.proveedor=this.value"></div>
+                : `<div class="per-ancho"><label for="almIngProv">Proveedor${op === 'SIN_FACTURA' ? ' (opcional)' : ''} <small>(escriba, flechas y Enter; si no está, regístrelo)</small></label>
+                        <div class="alm-cli-fila">${almIng.proveedorId && almProveedor(almIng.proveedorId)
+                            ? `<div class="alm-op sel alm-prov-elegido"><b>${esc(almIng.proveedorId)}</b><span>${esc(almProveedor(almIng.proveedorId).nombre)}</span><small>${esc(almProveedor(almIng.proveedorId).rif || '')}</small></div>
+                               <button type="button" class="btn-ghost" onclick="almIng.proveedorId='';almProvTexto='';almPintar();almEnfocar()">Cambiar</button>`
+                            : `<input type="search" id="almIngProv" autocomplete="off" data-primero data-enter-propio value="${esc(almProvTexto)}" placeholder="Nombre o RIF del proveedor" oninput="almProvTexto=this.value;almProvIdx=0;almProvPintar()" onkeydown="almProvTecla(event)">
+                               <button type="button" class="btn-ghost" onclick="almNuevoProveedor()">+ Nuevo</button>`}</div>
+                        ${almIng.proveedorId ? '' : `<div class="alm-lista corta" id="almProvLista">${almProvListaHTML()}</div>`}</div>
                     <div><label for="almIngDoc">${op === 'COMPRA' ? 'N° de factura o nota' : 'Referencia (opcional)'}</label><input type="text" id="almIngDoc" autocomplete="off" maxlength="40" ${op === 'COMPRA' ? 'required' : ''} value="${esc(almIng.documento)}" oninput="almIng.documento=this.value"></div>
                     <div class="per-ancho"><label for="almIngNota">Nota (opcional)</label><input type="text" id="almIngNota" autocomplete="off" maxlength="150" value="${esc(almIng.nota)}" oninput="almIng.nota=this.value"></div>
-                    <datalist id="almProvLista">${almDatos.proveedores.map(p => `<option value="${esc(p)}">`).join('')}</datalist>`}
+`}
             </div>
             <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="submit" class="btn-primary">Comenzar (Enter)</button></div>`}
         </form>`;
+    }
+    // ---------- Proveedor registrado: buscar (flechas y Enter) o registrar uno nuevo ----------
+    let almProvTexto = '', almProvIdx = 0;
+    const almProveedor = id => almDatos.proveedores.find(p => p.id === id);
+    function almProvResultados() {
+        const q = asisgClave(almProvTexto), qr = almProvTexto.replace(/[^0-9A-Za-z]/g, '').toUpperCase();
+        return almDatos.proveedores.filter(p => !q || asisgClave(p.nombre + ' ' + p.id).includes(q) || (qr && p.rif.replace(/[^0-9A-Za-z]/g, '').includes(qr))).slice(0, 30);
+    }
+    function almProvListaHTML() {
+        const l = almProvResultados();
+        if (!almDatos.proveedores.length) return '<div class="empty">Todavía no hay proveedores registrados. Use "+ Nuevo".</div>';
+        return l.length ? l.map((p, i) => `<button type="button" class="alm-op${i === almProvIdx ? ' sel' : ''}" onclick="almProvElegir('${esc(p.id)}')"><b>${esc(p.id)}</b><span>${esc(p.nombre)}</span><small>${esc(p.rif || p.telefono || '')}</small></button>`).join('')
+            : `<div class="empty">"${esc(almProvTexto)}" no está registrado. Pulse Enter o "+ Nuevo" para registrarlo.</div>`;
+    }
+    function almProvPintar() { const el = document.getElementById('almProvLista'); if (!el) return; el.innerHTML = almProvListaHTML(); const s = el.querySelector('.sel'); if (s) s.scrollIntoView({ block: 'nearest' }); }
+    function almProvTecla(e) {
+        const l = almProvResultados();
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); almProvIdx = Math.max(0, Math.min(l.length - 1, almProvIdx + (e.key === 'ArrowDown' ? 1 : -1))); almProvPintar(); }
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (l[almProvIdx] && almProvTexto.trim()) almProvElegir(l[almProvIdx].id);
+            else if (almProvTexto.trim()) almNuevoProveedor();
+            else if (almIng.operacion !== 'COMPRA') { const d = document.getElementById('almIngDoc'); if (d) d.focus(); }
+        }
+    }
+    function almProvElegir(id) {
+        almIng.proveedorId = id; almProvTexto = ''; almProvIdx = 0;
+        almPintar();
+        const d = document.getElementById('almIngDoc'); if (d) d.focus();
+    }
+    function almNuevoProveedor() {
+        almVentana(`<form class="req-dlg" data-enter onsubmit="almGuardarProveedor(event)"><h3>Nuevo proveedor</h3><div class="req-sub">Queda registrado para las próximas compras.</div>
+            <label for="almNpN">Nombre o razón social</label><input type="text" id="almNpN" autocomplete="off" maxlength="80" required value="${esc(almProvTexto)}" autofocus>
+            <div class="per-grid"><div><label for="almNpR">RIF</label><input type="text" id="almNpR" autocomplete="off" maxlength="15" placeholder="J-41204660-8"></div>
+            <div><label for="almNpT">Teléfono</label><input type="tel" id="almNpT" autocomplete="off" maxlength="20" placeholder="0412 5099271"></div>
+            <div class="per-ancho"><label for="almNpC">Persona de contacto (opcional)</label><input type="text" id="almNpC" autocomplete="off" maxlength="60"></div></div>
+            <div class="login-error" id="almNpError"></div>
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-ghost" onclick="almCerrar()">Cancelar</button><button type="submit" class="btn-primary" id="almNpBtn">Registrar</button></div></form>`);
+    }
+    async function almGuardarProveedor(ev) {
+        ev.preventDefault();
+        const btn = document.getElementById('almNpBtn'), v = id => document.getElementById(id).value.trim();
+        btnCargando(btn, 'Registrando...');
+        try {
+            const r = await llamarApi({ action: 'alm_proveedor_guardar', nombre: v('almNpN'), rif: v('almNpR'), telefono: v('almNpT'), contacto: v('almNpC') });
+            almCerrar(); almUsar(r);
+            if (almTab === 'ingresar' && !almIng.listo) almProvElegir(r.proveedorId);
+            mostrarBanner('Proveedor registrado: ' + r.proveedorId + '.', 'ok');
+        } catch (e) { document.getElementById('almNpError').textContent = e.message; btn.disabled = false; btn.textContent = 'Registrar'; }
     }
     function almTeclaOperacion(e) {
         const i = Number(e.key) - 1;
         if (ALM_OPS[i]) { e.preventDefault(); almElegirOperacion(ALM_OPS[i][0]); }
     }
     function almElegirOperacion(k) {
-        almIng = { operacion: k, proveedor: '', documento: '', clienteId: '', nota: '', items: [], sel: -1, listo: false, ultimo: '' };
+        almProvTexto = ''; almProvIdx = 0;
+        almIng = { operacion: k, proveedorId: '', documento: '', clienteId: '', nota: '', items: [], sel: -1, listo: false, ultimo: '' };
         almPintar(); almEnfocar();
     }
     function almComenzarIngreso(ev) {
         ev.preventDefault();
         const v = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
-        Object.assign(almIng, { proveedor: v('almIngProv'), documento: v('almIngDoc'), clienteId: v('almIngCli'), nota: v('almIngNota'), listo: true });
+        if (almIng.operacion === 'COMPRA' && !almIng.proveedorId) { mostrarBanner('Elija el proveedor (si no está registrado, use "+ Nuevo").', 'warn'); const b = document.getElementById('almIngProv'); if (b) b.focus(); return; }
+        Object.assign(almIng, { documento: v('almIngDoc'), clienteId: v('almIngCli'), nota: v('almIngNota'), listo: true });
         almPintar(); almEnfocar();
     }
     function almCambiarOperacion() {
         if (almIng.items.length && !confirm('Se perderán los ' + almIng.items.length + ' renglón(es) de este ingreso. ¿Cambiar de operación?')) return;
-        almIng = { operacion: '', proveedor: '', documento: '', clienteId: '', nota: '', items: [], sel: -1, listo: false, ultimo: '' };
+        almIng = { operacion: '', proveedorId: '', documento: '', clienteId: '', nota: '', items: [], sel: -1, listo: false, ultimo: '' };
         almPintar(); almEnfocar();
     }
     function almPedirCantidadIngreso(p, mult) {
@@ -10623,11 +10683,11 @@
         }
         btnCargando(btn, 'Guardando...');
         try {
-            const r = await llamarApi({ action: 'alm_ingresar', operacion: almIng.operacion, proveedor: almIng.proveedor, documento: almIng.documento, clienteId: almIng.clienteId,
+            const r = await llamarApi({ action: 'alm_ingresar', operacion: almIng.operacion, proveedorId: almIng.proveedorId, documento: almIng.documento, clienteId: almIng.clienteId,
                                         nota: almIng.nota, claveAdmin, items: almIng.items.map(x => ({ codigo: x.codigo, cantidad: x.cantidad, costo: x.costo })) });
-            if (r.yaRegistrado && !r.ingreso) { almCerrar(); mostrarBanner('Ese ingreso ya estaba guardado. Búsquelo en Ingresos.', 'warn'); almIng = { operacion: '', proveedor: '', documento: '', clienteId: '', nota: '', items: [], sel: -1, listo: false, ultimo: '' }; await almCargar(); return; }
+            if (r.yaRegistrado && !r.ingreso) { almCerrar(); mostrarBanner('Ese ingreso ya estaba guardado. Búsquelo en Ingresos.', 'warn'); almIng = { operacion: '', proveedorId: '', documento: '', clienteId: '', nota: '', items: [], sel: -1, listo: false, ultimo: '' }; await almCargar(); return; }
             almUsar(r); almIngresos = null;
-            almIng = { operacion: almIng.operacion, proveedor: '', documento: '', clienteId: '', nota: '', items: [], sel: -1, listo: false, ultimo: '' };
+            almIng = { operacion: almIng.operacion, proveedorId: '', documento: '', clienteId: '', nota: '', items: [], sel: -1, listo: false, ultimo: '' };
             almPintar();
             if (r.rebajado) mostrarBanner(`Se rebajó $ ${fmt(r.rebajado)} de la deuda del cliente en Cuentas por cobrar.`, 'ok');
             almPreguntarImprimir('ingreso', r.ingreso);
@@ -10716,7 +10776,7 @@
         const activos = ps.filter(p => p.activo);
         return `<div class="filters alm-filtros">
                 <div><label for="almPBus">Buscar</label><input type="search" id="almPBus" autocomplete="off" placeholder="Código, descripción, proveedor..." value="${esc(f.bus)}" oninput="almProdFiltro.bus=this.value;almPintar()" data-primero></div>
-                <div><label for="almPCat">Categoría</label><select id="almPCat" onchange="almProdFiltro.cat=this.value;almPintar()"><option value="">Todas</option>${almDatos.categorias.map(c => `<option${c === f.cat ? ' selected' : ''}>${esc(c)}</option>`).join('')}</select></div>
+                <div><label for="almPCat">Categoría</label><select id="almPCat" onchange="almProdFiltro.cat=this.value;almPintar()"><option value="">Todas</option>${almDatos.categorias.map(c => `<option value="${esc(c.nombre)}"${c.nombre === f.cat ? ' selected' : ''}>${esc(c.codigo + ' · ' + c.nombre)}</option>`).join('')}</select></div>
                 <div><label for="almPVer">Mostrar</label><select id="almPVer" onchange="almProdFiltro.ver=this.value;almPintar()">
                     ${[['activos', 'Activos'], ['con', 'Con existencia'], ['sin', 'Sin existencia'], ['bajo', 'Bajo el mínimo'], ['inactivos', 'Inactivos'], ['todos', 'Todos']].map(([v, t]) => `<option value="${v}"${v === f.ver ? ' selected' : ''}>${t}</option>`).join('')}</select></div>
             </div>
@@ -10741,8 +10801,8 @@
         almVentana(`<form class="req-dlg per-dlg" data-enter onsubmit="almGuardarProducto(event, '${esc(codigo).replace(/'/g, '&#39;')}')">
             <h3>${codigo ? 'Modificar producto' : 'Nuevo producto'}</h3><div class="req-sub">${codigo ? 'El código no se cambia (su historial queda con ese código).' : 'Enter pasa al siguiente campo; en el último, guarda.'}</div>
             <div class="per-grid">
-                <div><label for="almFCod">Código</label><input type="text" id="almFCod" autocomplete="off" maxlength="30" required value="${esc(p.codigo)}" ${codigo ? 'disabled' : 'autofocus'} spellcheck="false" oninput="almRevisarCodigo()"><small id="almFCodAviso" class="alm-aviso"></small></div>
-                <div><label for="almFCat">Categoría</label><input type="text" id="almFCat" autocomplete="off" list="almCatLista" maxlength="40" value="${esc(p.categoria || '')}" ${codigo ? 'autofocus' : ''}></div>
+                <div><label for="almFCod">Código ${codigo ? '' : almBotonTeclado('almFCod')}</label><input type="text" id="almFCod" autocomplete="off" maxlength="30" required value="${esc(p.codigo)}" ${codigo ? 'disabled' : 'autofocus'} spellcheck="false" inputmode="${almTeclado()}" data-enter-propio oninput="almRevisarCodigo()" onkeydown="almCampoEnter(event, almRevisarCodigo)"><div id="almFCodAviso" class="alm-aviso"></div></div>
+                <div><label for="almFCat">Categoría <small>(código o nombre)</small></label><input type="text" id="almFCat" autocomplete="off" list="almCatLista" maxlength="40" required value="${esc(almCatTexto(p.categoria))}" ${codigo ? 'autofocus' : ''} placeholder="01 a 04" data-enter-propio oninput="almRevisarCategoria(false)" onkeydown="almCampoEnter(event, () => almRevisarCategoria(true))" onblur="almRevisarCategoria(true)"><div id="almFCatAviso" class="alm-aviso"></div></div>
                 <div class="per-ancho"><label for="almFDes">Descripción</label><input type="text" id="almFDes" autocomplete="off" maxlength="80" required value="${esc(p.descripcion || '')}"></div>
                 <div><label for="almFTipo">Se vende</label><select id="almFTipo"><option value="Pesado"${p.tipo === 'Pesado' ? ' selected' : ''}>Pesado (pide el peso en kg)</option><option value="Unidad"${p.tipo === 'Unidad' ? ' selected' : ''}>Por unidad</option></select></div>
                 <div><label for="almFBul">Cantidad por bulto</label><input type="number" id="almFBul" step="0.001" min="0" value="${p.bulto || ''}"></div>
@@ -10754,18 +10814,61 @@
                 <div><label for="almFIva">IVA</label><select id="almFIva"><option${p.iva !== 'IVA 16%' ? ' selected' : ''}>Exento</option><option${p.iva === 'IVA 16%' ? ' selected' : ''}>IVA 16%</option></select></div>
                 ${codigo ? `<div class="per-ancho"><label class="interruptor"><input type="checkbox" id="almFAct" ${p.activo ? 'checked' : ''}><span class="sw-pista"></span> Activo (se puede facturar e ingresar)</label></div>` : ''}
             </div>
-            <datalist id="almCatLista">${almDatos.categorias.map(c => `<option value="${esc(c)}">`).join('')}</datalist>
-            <datalist id="almProvLista2">${almDatos.proveedores.map(c => `<option value="${esc(c)}">`).join('')}</datalist>
+            <datalist id="almCatLista">${almDatos.categorias.map(c => `<option value="${esc(c.codigo + ' ' + c.nombre)}">`).join('')}</datalist>
+            <datalist id="almProvLista2">${almDatos.proveedores.map(c => `<option value="${esc(c.nombre)}">`).join('')}</datalist>
             <div class="login-error" id="almFError"></div>
             <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-ghost" onclick="almCerrar()">Cancelar</button><button type="submit" class="btn-primary" id="almFBtn">Guardar</button></div></form>`);
         almRevisarCodigo();
     }
+    // Código en uso (o con espacios / *): se avisa al escribirlo y no deja seguir con Enter. Devuelve true si está bien.
     function almRevisarCodigo() {
         const el = document.getElementById('almFCod'), av = document.getElementById('almFCodAviso');
-        if (!el || el.disabled || !av) return;
+        if (!el || el.disabled || !av) return true;
         const c = el.value.trim(), ya = c && almProducto(c);
-        av.textContent = ya ? `Ya existe: ${ya.descripcion}` : /\s|\*/.test(c) ? 'Sin espacios ni *' : '';
+        av.innerHTML = ya ? `<b>El código ${esc(c)} ya está en uso:</b> ${esc(ya.descripcion)} <button type="button" class="btn-ghost btn-mini" onclick="almCerrar(); almEditarProducto('${esc(ya.codigo).replace(/'/g, '&#39;')}')">Ver ese producto</button>`
+            : /\s|\*/.test(c) ? 'El código no lleva espacios ni *' : '';
         el.classList.toggle('alm-mal', !!av.textContent);
+        return !av.textContent && !!c;
+    }
+    // Categoría: "01", "1", "char", "Charcutería"... -> "01 Charcutería". Con fijar = true deja escrita la elegida. Devuelve la categoría o null.
+    const almCatTexto = nombre => { const c = almDatos.categorias.find(x => x.nombre === nombre); return c ? c.codigo + ' ' + c.nombre : (nombre || ''); };
+    function almBuscarCategoria(txt) {
+        const s = asisgClave(txt).replace(/[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+        if (!s) return null;
+        const cod = /^0?(\d)\b/.exec(s), c = cod ? almDatos.categorias.find(x => Number(x.codigo) === Number(cod[1])) : null;
+        if (c) return c;
+        return almDatos.categorias.find(x => { const n = asisgClave(x.nombre).replace(/[^A-Z0-9 ]/g, ' '); return (s.length >= 3 && n.includes(s)) || s.includes(n); }) || null;
+    }
+    function almRevisarCategoria(fijar) {
+        const el = document.getElementById('almFCat'), av = document.getElementById('almFCatAviso');
+        if (!el || !av) return true;
+        const c = almBuscarCategoria(el.value);
+        if (!el.value.trim()) { av.textContent = fijar ? 'Elija la categoría: ' + almDatos.categorias.map(x => x.codigo + ' ' + x.nombre).join(' · ') : ''; el.classList.toggle('alm-mal', !!fijar); return false; }
+        if (!c) { av.textContent = 'No existe. Use: ' + almDatos.categorias.map(x => x.codigo + ' ' + x.nombre).join(' · '); el.classList.add('alm-mal'); return false; }
+        av.innerHTML = fijar ? '' : `<span class="alm-ok">→ ${esc(c.codigo + ' ' + c.nombre)}</span>`;
+        el.classList.remove('alm-mal');
+        if (fijar) el.value = c.codigo + ' ' + c.nombre;
+        return true;
+    }
+    // Enter en un campo que se revisa antes de pasar al siguiente (código, categoría)
+    function almCampoEnter(e, revisar) {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        if (!revisar()) return;
+        const form = e.target.closest('form'), campos = [...form.querySelectorAll('input:not([type=hidden]):not([type=checkbox]):not([disabled]), select:not([disabled])')].filter(x => x.offsetParent !== null);
+        const sig = campos[campos.indexOf(e.target) + 1];
+        if (sig) { sig.focus(); if (sig.select && !sig.value) sig.select(); } else form.requestSubmit();
+    }
+    // Teclado del teléfono para los códigos: numérico de marcar (lo normal: números y *, para 3*código) o con letras (BAN001, PAÑ001). Se recuerda en el equipo.
+    const almTeclado = () => { try { return localStorage.getItem('alm_teclado') === 'letras' ? 'text' : 'tel'; } catch (e) { return 'tel'; } };
+    const almBotonTeclado = id => `<button type="button" class="alm-teclado" onmousedown="event.preventDefault()" onclick="almCambiarTeclado('${id}')">${almTeclado() === 'tel' ? 'ABC' : '123'}</button>`;
+    function almCambiarTeclado(id) {
+        const letras = almTeclado() === 'tel';
+        try { localStorage.setItem('alm_teclado', letras ? 'letras' : 'numeros'); } catch (e) {}
+        const el = document.getElementById(id); if (!el) return;
+        el.setAttribute('inputmode', letras ? 'text' : 'tel');
+        el.closest('div').querySelector('.alm-teclado').textContent = letras ? '123' : 'ABC';
+        el.blur(); setTimeout(() => el.focus(), 60);   // el teléfono cambia el teclado al volver a entrar
     }
     function almCalcPrecio(desde) {
         const cos = almNum(document.getElementById('almFCos').value), mar = document.getElementById('almFMar'), pre = document.getElementById('almFPre');
@@ -10776,7 +10879,8 @@
     async function almGuardarProducto(ev, original) {
         ev.preventDefault();
         const v = id => document.getElementById(id).value.trim(), btn = document.getElementById('almFBtn'), err = document.getElementById('almFError');
-        if (!original && almProducto(v('almFCod'))) { err.textContent = 'Ese código ya existe: ' + almProducto(v('almFCod')).descripcion; document.getElementById('almFCod').focus(); return; }
+        if (!original && !almRevisarCodigo()) { err.textContent = almProducto(v('almFCod')) ? 'El código ' + v('almFCod') + ' ya está en uso: ' + almProducto(v('almFCod')).descripcion : 'Revise el código'; document.getElementById('almFCod').focus(); return; }
+        if (!almRevisarCategoria(true)) { err.textContent = 'Elija la categoría (01 a 04)'; document.getElementById('almFCat').focus(); return; }
         const act = document.getElementById('almFAct');
         btnCargando(btn, 'Guardando...');
         try {
