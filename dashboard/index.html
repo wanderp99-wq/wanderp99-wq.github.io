@@ -1113,7 +1113,8 @@
         .nom-scroll table { margin: 0; }
         .nom-scroll thead th { position: sticky; top: 0; z-index: 2; background: var(--card-bg); box-shadow: inset 0 -1px 0 var(--border); }
         .nom-scroll tfoot { position: sticky; bottom: 0; z-index: 2; }
-        .nom-scroll tfoot td { background: var(--list-bg); }
+        .nom-scroll tfoot td { background: var(--list-bg); padding-top: .45rem; padding-bottom: .45rem; }
+        .nom-pie-cobrar { white-space: nowrap; } .nom-pie-cobrar small { display: inline; margin-left: .3rem; }   /* $ y Bs en la misma línea: el pie ocupa una sola fila */
         .nom-scroll tfoot tr:first-child td { box-shadow: inset 0 1px 0 var(--border), 0 -6px 12px -8px var(--shadow); }
         .nom-tasa span { display: flex; align-items: center; gap: .4rem; } .nom-tasa input { width: 140px; } .nom-tasa small { color: var(--text-muted); }
         .nom-col-check { width: 2.2rem; text-align: center; } .nom-check { width: 1.1rem; height: 1.1rem; cursor: pointer; }
@@ -8027,14 +8028,13 @@
                 <div class="kpi amar"><div class="k-label">Por pagar</div><div class="k-value">${perUsd(porPagar)}</div><div class="k-label">${porPagarBs ? 'Bs ' + fmt(porPagarBs) : 'sin tasa'}${nomTasa() ? ' · tasa ' + fmt(nomTasa()) : ''}</div></div>
             </div>
             ${nomGrafico(netoPag, porPagar, pag.length, cerrSinPagar.length + pend.length, bsPag, porPagarBs, netoCerrSin)}
-            ${pend.length ? `<div class="req-acciones nom-pagar" style="margin-top:0">
-                <button type="button" class="btn-save" ${sel.length ? '' : 'disabled'} onclick="nomAbrir('*')">Cerrar seleccionados (${sel.length})${sel.length ? ' · ' + perUsd(suma(sel, 'neto')) + ' · ' + nomBs(suma(sel, 'neto')) : ''}</button>
-                <span class="nota" style="margin:0">${sel.length ? 'Pasan a Pagos de nómina, donde se registra el pago con su comprobante. Los demás quedan por cerrar.' : 'Marque a quién se le cierra la nómina (casilla a la izquierda).'}</span></div>` : ''}
             ${lista.length ? `<div class="tabla-wrap nom-scroll"><table class="req-tabla" data-sin-paginar><thead><tr><th class="nom-col-check">${pagables.length ? `<input type="checkbox" aria-label="Marcar todos" ${sel.length && sel.length === pagables.length ? 'checked' : ''} onchange="nomMarcarTodos(this.checked)">` : ''}</th><th class="izq">Trabajador</th><th class="izq">Local o departamento</th><th>Turnos</th>
                 <th>Generado</th><th>Gastos a debitar</th><th>A cobrar</th><th class="izq">Estado</th></tr></thead><tbody>${lista.map(fila).join('')}</tbody>
-                <tfoot><tr><td></td><td class="izq" colspan="3"><b>Total (${lista.length})</b></td><td><b>${perUsd(suma(pend, 'generado') + cerr.reduce((s, n) => s + n.cerrada.generado, 0))}</b></td>
-                <td><b>${perUsd(suma(pend, 'descontar') + cerr.reduce((s, n) => s + n.cerrada.descontado, 0))}</b></td><td><b>${perUsd(suma(pend, 'neto') + netoCerr)}</b><small>${nomTasa() || bsCerr ? 'Bs ' + fmt(r2(bsCerr + suma(pend, 'neto') * nomTasa())) : ''}</small></td><td></td></tr>
-                ${pend.length ? `<tr><td></td><td class="izq" colspan="5"><small>Por pagar</small></td><td><b>${perUsd(suma(pend, 'neto'))}</b><small>${nomBs(suma(pend, 'neto'))}</small></td><td></td></tr>` : ''}</tfoot></table></div>`
+                ${pend.length ? `<tfoot class="nom-pie"><tr><td></td>${sel.length
+                    ? `<td class="izq" colspan="3"><b>Seleccionados (${sel.length})</b></td><td><b>${perUsd(suma(sel, 'generado'))}</b></td><td><b>${perUsd(suma(sel, 'descontar'))}</b></td>
+                       <td class="nom-pie-cobrar"><b>${perUsd(suma(sel, 'neto'))}</b> <small>${nomBs(suma(sel, 'neto'))}</small></td>`
+                    : `<td class="izq" colspan="6"><small>Marque a quién se le cierra la nómina (casilla a la izquierda); aquí sale su total.</small></td>`}
+                    <td><button type="button" class="btn-save btn-mini" ${sel.length ? '' : 'disabled'} onclick="nomAbrir('*')" title="Pasan a Pagos de nómina, donde se registra el pago con su comprobante">Cerrar (${sel.length})</button></td></tr></tfoot>` : ''}</table></div>`
               : '<div class="empty">No hay trabajadores con estos filtros.</div>'}
             <div class="nota">Toque un trabajador para ver su detalle: turnos, horas extra, bonos y gastos. Pago por turnos según su perfil; un turno que no estaba en su horario de la semana (o, sin horario, distinto al de su perfil) o trabajar su día libre cuenta como hora extra.
                 Se descuenta todo lo que debe, sin pasar de lo que generó; lo que falte (y lo excluido) queda pendiente en Cuentas por cobrar.</div>`;
