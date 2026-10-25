@@ -1053,6 +1053,8 @@
         /* ===== Almacén: punto de venta (facturar e ingresar), productos e impresión ===== */
         .alm-pos { display: flex; flex-direction: column; gap: .75rem; }
         .alm-pos-top { display: grid; grid-template-columns: minmax(180px, 260px) 1fr minmax(200px, 280px); gap: .75rem; align-items: stretch; }
+        #almContenido input[type=text], #almContenido input[type=search], #almDlg input[type=text], #almDlg input[type=search] { text-transform: uppercase; }
+        #almContenido input::placeholder, #almDlg input::placeholder { text-transform: none; }
         .alm-cod input { font-size: 1.35rem; font-weight: 700; letter-spacing: .5px; padding: .7rem .8rem; font-family: ui-monospace, Consolas, monospace; }
         .alm-ultimo { background: var(--list-bg); border: 1px solid var(--border); border-radius: 12px; padding: .8rem 1rem; display: flex; align-items: center; font-size: 1.15rem; font-weight: 700; color: var(--title); min-height: 64px; }
         .alm-ultimo span { color: var(--text-muted); font-weight: 500; font-size: .95rem; }
@@ -10122,7 +10124,7 @@
     const almCant = (n, tipo) => new Intl.NumberFormat('es-VE', { minimumFractionDigits: tipo === 'Pesado' ? 3 : 0, maximumFractionDigits: 3 }).format(Number(n) || 0);
     const almUnidad = tipo => tipo === 'Pesado' ? 'kg' : 'und';
     const almTasa = () => { const t = tasaBCVdel(fechaLocalHoy()); return t ? t[1] : 0; };
-    const almProducto = cod => almDatos && almDatos.productos.find(p => p.codigo === String(cod).trim());
+    const almProducto = cod => { const c = String(cod == null ? '' : cod).trim().toUpperCase(); return almDatos && almDatos.productos.find(p => p.codigo.toUpperCase() === c); };   // mayúscula o minúscula da igual
     const almR = (n, d = 2) => { const f = Math.pow(10, d); return Math.round((Number(n) || 0) * f) / f; };
     // Los campos de monto ya devuelven el número normalizado ("0.520"); un texto con coma ("27,1" del Excel) se convierte
     const almNum = v => { const s = String(v == null ? '' : v).trim(); if (!s) return NaN; const n = Number(s.includes(',') ? NUM.leer(s) : s); return isFinite(n) ? n : NaN; };
@@ -10197,6 +10199,17 @@
         const f = almAlCerrar; almAlCerrar = null; if (f) f();
         if (!almDlgAbierta()) almEnfocar();
     }
+    // En el Almacén todo se escribe en mayúsculas (códigos, descripciones, proveedores, clientes, notas). El cursor no se mueve.
+    document.addEventListener('input', e => {
+        const el = e.target;
+        if (!el || el.tagName !== 'INPUT' || el._num || !/^(text|search|tel)$/.test(el.type) || !el.closest('#almContenido, #almDlg')) return;
+        const v = el.value, m = v.toUpperCase();
+        if (v === m) return;
+        const a = el.selectionStart, b = el.selectionEnd;
+        el.value = m;
+        try { el.setSelectionRange(a, b); } catch (x) {}
+        if (el.id === 'almCod') almCodTexto = m;
+    }, true);
     // Enter en un campo de un formulario con data-enter: pasa al siguiente; en el último, guarda
     document.addEventListener('keydown', e => {
         if (e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
@@ -10266,7 +10279,7 @@
                 <td>${almCant(x.cantidad, x.tipo)} <small>${almUnidad(x.tipo)}</small></td><td>${fmt(ingreso ? x.costo : x.precio)}</td><td><b>${fmt(x.cantidad * (ingreso ? x.costo : x.precio))}</b></td></tr>`).join('');
         return `<div class="alm-pos">
             <form class="alm-pos-top" onsubmit="event.preventDefault(); almEnter()">
-                <div class="alm-cod"><label for="almCod">Código ${almBotonTeclado('almCod')}</label><input type="text" id="almCod" autocomplete="off" spellcheck="false" placeholder="Código · 3*código" inputmode="${almTeclado()}" value="${esc(almCodTexto)}" oninput="almCodTexto=this.value"></div>
+                <div class="alm-cod"><label for="almCod">Código ${almBotonTeclado('almCod')}</label><input type="text" id="almCod" autocomplete="off" spellcheck="false" placeholder="${almTab === 'facturar' ? 'Código · 3*código · 520*código (g)' : 'Código · 3*código'}" inputmode="${almTeclado()}" value="${esc(almCodTexto)}" oninput="almCodTexto=this.value"></div>
                 <div class="alm-ultimo">${doc.ultimo ? esc(doc.ultimo) : `<span>${ingreso ? 'Marque el código y presione Enter para escribir la cantidad' : 'Marque el código y presione Enter'}</span>`}</div>
                 <div class="alm-total"><small>${ingreso ? 'Total costo' : 'Total a pagar'}</small><b>$ ${fmt(total)}</b>
                     <small>${tasa ? `Bs ${fmt(total * tasa)} · tasa ${fmt(tasa)}` : 'Tasa BCV no disponible'}${desc ? ` · desc. $ ${fmt(desc)}` : ''}</small></div>
@@ -10292,8 +10305,11 @@
         const cod = document.getElementById('almCod'), txt = cod.value.trim();
         if (!txt) return;
         const m = /^(\d+(?:[.,]\d+)?)\s*\*\s*(\S+)$/.exec(txt);
-        const codigo = m ? m[2] : txt, mult = m ? Number(m[1].replace(',', '.')) : null;
+        const codigo = m ? m[2] : txt;
+        let mult = m ? Number(m[1].replace(',', '.')) : null;
         const p = almProducto(codigo);
+        // Pesado al facturar: "520*001" son 520 gramos (con decimales, "0,5*001", son kg)
+        if (p && p.tipo === 'Pesado' && almTab === 'facturar' && m && !/[.,]/.test(m[1])) mult = almR(mult / 1000, 3);
         if (!p) { almNoExiste(codigo); return; }
         if (!p.activo) { mostrarBanner(`${p.descripcion} está inactivo.`, 'warn'); cod.select(); return; }
         cod.value = ''; almCodTexto = '';
@@ -10314,16 +10330,18 @@
         const tasa = almTasa();
         almVentana(`<form class="req-dlg alm-peso" onsubmit="event.preventDefault(); almPesoListo('${esc(p.codigo).replace(/'/g, '&#39;')}')">
             <h3>${esc(p.descripcion)}</h3><div class="req-sub">${esc(p.codigo)} · $ ${fmt(p.precio)} el kg${tasa ? ' · Bs ' + fmt(p.precio * tasa) : ''} · existencia ${almCant(p.existencia, 'Pesado')} kg</div>
-            <label for="almPeso">Peso (kg)</label><input type="number" id="almPeso" step="0.001" min="0" required autofocus>
+            <label for="almPeso">Peso en gramos</label><input type="number" id="almPeso" step="1" min="0" required autofocus placeholder="Ej.: 520">
             <div class="alm-peso-total" id="almPesoTotal"></div>
             <div class="login-error" id="almPesoError"></div>
             <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-ghost" onclick="almCerrar()">Cancelar (Esc)</button><button type="submit" class="btn-primary">Agregar (Enter)</button></div></form>`);
         const inp = document.getElementById('almPeso');
-        inp.addEventListener('input', () => { const v = almNum(inp.value); document.getElementById('almPesoTotal').textContent = v > 0 ? '$ ' + fmt(v * p.precio) : ''; });
+        inp.addEventListener('input', () => { const kg = almNum(inp.value) / 1000; document.getElementById('almPesoTotal').textContent = kg > 0 ? `${almCant(kg, 'Pesado')} kg · $ ${fmt(kg * p.precio)}` : ''; });
     }
     function almPesoListo(codigo) {
-        const p = almProducto(codigo), v = almR(almNum(document.getElementById('almPeso').value), 3);
-        if (!(v > 0)) { document.getElementById('almPesoError').textContent = 'Escriba el peso'; return; }
+        // Se escribe en gramos y en la nota va en kg (520 g = 0,520 kg)
+        const p = almProducto(codigo), g = almNum(document.getElementById('almPeso').value), v = almR(g / 1000, 3);
+        if (!(v > 0)) { document.getElementById('almPesoError').textContent = 'Escriba el peso en gramos'; return; }
+        if (g > 100000) { document.getElementById('almPesoError').textContent = 'Revise el peso: ' + fmt(g / 1000) + ' kg (se escribe en gramos)'; return; }
         almCerrar();
         almAgregarVenta(p, v);
     }
@@ -10923,18 +10941,20 @@
                 const r = i + 1, cod = texto(r, C.nuevo) || texto(r, C.cod), des = String(f[C.des] || '').trim();
                 if (!cod && !des) return;
                 if (vistos[cod]) repetidos.push(`${cod}: ${vistos[cod]} y ${des}`); else vistos[cod] = des;
-                prods.push({ codigo: cod, descripcion: des, existencia: num(f, C.exi), categoria: C.cat >= 0 ? String(f[C.cat]).trim() : '', tipo: C.tipo >= 0 ? String(f[C.tipo]).trim() : 'Pesado',
-                             costo: num(f, C.cos), precio: num(f, C.pre), bulto: num(f, C.bul), minimo: num(f, C.min), proveedor: C.prov >= 0 ? String(f[C.prov]).trim() : '', iva: C.iva >= 0 ? String(f[C.iva]).trim() : 'Exento' });
+                prods.push({ codigo: cod, descripcion: des, existencia: num(f, C.exi), categoria: C.cat >= 0 ? String(f[C.cat]).trim() : '', tipo: C.tipo >= 0 ? String(f[C.tipo]).trim() : '',
+                             costo: num(f, C.cos), precio: num(f, C.pre), bulto: num(f, C.bul), minimo: num(f, C.min), proveedor: C.prov >= 0 ? String(f[C.prov]).trim() : '', iva: C.iva >= 0 ? String(f[C.iva]).trim() : '' });
             });
-            const nuevos = prods.filter(p => !almProducto(p.codigo)), sinPrecio = nuevos.filter(p => !p.precio).length;
+            const nuevos = prods.filter(p => !almProducto(p.codigo)), sinPrecio = prods.filter(p => !p.precio && !(almProducto(p.codigo) || {}).precio).length;
+            const conPrecio = prods.filter(p => almProducto(p.codigo) && p.precio > 0 && Math.abs(p.precio - almProducto(p.codigo).precio) > 0.00005).length;
             almVentana(`<form class="req-dlg alm-dlg-ancho" onsubmit="almImportarListo(event)"><h3>Importar productos</h3><div class="req-sub">${esc(file.name)} · hoja ${esc(nombre)}</div>
                 ${repetidos.length ? `<div class="banner error" style="display:block">Hay ${repetidos.length} código(s) repetido(s). Corríjalos en el Excel (columna CÓDIGO NUEVO) y vuelva a cargarlo:<br>${repetidos.slice(0, 12).map(esc).join('<br>')}${repetidos.length > 12 ? '<br>…' : ''}</div>` : `
                 <div class="alm-resumen"><div><span>Productos en el archivo</span><b>${prods.length}</b></div><div class="tot"><span>Nuevos (se agregan)</span><b>${nuevos.length}</b></div>
-                <div><span>Ya registrados (no se tocan)</span><b>${prods.length - nuevos.length}</b></div><div><span>Nuevos sin precio de venta</span><b>${sinPrecio}</b></div></div>
-                <div class="nota">La existencia de cada producto nuevo queda como inventario inicial. Lo que falte (precio, costo, mínimo) se completa luego con "Modificar".</div>`}
+                <div><span>Ya registrados (se actualizan sus datos)</span><b>${prods.length - nuevos.length}</b></div><div><span>· con precio de venta nuevo</span><b>${conPrecio}</b></div>
+                <div><span>Quedarían sin precio de venta</span><b>${sinPrecio}</b></div></div>
+                <div class="nota">Los nuevos entran con su existencia como inventario inicial. A los ya registrados se les actualiza precio, costo, categoría y demás datos; su existencia no cambia. Una celda vacía en el Excel deja el dato que ya tenía.</div>`}
                 <div class="login-error" id="almImpError"></div>
-                <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-ghost" onclick="almCerrar()">Cancelar</button>${!repetidos.length && nuevos.length ? `<button type="submit" class="btn-primary" id="almImpBtn" autofocus>Importar ${nuevos.length}</button>` : ''}</div></form>`);
-            almImportando = nuevos;
+                <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-ghost" onclick="almCerrar()">Cancelar</button>${!repetidos.length && prods.length ? `<button type="submit" class="btn-primary" id="almImpBtn" autofocus>${nuevos.length ? 'Importar ' + nuevos.length + (prods.length > nuevos.length ? ' y actualizar ' + (prods.length - nuevos.length) : '') : 'Actualizar ' + prods.length}</button>` : ''}</div></form>`);
+            almImportando = prods;
         } catch (e) { mostrarBanner('No se pudo leer el Excel: ' + e.message, 'error'); }
     }
     let almImportando = [];
@@ -10945,7 +10965,7 @@
         try {
             const r = await llamarApi({ action: 'alm_importar', productos: almImportando });
             almCerrar(); almUsar(r);
-            mostrarBanner(`Importados ${r.importados} producto(s).` + ((r.omitidos || []).length ? ` ${r.omitidos.length} ya existían.` : ''), 'ok');
+            mostrarBanner(`Importados ${r.importados} producto(s) nuevos · ${r.actualizados} actualizados (${r.preciosCambiados} con precio nuevo)` + (r.sinCambios ? ` · ${r.sinCambios} sin cambios.` : '.'), 'ok');
         } catch (e) { document.getElementById('almImpError').textContent = e.message; btn.disabled = false; btn.textContent = 'Importar'; }
     }
 
