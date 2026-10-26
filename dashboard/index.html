@@ -3114,7 +3114,26 @@
 
     // Claves de administrador que se recuerdan mientras la sesión está abierta (para no escribirlas en cada verificación).
     // Al salir o al entrar otra persona se olvidan todas: nadie puede usar la clave que escribió otro. Toda clave nueva que se recuerde va aquí.
-    function olvidarClavesAdmin() { claveAdmin = null; nomClave = ''; perClaveVerif = ''; efeClaveVerif = ''; }
+    function olvidarClavesAdmin() { claveAdmin = null; nomClave = ''; perClaveVerif = ''; efeClaveVerif = ''; claveAdminRestaurar(); }
+    // Si la sesión es de administrador, no se le pide su clave otra vez: cada campo "Clave de administrador" se llena con la de la sesión
+    // y se esconde (la ventana queda como confirmación). Con otros perfiles se sigue pidiendo.
+    function claveAdminAuto(raiz) {
+        if (!esPrincipal || !clave || !raiz || !raiz.querySelectorAll) return;
+        raiz.querySelectorAll('input[type="password"]').forEach(inp => {
+            if (inp.dataset.claveAuto || inp.id === 'loginClave' || inp.autocomplete === 'new-password') return;
+            const lab = inp.id ? document.querySelector(`label[for="${inp.id}"]`) : null, padre = inp.closest('label');
+            if (!/clave de administrador/i.test([inp.placeholder, lab && lab.textContent, padre && padre.textContent].join(' '))) return;
+            inp.dataset.claveAuto = '1'; inp.value = clave; inp.dispatchEvent(new Event('input', { bubbles: true }));
+            const caja = inp.parentElement && inp.parentElement.tagName === 'DIV' && inp.parentElement.querySelectorAll('input,select,textarea').length === 1 ? inp.parentElement : null;
+            [padre, lab, caja, inp].forEach(el => { if (el) { el.dataset.claveOculta = '1'; el.style.display = 'none'; } });
+        });
+    }
+    function claveAdminRestaurar() {
+        document.querySelectorAll('[data-clave-oculta]').forEach(el => { el.style.display = ''; delete el.dataset.claveOculta; });
+        document.querySelectorAll('input[data-clave-auto]').forEach(inp => { inp.value = ''; delete inp.dataset.claveAuto; });
+    }
+    new MutationObserver(ms => { if (esPrincipal) ms.forEach(m => m.addedNodes.forEach(n => { if (n.nodeType === 1) claveAdminAuto(n.parentElement || n); })); })
+        .observe(document.documentElement, { childList: true, subtree: true });
     function cerrarSesion(mensaje) {
         if (Object.keys(borradores).length && !mensaje && !confirm('Hay cambios sin guardar. ¿Salir de todas formas?')) return;
         if (clave && WEB_APP_URL && typeof mensaje !== 'string') llamarApiReal({ action: 'ping', salir: true, vista: '', disp: DISPOSITIVO }, performance.now()).catch(() => {});   // deja de figurar como conectado
@@ -3188,6 +3207,7 @@
         if (vista !== 'cuadre' && seleccion !== null) { const v = vistaActual; vistaActual = vista; cuaCerrarCaja(); vistaActual = v; }   // la ventana de la caja no sigue abierta en otro módulo
 
         vistaActual = vista;
+        claveAdminAuto(document.body);
         // login, menu, cuadre, ventas y admin tienen su propia sección; el resto usa la genérica "en construcción"
         // Caja chica usa la misma sección de Control de efectivo, mostrando solo la caja chica
         const seccion = vista === 'cajachica' ? 'efectivo' : vista === 'reqcharcu' ? 'req' : vista === 'asistencia' ? 'asis' : vista === 'asisgestion' ? 'asisg' : (vista === 'nomina' || vista === 'talento' || vista === 'cxc' || vista === 'horarios') ? 'per' : (vista === 'inventario' || vista === 'movalmacen') ? 'alm' : vista === 'pagonomina' ? 'pnom' : vista === 'marcaje' ? 'marca' : ['login', 'menu', 'cuadre', 'ventas', 'admin', 'pagos', 'efectivo'].includes(vista) ? vista : 'modulo';
@@ -10193,7 +10213,8 @@
             ${lista.map(c => `<tr><td class="izq"><small>${esc(c.id)}</small></td><td class="izq"><b>${esc(c.nombre)}</b></td>
                 <td class="izq"><span class="chip ${c.tipo === 'Trabajador' ? 'st-info' : c.tipo === 'Almacén' ? 'st-ok' : 'st-pend'}">${c.tipo}</span></td><td class="izq">${esc(c.telefono) || '—'}</td>
                 <td class="izq">${esc(c.cedula) || '—'}</td><td class="izq"><small>${esc(c.notas)}</small></td>
-                <td>${c.tipo === 'Cliente' ? `<button type="button" class="btn-ghost btn-mini" onclick="perEditarCliente('${esc(c.id)}')">Modificar</button>` : c.tipo === 'Almacén' ? '<small>en Almacén</small>' : '<small>en Nómina</small>'}</td></tr>`).join('')}
+                <td class="alm-acc">${c.tipo === 'Cliente' ? `<button type="button" class="btn-ghost btn-mini" onclick="perEditarCliente('${esc(c.id)}')">Modificar</button>` : c.tipo === 'Almacén' ? '<small>en Almacén</small>' : '<small>en Nómina</small>'}
+                    ${c.tipo !== 'Trabajador' ? `<button type="button" class="btn-ghost btn-mini btn-peligro" style="color:var(--danger)" onclick="perEliminarCliente('${esc(c.id)}')">Eliminar</button>` : ''}</td></tr>`).join('')}
             </tbody></table></div>` : '<div class="empty">No hay clientes con ese nombre.</div>'}
             <div class="nota">Para registrar un abono o una deuda, el cliente debe estar registrado aquí. Los trabajadores entran solos (se modifican en Talento humano › Trabajadores).</div>`;
     }
@@ -10221,6 +10242,19 @@
             perCerrar(); perUsar(r);
             mostrarBanner(`Cliente ${id ? 'modificado' : 'registrado'}: ${payload.nombre} (${r.id}).`, 'ok');
         } catch (e) { err.textContent = e.message; btn.disabled = false; btn.textContent = 'Guardar'; }
+    }
+
+    // Eliminar un cliente: con clave de administrador; el servidor no deja si tiene cuentas por cobrar pendientes
+    async function perEliminarCliente(id) {
+        const c = perDatos.clientes.find(x => x.id === id);
+        if (!c) return;
+        const claveAdm = await efePedirClave('Eliminar cliente', `${c.nombre} (${c.id}) dejará de aparecer en Cuentas por cobrar${c.tipo === 'Almacén' ? ' y en el Almacén' : ''}. Lo ya registrado (notas, abonos, deudas pagadas) se conserva.`);
+        if (!claveAdm) return;
+        try {
+            const r = await llamarApi({ action: 'per_cli_eliminar', id, claveAdmin: claveAdm });
+            perUsar(r); if (typeof almDatos !== 'undefined' && almDatos) almDatos.clientes = (almDatos.clientes || []).filter(x => x.id !== id);
+            mostrarBanner(`Cliente eliminado: ${c.nombre}.`, 'ok');
+        } catch (e) { mostrarBanner(e.message, 'error'); }
     }
 
     // ==========================================
@@ -10931,36 +10965,28 @@
                 await almCargar();
             }
         });
+        almEnviarTelegram(nota);   // siempre, sin preguntar: va a la cola después de guardarla (si no se guardó, avisa)
     }
-    const almPrefTelegram = () => { try { return localStorage.getItem('alm_tg') !== '0'; } catch (e) { return true; } };
     function almPreguntarImprimir(tipo, doc) {
-        if (tipo === 'nota') {   // nota: imprimir y/o enviarla al grupo de Telegram
-            almUltimaNota = doc;
-            almVentana(`<form class="req-dlg" onsubmit="almDespuesDeEmitir(event)">
-                <h3>Nota de entrega N° ${esc(doc.numero)}</h3>
-                <div class="req-sub">${esc(doc.cliente)} · ${doc.condicion === 'Tienda' ? 'despacho a tienda' : esc(doc.condicion)}${doc.vence ? ' (vence ' + fechaBonita(doc.vence) + ')' : ''} · $ ${fmt(doc.total)}</div>
-                <div class="alm-que-hacer">
-                    <label class="interruptor"><input type="checkbox" id="almQImp" checked><span class="sw-pista"></span> Imprimir (media carta)</label>
-                    <label class="interruptor"><input type="checkbox" id="almQTg" ${almPrefTelegram() ? 'checked' : ''}><span class="sw-pista"></span> Enviar a Telegram · Control de depósito</label></div>
-                <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-ghost" onclick="almCerrar()">Ninguno (Esc)</button><button type="submit" class="btn-primary" autofocus>Aceptar (Enter)</button></div></form>`);
-            return;
-        }
-        almVentana(`<form class="req-dlg" onsubmit="event.preventDefault(); almCerrar(); almImprimir('${tipo}', ${tipo === 'nota' ? 'almUltimaNota' : 'almUltimoIngreso'})">
+        // La nota se imprime con la versión que guardó Google (si ya llegó)
+        almVentana(`<form class="req-dlg" onsubmit="event.preventDefault(); const cp = document.getElementById('almQCopia'); almCopiaGuardar(cp && cp.checked); almCerrar(); almImprimir('${tipo}', ${tipo === 'nota' ? 'almUltimaNota._guardada || almUltimaNota' : 'almUltimoIngreso'}, cp && cp.checked)">
             <h3>${tipo === 'nota' ? 'Nota de entrega N° ' + esc(doc.numero) : 'Operación de inventario N° ' + esc(doc.numero)}</h3>
-            <div class="req-sub">${tipo === 'nota' ? `${esc(doc.cliente)} · ${esc(doc.condicion)}${doc.vence ? ' (vence ' + fechaBonita(doc.vence) + ')' : ''}` : esc(doc.operacion + (doc.tercero ? ' · ' + doc.tercero : ''))} · $ ${fmt(doc.total)}</div>
+            <div class="req-sub">${tipo === 'nota' ? `${esc(doc.cliente)} · ${doc.condicion === 'Tienda' ? 'despacho a tienda' : esc(doc.condicion)}${doc.vence ? ' (vence ' + fechaBonita(doc.vence) + ')' : ''}` : esc(doc.operacion + (doc.tercero ? ' · ' + doc.tercero : ''))} · $ ${fmt(doc.total)}</div>
+            ${tipo === 'nota' ? '<div class="nota" style="margin-top:.5rem">Se envía sola al grupo de Telegram · Control de depósito.</div>' : ''}
             <p style="margin:.75rem 0 0">¿Desea imprimirlo (media carta)?</p>
+            ${tipo === 'nota' ? `<div class="alm-que-hacer"><label class="interruptor"><input type="checkbox" id="almQCopia" ${almCopiaPref() ? 'checked' : ''}><span class="sw-pista"></span> Imprimir también una copia <small>(tecla C)</small></label></div>` : ''}
             <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-ghost" onclick="almCerrar()">No (Esc)</button><button type="submit" class="btn-primary" autofocus>Imprimir (Enter)</button></div></form>`);
         if (tipo === 'nota') almUltimaNota = doc; else almUltimoIngreso = doc;
     }
     let almUltimaNota = null, almUltimoIngreso = null;
-    function almDespuesDeEmitir(ev) {
-        ev.preventDefault();
-        const imp = document.getElementById('almQImp').checked, tg = document.getElementById('almQTg').checked, n = almUltimaNota;
-        try { localStorage.setItem('alm_tg', tg ? '1' : '0'); } catch (e) {}
-        almCerrar();
-        if (imp) almImprimir('nota', n._guardada || n);
-        if (tg) almEnviarTelegram(n);
-    }
+    // La opción de copia se recuerda en este equipo
+    const almCopiaPref = () => { try { return localStorage.getItem('alm_copia') === '1'; } catch (e) { return false; } };
+    function almCopiaGuardar(v) { try { localStorage.setItem('alm_copia', v ? '1' : '0'); } catch (e) {} }
+    // Tecla C en la pregunta de imprimir: marca o desmarca la copia
+    window.addEventListener('keydown', e => {
+        const cp = document.getElementById('almQCopia');
+        if (cp && (e.key === 'c' || e.key === 'C') && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); cp.checked = !cp.checked; }
+    }, true);
 
     // ---------- Ingresar mercancía: primero el tipo de operación, luego código + Enter + cantidad ----------
     function almIngresarVista() {
@@ -11467,22 +11493,37 @@
     async function almExportarNotas() {
         const l = almNotasFiltradas(); if (!l.length) { mostrarBanner('No hay notas para exportar con estos filtros.', 'warn'); return; }
         const X = await libXLSX(), wb = X.utils.book_new();
+        // Hoja 1: un renglón por producto, con todos los datos de su nota
+        X.utils.book_append_sheet(wb, X.utils.json_to_sheet(l.flatMap(n => n.detalle.map((x, i) => ({ 'N° nota': n.numero, Fecha: fechaBonita(n.fecha), Hora: n.hora, 'Facturó': n.usuario,
+            Cliente: n.cliente, 'ID cliente': n.clienteId, 'RIF/C.I.': n.cedula, 'Teléfono': n.telefono, 'Dirección': n.direccion, Condición: n.condicion === 'Tienda' ? 'Despacho a tienda' : n.condicion, Vence: n.vence ? fechaBonita(n.vence) : '',
+            Estado: n.estado, 'Renglón': i + 1, 'Código': x.codigo, 'Descripción': x.descripcion, Cantidad: x.cantidad, Unidad: almUnidad(x.tipo), 'Precio $': x.precio, 'Total renglón $': x.total,
+            'Tasa BCV': n.tasa || '', 'Total renglón Bs': n.tasa ? almR(x.total * n.tasa) : '', 'Subtotal nota $': n.subtotal, 'Descuento nota $': n.descuento, 'Total nota $': n.total, 'Total nota Bs': n.totalBs || '',
+            Comentario: n.comentario, 'Ingresada en tienda': n.ingresada, Verificada: n.verificada, Modificaciones: n.modificaciones })))), 'Detalle completo');
         X.utils.book_append_sheet(wb, X.utils.json_to_sheet(l.map(n => ({ 'N°': n.numero, Fecha: fechaBonita(n.fecha), Hora: n.hora, Cliente: n.cliente, 'RIF/C.I.': n.cedula, Condición: n.condicion === 'Tienda' ? 'Despacho a tienda' : n.condicion,
             Vence: n.vence ? fechaBonita(n.vence) : '', Renglones: n.renglones, 'Subtotal $': n.subtotal, 'Descuento $': n.descuento, 'Total $': n.total, Tasa: n.tasa || '', 'Total Bs': n.totalBs || '', Estado: n.estado,
-            'Ingresada en tienda': n.ingresada, Verificada: n.verificada, Comentario: n.comentario, Usuario: n.usuario, Modificaciones: n.modificaciones }))), 'Notas');
-        X.utils.book_append_sheet(wb, X.utils.json_to_sheet(l.flatMap(n => n.detalle.map(x => ({ 'N°': n.numero, Fecha: fechaBonita(n.fecha), Cliente: n.cliente, Estado: n.estado, Código: x.codigo, Descripción: x.descripcion,
-            Cantidad: x.cantidad, Unidad: almUnidad(x.tipo), 'Precio $': x.precio, 'Total $': x.total })))), 'Detalle');
+            'Ingresada en tienda': n.ingresada, Verificada: n.verificada, Comentario: n.comentario, 'Facturó': n.usuario, Modificaciones: n.modificaciones }))), 'Resumen por nota');
         const cli = almNotasF.cliente ? ' ' + ((almNotas.find(n => n.clienteId === almNotasF.cliente) || {}).cliente || '') : '';
         X.writeFile(wb, `Notas de entrega${cli} ${almNotasF.modo === 'fechas' ? (almNotasF.desde || '') + ' a ' + (almNotasF.hasta || '') : 'ultimas 100'}.xlsx`.replace(/[\\/:*?"<>|]/g, ''));
     }
     async function almExportarOps() {
         const l = almOpsFiltradas(); if (!l.length) { mostrarBanner('No hay operaciones para exportar con estos filtros.', 'warn'); return; }
         const X = await libXLSX(), wb = X.utils.book_new();
+        X.utils.book_append_sheet(wb, X.utils.json_to_sheet(l.flatMap(o => o.detalle.map((x, i) => ({ 'N° operación': o.numero, Fecha: fechaBonita(o.fecha), Hora: o.hora, 'Registró': o.usuario, Operación: o.operacion,
+            'Proveedor / cliente': o.tercero, Documento: o.documento, Nota: o.nota, 'Renglón': i + 1, 'Código': x.codigo, 'Descripción': x.descripcion, 'Existencia antes': x.existencia != null ? x.existencia : '',
+            Contado: x.contado != null ? x.contado : '', Cantidad: x.cantidad, Unidad: almUnidad(x.tipo), 'Costo $': x.costo, 'Total renglón $': x.total, 'Total operación $': o.total, Verificada: o.verificada })))), 'Detalle completo');
         X.utils.book_append_sheet(wb, X.utils.json_to_sheet(l.map(o => ({ 'N°': o.numero, Fecha: fechaBonita(o.fecha), Hora: o.hora, Operación: o.operacion, 'Proveedor / cliente': o.tercero, Documento: o.documento,
-            Renglones: o.renglones, 'Valor $': o.total, Nota: o.nota, Usuario: o.usuario, Verificada: o.verificada }))), 'Operaciones');
-        X.utils.book_append_sheet(wb, X.utils.json_to_sheet(l.flatMap(o => o.detalle.map(x => ({ 'N°': o.numero, Fecha: fechaBonita(o.fecha), Operación: o.operacion, Código: x.codigo, Descripción: x.descripcion,
-            Existencia: x.existencia != null ? x.existencia : '', Contado: x.contado != null ? x.contado : '', Cantidad: x.cantidad, Unidad: almUnidad(x.tipo), 'Costo $': x.costo, 'Total $': x.total })))), 'Detalle');
+            Renglones: o.renglones, 'Valor $': o.total, Nota: o.nota, 'Registró': o.usuario, Verificada: o.verificada }))), 'Resumen por operación');
         X.writeFile(wb, `Operaciones de inventario ${almOpsF.modo === 'fechas' ? (almOpsF.desde || '') + ' a ' + (almOpsF.hasta || '') : 'ultimas 100'}.xlsx`);
+    }
+    // Existencia del almacén a Excel: todos los productos, por categoría
+    async function almExportarExistencia() {
+        const ps = (almDatos.productos || []).slice().sort((a, b) => (a.categoria || '').localeCompare(b.categoria || '', 'es') || a.descripcion.localeCompare(b.descripcion, 'es'));
+        if (!ps.length) { mostrarBanner('No hay productos para exportar.', 'warn'); return; }
+        const X = await libXLSX(), wb = X.utils.book_new(), ex = p => Math.max(0, p.existencia);
+        X.utils.book_append_sheet(wb, X.utils.json_to_sheet(ps.map(p => ({ 'Código': p.codigo, 'Descripción': p.descripcion, 'Categoría': p.categoria, Tipo: p.tipo === 'Pesado' ? 'Pesado' : 'Por unidad',
+            Existencia: p.existencia, Unidad: almUnidad(p.tipo), 'Mínimo': p.minimo || '', 'Bajo el mínimo': p.activo && p.minimo > 0 && p.existencia <= p.minimo ? 'Sí' : '',
+            'Costo $': p.costo, 'Valor a costo $': almR(ex(p) * p.costo), 'Precio $': p.precio, 'Valor a precio $': almR(ex(p) * p.precio), Proveedor: p.proveedor, Estado: p.activo ? 'Activo' : 'Inactivo' }))), 'Existencia');
+        X.writeFile(wb, `Existencia almacén ${fechaLocalHoy()}.xlsx`);
     }
     // ---------- Inversión por tienda (semana de sábado a viernes): gastos de la tienda + mercancía del almacén ----------
     let almTiendas = null, almTiendasSemana = '';
@@ -11566,6 +11607,7 @@
                 <div class="kpi"><div class="k-label">Bajo el mínimo</div><div class="k-value" style="color:var(--bad)">${activos.filter(bajo).length}</div></div>
                 <div class="kpi"><div class="k-label">Valor a costo $</div><div class="k-value">${fmt(activos.reduce((s, p) => s + Math.max(0, p.existencia) * p.costo, 0))}</div></div></div>
             <div class="req-acciones" style="margin-top:0"><button type="button" class="btn-primary" onclick="almEditarProducto('')">+ Nuevo producto</button>
+                <button type="button" class="btn-ghost" onclick="almExportarExistencia()">Exportar existencia a Excel</button>
                 ${permisos.includes('inventario') ? `<label class="btn-ghost" style="cursor:pointer">Importar Excel<input type="file" accept=".xlsx,.xls" hidden onchange="almImportarExcel(this.files[0]); this.value=''"></label>` : ''}</div>
             ${l.length ? `<div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">Código</th><th class="izq">Descripción</th><th class="izq">Categoría</th><th>Costo $</th><th>Precio $</th><th>Margen</th><th>Existencia</th><th></th></tr></thead><tbody>
             ${l.map(p => `<tr class="${p.activo ? '' : 'alm-anulada'}"><td class="izq"><b>${esc(p.codigo)}</b></td><td class="izq">${esc(p.descripcion)}<small>${p.tipo === 'Pesado' ? 'Pesado (kg)' : 'Por unidad'}${p.proveedor ? ' · ' + esc(p.proveedor) : ''}${p.iva !== 'Exento' ? ' · ' + esc(p.iva) : ''}</small></td>
@@ -11739,9 +11781,11 @@
     }
 
     // ---------- Impresión a media carta (nota de entrega y comprobante de ingreso) ----------
-    function almImprimir(tipo, d) {
+    // copia: en la misma impresión sale una segunda hoja igual, marcada "COPIA"
+    function almImprimir(tipo, d, copia) {
         if (!d) return;
-        const html = almDocumentoHTML(tipo, d);
+        let html = almDocumentoHTML(tipo, d);
+        if (copia) { const i = html.indexOf('<body>') + 6, j = html.lastIndexOf('</body>'); html = html.slice(0, j) + `<div class="copia-hoja"><div class="copia-marca">COPIA</div>${html.slice(i, j)}</div>` + html.slice(j); }
         let fr = document.getElementById('almImprimeMarco');
         if (fr) fr.remove();
         fr = document.createElement('iframe'); fr.id = 'almImprimeMarco'; fr.setAttribute('aria-hidden', 'true');
@@ -11766,7 +11810,7 @@
     async function almImagenNota(n) {
         const logo = (document.querySelector('link[rel="icon"]') || {}).href || '', png = await almLogoPNG();
         // En la imagen: letra Arial con números alineados (la Courier se ve tosca en pantalla) y sin las líneas de firma
-        let html = almDocumentoHTML('nota', n).replace('</style>', `html,body{background:#fff}body{width:5.5in;padding:6mm 7mm 2mm}
+        let html = almDocumentoHTML('nota', n, true).replace('</style>', `html,body{background:#fff}body{width:5.5in;padding:6mm 7mm 2mm}
             td,.tot,.num b{font-family:Arial,Helvetica,sans-serif;font-variant-numeric:tabular-nums}td{padding:.9mm .8mm}td.cod{font-size:6.6pt}
             .cab img{width:12mm;height:12mm}.num b{letter-spacing:.3pt}.tot{gap:1.5mm 5mm;padding-top:1.5mm}.tot .g{color:#2f7a00}.firmas{display:none}</style>`);
         if (logo && png) html = html.split(`src="${logo}"`).join(`src="${png}"`);
@@ -11796,13 +11840,18 @@
             } catch (e) { mostrarBanner(`La nota ${n.numero} no se pudo enviar a Telegram: ${e.message}`, 'error'); }
         });
     }
-    function almDocumentoHTML(tipo, d) {
+    // sinPrecios: la versión para el grupo de Telegram (la ven los trabajadores): solo cantidades, sin precios ni totales en $
+    function almDocumentoHTML(tipo, d, sinPrecios) {
         const logo = (document.querySelector('link[rel="icon"]') || {}).href || '';
-        const nota = tipo === 'nota', E = ALM_EMPRESA;
+        const nota = tipo === 'nota', E = ALM_EMPRESA, sp = nota && !!sinPrecios;
         const cant = x => almCant(x.cantidad, x.tipo) + ' ' + almUnidad(x.tipo);
-        const filas = d.detalle.map(x => `<tr><td class="c">${cant(x)}</td><td class="cod">${esc(x.codigo)}</td><td class="des">${esc(x.descripcion)}</td><td class="n">${fmt(nota ? x.precio : x.costo)}</td><td class="n">${fmt(x.total)}</td></tr>`).join('');
+        const filas = sp ? d.detalle.map((x, i) => `<tr><td class="n">${i + 1}</td><td class="cod">${esc(x.codigo)}</td><td class="c">${cant(x)}</td><td class="des">${esc(x.descripcion)}</td></tr>`).join('')
+            : d.detalle.map(x => `<tr><td class="c">${cant(x)}</td><td class="cod">${esc(x.codigo)}</td><td class="des">${esc(x.descripcion)}</td><td class="n">${fmt(nota ? x.precio : x.costo)}</td><td class="n">${fmt(x.total)}</td></tr>`).join('');
+        const kg = almR(d.detalle.filter(x => x.tipo === 'Pesado').reduce((s, x) => s + x.cantidad, 0), 3), und = d.detalle.filter(x => x.tipo !== 'Pesado').reduce((s, x) => s + x.cantidad, 0);
         const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>${nota ? 'Nota de entrega ' : 'Operación de inventario '}${esc(d.numero)}</title><style>
-            @page{size:5.5in 8.5in;margin:7mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+            @page{size:5.5in 8.5in;margin:5mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+            @media print{html,body{width:100%;margin:0;padding:0}}
+            .copia-hoja{break-before:page;page-break-before:always}.copia-marca{text-align:center;font-weight:800;letter-spacing:2pt;color:#475569;font-size:7pt;margin-bottom:1mm}
             body{margin:0;font-family:Arial,Helvetica,sans-serif;color:#0f172a;font-size:8.6pt}
             .cab{display:flex;gap:2.5mm;align-items:center;border-bottom:.5mm solid #44AC00;padding-bottom:1.5mm}
             .cab img{width:10mm;height:10mm}.emp{flex:1;line-height:1.25}.emp b{font-size:9pt;display:block}.emp span{display:block;color:#475569;font-size:6.4pt}
@@ -11814,7 +11863,8 @@
             td{padding:.55mm .8mm;vertical-align:top;font-family:'Courier New',monospace;font-size:7.8pt;line-height:1.2}
             td.des{font-family:Arial,Helvetica,sans-serif;font-size:7.4pt;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
             td.cod{font-size:7pt;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-            col.c1{width:15%}col.c2{width:16%}col.c4{width:13%}col.c5{width:14%}
+            col.c1{width:15%}col.c2{width:16%}col.c4{width:13%}col.c5{width:14%}col.t1{width:7%}col.t2{width:18%}col.t3{width:17%}
+            .coment{margin:1mm 0;padding:1mm 1.8mm;border-left:.7mm solid #44AC00;background:#f0f9e8;font-size:7.4pt;line-height:1.3;border-radius:1mm}
             tbody tr:nth-child(even) td{background:#f8fafc}
             .c{white-space:nowrap}.n{text-align:right;white-space:nowrap}th.n{text-align:right}
             .tot{display:flex;justify-content:flex-end;align-items:baseline;flex-wrap:wrap;gap:1.5mm 4mm;margin-top:1.2mm;padding-top:1mm;border-top:.4mm solid #0f172a;font-size:7.4pt;font-family:'Courier New',monospace}
@@ -11827,14 +11877,16 @@
                 <div class="num"><small>${nota ? 'NOTA DE ENTREGA' : 'OPERACIÓN DE INVENTARIO'}</small><b>N° ${esc(d.numero)}</b></div></div>
             <div class="datos"><div>${nota ? `<b>${esc(d.cliente)}</b> <span class="gris">${esc([d.cedula ? 'RIF ' + d.cedula : '', d.telefono ? 'Tel. ' + d.telefono : ''].filter(Boolean).join(' · '))}</span>${d.direccion ? `<br><span class="gris">${esc(d.direccion)}</span>` : ''}`
                     : `<b>${esc(d.operacion)}</b>${d.tercero ? ' · ' + esc(d.tercero) : ''}${d.documento || d.nota ? `<br><span class="gris">${esc([d.documento ? 'Doc. ' + d.documento : '', d.nota].filter(Boolean).join(' · '))}</span>` : ''}`}</div>
-                <div class="der"><b>${fechaBonita(d.fecha)}</b> ${esc(d.hora)}${nota ? `<br><b>${d.condicion === 'Tienda' ? 'DESPACHO A TIENDA' : esc(d.condicion.toUpperCase())}</b>${d.vence ? ' · vence ' + fechaBonita(d.vence) : ''}${d.tasa ? '<br><span class="gris">Tasa BCV ' + fmt(d.tasa) + '</span>' : ''}` : ''}</div></div>
-            <table><colgroup><col class="c1"><col class="c2"><col><col class="c4"><col class="c5"></colgroup><thead><tr><th>Cant.</th><th>Cód.</th><th>Descripción</th><th class="n">${nota ? 'Precio $' : 'Costo $'}</th><th class="n">Total $</th></tr></thead><tbody>${filas}</tbody></table>
-            <div class="tot">${nota ? `${d.descuento ? `<span>Subtotal ${fmt(d.subtotal)}</span><span>Desc. ${fmt(d.descuento)}</span>` : ''}${d.totalBs ? `<span>Bs ${fmt(d.totalBs)}</span>` : ''}<span class="g">TOTAL USD ${fmt(d.total)}</span>`
+                <div class="der"><b>${fechaBonita(d.fecha)}</b> ${esc(d.hora)}${nota ? `<br><b>${d.condicion === 'Tienda' ? 'DESPACHO A TIENDA' : esc(d.condicion.toUpperCase())}</b>${d.vence ? ' · vence ' + fechaBonita(d.vence) : ''}${d.tasa && !sp ? '<br><span class="gris">Tasa BCV ' + fmt(d.tasa) + '</span>' : ''}` : ''}</div></div>
+            ${nota && d.comentario ? `<div class="coment"><b>Comentario:</b> ${esc(d.comentario)}</div>` : ''}
+            ${sp ? `<table><colgroup><col class="t1"><col class="t2"><col class="t3"><col></colgroup><thead><tr><th class="n">N°</th><th>Código</th><th>Cantidad</th><th>Descripción</th></tr></thead><tbody>${filas}</tbody></table>`
+                 : `<table><colgroup><col class="c1"><col class="c2"><col><col class="c4"><col class="c5"></colgroup><thead><tr><th>Cant.</th><th>Cód.</th><th>Descripción</th><th class="n">${nota ? 'Precio $' : 'Costo $'}</th><th class="n">Total $</th></tr></thead><tbody>${filas}</tbody></table>`}
+            <div class="tot">${sp ? `<span class="g">${d.detalle.length} renglón(es)</span>${kg ? `<span class="g">${almCant(kg, 'Pesado')} kg</span>` : ''}${und ? `<span class="g">${almCant(und, 'Unidad')} und</span>` : ''}`
+                : nota ? `${d.descuento ? `<span>Subtotal ${fmt(d.subtotal)}</span><span>Desc. ${fmt(d.descuento)}</span>` : ''}${d.totalBs ? `<span>Bs ${fmt(d.totalBs)}</span>` : ''}<span class="g">TOTAL USD ${fmt(d.total)}</span>`
                 : d.operacion === 'Ajuste de inventario' ? (() => { const a = almTotalesAjuste(d.detalle); return `<span>Sobrante + ${fmt(a.sobra)}</span><span>Faltante − ${fmt(Math.abs(a.falta))}</span><span class="g">NETO USD ${d.total < 0 ? '−' : ''}${fmt(Math.abs(d.total))}</span>`; })()
                 : `<span class="g">TOTAL COSTO USD ${fmt(d.total)}</span>`}</div>
-            ${nota && d.comentario ? `<div class="leyenda" style="text-align:left"><b>Comentario:</b> ${esc(d.comentario)}</div>` : ''}
             ${nota && d.estado === 'Anulada' ? `<div class="anulada">NOTA ANULADA</div>` : ''}
-            <div class="leyenda">${nota && d.condicion !== 'Tienda' ? 'Monto exento. Debe pagarse al tipo de cambio vigente para el momento del pago · ' : ''}${d.detalle.length} renglón(es) · ${esc(d.usuario || '')}</div>
+            <div class="leyenda">${sp ? `Despachó: ${esc(d.usuario || '')}` : `${nota && d.condicion !== 'Tienda' ? 'Monto exento. Debe pagarse al tipo de cambio vigente para el momento del pago · ' : ''}${d.detalle.length} renglón(es) · ${esc(d.usuario || '')}`}</div>
             <div class="firmas"><div>${nota ? 'Despachado por' : 'Recibido por'}</div><div>${nota ? 'Recibido conforme (cliente)' : 'Entregado por'}</div></div></body></html>`;
         return html;
     }
@@ -13878,7 +13930,8 @@
                 <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-ghost" id="efeClaveNo">Cancelar</button><button type="submit" class="btn-primary">Continuar</button></div></form>`;
             fondo.querySelector('form').onsubmit = e => { e.preventDefault(); cerrar(document.getElementById('efeClaveIn').value); };
             document.getElementById('efeClaveNo').onclick = () => cerrar(null);
-            fondo.classList.remove('hidden'); document.getElementById('efeClaveIn').focus();
+            fondo.classList.remove('hidden'); claveAdminAuto(fondo);
+            (esPrincipal ? fondo.querySelector('button[type="submit"]') : document.getElementById('efeClaveIn')).focus();
         });
     }
     async function efeVerificarTodosFlujo() {
