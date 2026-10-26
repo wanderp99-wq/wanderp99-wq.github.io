@@ -1111,6 +1111,83 @@
         .alm-lista-acc { margin-top: -.3rem; align-items: center; gap: .8rem; flex-wrap: wrap; }
         .alm-marcas { display: flex; flex-direction: column; gap: .4rem; margin-top: .7rem; } .alm-marcas div { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; } .alm-marcas small { color: var(--text-muted); }
         .alm-mod-in { width: 92px; text-align: right; }
+        /* Compra con foto y precios en tiendas */
+        .cmp-fotos { display: flex; flex-wrap: wrap; gap: .6rem; margin: .8rem 0; }
+        .cmp-foto { position: relative; width: 96px; height: 120px; border-radius: 10px; overflow: hidden; border: 1px solid var(--border); background: var(--list-bg); }
+        .cmp-foto img { width: 100%; height: 100%; object-fit: cover; }
+        .cmp-foto button { position: absolute; top: 4px; right: 4px; border: 0; border-radius: 50%; width: 24px; height: 24px; background: rgba(0,0,0,.6); color: #fff; cursor: pointer; }
+        .cmp-agregar { width: 96px; height: 120px; border: 2px dashed var(--border); border-radius: 10px; display: flex; align-items: center; justify-content: center; text-align: center; cursor: pointer; color: var(--text-muted); font-size: .85rem; padding: .4rem; }
+        .cmp-tabla { min-width: 0; }
+        .cmp-tabla.x-c .g-c, .cmp-tabla.x-m .g-m, .cmp-tabla.x-u .g-u, .cmp-tabla.x-b .g-b, .cmp-tabla.x-d .g-d { display: none; }
+        .cmp-tabla.solo-SR .g-t:not(.g-t-SR), .cmp-tabla.solo-RU .g-t:not(.g-t-RU), .cmp-tabla.solo-IS .g-t:not(.g-t-IS), .cmp-tabla.solo-PA .g-t:not(.g-t-PA) { display: none; }
+        .cmp-ver { display: flex; flex-wrap: wrap; gap: .4rem .5rem; align-items: center; margin: .5rem 0 .7rem; }
+        .cmp-ver-t { font-size: .8rem; color: var(--text-muted); margin-left: .3rem; }
+        .cmp-chip { display: inline-flex; gap: .35rem; align-items: center; padding: .3rem .65rem; border: 1px solid var(--border); border-radius: 999px; font-size: .85rem; cursor: pointer; font-weight: 500; }
+        .cmp-chip input { width: auto; margin: 0; accent-color: #44AC00; }
+        .cmp-chip:has(input:checked) { border-color: #44AC00; background: rgba(68,172,0,.08); }
+        .cmp-ver select { width: auto; padding: .3rem .5rem; font-size: .85rem; }
+        .cmp-psico { margin-left: auto; font-size: .85rem; }
+        .cmp-prod { display: flex; gap: .35rem; align-items: center; }
+        .cmp-prod b { font-size: .88rem; }
+        .cmp-tabla .cmp-desc { min-width: 210px; font-size: .85rem; }
+        .cmp-nomayor { color: var(--text-muted); white-space: nowrap; }
+        .cmp-tabla td { vertical-align: top; padding: .35rem .3rem; }
+        .cmp-tabla td:nth-child(2) { min-width: 240px; }
+        .cmp-tabla input { padding: .35rem .4rem; font-size: .88rem; }
+        .cmp-tabla .cmp-cod { width: 92px; } .cmp-tabla .cmp-n { width: 74px; text-align: right; } .cmp-tabla .cmp-p { width: 58px; text-align: right; } .cmp-tabla .cmp-d { width: 58px; text-align: right; }
+        .cmp-tabla small { display: block; color: var(--text-muted); font-size: .74rem; line-height: 1.25; max-width: 230px; text-align: left; }
+        .cmp-regla { color: #3a9400; }
+        .cmp-tabla .cmp-mal input.cmp-cod { border-color: var(--danger); }
+        .cmp-tabla th.cmp-t, .cmp-tabla td.cmp-t { background: var(--list-bg); }
+        .cmp-pie { display: flex; flex-wrap: wrap; gap: .4rem 1.4rem; align-items: baseline; margin: .7rem 0; font-size: .92rem; }
+        .cmp-pie b { font-size: 1.05rem; }
+        .cmp-orden { border: 1px solid var(--border); border-radius: var(--radius); padding: .8rem .9rem; margin-bottom: .7rem; }
+        .cmp-ord-cab { display: flex; flex-wrap: wrap; gap: .4rem .7rem; align-items: baseline; }
+        .cmp-ord-cab b { font-size: 1rem; }
+        .cmp-ord-cab small { color: var(--text-muted); }
+        .cmp-ord-sub { color: var(--text-muted); font-size: .8rem; margin: .15rem 0 .5rem; }
+        .cmp-precios { display: flex; flex-wrap: wrap; gap: .3rem 1.2rem; align-items: center; font-size: .9rem; margin-bottom: .6rem; }
+        .cmp-precios .sube { color: var(--danger); } .cmp-precios .baja { color: #16a34a; }
+        .cmp-tiendas { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: .5rem; }
+        .cmp-tienda { border: 1px solid var(--border); border-radius: 10px; padding: .5rem .6rem; font-size: .85rem; display: flex; flex-direction: column; gap: .35rem; }
+        .cmp-tienda > small { color: var(--text-muted); }
+        .cmp-tienda.listo { border-color: #44AC00; }
+        .cmp-marca { display: flex; justify-content: space-between; gap: .4rem; align-items: center; }
+        .cmp-marca.hecho { color: #2f8f00; }
+        .cmp-marca small { color: var(--text-muted); display: block; font-size: .74rem; }
+        .cmp-marca .btn-mini { white-space: nowrap; }
+        .cmp-otabla td, .cmp-otabla th { vertical-align: top; }
+        .cmp-otabla td:first-child { min-width: 220px; }
+        .cmp-otabla td small { display: block; color: var(--text-muted); font-size: .74rem; line-height: 1.3; }
+        .cmp-otabla td small.sube { color: var(--danger); } .cmp-otabla td small.baja { color: #16a34a; }
+        .cmp-otabla tr.cmp-definir td:first-child { box-shadow: inset 3px 0 0 var(--amar, #eab308); }
+        .cmp-oth { text-align: center; min-width: 118px; }
+        .cmp-oth small { display: block; font-weight: 400; font-size: .7rem; color: var(--text-muted); text-transform: none; letter-spacing: 0; }
+        .cmp-todo { margin-top: .25rem; border: 1px solid var(--border); background: transparent; color: var(--text-muted); border-radius: 999px; font-size: .7rem; padding: .1rem .5rem; cursor: pointer; }
+        .cmp-otd { text-align: center; }
+        .cmp-bts { display: flex; gap: .3rem; justify-content: center; flex-wrap: wrap; }
+        .cmp-bt { border: 1px solid var(--border); background: var(--card-bg, transparent); color: var(--text-main); border-radius: 8px; padding: .3rem .55rem; font-size: .8rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
+        .cmp-bt:hover:not(:disabled) { border-color: #44AC00; }
+        .cmp-bt.hecho { background: #44AC00; border-color: #44AC00; color: #fff; }
+        .cmp-bt:disabled { opacity: .45; cursor: not-allowed; }
+        .cmp-link { border: 0; background: none; color: var(--primary, #2563eb); padding: 0; margin-top: .2rem; font-size: .78rem; cursor: pointer; text-decoration: underline; }
+        .cmp-seg { display: inline-flex; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+        .cmp-seg button { border: 0; background: transparent; color: var(--text-main); padding: .35rem .7rem; font-size: .85rem; font-weight: 600; cursor: pointer; }
+        .cmp-seg button.act { background: #44AC00; color: #fff; }
+        .cmp-desc-in { width: 64px !important; padding: .3rem .4rem !important; }
+        .cmp-cant { display: inline-block; margin-right: .45rem; padding: .1rem .5rem; border-radius: 999px; background: rgba(68,172,0,.14); color: #2f8f00; font-weight: 800; font-size: .92rem; white-space: nowrap; }
+        .cmp-cant.sin { background: var(--list-bg); color: var(--text-muted); font-weight: 600; font-size: .78rem; }
+        .cmp-imp { margin-left: auto; }
+        .cmp-resumen { display: flex; flex-wrap: wrap; gap: .4rem 1.4rem; margin: .2rem 0 .6rem; font-size: .9rem; }
+        .cmp-pasos { margin: .4rem 0 .6rem; padding-left: 1.3rem; line-height: 1.9; }
+        .cmp-prompt { font-family: ui-monospace, Consolas, monospace; font-size: .78rem; color: var(--text-muted); margin-bottom: .7rem; }
+        #cmpPrompt, #cmpTexto { display: block; width: 100%; box-sizing: border-box; resize: vertical; }
+        #cmpTexto { font-family: ui-monospace, Consolas, monospace; font-size: .82rem; min-height: 180px; }
+        .cmp-como { display: flex; flex-direction: column; gap: .4rem; margin: .5rem 0 .7rem; }
+        .cmp-op { display: flex; align-items: center; gap: .55rem; padding: .5rem .7rem; border: 1px solid var(--border); border-radius: 10px; cursor: pointer; font-weight: 500; }
+        .cmp-op input { width: auto; margin: 0; accent-color: #44AC00; }
+        .cmp-op:has(input:checked) { border-color: #44AC00; background: rgba(68,172,0,.08); }
+
         .adm-seg-aviso { background: var(--amar-bg); color: var(--amar-txt); border-radius: var(--radius); padding: .55rem .8rem; margin-bottom: .5rem; font-size: .9rem; }
         .adm-seg-aviso.mal { background: var(--bad-bg, #fde8e8); color: var(--danger); }
         .req-alm-btn { margin-top: .45rem; align-self: flex-start; position: relative; z-index: 1; }
@@ -2887,7 +2964,7 @@
         if (TIEMPOS.length > 60) TIEMPOS.pop();
     }
     // Solo lectura: si la respuesta de Google no llega, se reintenta una vez sola (no cambia nada en la hoja)
-    const SOLO_LECTURA = /^(login|list|cuadre_detalle|cuadre_detalle_lote|mov_listar|cuentas_listar|conc_listar|efe_listar|cc_listar|req_datos|req_ventas|req_historial|asis_hoy|asis_listar|asisg_listar|per_listar|cxc_deudas|nom_historial|nom_autorizar|hor_datos|alm_datos|alm_notas|alm_ingresos|alm_kardex|alm_tiendas|alm_existencias|pnom_listar|ping|cambios|enlinea|marca_estado)$/;
+    const SOLO_LECTURA = /^(login|list|cuadre_detalle|cuadre_detalle_lote|mov_listar|cuentas_listar|conc_listar|efe_listar|cc_listar|req_datos|req_ventas|req_historial|asis_hoy|asis_listar|asisg_listar|per_listar|cxc_deudas|nom_historial|nom_autorizar|hor_datos|alm_datos|alm_notas|alm_ingresos|alm_kardex|alm_tiendas|alm_existencias|cmp_compras|cmp_ordenes|cmp_enlazar|pnom_listar|ping|cambios|enlinea|marca_estado)$/;
     // Guardados sin repetir: cada cambio lleva un "idem". Si no llegó la respuesta y se vuelve a pulsar el MISMO cambio,
     // se manda el mismo idem y Google responde "ya estaba registrado" en vez de guardarlo otra vez.
     const idemPendientes = new Map();   // contenido del cambio -> idem del intento sin respuesta
@@ -2936,7 +3013,7 @@
         }
     }
     // Lo que no se guarda para después (necesita respuesta en el momento o es de administración de claves)
-    const NO_COLA = /^(login|ping|cambios|enlinea|nom_autorizar|adm_|alm_)/;   // el almacén necesita internet: la nota lleva número y existencia del momento
+    const NO_COLA = /^(login|ping|cambios|enlinea|nom_autorizar|adm_|alm_|cmp_)/;   // el almacén necesita internet: la nota lleva número y existencia del momento
     COLA.configurar({ url: WEB_APP_URL, clave: () => clave, usuario: () => nombreUsuario,
         alTerminar: hechos => mostrarBanner(`Se enviaron ${hechos.length} registro(s) que estaban pendientes sin conexión.` + (hechos.some(x => x.tipo === 'panel') ? ' Pulse Actualizar para verlos.' : ''), 'ok') });
     // Identificador de este equipo (al azar, queda en el navegador): el servidor cuenta los intentos con clave incorrecta por equipo
@@ -3014,6 +3091,7 @@
         nomina: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18H6z"/><path d="M9 7h6M9 11h6M9 15h3"/><path d="M15 15.5h1.5"/></svg>',
         inventario: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9z"/><path d="m4 7.5 8 4.5 8-4.5M12 12v9"/></svg>',
         reqcharcu: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 3v2h6V3"/><path d="M8.5 10h7M8.5 13.5h7M8.5 17h4"/></svg>',
+        precios: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z"/><circle cx="8" cy="8" r="1.5"/><path d="m12 16 1.5 1.5 3-3"/></svg>',
         movalmacen: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h13l-3-3M20 16H7l3 3"/></svg>',
         talento: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="8" r="3.5"/><path d="M3.5 20c0-3.6 2.9-6.5 6.5-6.5 1.3 0 2.5.4 3.5 1"/><path d="m17.5 13 1.2 2.4 2.6.4-1.9 1.8.5 2.6-2.4-1.3-2.4 1.3.5-2.6-1.9-1.8 2.6-.4z"/></svg>',
         horarios: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/><circle cx="15.5" cy="15.5" r="3.5"/><path d="M15.5 14v1.5l1 1"/></svg>'
@@ -3042,7 +3120,8 @@
         { id: 'horarios',   area: 'rrhh',    titulo: 'Horarios de trabajo',   desc: 'Horario semanal de cada tienda: generarlo, ajustarlo y enviarlo por Telegram.', listo: true },
         { id: 'reqcharcu',  area: 'almacen', titulo: 'Requerimientos de charcutería', desc: 'Cuánto enviar a cada local según ventas, exhibición y la existencia de la cava.', listo: true },
         { id: 'inventario', area: 'almacen', titulo: 'Productos e inventario', desc: 'Catálogo de productos, existencia del almacén y movimientos.', listo: true },
-        { id: 'movalmacen', area: 'almacen', titulo: 'Entradas y salidas',    desc: 'Facturar notas de entrega y operaciones de inventario.', listo: true }
+        { id: 'movalmacen', area: 'almacen', titulo: 'Entradas y salidas',    desc: 'Facturar notas de entrega, compras con foto de la factura y operaciones de inventario.', listo: true },
+        { id: 'precios',    area: 'almacen', titulo: 'Precios en tiendas',    desc: 'Lo que entró al almacén: costo y precios nuevos, y qué falta ingresar o cambiar en cada tienda.', listo: true }
     ];
     MODULOS.forEach(m => { if (!m.area) m.area = 'admin'; });
     let areaActual = null;   // área abierta en el menú (null = menú de áreas)
@@ -3236,7 +3315,7 @@
         claveAdminAuto(document.body);
         // login, menu, cuadre, ventas y admin tienen su propia sección; el resto usa la genérica "en construcción"
         // Caja chica usa la misma sección de Control de efectivo, mostrando solo la caja chica
-        const seccion = vista === 'cajachica' ? 'efectivo' : vista === 'reqcharcu' ? 'req' : vista === 'asistencia' ? 'asis' : vista === 'asisgestion' ? 'asisg' : (vista === 'nomina' || vista === 'talento' || vista === 'cxc' || vista === 'horarios') ? 'per' : (vista === 'inventario' || vista === 'movalmacen') ? 'alm' : vista === 'pagonomina' ? 'pnom' : vista === 'marcaje' ? 'marca' : ['login', 'menu', 'cuadre', 'ventas', 'admin', 'pagos', 'efectivo'].includes(vista) ? vista : 'modulo';
+        const seccion = vista === 'cajachica' ? 'efectivo' : vista === 'reqcharcu' ? 'req' : vista === 'asistencia' ? 'asis' : vista === 'asisgestion' ? 'asisg' : (vista === 'nomina' || vista === 'talento' || vista === 'cxc' || vista === 'horarios') ? 'per' : (vista === 'inventario' || vista === 'movalmacen' || vista === 'precios') ? 'alm' : vista === 'pagonomina' ? 'pnom' : vista === 'marcaje' ? 'marca' : ['login', 'menu', 'cuadre', 'ventas', 'admin', 'pagos', 'efectivo'].includes(vista) ? vista : 'modulo';
         ['login', 'menu', 'cuadre', 'ventas', 'admin', 'pagos', 'efectivo', 'req', 'asis', 'asisg', 'per', 'alm', 'pnom', 'marca', 'modulo'].forEach(v => {
             const el = document.getElementById('vista' + v[0].toUpperCase() + v.slice(1));
             el.dataset.pantalla = '';   // al aparecer entra deslizándose (ANIM)
@@ -3269,7 +3348,7 @@
         if (vista === 'asisgestion') asisgIniciar();
         if (vista === 'nomina' || vista === 'talento' || vista === 'cxc' || vista === 'horarios') perIniciar(vista);
         if (vista === 'marcaje') marcaIniciar();
-        if (vista === 'inventario' || vista === 'movalmacen') almIniciar(vista);
+        if (vista === 'inventario' || vista === 'movalmacen' || vista === 'precios') almIniciar(vista);
         if (vista === 'pagonomina') pnomIniciar();
         if (vista !== 'login' && vista !== 'marcaje') setTimeout(() => avisarEnLinea(true), 500);
         if (vista === 'efectivo' || vista === 'cajachica') efeIniciar(vista === 'cajachica');
@@ -3298,13 +3377,13 @@
         efectivo: () => efeActualizar(), cajachica: () => efeActualizar(), reqcharcu: () => reqCargar(),
         asistencia: () => asisCargarHist(true), asisgestion: () => asisgCargar(true),
         nomina: () => perCargar(), talento: () => perCargar(), cxc: () => perCargar(), horarios: () => perCargar(),
-        inventario: () => almCargar(), movalmacen: () => almCargar(), pagonomina: () => pnomCargar()
+        inventario: () => almCargar(), movalmacen: () => { cmpCompras = null; return almCargar(); }, precios: () => { cmpOrd = null; return almCargar(); }, pagonomina: () => pnomCargar()
     };
     // ---------- Cambios en vivo: cada 30 s se pregunta a Google qué áreas cambiaron (respuesta mínima).
     // Si cambió la del módulo abierto, se vuelve a leer solo, sin molestar: no mientras se escribe, hay una ventana abierta o algo se guarda.
     const VISTA_AREAS = { cuadre: ['cuadre'], ventas: ['cuadre'], pagos: ['cuadre'], efectivo: ['efe', 'cuadre'], cajachica: ['efe'], reqcharcu: ['req'],
         asistencia: ['asis'], asisgestion: ['asis', 'per'], nomina: ['per', 'asis'], talento: ['per'], cxc: ['per', 'alm', 'cuadre'], horarios: ['per'],
-        inventario: ['alm'], movalmacen: ['alm'], pagonomina: ['per'] };
+        inventario: ['alm'], movalmacen: ['alm'], precios: ['alm'], pagonomina: ['per'] };
     const VIVO_CADA = 30000;
     let verConocida = {}, vivoOcupado = false, vivoTecleo = 0;
     function vivoUsar(v) { Object.keys(v).forEach(k => { if (!verConocida[k] || v[k] > verConocida[k]) verConocida[k] = v[k]; }); }
@@ -10543,7 +10622,7 @@
     let almDatos = null, almVista = '', almTab = '', almNotas = null, almIngresos = null;
     let almVenta = { items: [], sel: -1, descuento: 0, claveDesc: '', claveStock: '', ultimo: '' };
     let almIng = { operacion: '', proveedorId: '', documento: '', clienteId: '', nota: '', items: [], sel: -1, listo: false, ultimo: '' };
-    const ALM_TABS = { inventario: [['productos', 'Productos']], movalmacen: [['facturar', 'Facturar'], ['ingresar', 'Operaciones de inventario'], ['notas', 'Notas emitidas'], ['ingresos', 'Historial de operaciones'], ['tiendas', 'Inversión por tienda']] };
+    const ALM_TABS = { precios: [['ordenes', 'Por actualizar'], ['completas', 'Historial']], inventario: [['productos', 'Productos']], movalmacen: [['facturar', 'Facturar'], ['compra', 'Compra con foto'], ['ingresar', 'Operaciones de inventario'], ['notas', 'Notas emitidas'], ['ingresos', 'Historial de operaciones'], ['tiendas', 'Inversión por tienda']] };
     const ALM_OPS = [['COMPRA', 'Compra a proveedor'], ['SIN_FACTURA', 'Ingreso sin factura'], ['DEVOLUCION', 'Devolución de cliente'], ['AJUSTE', 'Ajuste de inventario'], ['DESCUENTO', 'Descuento de inventario']];
     const ALM_EMPRESA = { nombre: 'DISTRIBUIDORA PLAZA VALENCIA 20, C.A.', rif: 'J-50076678-5', direccion: 'Av. Carabobo C/C Rocío e Infante, Casa Nro 84-15, Zona Candelaria, Valencia, Carabobo', telefono: '0414-9403766' };
     const almCant = (n, tipo) => new Intl.NumberFormat('es-VE', { minimumFractionDigits: tipo === 'Pesado' ? 3 : 0, maximumFractionDigits: 3 }).format(Number(n) || 0);
@@ -10577,7 +10656,7 @@
     function almUsar(r) {
         almDatosEn = Date.now();
         almDatos = { productos: r.productos || [], clientes: r.clientes || [], categorias: r.categorias || [], proveedores: r.proveedores || [],
-                     proximaNota: r.proximaNota || '', proximoIngreso: r.proximoIngreso || '', telegram: !!r.telegram, pendientes: r.pendientes || null };
+                     proximaNota: r.proximaNota || '', proximoIngreso: r.proximoIngreso || '', telegram: !!r.telegram, pendientes: r.pendientes || null, precios: r.precios || {} };
         almPintar();
     }
     function almModo(t) {
@@ -10587,8 +10666,10 @@
         almEnfocar();
     }
     function almPintar() {
-        if (!almDatos || (vistaActual !== 'inventario' && vistaActual !== 'movalmacen')) return;
+        if (!almDatos || (vistaActual !== 'inventario' && vistaActual !== 'movalmacen' && vistaActual !== 'precios')) return;
         const out = document.getElementById('almContenido');
+        if (almTab === 'compra') { cmpPintarCompra(out); return; }   // la compra se dibuja aparte: sus campos se actualizan uno a uno
+        if (almTab === 'ordenes' || almTab === 'completas') { pintarConservando(out, cmpOrdenesVista()); if (!cmpOrd || (cmpOrd.ver !== (almTab === 'completas' ? 'completas' : 'pendientes') && !cmpOrd.cargando)) cmpCargarOrdenes(); return; }
         pintarConservando(out, (almVista === 'movalmacen' ? almPendientesHTML() : '') + (almTab === 'productos' ? almProductosVista() : almTab === 'facturar' ? almFacturarVista() : almTab === 'ingresar' ? almIngresarVista()
                               : almTab === 'notas' ? almNotasVista() : almTab === 'tiendas' ? almTiendasVista() : almIngresosVista()));
         if (almTab === 'notas' && !almNotas) almCargarNotas();
@@ -11179,6 +11260,7 @@
             const r = await llamarApi({ action: 'alm_proveedor_guardar', nombre: v('almNpN'), rif: v('almNpR'), telefono: v('almNpT'), contacto: v('almNpC') });
             almCerrar(); almUsar(r);
             if (almTab === 'ingresar' && !almIng.listo) almProvElegir(r.proveedorId);
+            if (almTab === 'compra') { cmp.proveedorId = r.proveedorId; cmpPintarCompra(document.getElementById('almContenido'), true); }
             mostrarBanner('Proveedor registrado: ' + r.proveedorId + '.', 'ok');
         } catch (e) { document.getElementById('almNpError').textContent = e.message; btn.disabled = false; btn.textContent = 'Registrar'; }
     }
@@ -11633,6 +11715,718 @@
             'Costo $': p.costo, 'Valor a costo $': almR(ex(p) * p.costo), 'Precio $': p.precio, 'Valor a precio $': almR(ex(p) * p.precio), Proveedor: p.proveedor, Estado: p.activo ? 'Activo' : 'Inactivo' }))), 'Existencia');
         X.writeFile(wb, `Existencia almacén ${fechaLocalHoy()}.xlsx`);
     }
+    // ==========================================
+    // COMPRAS CON FOTO Y PRECIOS EN TIENDAS (Compras.gs · cmp_*)
+    // Compra: foto de la factura -> Gemini la lee -> se revisa, se calcula el precio (costo ÷ (1 − %)) y se reparte a las tiendas:
+    // entra al almacén, sale una nota por tienda y lo no repartido queda en el almacén.
+    // Precios en tiendas: una orden por producto que entra; en cada tienda se marca "ingresado" y "precio actualizado" (quién, cuándo y cómo).
+    // ==========================================
+    const CMP_TIENDAS = ['Santa Rosa', 'Ricardo Urriera', 'Isabelica', 'Parcelas'];
+    const CMP_SIGLA = { 'Santa Rosa': 'SR', 'Ricardo Urriera': 'RU', 'Isabelica': 'IS', 'Parcelas': 'PA' };
+    const cmpN = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase();
+    const cmpR2 = x => Math.round((Number(x) || 0) * 100) / 100;
+    // Reglas del manual "Guía para actualización y fijación de precios de venta". Son sugerencias: todo se puede cambiar.
+    // merma: % que se suma al costo (costo real) · detal / mayor: margen sobre el precio (precio = costo ÷ (1 − %)).
+    // Al mayor se usa el costo de la factura, sin merma (el producto entero no merma). Si el producto ya tuvo precio, se sugieren SUS márgenes de la última vez.
+    // Márgenes al mayor: sacados del libro de compras 2026 (hoja "Hoja 6": mayor 1 de charcutería ≈ 9 % a 14 % sobre el costo).
+    // Márgenes al detal de víveres: los que usan en el libro (pan 20 %, harina 10 %, aceite 15 %, limpieza 30 %, atún 25 %, refresco 22 %).
+    const CMP_REGLAS = [
+        { n: 'Queso duro: costo real + $1 al detal (merma 4 % + 1 % por variación del dólar)', re: /QUESO\s+DURO/, merma: 5, detal: 'mas1', mayor: 12 },
+        { n: 'Queso guayanés: merma de 8 % sobre el costo', re: /GUAYAN/, merma: 8, detal: 25, mayor: 12 },
+        { n: 'Chuleta: merma al rebanar 6 % + costo de rebanado 5 %', re: /CHULETA/, merma: 11, detal: 25, mayor: 12 },
+        { n: 'Queso amarillo pardito: al mayor $0,50 sobre el costo (la factura trae IVA)', re: /PARDITO/, merma: 0, detal: 25, mayor: 'mas050' },
+        { n: 'Huevos medio cartón: mitad de (caja + $5) ÷ 12', re: /HUEVO/, re2: /MEDIO/, especial: 'huevoMedio', mayor: 8 },
+        { n: 'Huevos por unidad: (precio del cartón + 10 %) ÷ 30', re: /HUEVO/, re2: /UNIDAD|\bUND\b/, especial: 'huevoUnidad', mayor: 8 },
+        { n: 'Huevos sixpack: precio por unidad × 6', re: /HUEVO/, re2: /SIX|\b6\b/, especial: 'huevoSix', mayor: 8 },
+        { n: 'Huevos por cartón: (caja + $5) ÷ 12', re: /HUEVO/, especial: 'huevoCarton', mayor: 8 },
+        { n: 'Charcutería con merma y manipulación: +25 %', cat: 'Charcutería', re: /BOLO[ÑN]A|JAMON|QUESO\s+AMARILLO|PAISA|MOZZARELLA|FIAMBRE|MORTADELA\s+(EXTRA|TAPARA)|PEPPERONI|TOCINETA/, merma: 0, detal: 25, mayor: 12 },
+        { n: 'Charcutería sin manipulación: 15 % a 20 %', cat: 'Charcutería', re: /MORTADELA|SALCHICHA|CHORIZO|MASA|TEQUE/, merma: 0, detal: 18, mayor: 10 },
+        { n: 'Charcutería: revise la merma y la competencia', cat: 'Charcutería', merma: 0, detal: 25, mayor: 12 },
+        { n: 'Víveres esenciales (harina, arroz): 10 %', cat: 'Víveres', re: /HARINA|ARROZ/, detal: 10, mayor: 7 },
+        { n: 'Aceite: 15 % (libro de compras)', cat: 'Víveres', re: /ACEITE/, detal: 15, mayor: 10 },
+        { n: 'Limpieza (cloro, desinfectante, jabón...): 30 % (libro de compras)', re: /CLORO|DESINFECTANTE|JABON|DETERGENTE|LAVAPLATOS|SUAVIZANTE|LIMPIADOR|LEJIA/, detal: 30, mayor: 18 },
+        { n: 'Enlatados (atún, sardina): 25 % (libro de compras)', cat: 'Víveres', re: /ATUN|SARDINA/, detal: 25, mayor: 15 },
+        { n: 'Pan: 20 % (libro de compras)', cat: 'Víveres', re: /\bPAN\b|PAN\s+BAKED|SANDWICH|BIMBO/, detal: 20, mayor: 12 },
+        { n: 'Víveres complementarios: 20 % a 25 %', cat: 'Víveres', re: /AVENA|AZUCAR|KETCHUP|MAYONESA|SALSA|PASTA|CARAOTA/, detal: 20, mayor: 13 },
+        { n: 'Gravado económico (snack, cereal, dulce): hasta 40 %', cat: 'Víveres', iva: true, re: /SNACK|CEREAL|CHOCOLATE|CARAMELO|GALLETA|DULCE|CHUPETA|CHICLE|PAPITA/, detal: 40, mayor: 25 },
+        { n: 'Gravado de poco valor (costo menor a $1): hasta 40 %', cat: 'Víveres', iva: true, max: 1, detal: 40, mayor: 25 },
+        { n: 'Víveres gravados: 20 % a 40 %', cat: 'Víveres', iva: true, detal: 25, mayor: 15 },
+        { n: 'Víveres exentos (cesta básica): 10 % a 15 %', cat: 'Víveres', detal: 12, mayor: 8 },
+        { n: 'Refrescos y bebidas: 22 % (libro de compras)', cat: 'Bebidas y lácteos', re: /REFRESCO|JUGO|AGUA|MALTA|BEBIDA|GOLDEN/, detal: 22, mayor: 13 },
+        { n: 'Bebidas y lácteos', cat: 'Bebidas y lácteos', detal: 20, mayor: 12 },
+        { n: 'Insumos: se actualiza el costo (no se venden)', cat: 'Insumos', detal: 0, mayor: 0 }
+    ];
+    function cmpRegla(p, costo) {
+        const n = cmpN(p.descripcion);
+        return CMP_REGLAS.find(r => (!r.cat || r.cat === p.categoria) && (!r.re || r.re.test(n)) && (!r.re2 || r.re2.test(n)) && (r.iva == null || (p.iva !== 'Exento') === r.iva) && (r.max == null || costo < r.max))
+            || { n: 'Sin regla en el manual: revise el margen', detal: 20, mayor: 12, merma: 0 };
+    }
+    // Psicología del precio (manual): terminar en 7 o 9 (0,95 -> 0,97) y, si apenas pasa de un entero, quedarse en ,99 (1,05 -> 0,99).
+    // Bajar a ,99 solo si conserva al menos el 70 % del margen buscado (con costo); si no, sube (harina al 10 %: 1,06 -> 1,07, no 0,99)
+    // Apagada al empezar: el libro de compras redondea al centavo (se enciende en la compra o en la calculadora y el equipo lo recuerda)
+    let cmpPsicoActivo = (() => { try { return localStorage.getItem('cmp_psico') === '1'; } catch (e) { return false; } })();
+    function cmpPsico(x, costo) {
+        if (!(x > 0)) return 0;
+        if (!cmpPsicoActivo) return Math.round(x * 100 + 1e-6) / 100;   // sin terminación: al centavo, como en el libro de compras
+        const c = Math.round(x * 100);
+        if (c >= 100 && c % 100 <= 6) {
+            const baja = (Math.floor(c / 100) * 100 - 1) / 100;
+            if (!(costo > 0) || (1 - costo / baja) >= 0.7 * (1 - costo / x)) return baja;
+        }
+        const fin = d => c + ((d - c % 10) + 10) % 10;
+        return Math.min(fin(7), fin(9)) / 100;
+    }
+    function cmpEspecial(tipo, costo) {
+        if (tipo === 'huevoCarton') return cmpPsico(costo + 5 / 12);
+        if (tipo === 'huevoMedio') return cmpPsico(costo + 5 / 24);
+        const carton = almDatos.productos.find(x => /HUEVO/.test(cmpN(x.descripcion)) && /CARTON/.test(cmpN(x.descripcion)) && !/MEDIO/.test(cmpN(x.descripcion)));
+        const precioCarton = (carton && ((almDatos.precios || {})[carton.codigo] || {}).detal) || (costo * 30 + 5 / 12);
+        const unidad = cmpR2(precioCarton * 1.10 / 30);
+        return tipo === 'huevoSix' ? cmpPsico(unidad * 6) : unidad;
+    }
+    // Al mayor solo se vende charcutería: los demás productos tienen solo precio al detal
+    const cmpVendeMayor = p => !!p && p.categoria === 'Charcutería';
+    // Precios de un producto con su costo, merma y márgenes. libre: la persona cambió el margen (la regla especial ya no manda)
+    function cmpPrecios(p, costo, v, libre) {
+        const r = libre ? {} : cmpRegla(p, costo), costoReal = costo * (1 + (v.merma || 0) / 100);
+        if (p.categoria === 'Insumos') return { costoReal, detal: cmpR2(costoReal), mayor: 0, margenDetal: 0, margenMayor: 0 };
+        const detal = r.detal === 'mas1' ? cmpR2(costoReal + 1) : r.especial ? cmpEspecial(r.especial, costo) : (v.margenDetal >= 100 ? 0 : cmpPsico(costoReal / (1 - (v.margenDetal || 0) / 100), costoReal));
+        const mayor = !cmpVendeMayor(p) ? 0 : r.mayor === 'mas050' ? cmpR2(costo + 0.5) : (v.margenMayor >= 100 ? 0 : Math.round(costo / (1 - (v.margenMayor || 0) / 100) * 100 + 1e-6) / 100);   // al mayor: al centavo, sin terminación
+        return { costoReal, detal, mayor, margenDetal: detal > 0 ? cmpR2((1 - costoReal / detal) * 100) : 0, margenMayor: mayor > 0 ? cmpR2((1 - costo / mayor) * 100) : 0 };
+    }
+    // Sugerencia: los márgenes de la última vez (si tuvo precio) o la regla del manual
+    // Producto de un renglón: el del catálogo (por código) o, sin código, uno "libre" con la descripción de la factura
+    // (víveres que se reparten completos a las tiendas: no hace falta registrarlos; su precio se recuerda por la descripción)
+    const cmpClaveLibre = d => 'D:' + cmpN(d).replace(/[^A-Z0-9]/g, '').slice(0, 100);
+    function cmpProd(l) {
+        // Del catálogo; el IVA lo dice la factura (el catálogo de BigSoft no lo trae): gravado en la factura = gravado para el margen
+        if (l.codigo) { const p = almProducto(l.codigo); return p ? (l.iva > 0 && p.iva === 'Exento' ? Object.assign({}, p, { iva: 'IVA 16%' }) : p) : null; }
+        return l.descripcion ? { codigo: '', descripcion: l.descripcion, categoria: l.categoria || 'Víveres', tipo: 'Unidad', iva: l.iva > 0 ? 'IVA 16%' : 'Exento', libre: true } : null;
+    }
+    const cmpClaveProd = p => p.codigo || cmpClaveLibre(p.descripcion);
+    // Sugerencia: los márgenes de la última vez (si tuvo precio) o la regla del manual
+    function cmpSugerir(p, costo) {
+        if (typeof p === 'string') p = almProducto(p);
+        if (!p) return null;
+        const r = cmpRegla(p, costo), ant = (almDatos.precios || {})[cmpClaveProd(p)];
+        const usaAnt = !!(ant && !r.especial && typeof r.detal === 'number' && r.detal > 0 && ant.margenDetal > 0);
+        const v = { merma: usaAnt ? ant.merma : (r.merma || 0), margenDetal: usaAnt ? ant.margenDetal : (typeof r.detal === 'number' ? r.detal : 0),
+                    margenMayor: !cmpVendeMayor(p) ? 0 : usaAnt && ant.margenMayor > 0 ? ant.margenMayor : (typeof r.mayor === 'number' ? r.mayor : 0) };
+        const pr = cmpPrecios(p, costo, v, usaAnt);
+        return Object.assign(v, pr, { regla: usaAnt ? `Márgenes de la última vez (${fmt(ant.margenDetal)} % al detal)` : r.n, libre: usaAnt, ant: ant || null });
+    }
+
+    // ---------- Compra con foto ----------
+    let cmp = { paso: 'foto', fotos: [], leyendo: false, proveedorId: '', proveedorLeido: null, factura: '', fechaFactura: '', lineas: [], leido: null, enlaces: [], resultado: null };
+    let cmpCompras = null;
+    function cmpLineaNueva(x) { return Object.assign({ codigo: '', descripcion: '', categoria: 'Víveres', iva: 0, conversion: '', claveProveedor: '', descripcionFactura: '', unidad: '', cantidad: 0, costo: 0, merma: 0, margenDetal: 0, detal: 0, margenMayor: 0, mayor: 0, regla: '', libre: false, dist: {} }, x || {}); }
+    function cmpPintarCompra(out, forzar) {
+        // Mientras se escribe en la tabla no se redibuja (se perdería el cursor): solo al cambiar de paso, de renglones o de proveedor
+        if (!forzar && out.querySelector('#cmpTabla') && cmp.paso === 'revisar' && out.dataset.cmpPaso === 'revisar') return;
+        out.dataset.cmpPaso = cmp.paso;
+        out.innerHTML = cmp.paso === 'revisar' ? cmpRevisarVista() : cmp.paso === 'listo' ? cmpListoVista() : cmpFotoVista();
+        if (cmp.paso === 'foto' && !cmpCompras) cmpCargarCompras();
+    }
+    // ---------- Plan B: transcribir con cualquier IA (ChatGPT, Gemini, Claude...) y pegar el texto ----------
+    const CMP_PROMPT = `Transcribe la factura de compra de la foto. Responde SOLO con texto en este formato exacto, sin explicaciones, sin tablas de markdown y sin comillas:
+
+PROVEEDOR: <nombre del proveedor> | RIF: <rif>
+FACTURA: <número de factura o control> | FECHA: <AAAA-MM-DD> | MONEDA: <USD o BS> | TASA: <tasa de cambio si aparece, si no 0>
+TOTAL: <total de la factura, en la misma moneda de los costos>
+CODIGO | BARRAS | DESCRIPCION | CANTIDAD | UNIDAD | UNIDADES_POR_EMPAQUE | COSTO_UNITARIO | IVA | TOTAL
+<un renglón por producto, en el mismo orden de la factura>
+
+Reglas:
+- Una línea por producto, con los campos separados por " | ".
+- Números con punto decimal y sin separador de miles (ejemplo: 1234.50).
+- COSTO_UNITARIO = precio unitario SIN IVA, tal como aparece en la factura.
+- IVA = 16 si el producto es gravado (G) y 0 si es exento (E).
+- UNIDAD: UND, KG, CAJA, BULTO, PAQUETE o FARDO, como diga la factura.
+- UNIDADES_POR_EMPAQUE: si es CAJA, BULTO, PAQUETE o FARDO, cuántas unidades trae (por ejemplo 12X800ML = 12); si no, 0.
+- CODIGO: el código del producto del proveedor. BARRAS: el código de barras si aparece; si no, déjalo vacío.
+- No inventes datos: si algo no se ve, déjalo vacío.`;
+    // Lee el texto que devolvió la IA: el formato de arriba, una tabla con | o el JSON de Gemini
+    function cmpLeerTexto(txt) {
+        txt = String(txt || '').replace(/```[a-z]*/gi, '').trim();
+        if (!txt) throw new Error('Pegue el texto que respondió la IA');
+        const num = s => {
+            s = String(s == null ? '' : s).replace(/[^\d.,-]/g, '');
+            if (!s) return 0;
+            const coma = s.lastIndexOf(','), punto = s.lastIndexOf('.');
+            if (coma > -1 && punto > -1) s = coma > punto ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, '');
+            else if (coma > -1) s = s.split(',').length > 2 ? s.replace(/,/g, '') : s.replace(',', '.');   // "12,5" decimal; "1,234,567" miles
+            else if (s.split('.').length > 2) s = s.replace(/\./g, '');                                       // "1.234.567" miles
+            return Number(s) || 0;
+        };
+        const fecha = s => { s = String(s || '').trim(); const m = /^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/.exec(s); return m ? `${m[3].length === 2 ? '20' + m[3] : m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}` : s; };
+        if (/^\{/.test(txt)) {   // JSON (como el que devuelve Gemini)
+            const j = JSON.parse(txt);
+            if (!Array.isArray(j.lineas)) throw new Error('El JSON no trae "lineas"');
+            return j;
+        }
+        const f = { proveedor: { nombre: '', rif: '' }, factura: '', fecha: '', moneda: 'USD', tasa: 0, total: 0, lineas: [] };
+        const clave = k => cmpN(k).replace(/[^A-Z_]/g, '');
+        let cab = null;
+        const ORDEN = ['CODIGO', 'BARRAS', 'DESCRIPCION', 'CANTIDAD', 'UNIDAD', 'UNIDADES_POR_EMPAQUE', 'COSTO_UNITARIO', 'IVA', 'TOTAL'];
+        txt.split(/\r?\n/).map(l => l.trim()).filter(Boolean).forEach(l => {
+            if (/^[\s|:\-]+$/.test(l)) return;   // separador de tabla
+            let celdas = l.split('|').map(x => x.trim());
+            // Bordes de tabla markdown ("| a | b |"): solo si la línea abre Y cierra con "|". Si solo empieza con "|",
+            // es un código vacío ("|  | REFRESCO ..." = sin código y sin barras) y no se quita (si no, se corren las columnas)
+            if (/^\|.*\|$/.test(l)) { celdas.shift(); celdas.pop(); }
+            // Si sobra o falta una celda al principio respecto a los títulos, se alinea por la columna de la cantidad (la primera que es solo número después del texto)
+            if (cab && celdas.length !== cab.length && Math.abs(celdas.length - cab.length) === 1) {
+                const iDesc = cab.indexOf('DESCRIPCION'), conTexto = celdas.findIndex(c => /[A-Za-zÁÉÍÓÚÑáéíóúñ]{3,}/.test(c) && !/^(UND|KG|CAJA|BULTO|PAQUETE|FARDO)$/i.test(c));
+                if (iDesc >= 0 && conTexto >= 0 && conTexto !== iDesc) { const d = iDesc - conTexto; celdas = d > 0 ? Array(d).fill('').concat(celdas) : celdas.slice(-d); }
+            }
+            // Datos de la factura: "CLAVE: valor | CLAVE: valor"
+            if (celdas.every(c => /^[A-ZÁÉÍÓÚÑa-záéíóúñ_ ]+\s*:/.test(c)) && !/DESCRIPCION/.test(clave(l))) {
+                celdas.forEach(c => {
+                    const i = c.indexOf(':'), k = clave(c.slice(0, i)), v = c.slice(i + 1).trim();
+                    if (k === 'PROVEEDOR') f.proveedor.nombre = v; else if (k === 'RIF') f.proveedor.rif = v; else if (k === 'FACTURA' || k === 'NFACTURA') f.factura = v;
+                    else if (k === 'FECHA') f.fecha = fecha(v); else if (k === 'MONEDA') f.moneda = /BS|BOL/i.test(v) ? 'BS' : 'USD'; else if (k === 'TASA') f.tasa = num(v); else if (k === 'TOTAL') f.total = num(v);
+                });
+                return;
+            }
+            if (celdas.length < 4) return;
+            if (celdas.some(c => clave(c) === 'DESCRIPCION')) { cab = celdas.map(clave); return; }   // títulos de las columnas
+            const col = n => { const i = (cab || ORDEN).indexOf(n); return i >= 0 ? celdas[i] : ''; };
+            const desc = col('DESCRIPCION'); if (!desc) return;
+            f.lineas.push({ codigoProveedor: col('CODIGO'), codigoBarras: col('BARRAS'), descripcion: desc, cantidad: num(col('CANTIDAD')), unidad: col('UNIDAD'),
+                            unidadesPorEmpaque: num(col('UNIDADES_POR_EMPAQUE')), costoUnitario: num(col('COSTO_UNITARIO')), iva: num(col('IVA')), total: num(col('TOTAL')) });
+        });
+        if (!f.lineas.length) throw new Error('No encontré los renglones de productos. Revise que la IA respondió con el formato del mensaje (una línea por producto con |).');
+        return f;
+    }
+    async function cmpCopiarPrompt(btn) {
+        try { await navigator.clipboard.writeText(CMP_PROMPT); btn.textContent = '✓ Copiado'; }
+        catch (e) { const a = document.getElementById('cmpPrompt'); a.select(); document.execCommand('copy'); btn.textContent = '✓ Copiado'; }
+        setTimeout(() => { btn.textContent = 'Copiar mensaje'; }, 2500);
+    }
+    async function cmpUsarTexto() {
+        const err = document.getElementById('cmpError'), btn = document.getElementById('cmpBtnTexto');
+        err.textContent = '';
+        let f;
+        try { f = cmpLeerTexto(document.getElementById('cmpTexto').value); } catch (e) { err.textContent = e.message; return; }
+        btnCargando(btn, 'Enlazando códigos...');
+        try { cmp.modoTexto = false; cmpUsarLectura(await llamarApi({ action: 'cmp_enlazar', factura: f })); }
+        catch (e) { cmp.modoTexto = true; err.textContent = e.message; btn.disabled = false; btn.textContent = 'Leer texto'; }
+    }
+    function cmpTextoVista() {
+        return `<div class="grafico-card">
+                <h3 style="margin-top:0">Pegar el texto de otra IA</h3>
+                <div class="nota" style="margin-top:0">Sirve con ChatGPT, Gemini, Claude o cualquier IA que lea fotos (en el teléfono o la PC). El sistema enlaza los códigos y arma la distribución igual que con la foto.</div>
+                <ol class="cmp-pasos"><li><b>Copie este mensaje</b> <button type="button" class="btn-ghost btn-mini" onclick="cmpCopiarPrompt(this)">Copiar mensaje</button></li>
+                    <li>En la IA, <b>pegue el mensaje y adjunte la foto</b> de la factura.</li>
+                    <li><b>Copie la respuesta completa</b> y péguela aquí abajo.</li></ol>
+                <textarea id="cmpPrompt" class="cmp-prompt" rows="5" readonly>${esc(CMP_PROMPT)}</textarea>
+                <label for="cmpTexto">Respuesta de la IA</label>
+                <textarea id="cmpTexto" rows="10" placeholder="PROVEEDOR: ... | RIF: ...&#10;FACTURA: ... | FECHA: ...&#10;CODIGO | BARRAS | DESCRIPCION | CANTIDAD | ..."></textarea>
+                <div class="login-error" id="cmpError"></div>
+                <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-ghost" onclick="cmp.modoTexto=false;cmpPintarCompra(document.getElementById('almContenido'), true)">Volver</button>
+                    <button type="button" class="btn-primary" id="cmpBtnTexto" onclick="cmpUsarTexto()">Leer texto</button></div></div>`;
+    }
+    function cmpFotoVista() {
+        const ultimas = cmpCompras ? cmpCompras.slice(0, 15) : null;
+        if (cmp.modoTexto) return cmpTextoVista();
+        return `<div class="grafico-card">
+                <h3 style="margin-top:0">Compra con foto de la factura</h3>
+                <div class="nota" style="margin-top:0">Tome la foto derecha, completa y con buena luz. Si la factura tiene varias páginas, una foto por página (hasta 4). Gemini lee proveedor, productos, cantidades y costos; usted revisa todo antes de guardar.</div>
+                <div class="cmp-fotos">${cmp.fotos.map((f, i) => `<div class="cmp-foto"><img src="${f}" alt="Página ${i + 1}"><button type="button" title="Quitar" onclick="cmp.fotos.splice(${i},1);almPintar()">✕</button></div>`).join('')}
+                    ${cmp.fotos.length < 4 ? `<label class="cmp-agregar">＋ ${cmp.fotos.length ? 'Otra página' : 'Tomar o elegir foto'}<input type="file" accept="image/*" capture="environment" multiple hidden onchange="cmpAgregarFotos(this.files); this.value=''"></label>` : ''}</div>
+                <div class="login-error" id="cmpError"></div>
+                <div class="req-acciones" style="margin-bottom:0"><button type="button" class="btn-ghost" onclick="cmpSinFoto()">Escribir sin foto</button>
+                    <button type="button" class="btn-ghost" onclick="cmp.modoTexto=true;cmpPintarCompra(document.getElementById('almContenido'), true)">Pegar texto de otra IA</button>
+                    <button type="button" class="btn-primary" id="cmpBtnLeer" onclick="cmpLeer()" ${cmp.fotos.length && !cmp.leyendo ? '' : 'disabled'}>${cmp.leyendo ? 'Leyendo la factura...' : 'Leer factura'}</button></div>
+            </div>
+            <div class="grafico-card"><div class="grafico-head"><h3>Compras recientes</h3></div>
+                ${!ultimas ? cargandoHTML('Cargando compras...') : !ultimas.length ? '<div class="empty">Todavía no hay compras registradas con foto.</div>'
+                : `<div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">N°</th><th class="izq">Fecha</th><th class="izq">Proveedor · factura</th><th>Renglones</th><th>Costo $</th><th class="izq">Notas a tiendas</th><th class="izq">Quedó en almacén</th><th></th></tr></thead><tbody>
+                    ${ultimas.map(c => `<tr><td class="izq"><b>${esc(c.numero)}</b></td><td class="izq">${fechaBonita(c.fecha)} <small>${esc(c.hora)}</small></td><td class="izq">${esc(c.proveedor)}<small>Factura ${esc(c.factura || 's/n')} · ${esc(c.usuario)}</small></td>
+                        <td>${c.renglones}</td><td>${fmt(c.total)}</td><td class="izq"><small>${Object.keys(c.notas).map(k => esc(CMP_SIGLA[k] || k) + ' ' + esc(c.notas[k])).join(' · ') || '—'}</small></td>
+                        <td class="izq"><small>${Object.keys(c.queda).map(k => { const p = almProducto(k); return esc(p ? p.descripcion : k) + ': ' + almCant(c.queda[k], p && p.tipo) + ' ' + almUnidad(p && p.tipo); }).join('<br>') || 'Nada'}</small></td>
+                        <td>${c.fotos.map((u, i) => `<a class="btn-ghost btn-mini" href="${esc(u)}" target="_blank" rel="noopener">Foto${c.fotos.length > 1 ? ' ' + (i + 1) : ''}</a>`).join(' ')}</td></tr>`).join('')}</tbody></table></div>`}</div>`;
+    }
+    async function cmpCargarCompras() {
+        cmpCompras = [];   // mientras carga no se vuelve a pedir
+        try { cmpCompras = (await llamarApi({ action: 'cmp_compras' })).compras || []; } catch (e) { mostrarBanner('No se pudieron leer las compras: ' + e.message, 'error'); }
+        if (almTab === 'compra' && cmp.paso === 'foto') cmpPintarCompra(document.getElementById('almContenido'), true);
+    }
+    // La foto se achica en el equipo (1800 px, JPEG): sube rápido y Gemini la lee igual de bien
+    async function cmpComprimir(file) {
+        const url = URL.createObjectURL(file), img = new Image();
+        try {
+            await new Promise((ok, mal) => { img.onload = ok; img.onerror = () => mal(new Error('No se pudo abrir la imagen ' + file.name)); img.src = url; });
+            const k = Math.min(1, 1800 / Math.max(img.width, img.height)), c = document.createElement('canvas');
+            c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+            c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+            return c.toDataURL('image/jpeg', 0.82);
+        } finally { URL.revokeObjectURL(url); }
+    }
+    async function cmpAgregarFotos(files) {
+        try { for (const f of [...files].slice(0, 4 - cmp.fotos.length)) cmp.fotos.push(await cmpComprimir(f)); }
+        catch (e) { mostrarBanner(e.message, 'error'); }
+        cmpPintarCompra(document.getElementById('almContenido'), true);
+    }
+    // Leer: con reloj en el botón y un límite de 2 minutos; cualquier error (también al armar la tabla) se muestra
+    async function cmpLeer() {
+        if (!cmp.fotos.length || cmp.leyendo) return;
+        const out = () => document.getElementById('almContenido'), desde = Date.now();
+        cmp.leyendo = true; cmpPintarCompra(out(), true);
+        const reloj = setInterval(() => { const b = document.getElementById('cmpBtnLeer'); if (b && cmp.leyendo) b.textContent = `Leyendo la factura... ${Math.round((Date.now() - desde) / 1000)} s`; }, 1000);
+        try {
+            const r = await Promise.race([llamarApi({ action: 'cmp_leer', imagenes: cmp.fotos }),
+                new Promise((_, mal) => setTimeout(() => mal(new Error('Gemini tardó más de 2 minutos sin responder. Vuelva a intentar; si se repite, recorte la foto a solo la factura.')), 120000))]);
+            cmp.leyendo = false;
+            cmpUsarLectura(r);
+        } catch (e) {
+            cmp.leyendo = false; cmp.paso = 'foto';
+            cmpPintarCompra(out(), true);
+            const el = document.getElementById('cmpError'); if (el) el.textContent = 'No se pudo leer la factura: ' + (e && e.message || e);
+            console.error(e);
+        } finally { clearInterval(reloj); }
+    }
+    function cmpUsarLectura(r) {
+        const tasa = r.moneda === 'BS' ? (r.tasa || almTasa()) : 0;
+        const lineas = (r.lineas || []).map(l => {
+            // Costo en $ con el IVA incluido (es lo que se paga); si la factura está en Bs, se pasa a $ con su tasa
+            let costo = l.costoUnitario * (1 + (l.iva || 0) / 100), cantidad = l.cantidad, conversion = '';
+            if (tasa > 0) costo = costo / tasa;
+            // Caja, bulto o paquete: se pasa a unidades (se ingresa y se reparte por unidad). "12X800ML" = 12 unidades por caja
+            const porEmpaque = l.porEmpaque > 1 ? l.porEmpaque : Number((/(\d+)\s*[Xx]\s*\d/.exec(l.descripcionFactura || '') || [])[1]) || 0;
+            if (/CAJA|BULTO|FARDO|PAQ|BOLSA|DOCENA|\bCJ\b|\bBL\b/i.test(l.unidad || '') && porEmpaque > 1) {
+                conversion = `${fmt(cantidad)} ${String(l.unidad).toLowerCase()} × ${porEmpaque} = ${fmt(cantidad * porEmpaque)} unidades a $ ${fmt(costo / porEmpaque)}`;
+                cantidad = cantidad * porEmpaque; costo = costo / porEmpaque;
+            }
+            const x = cmpLineaNueva({ codigo: l.codigo, descripcion: String(l.descripcionFactura || '').trim().toUpperCase(), claveProveedor: l.claveProveedor,
+                                      descripcionFactura: [l.codigoProveedor, l.descripcionFactura].filter(Boolean).join(' · '), iva: l.iva || 0, conversion,
+                                      unidad: l.unidad, cantidad: Math.round(cantidad * 1000) / 1000, costo: Math.round(costo * 10000) / 10000, origenCodigo: l.origenCodigo });
+            cmpAplicarSugerencia(x);
+            return x;
+        });
+        Object.assign(cmp, { paso: 'revisar', leido: r, proveedorId: r.proveedorId || '', proveedorLeido: r.proveedorLeido || null, factura: r.factura || '', fechaFactura: r.fechaFactura || '', enlaces: r.fotos || [], lineas });
+        if (!cmp.lineas.length) cmp.lineas.push(cmpLineaNueva());
+        cmpPintarCompra(document.getElementById('almContenido'), true);
+        if (tasa > 0) mostrarBanner(`La factura está en bolívares: los costos se pasaron a $ con la tasa ${fmt(tasa)}. Revíselos.`, 'warn');
+    }
+    function cmpSinFoto() {
+        Object.assign(cmp, { paso: 'revisar', leido: null, proveedorId: '', proveedorLeido: null, factura: '', fechaFactura: fechaLocalHoy(), enlaces: [], lineas: [cmpLineaNueva()] });
+        cmpPintarCompra(document.getElementById('almContenido'), true);
+    }
+    // Interruptor "terminación psicológica": se recalculan los precios de la compra (respetando los márgenes escritos)
+    function cmpCambiarPsico(activo) {
+        cmpPsicoActivo = activo;
+        try { localStorage.setItem('cmp_psico', activo ? '1' : '0'); } catch (e) {}
+        cmp.lineas.forEach(l => { const p = cmpProd(l); if (!p) return; const pr = cmpPrecios(p, l.costo, l, l.libre); l.detal = pr.detal; l.margenDetal = pr.margenDetal; });
+        if (almTab === 'compra' && cmp.paso === 'revisar') cmpPintarCompra(document.getElementById('almContenido'), true);
+    }
+    function cmpAplicarSugerencia(l) {
+        const s = cmpSugerir(cmpProd(l), l.costo);
+        if (!s) { l.regla = ''; return; }
+        Object.assign(l, { merma: s.merma, margenDetal: s.margenDetal, detal: s.detal, margenMayor: s.margenMayor, mayor: s.mayor, regla: s.regla, libre: s.libre,
+                           detalAnt: s.ant ? s.ant.detal : 0, mayorAnt: s.ant ? s.ant.mayor : 0 });
+    }
+    const cmpRepartido = l => CMP_TIENDAS.reduce((s, t) => s + (Number(l.dist[t]) || 0), 0);
+    function cmpFilaHTML(l, i) {
+        const p = cmpProd(l), mal = l.codigo && !p, tasa = almTasa(), mayor = cmpVendeMayor(p);
+        const n = (c, v, cls, extra) => `<input type="number" class="${cls}" step="${c === 'cantidad' ? 'any' : '0.01'}" min="0" value="${v ? v : ''}" data-i="${i}" data-c="${c}" oninput="cmpEntrada(this)" ${extra || ''}>`;
+        const costoReal = l.costo * (1 + (l.merma || 0) / 100), queda = cmpR2(l.cantidad - cmpRepartido(l));
+        const bs = v => v > 0 && tasa ? fmt(v * tasa) : '—';
+        return `<tr id="cmpF${i}" class="${mal ? 'cmp-mal' : ''}">
+            <td>${i + 1}</td>
+            <td class="izq"><div class="cmp-prod"><input type="text" class="cmp-cod" list="cmpProds" value="${esc(l.codigo)}" placeholder="Código" autocomplete="off" onchange="cmpCodigo(${i}, this.value)">
+                ${p && !p.libre ? `<b>${esc(p.descripcion)}</b>` : `<input type="text" class="cmp-desc" value="${esc(l.descripcion)}" placeholder="Descripción del producto" autocomplete="off" oninput="cmp.lineas[${i}].descripcion=this.value" onchange="cmpDescripcion(${i})">`}</div>
+                ${mal ? '<small style="color:var(--danger)">No existe ese código: bórrelo para trabajar con la descripción</small>' : ''}
+                ${p && p.libre ? `<small>Sin código: se reparte completo a las tiendas${queda > 0 ? ' · <a href="#" onclick="event.preventDefault(); almEditarProducto(\'\', \'\')">registrarlo para dejar en el almacén</a>' : ''}</small>` : ''}
+                ${l.conversion ? `<small>📦 ${esc(l.conversion)}</small>` : ''}
+                ${l.descripcionFactura ? `<small>Factura: ${esc(l.descripcionFactura)}${l.unidad ? ' (' + esc(l.unidad) + ')' : ''}${l.origenCodigo === 'recordado' ? ' · ✓ recordado' : l.origenCodigo === 'barras' ? ' · ✓ por código de barras' : l.origenCodigo === 'parecido' ? ' · <b>parecido: revíselo</b>' : l.origenCodigo === 'sugerido' ? ' · sugerido' : ''}</small>` : ''}
+                <small class="cmp-regla">${esc(l.regla || '')}</small></td>
+            <td>${n('cantidad', l.cantidad, 'cmp-n')}<small>${p ? almUnidad(p.tipo) : ''}</small></td>
+            <td class="g-c">${n('costo', l.costo, 'cmp-n', 'data-step="0.0001"')}${l.iva ? `<small>con IVA ${l.iva} %</small>` : ''}</td>
+            <td class="g-c">${n('merma', l.merma, 'cmp-p')}</td>
+            <td class="g-c"><span id="cmpCr${i}">${fmt(costoReal)}</span>${l.detalAnt ? `<small>Antes detal ${fmt(l.detalAnt)}</small>` : ''}</td>
+            <td class="g-m">${n('margenDetal', l.margenDetal, 'cmp-p')}</td>
+            <td class="g-u">${n('detal', l.detal, 'cmp-n')}</td>
+            <td class="g-b"><span id="cmpDb${i}">${bs(l.detal)}</span></td>
+            ${mayor ? `<td class="g-m">${n('margenMayor', l.margenMayor, 'cmp-p')}</td>
+            <td class="g-u">${n('mayor', l.mayor, 'cmp-n')}${l.mayorAnt ? `<small>Antes ${fmt(l.mayorAnt)}</small>` : ''}</td>
+            <td class="g-b"><span id="cmpMb${i}">${bs(l.mayor)}</span></td>` : '<td class="g-m"></td><td class="g-u"><small class="cmp-nomayor">Solo detal</small></td><td class="g-b"></td>'}
+            ${CMP_TIENDAS.map(t => `<td class="cmp-t g-d g-t g-t-${CMP_SIGLA[t]}">${n('dist:' + t, l.dist[t], 'cmp-d')}</td>`).join('')}
+            <td class="g-d"><b id="cmpQ${i}" style="${queda < 0 || (p && p.libre && queda > 0) ? 'color:var(--danger)' : ''}">${almCant(queda, p && p.tipo)}</b></td>
+            <td><button type="button" class="btn-ghost btn-mini" title="Quitar renglón" onclick="cmp.lineas.splice(${i},1);cmpPintarCompra(document.getElementById('almContenido'), true)">✕</button></td></tr>`;
+    }
+    // ---------- Qué columnas se ven (se recuerda en el equipo) ----------
+    const CMP_GRUPOS = [['c', 'Costos'], ['m', 'Márgenes'], ['u', 'Precios $'], ['b', 'Precios Bs'], ['d', 'Distribución']];
+    const CMP_ATAJOS = [['Descripción y costo', { c: true, m: false, u: false, b: false, d: false }], ['Precios $ y Bs', { c: false, m: true, u: true, b: true, d: false }],
+                        ['Precios en Bs', { c: false, m: false, u: false, b: true, d: false }], ['Solo distribución', { c: false, m: false, u: false, b: false, d: true }],
+                        ['Todo', { c: true, m: true, u: true, b: true, d: true }]];
+    let cmpVer = (() => { const base = { c: true, m: true, u: true, b: false, d: true, t: '' }; try { return Object.assign(base, JSON.parse(localStorage.getItem('cmp_ver') || '{}')); } catch (e) { return base; } })();
+    const cmpClaseVer = () => 'req-tabla cmp-tabla' + CMP_GRUPOS.map(([k]) => cmpVer[k] ? '' : ' x-' + k).join('') + (cmpVer.t ? ' solo-' + CMP_SIGLA[cmpVer.t] : '');
+    function cmpVerHTML() {
+        return `<div class="cmp-ver" id="cmpVer"><span class="cmp-ver-t">Ver:</span>${CMP_GRUPOS.map(([k, n]) => `<label class="cmp-chip"><input type="checkbox" ${cmpVer[k] ? 'checked' : ''} onchange="cmpCambiarVer('${k}', this.checked)"> ${n}</label>`).join('')}
+            <select onchange="cmpCambiarVer('t', this.value)" title="Ver la distribución de un solo local"><option value="">Todas las tiendas</option>${CMP_TIENDAS.map(t => `<option${t === cmpVer.t ? ' selected' : ''}>${t}</option>`).join('')}</select>
+            <span class="cmp-ver-t">Atajos:</span>${CMP_ATAJOS.map(([n], i) => `<button type="button" class="btn-ghost btn-mini" onclick="cmpAtajo(${i})">${n}</button>`).join('')}
+            <label class="interruptor cmp-psico"><input type="checkbox" ${cmpPsicoActivo ? 'checked' : ''} onchange="cmpCambiarPsico(this.checked)"><span class="sw-pista"></span> Terminación 7 · ,99</label></div>`;
+    }
+    function cmpAplicarVer() {
+        try { localStorage.setItem('cmp_ver', JSON.stringify(cmpVer)); } catch (e) {}
+        const tb = document.getElementById('cmpTabla'); if (tb) tb.className = cmpClaseVer();
+        const v = document.getElementById('cmpVer'); if (v) v.outerHTML = cmpVerHTML();
+    }
+    function cmpCambiarVer(k, v) { cmpVer[k] = v; if (k === 't' && v) cmpVer.d = true; cmpAplicarVer(); }
+    function cmpAtajo(i) { Object.assign(cmpVer, CMP_ATAJOS[i][1], { t: '' }); cmpAplicarVer(); }
+    // Descripción de un renglón sin código: se vuelve a sugerir el precio (por si tiene precio de la última vez)
+    function cmpDescripcion(i) {
+        const l = cmp.lineas[i]; l.descripcion = String(l.descripcion || '').trim().toUpperCase();
+        if (!l.codigo) cmpAplicarSugerencia(l);
+        const tr = document.getElementById('cmpF' + i); if (tr) tr.outerHTML = cmpFilaHTML(l, i);
+        document.getElementById('cmpPie').innerHTML = cmpPieHTML();
+    }
+    function cmpRevisarVista() {
+        const prov = cmp.proveedorId ? almProveedor(cmp.proveedorId) : null, pl = cmp.proveedorLeido;
+        return `<datalist id="cmpProds">${almDatos.productos.filter(p => p.activo).map(p => `<option value="${esc(p.codigo)}">${esc(p.descripcion)}</option>`).join('')}</datalist>
+            <div class="grafico-card">
+                <div class="grafico-head"><h3>Revisar la compra</h3><div class="req-acciones" style="margin:0">${cmp.enlaces.map((u, i) => `<a class="btn-ghost btn-mini" href="${esc(u)}" target="_blank" rel="noopener">Ver foto${cmp.enlaces.length > 1 ? ' ' + (i + 1) : ''}</a>`).join('')}
+                    <button type="button" class="btn-ghost btn-mini" onclick="cmpDescartar()">Descartar</button></div></div>
+                <div class="filters">
+                    <div><label for="cmpProv">Proveedor</label><select id="cmpProv" onchange="cmp.proveedorId=this.value"><option value="">Elegir...</option>${almDatos.proveedores.map(p => `<option value="${esc(p.id)}"${p.id === cmp.proveedorId ? ' selected' : ''}>${esc(p.nombre)}</option>`).join('')}</select>
+                        ${!prov && pl && pl.nombre ? `<small class="nota">Leído: <b>${esc(pl.nombre)}</b> ${esc(pl.rif || '')} — no está registrado. <a href="#" onclick="event.preventDefault(); cmpRegistrarProveedor()">Registrarlo</a></small>` : ''}</div>
+                    <div><label for="cmpFac">N° de factura</label><input type="text" id="cmpFac" maxlength="40" autocomplete="off" value="${esc(cmp.factura)}" oninput="cmp.factura=this.value"></div>
+                    <div><label for="cmpFecha">Fecha de la factura</label><input type="date" id="cmpFecha" value="${esc(cmp.fechaFactura)}" oninput="cmp.fechaFactura=this.value"></div>
+                </div>
+                <div class="nota">Escriba el <b>%</b> y el precio de venta sale solo (costo ÷ (1 − %)); también puede escribir el precio y el % se calcula. El % sale sugerido según el manual (o el de la última vez). Los productos <b>sin código</b> se trabajan con su descripción y se reparten completos; solo lo que queda en el almacén necesita estar registrado. Las cajas y bultos se pasan a unidades.</div>
+                ${cmpVerHTML()}
+                <div class="tabla-wrap"><table class="${cmpClaseVer()}" id="cmpTabla" data-sin-paginar><thead><tr><th>#</th><th class="izq">Producto</th><th>Cant.</th><th class="g-c">Costo $</th><th class="g-c">Merma %</th><th class="g-c">Costo real</th><th class="g-m">% detal</th><th class="g-u">Detal $</th><th class="g-b">Detal Bs</th><th class="g-m">% mayor</th><th class="g-u">Mayor $</th><th class="g-b">Mayor Bs</th>
+                    ${CMP_TIENDAS.map(t => `<th class="cmp-t g-d g-t g-t-${CMP_SIGLA[t]}" title="${esc(t)}">${CMP_SIGLA[t]}</th>`).join('')}<th class="g-d">Queda</th><th></th></tr></thead>
+                    <tbody>${cmp.lineas.map(cmpFilaHTML).join('')}</tbody></table></div>
+                <div class="req-acciones"><button type="button" class="btn-ghost" onclick="cmp.lineas.push(cmpLineaNueva());cmpPintarCompra(document.getElementById('almContenido'), true)">＋ Agregar renglón</button></div>
+                <div class="cmp-pie" id="cmpPie">${cmpPieHTML()}</div>
+                <div class="login-error" id="cmpError"></div>
+                <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-primary" id="cmpBtnGuardar" onclick="cmpGuardar()">Guardar compra y emitir notas</button></div>
+            </div>`;
+    }
+    function cmpDescartar() {
+        if (!confirm('¿Descartar esta compra sin guardar?')) return;
+        Object.assign(cmp, { paso: 'foto', fotos: [], lineas: [], leido: null, enlaces: [] });
+        cmpPintarCompra(document.getElementById('almContenido'), true);
+    }
+    function cmpRegistrarProveedor() {
+        const pl = cmp.proveedorLeido || {};
+        almProvTexto = pl.nombre || ''; almNuevoProveedor();
+        setTimeout(() => { const r = document.getElementById('almNpR'); if (r) r.value = pl.rif || ''; }, 50);
+    }
+    function cmpPieHTML() {
+        const total = cmp.lineas.reduce((s, l) => s + (l.cantidad || 0) * (l.costo || 0), 0);
+        let leido = cmp.leido && cmp.leido.total, enBs = '';
+        // Total de la factura en bolívares (los costos ya están en $): se compara pasándolo a $
+        if (leido && total > 0 && leido > total * 20) { const ts = (cmp.leido.tasa || almTasa()); if (ts) { enBs = ` (Bs ${fmt(leido)} a ${fmt(ts)})`; leido = leido / ts; } }
+        const porTienda = CMP_TIENDAS.map(t => { const v = cmp.lineas.reduce((s, l) => s + (Number(l.dist[t]) || 0) * (l.costo || 0), 0); return v > 0 ? `${CMP_SIGLA[t]} $ ${fmt(v)}` : ''; }).filter(Boolean);
+        return `<span>Costo de la compra: <b>$ ${fmt(total)}</b></span>${leido ? `<span>Total de la factura (leído): $ ${fmt(leido)}${enBs}${Math.abs(leido - total) > 0.02 * leido ? ' <b style="color:var(--danger)">no coincide: revise cantidades y costos</b>' : ' ✓'}</span>` : ''}
+            <span>${cmp.lineas.length} renglón(es)</span>${porTienda.length ? `<span>A tiendas (al costo): ${porTienda.join(' · ')}</span>` : '<span>Todo queda en el almacén</span>'}`;
+    }
+    function cmpCodigo(i, v) {
+        const l = cmp.lineas[i]; l.codigo = String(v || '').trim().toUpperCase();
+        const p = l.codigo ? almProducto(l.codigo) : null; if (p) { l.codigo = p.codigo; l.libre = false; }
+        cmpAplicarSugerencia(l);
+        const tr = document.getElementById('cmpF' + i); if (tr) tr.outerHTML = cmpFilaHTML(l, i);
+        document.getElementById('cmpPie').innerHTML = cmpPieHTML();
+        const sig = document.querySelector(`#cmpF${i} input[data-c="cantidad"]`); if (sig && p) sig.focus();
+    }
+    // Un campo de la tabla: se guarda y se recalcula lo que depende de él (sin redibujar: el cursor no se mueve)
+    function cmpEntrada(el) {
+        const i = Number(el.dataset.i), c = el.dataset.c, l = cmp.lineas[i], v = el.value === '' ? 0 : Number(el.value);
+        if (!l) return;
+        if (c.startsWith('dist:')) l.dist[c.slice(5)] = v; else l[c] = v;
+        const p = cmpProd(l);
+        if (p && ['costo', 'merma', 'margenDetal', 'margenMayor'].includes(c)) {
+            if (c !== 'costo') l.libre = true;   // la persona decide el margen: la regla especial ya no manda
+            const pr = cmpPrecios(p, l.costo, l, l.libre);
+            // Cada margen mueve solo su precio (merma y margen detal -> detal; margen mayor -> mayor; el costo, los dos)
+            if (c !== 'margenMayor') { l.detal = pr.detal; if (c !== 'margenDetal') l.margenDetal = pr.margenDetal; }
+            if (c === 'costo' || c === 'margenMayor') { l.mayor = pr.mayor; if (c !== 'margenMayor') l.margenMayor = pr.margenMayor; }
+        }
+        if (c === 'detal') l.margenDetal = l.detal > 0 ? cmpR2((1 - l.costo * (1 + l.merma / 100) / l.detal) * 100) : 0;
+        if (c === 'mayor') l.margenMayor = l.mayor > 0 ? cmpR2((1 - l.costo / l.mayor) * 100) : 0;
+        const fila = document.getElementById('cmpF' + i);
+        ['detal', 'mayor', 'margenDetal', 'margenMayor'].filter(k => k !== c).forEach(k => { const x = fila.querySelector(`input[data-c="${k}"]`); if (x && x !== document.activeElement) x.value = l[k] || ''; });
+        document.getElementById('cmpCr' + i).textContent = fmt(l.costo * (1 + (l.merma || 0) / 100));
+        const tasa = almTasa(), db = document.getElementById('cmpDb' + i), mb = document.getElementById('cmpMb' + i);
+        if (db) db.textContent = l.detal > 0 && tasa ? fmt(l.detal * tasa) : '—';
+        if (mb) mb.textContent = l.mayor > 0 && tasa ? fmt(l.mayor * tasa) : '—';
+        const q = cmpR2(l.cantidad - cmpRepartido(l)), qe = document.getElementById('cmpQ' + i);
+        qe.textContent = almCant(q, p && p.tipo); qe.style.color = q < 0 || (p && p.libre && q > 0) ? 'var(--danger)' : '';
+        document.getElementById('cmpPie').innerHTML = cmpPieHTML();
+    }
+    async function cmpGuardar() {
+        const err = document.getElementById('cmpError'); err.textContent = '';
+        if (!cmp.proveedorId) { err.textContent = 'Elija el proveedor (si no está, regístrelo).'; return; }
+        if (!cmp.factura.trim()) { err.textContent = 'Escriba el N° de la factura.'; return; }
+        const lineas = cmp.lineas.filter(l => l.codigo || l.descripcion || l.cantidad);
+        if (!lineas.length) { err.textContent = 'La compra no tiene productos.'; return; }
+        const queda = l => l.cantidad - cmpRepartido(l);
+        const malo = lineas.find(l => { const p = cmpProd(l); return !p || !(l.cantidad > 0) || queda(l) < -0.0005 || (p.libre && queda(l) > 0.0005); });
+        if (malo) {
+            const n = cmp.lineas.indexOf(malo) + 1, p = cmpProd(malo);
+            err.textContent = !p ? `Renglón ${n}: escriba la descripción o elija un código.` : !(malo.cantidad > 0) ? `Renglón ${n}: falta la cantidad.` : queda(malo) < 0 ? `Renglón ${n}: se reparte más de lo que llegó.`
+                : `Renglón ${n}: "${p.descripcion}" no tiene código, así que se reparte completo. Reparta lo que queda o regístrelo en el catálogo para dejarlo en el almacén.`;
+            return;
+        }
+        const notas = CMP_TIENDAS.filter(t => lineas.some(l => Number(l.dist[t]) > 0)), alAlmacen = lineas.filter(l => l.codigo).length;
+        const sinPrecio = lineas.filter(l => !(l.detal > 0) && cmpProd(l).categoria !== 'Insumos').length;
+        if (!confirm(`${alAlmacen ? alAlmacen + ' producto(s) con código entran al almacén. ' : ''}${notas.length ? 'Se emite una nota a: ' + notas.join(', ') + '.' : ''}` + (sinPrecio ? `\n${sinPrecio} producto(s) sin precio al detal: quedan "por definir precio".` : '') + '\n\n¿Guardar la compra?')) return;
+        const btn = document.getElementById('cmpBtnGuardar'); btnCargando(btn, 'Guardando...');
+        try {
+            const r = await llamarApi({ action: 'cmp_guardar', proveedorId: cmp.proveedorId, factura: cmp.factura.trim(), fechaFactura: cmp.fechaFactura, tasa: almTasa(), fotos: cmp.enlaces,
+                tasaFactura: cmp.leido && cmp.leido.moneda === 'BS' ? (cmp.leido.tasa || almTasa()) : almTasa(),
+                lineas: lineas.map(l => ({ codigo: l.codigo, descripcion: cmpProd(l).descripcion, categoria: cmpProd(l).categoria, claveProveedor: l.claveProveedor, cantidad: l.cantidad, costo: l.costo, merma: l.merma, margenDetal: l.margenDetal, detal: l.detal,
+                                           margenMayor: l.margenMayor, mayor: l.mayor, dist: l.dist })) });
+            almAplicarCambios(r.cambios);
+            if (r.proximoIngreso) almDatos.proximoIngreso = r.proximoIngreso;
+            (r.notas || []).forEach(n => almEnviarTelegram(n));   // cada nota a su grupo de Telegram, igual que al facturar
+            almNotas = null; almIngresos = null; almTiendas = null; cmpCompras = null; cmpOrd = null;
+            Object.assign(cmp, { paso: 'listo', resultado: r, fotos: [] });
+            cmpPintarCompra(document.getElementById('almContenido'), true);
+            almCargar();
+        } catch (e) { err.textContent = e.message; btn.disabled = false; btn.textContent = 'Guardar compra y emitir notas'; }
+    }
+    function cmpListoVista() {
+        const r = cmp.resultado || {};
+        return `<div class="grafico-card">
+            <h3 style="margin-top:0;color:#3a9400">✓ Compra ${esc(r.compra || '')} guardada</h3>
+            <div class="nota" style="margin-top:0">${r.ingreso ? `Entró al almacén con la operación de inventario N° ${esc(r.ingreso.numero)}. ` : ''}${(r.ordenes || []).length} orden(es) de actualización en "Precios en tiendas".${r.libro ? ` Anotada en el Libro de compras (pestaña ${esc(r.libro.hoja)}, NRO ${esc(r.libro.nro)}, ${r.libro.renglones} renglón(es)).` : ''}</div>
+            ${(r.notas || []).length ? `<h4 class="per-sub">Notas de entrega a las tiendas (se envían solas a Telegram)</h4>
+                ${(r.notas || []).map((n, i) => `<div class="cmp-marca"><span><b>N° ${esc(n.numero)}</b> · ${esc(n.cliente)} · ${n.renglones} renglón(es)</span><button type="button" class="btn-ghost btn-mini" onclick="almImprimir('nota', cmp.resultado.notas[${i}])">Imprimir</button></div>`).join('')}` : ''}
+            ${Object.keys(r.queda || {}).length ? `<h4 class="per-sub">Quedó en el almacén (por distribuir o facturar)</h4><div class="nota" style="margin-top:0">${Object.keys(r.queda).map(k => { const p = almProducto(k); return esc(p ? p.descripcion : k) + ': <b>' + almCant(r.queda[k], p && p.tipo) + ' ' + almUnidad(p && p.tipo) + '</b>'; }).join(' · ')}</div>` : ''}
+            ${(r.errores || []).length ? `<div class="banner error">No se pudo emitir: ${r.errores.map(esc).join(' · ')}. Esa mercancía quedó en el almacén: emita la nota desde Facturar.</div>` : ''}
+            <div class="req-acciones" style="margin-bottom:0">${permisos.includes('precios') ? `<button type="button" class="btn-ghost" onclick="irA('precios')">Ver precios en tiendas</button>` : ''}<button type="button" class="btn-primary" onclick="cmp.paso='foto';cmp.resultado=null;cmpPintarCompra(document.getElementById('almContenido'), true)">Nueva compra</button></div></div>`;
+    }
+
+    // ---------- Precios en tiendas: órdenes de actualización ----------
+    let cmpOrd = null, cmpOrdF = { tienda: '', estado: '', bus: '' };
+    // Cómo se ven los precios (se recuerda en el equipo): Bs a la tasa BCV, $ BCV o $ con el descuento por pago en divisas (lo que se carga en el sistema de la tienda)
+    let cmpPV = (() => { const base = { modo: 'usd', como: 'En el sistema de la tienda' }; try { return Object.assign(base, JSON.parse(localStorage.getItem('cmp_pv') || '{}')); } catch (e) { return base; } })();
+    function cmpGuardarPV() { try { localStorage.setItem('cmp_pv', JSON.stringify(cmpPV)); } catch (e) {} }
+    // El descuento por divisas es uno solo para todas las tiendas (lo guarda el servidor)
+    const cmpDesc = () => cmpOrd && cmpOrd.descDivisas != null ? Number(cmpOrd.descDivisas) : 8;
+    const cmpEnModo = v => !(v > 0) ? 0 : cmpPV.modo === 'bs' ? v * (almTasa() || 0) : cmpPV.modo === 'desc' ? v * (1 - cmpDesc() / 100) : v;
+    async function cmpCambiarDesc(el) {
+        const v = Number(el.value);
+        if (!(v >= 0 && v <= 50)) { mostrarBanner('El descuento debe estar entre 0 y 50 %', 'warn'); el.value = cmpDesc(); return; }
+        if (v === cmpDesc()) return;
+        const c = await efePedirClave('Descuento por pago en divisas', `Cambia de ${cmpDesc()} % a ${v} % para todas las tiendas.`);
+        if (!c) { el.value = cmpDesc(); return; }
+        try { cmpUsarOrdenes(await llamarApi({ action: 'cmp_desc_divisas', valor: v, claveAdmin: c, ver: cmpOrd.ver })); mostrarBanner(`Descuento por divisas: ${v} % en todas las tiendas.`, 'ok'); }
+        catch (e) { el.value = cmpDesc(); mostrarBanner(e.message, 'error'); }
+    }
+    const cmpMon = v => !(v > 0) ? '—' : cmpPV.modo === 'bs' ? (almTasa() ? 'Bs ' + fmt(cmpEnModo(v)) : 'sin tasa') : (cmpPV.modo === 'desc' ? new Intl.NumberFormat('es-VE', { minimumFractionDigits: 3, maximumFractionDigits: 3 }).format(cmpEnModo(v)) : fmt(v));   // con descuento: 3 decimales, como en el libro
+    async function cmpCargarOrdenes() {
+        const ver = almTab === 'completas' ? 'completas' : 'pendientes';
+        cmpOrd = { cargando: ver, ver: '' };
+        try { cmpOrd = await llamarApi({ action: 'cmp_ordenes', ver }); }
+        catch (e) { cmpOrd = { ver, ordenes: [], error: e.message }; }
+        almPintar();
+    }
+    function cmpUsarOrdenes(r) { if (r && r.ordenes) cmpOrd = { ordenes: r.ordenes, ver: r.ver, descDivisas: r.descDivisas, porDefinir: r.porDefinir, porActualizar: r.porActualizar }; almPintar(); }
+    const cmpFlecha = (a, b) => !a || !b || Math.abs(a - b) < 0.005 ? '' : b > a ? ` <span class="sube">▲ ${fmt((b / a - 1) * 100)} %</span>` : ` <span class="baja">▼ ${fmt((1 - b / a) * 100)} %</span>`;
+    // Lista práctica, como el libro de compras: un renglón por producto y, por tienda, botones "Ingresó" y "Precio" (un clic marca)
+    const cmpPendienteEn = (o, t) => { const m = o.marcas[t] || {}; return !m.actualizado || (((o.dist[t] || {}).cant > 0) && !m.ingresado); };
+    function cmpOrdFiltradas() {
+        const f = cmpOrdF, q = cmpN(f.bus), completas = almTab === 'completas';
+        return cmpOrd.ordenes.filter(o => (!q || cmpN(o.codigo + ' ' + o.descripcion + ' ' + o.proveedor + ' ' + o.origen).includes(q))
+            && (completas || !f.estado || o.estado === f.estado) && (completas || !f.tienda || cmpPendienteEn(o, f.tienda)));
+    }
+    function cmpOrdenesVista() {
+        if (!cmpOrd || !cmpOrd.ordenes) return cargandoHTML('Cargando órdenes...');
+        if (cmpOrd.error) return `<div class="banner error">${esc(cmpOrd.error)}</div>`;
+        const f = cmpOrdF, completas = almTab === 'completas', l = cmpOrdFiltradas();
+        const tiendas = f.tienda ? [f.tienda] : CMP_TIENDAS, conMayor = l.some(o => o.mayor > 0 || o.categoria === 'Charcutería');
+        const etiqueta = cmpPV.modo === 'bs' ? 'Bs' : cmpPV.modo === 'desc' ? `$ −${String(cmpDesc()).replace('.', ',')} %` : '$ BCV';
+        const modos = [['bs', 'Bs'], ['usd', '$ BCV'], ['desc', `$ −${String(cmpDesc()).replace('.', ',')} %`]];
+        return `<div class="filters alm-filtros">
+                <div><label for="cmpOB">Buscar</label><input type="search" id="cmpOB" autocomplete="off" placeholder="Producto, código, proveedor..." value="${esc(f.bus)}" oninput="cmpOrdF.bus=this.value;almPintar()"></div>
+                <div><label for="cmpOT">Tienda</label><select id="cmpOT" onchange="cmpOrdF.tienda=this.value;almPintar()"><option value="">Todas</option>${CMP_TIENDAS.map(t => `<option${t === f.tienda ? ' selected' : ''}>${t}</option>`).join('')}</select></div>
+                ${completas ? '' : `<div><label for="cmpOE">Estado</label><select id="cmpOE" onchange="cmpOrdF.estado=this.value;almPintar()">${[['', 'Todas las pendientes'], ['Por definir precio', 'Por definir precio'], ['Por actualizar', 'Por actualizar en tiendas']].map(([v, x]) => `<option value="${v}"${v === f.estado ? ' selected' : ''}>${x}</option>`).join('')}</select></div>`}
+            </div>
+            <div class="cmp-ver">
+                <span class="cmp-ver-t">Precios en:</span><span class="cmp-seg">${modos.map(([v, n]) => `<button type="button" class="${cmpPV.modo === v ? 'act' : ''}" onclick="cmpPV.modo='${v}';cmpGuardarPV();almPintar()">${n}</button>`).join('')}</span>
+                <label class="cmp-ver-t" for="cmpDesc" title="El mismo en todas las tiendas">Descuento divisas</label><input type="number" id="cmpDesc" class="cmp-desc-in" min="0" max="50" step="0.5" value="${cmpDesc()}" ${permisos.some(x => x === 'precios' || x === 'inventario') ? '' : 'disabled'} onchange="cmpCambiarDesc(this)"><span class="cmp-ver-t">% (todas las tiendas)</span>
+                ${completas ? '' : `<label class="cmp-ver-t" for="cmpComoR">Al marcar:</label><select id="cmpComoR" onchange="cmpPV.como=this.value;cmpGuardarPV()">${CMP_COMO.actualizado.map(c => `<option${c === cmpPV.como ? ' selected' : ''}>${esc(c)}</option>`).join('')}</select>`}
+                ${cmpPV.modo === 'bs' ? `<span class="cmp-ver-t">Tasa BCV ${almTasa() ? fmt(almTasa()) : '—'}</span>` : ''}
+            </div>
+            ${completas ? '' : `<div class="cmp-resumen"><span>Por definir precio: <b style="color:var(--amar-txt)">${cmpOrd.porDefinir || 0}</b></span><span>Por actualizar: <b>${cmpOrd.porActualizar || 0}</b></span>${f.tienda ? `<span>Pendientes en ${esc(f.tienda)}: <b>${l.length}</b></span>` : ''}
+                ${l.length ? `<button type="button" class="btn-ghost btn-mini cmp-imp" onclick="cmpImprimirPendientes()">🖨 Imprimir ${f.tienda ? 'lo de ' + esc(f.tienda) : 'la lista'}</button>` : ''}</div>`}
+            ${!l.length ? `<div class="empty">${completas ? 'Todavía no hay órdenes completas.' : 'No hay nada pendiente con estos filtros.'}</div>` : `<div class="tabla-wrap"><table class="req-tabla cmp-otabla" data-sin-paginar><thead><tr>
+                <th class="izq">Producto</th><th>Costo ${etiqueta}</th><th>Detal ${etiqueta}</th>${conMayor ? `<th>Mayor ${etiqueta}</th>` : ''}
+                ${tiendas.map(t => `<th class="cmp-oth">${esc(CMP_SIGLA[t])}<small>${esc(t)}</small>${completas ? '' : `<button type="button" class="cmp-todo" title="Marcar con precio actualizado todo lo pendiente de ${esc(t)} en esta lista" onclick="cmpMarcarTienda('${esc(t)}')">✓ todo</button>`}</th>`).join('')}
+                </tr></thead><tbody>${l.map(o => cmpOrdenFila(o, tiendas, completas, conMayor)).join('')}</tbody></table></div>`}
+            <div class="nota">Un clic en <b>Ingresó</b> o <b>Precio</b> lo marca a su nombre con la hora (y el "cómo" elegido arriba). Un clic en uno marcado muestra quién y cómo, y permite quitarlo. Los precios "$ −${String(cmpDesc()).replace('.', ',')} %" son los que se cargan en el sistema de la tienda para pago en divisas.</div>`;
+    }
+    function cmpOrdenFila(o, tiendas, completas, conMayor) {
+        const definir = o.estado === 'Por definir precio', puedePrecio = !completas && permisos.some(x => x === 'precios' || x === 'inventario');
+        const flecha = (a, b) => !a || !b || Math.abs(a - b) < 0.005 ? '' : `<small class="${b > a ? 'sube' : 'baja'}">${b > a ? '▲' : '▼'} ${fmt(Math.abs(b / a - 1) * 100)} %</small>`;
+        const boton = (t, k) => {
+            const m = (o.marcas[t] || {})[k], txt = k === 'ingresado' ? 'Ingresó' : 'Precio';
+            if (m) return `<button type="button" class="cmp-bt hecho" title="${esc(m.por + ' · ' + m.en + (m.como ? ' · ' + m.como : ''))}" onclick="cmpMarcaInfo('${esc(o.id)}','${esc(t)}','${k}')">✓ ${txt}</button>`;
+            if (completas) return '';
+            if (k === 'actualizado' && definir) return `<button type="button" class="cmp-bt" disabled title="Primero defina el precio">${txt}</button>`;
+            return `<button type="button" class="cmp-bt" onclick="cmpMarcarRapido('${esc(o.id)}','${esc(t)}','${k}')">${txt}</button>`;
+        };
+        const una = tiendas.length === 1 ? (o.dist[tiendas[0]] || {}) : null;
+        return `<tr class="${definir ? 'cmp-definir' : ''}">
+            <td class="izq">${una ? (una.cant > 0 ? `<span class="cmp-cant">${almCant(una.cant, o.tipo)} ${almUnidad(o.tipo)}</span>` : '<span class="cmp-cant sin">solo precio</span>') : ''}<b>${esc(o.descripcion)}</b>${definir ? ' <span class="chip st-sobra">Por definir precio</span>' : ''}
+                <small>${o.codigo ? esc(o.codigo) : 'sin código'} · ${esc(o.categoria)} · ${esc(o.proveedor || o.origen)} · ${esc(String(o.fecha).slice(0, 10))}</small>
+                ${puedePrecio ? `<button type="button" class="cmp-link" onclick="cmpPrecioDlg('${esc(o.id)}')">${definir ? 'Definir precio' : 'Cambiar precio'}</button>` : ''}</td>
+            <td><b>${cmpMon(o.costo)}</b>${flecha(o.costoAnt, o.costo)}</td>
+            <td><b>${cmpMon(o.detal)}</b>${o.detalAnt ? `<small>antes ${cmpMon(o.detalAnt)}</small>` : ''}</td>
+            ${conMayor ? `<td>${o.mayor ? `<b>${cmpMon(o.mayor)}</b>${o.mayorAnt ? `<small>antes ${cmpMon(o.mayorAnt)}</small>` : ''}` : '<small>—</small>'}</td>` : ''}
+            ${tiendas.map(t => { const d = o.dist[t] || {}; return `<td class="cmp-otd"><div class="cmp-bts">${d.cant > 0 ? boton(t, 'ingresado') : ''}${boton(t, 'actualizado')}</div>${d.cant > 0 ? `<small>${almCant(d.cant, o.tipo)} ${almUnidad(o.tipo)}${d.nota ? ' · NE ' + esc(d.nota) : ''}</small>` : ''}</td>`; }).join('')}
+        </tr>`;
+    }
+    // Lista para imprimir: lo pendiente (con los filtros de la pantalla), con casillas para tildar en la tienda
+    function cmpImprimirPendientes() {
+        const l = cmpOrdFiltradas(), f = cmpOrdF, tiendas = f.tienda ? [f.tienda] : CMP_TIENDAS;
+        if (!l.length) { mostrarBanner('No hay nada pendiente con estos filtros.', 'warn'); return; }
+        const etiqueta = cmpPV.modo === 'bs' ? 'Bs' : cmpPV.modo === 'desc' ? `$ −${String(cmpDesc()).replace('.', ',')} %` : '$ BCV';
+        const conMayor = l.some(o => o.mayor > 0), caja = (o, t, k) => { const m = (o.marcas[t] || {})[k]; return m ? '<span class="ok">✓</span>' : '<span class="box"></span>'; };
+        const filas = l.map((o, i) => `<tr><td class="n">${i + 1}</td>
+            ${f.tienda ? `<td class="cant">${(o.dist[f.tienda] || {}).cant > 0 ? almCant(o.dist[f.tienda].cant, o.tipo) + ' ' + almUnidad(o.tipo) : '—'}</td>` : ''}
+            <td class="prod"><b>${esc(o.descripcion)}</b><small>${o.codigo ? esc(o.codigo) : 'sin código'}${o.estado === 'Por definir precio' ? ' · POR DEFINIR PRECIO' : ''}</small></td>
+            <td class="m">${cmpMon(o.costo)}</td><td class="m"><b>${cmpMon(o.detal)}</b></td>${conMayor ? `<td class="m">${o.mayor ? cmpMon(o.mayor) : '—'}</td>` : ''}
+            ${tiendas.map(t => `<td class="c">${(o.dist[t] || {}).cant > 0 ? (f.tienda ? '' : `<small>${almCant(o.dist[t].cant, o.tipo)}</small>`) + caja(o, t, 'ingresado') + ' ' : ''}${caja(o, t, 'actualizado')}</td>`).join('')}</tr>`).join('');
+        const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Pendientes por actualizar${f.tienda ? ' · ' + esc(f.tienda) : ''}</title><style>
+            @page{size:letter;margin:10mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+            body{margin:0;font-family:Arial,Helvetica,sans-serif;color:#0f172a;font-size:9.5pt}
+            h1{font-size:13pt;margin:0}.sub{color:#475569;font-size:8.5pt;margin:1mm 0 3mm;border-bottom:.5mm solid #44AC00;padding-bottom:2mm}
+            table{width:100%;border-collapse:collapse}th{font-size:7.5pt;text-transform:uppercase;color:#475569;text-align:left;border-bottom:.3mm solid #0f172a;padding:1.2mm 1mm}
+            td{border-bottom:.2mm solid #cbd5e1;padding:1.6mm 1mm;vertical-align:middle}tr{break-inside:avoid}
+            td.n{color:#64748b;width:6mm}td.cant{font-weight:700;color:#2f7a00;white-space:nowrap;font-size:10.5pt}
+            td.prod small{display:block;color:#64748b;font-size:7.5pt}td.m,th.m{text-align:right;white-space:nowrap}
+            td.c,th.c{text-align:center;white-space:nowrap}td.c small{display:block;color:#2f7a00;font-weight:700}
+            .box{display:inline-block;width:4mm;height:4mm;border:.35mm solid #0f172a;border-radius:.6mm;vertical-align:middle}.ok{color:#2f7a00;font-weight:700}
+            .pie{margin-top:4mm;color:#475569;font-size:8pt}.firma{margin-top:10mm;display:flex;gap:10mm}.firma div{flex:1;border-top:.3mm solid #0f172a;text-align:center;padding-top:1mm;font-size:8pt;color:#475569}
+            </style></head><body>
+            <h1>Pendientes por actualizar${f.tienda ? ' · ' + esc(f.tienda) : ' · todas las tiendas'}</h1>
+            <div class="sub">${fechaBonita(fechaLocalHoy())} · ${l.length} producto(s) · precios en ${esc(etiqueta)}${cmpPV.modo === 'bs' && almTasa() ? ' (tasa ' + fmt(almTasa()) + ')' : ''} · impreso por ${esc(nombreUsuario)}</div>
+            <table><thead><tr><th>#</th>${f.tienda ? '<th>Recibe</th>' : ''}<th>Producto</th><th class="m">Costo</th><th class="m">Detal</th>${conMayor ? '<th class="m">Mayor</th>' : ''}
+                ${tiendas.map(t => `<th class="c">${f.tienda ? 'Ingresó · Precio' : esc(CMP_SIGLA[t])}</th>`).join('')}</tr></thead><tbody>${filas}</tbody></table>
+            <div class="pie">${f.tienda ? 'Tilde cada casilla al ingresar la mercancía y al cambiar el precio en el sistema de la tienda.' : 'En cada tienda: la primera casilla es "ingresó" (solo si recibe mercancía) y la segunda "precio actualizado".'} ✓ = ya marcado en el sistema.</div>
+            <div class="firma"><div>Actualizado por</div><div>Revisado por</div></div></body></html>`;
+        let fr = document.getElementById('almImprimeMarco'); if (fr) fr.remove();
+        fr = document.createElement('iframe'); fr.id = 'almImprimeMarco'; fr.setAttribute('aria-hidden', 'true');
+        fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+        document.body.appendChild(fr);
+        const w = fr.contentWindow; w.document.open(); w.document.write(html); w.document.close();
+        setTimeout(() => { try { w.focus(); w.print(); } catch (e) { mostrarBanner('No se pudo abrir la impresión: ' + e.message, 'error'); } }, 200);
+    }
+    // Un clic: se marca al instante en pantalla y se guarda en segundo plano (si falla, se desmarca y avisa)
+    function cmpMarcarRapido(id, local, tipo) {
+        const o = cmpOrd.ordenes.find(x => x.id === id); if (!o) return;
+        const como = tipo === 'ingresado' ? 'Ingresado en el sistema de la tienda' : cmpPV.como;
+        o.marcas[local] = o.marcas[local] || {};
+        o.marcas[local][tipo] = { por: nombreUsuario, en: 'guardando...', como };
+        almPintar();
+        llamarApi({ action: 'cmp_marcar', id, local, tipo, como, ver: cmpOrd.ver })
+            .then(r => cmpUsarOrdenes(r))
+            .catch(e => { if (o.marcas[local]) delete o.marcas[local][tipo]; almPintar(); mostrarBanner('No se pudo marcar: ' + e.message, 'error'); });
+    }
+    // Toda una tienda: los precios pendientes (ya definidos) de lo que se ve en la lista
+    async function cmpMarcarTienda(local) {
+        const f = cmpOrdF, q = cmpN(f.bus);
+        const items = cmpOrd.ordenes.filter(o => o.estado !== 'Por definir precio' && !(o.marcas[local] || {}).actualizado
+            && (!q || cmpN(o.codigo + ' ' + o.descripcion + ' ' + o.proveedor + ' ' + o.origen).includes(q)) && (!f.estado || o.estado === f.estado)).map(o => ({ id: o.id, local, tipo: 'actualizado' }));
+        if (!items.length) { mostrarBanner(`No hay precios pendientes en ${local} en esta lista.`, 'warn'); return; }
+        if (!confirm(`¿Marcar ${items.length} precio(s) como actualizados en ${local}?\nQueda a su nombre: "${cmpPV.como}".`)) return;
+        try { cmpUsarOrdenes(await llamarApi({ action: 'cmp_marcar_lote', items, como: cmpPV.como, ver: cmpOrd.ver })); mostrarBanner(`${items.length} precio(s) marcados en ${local}.`, 'ok'); }
+        catch (e) { mostrarBanner('No se pudo marcar: ' + e.message, 'error'); }
+    }
+    function cmpMarcaInfo(id, local, tipo) {
+        const o = cmpOrd.ordenes.find(x => x.id === id), m = o && (o.marcas[local] || {})[tipo]; if (!m) return;
+        almVentana(`<div class="req-dlg"><h3>${tipo === 'ingresado' ? 'Ingresado' : 'Precio actualizado'} · ${esc(local)}</h3>
+            <div class="req-sub">${esc(o.descripcion)}</div>
+            <p style="margin:.6rem 0">Por <b>${esc(m.por)}</b> · ${esc(m.en)}${m.como ? '<br>Cómo: ' + esc(m.como) : ''}${m.precio ? `<br>Precio marcado: detal $ ${fmt(m.precio.detal)}${m.precio.mayor ? ' · mayor $ ' + fmt(m.precio.mayor) : ''}` : ''}</p>
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0">${almTab === 'completas' ? '' : `<button type="button" class="btn-ghost" style="color:var(--danger)" onclick="almCerrar();cmpQuitarMarca('${esc(id)}','${esc(local)}','${tipo}')">Quitar la marca</button>`}<button type="button" class="btn-primary" onclick="almCerrar()">Cerrar</button></div></div>`);
+    }
+    const CMP_COMO = { actualizado: ['En el sistema de la tienda', 'En el sistema y en la etiqueta del anaquel', 'Solo la etiqueta del anaquel'],
+                       ingresado: ['Ingresado en el sistema de la tienda', 'Recibido, contado e ingresado'] };
+    function cmpMarcarDlg(id, tienda, tipo) {
+        const o = cmpOrd.ordenes.find(x => x.id === id); if (!o) return;
+        almVentana(`<form class="req-dlg" onsubmit="cmpMarcar(event, '${esc(id)}', '${esc(tienda)}', '${tipo}')">
+            <h3>${tipo === 'ingresado' ? 'Mercancía ingresada' : 'Precio actualizado'} en ${esc(tienda)}</h3>
+            <div class="req-sub">${esc(o.descripcion)} · ${tipo === 'ingresado' ? `${almCant((o.dist[tienda] || {}).cant, o.tipo)} ${almUnidad(o.tipo)} (nota ${esc((o.dist[tienda] || {}).nota || '')})` : `detal <b>$ ${fmt(o.detal)}</b>${o.mayor ? ` · mayor <b>$ ${fmt(o.mayor)}</b>` : ''} · costo $ ${fmt(o.costo)}`}</div>
+            <label>¿Cómo se hizo?</label>
+            <div class="cmp-como">${CMP_COMO[tipo].map((c, i) => `<label class="cmp-op"><input type="radio" name="cmpComo" value="${esc(c)}" ${i === 0 ? 'checked' : ''}> ${esc(c)}</label>`).join('')}</div>
+            <label for="cmpComoTxt">Detalle (opcional)</label><input type="text" id="cmpComoTxt" maxlength="100" autocomplete="off" placeholder="Ej.: caja 1, lo cambió María">
+            <div class="nota">Queda a nombre de <b>${esc(nombreUsuario)}</b> con la fecha y la hora.</div>
+            <div class="login-error" id="cmpMarError"></div>
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-ghost" onclick="almCerrar()">Cancelar</button><button type="submit" class="btn-primary" id="cmpBtnMar">Marcar</button></div></form>`);
+    }
+    async function cmpMarcar(ev, id, local, tipo) {
+        ev.preventDefault();
+        const r1 = document.querySelector('input[name="cmpComo"]:checked'), det = document.getElementById('cmpComoTxt').value.trim();
+        const btn = document.getElementById('cmpBtnMar'); btnCargando(btn, 'Guardando...');
+        try { const r = await llamarApi({ action: 'cmp_marcar', id, local, tipo, como: [r1 ? r1.value : '', det].filter(Boolean).join(' · '), ver: cmpOrd.ver }); almCerrar(); cmpUsarOrdenes(r); }
+        catch (e) { document.getElementById('cmpMarError').textContent = e.message; btn.disabled = false; btn.textContent = 'Marcar'; }
+    }
+    async function cmpQuitarMarca(id, local, tipo) {
+        const c = await efePedirClave('Quitar la marca', `Se quita "${tipo === 'ingresado' ? 'ingresado' : 'precio actualizado'}" en ${local}. Queda registrado quién la quitó.`);
+        if (!c) return;
+        try { cmpUsarOrdenes(await llamarApi({ action: 'cmp_marcar', id, local, tipo, quitar: true, claveAdmin: c, ver: cmpOrd.ver })); }
+        catch (e) { mostrarBanner(e.message, 'error'); }
+    }
+    // Calculadora de la orden: la misma de la compra (regla del manual o márgenes de la última vez)
+    let cmpCalc = null;
+    function cmpPrecioDlg(id) {
+        const o = cmpOrd.ordenes.find(x => x.id === id); if (!o) return;
+        const p = almProducto(o.codigo) || (!o.codigo ? { codigo: '', descripcion: o.descripcion, categoria: o.categoria, tipo: o.tipo, iva: 'Exento', libre: true } : null);
+        const s = p ? cmpSugerir(p, o.costo) : null;
+        cmpCalc = { id, prod: p, codigo: o.codigo, costo: o.costo, merma: o.detal ? o.merma : (s ? s.merma : 0), libre: !!o.detal || !!(s && s.libre),
+                    detal: o.detal || (s ? s.detal : 0), mayor: o.mayor || (s ? s.mayor : 0), margenDetal: 0, margenMayor: 0 };
+        const cr = cmpCalc.costo * (1 + cmpCalc.merma / 100);
+        cmpCalc.margenDetal = cmpCalc.detal > 0 ? cmpR2((1 - cr / cmpCalc.detal) * 100) : 0;
+        cmpCalc.margenMayor = cmpCalc.mayor > 0 ? cmpR2((1 - cmpCalc.costo / cmpCalc.mayor) * 100) : 0;
+        const n = c => `<input type="number" step="0.01" min="0" id="cmpK_${c}" value="${cmpCalc[c] ? cmpCalc[c] : ''}" oninput="cmpCalcEntrada('${c}', this.value)">`;
+        almVentana(`<form class="req-dlg" onsubmit="cmpGuardarPrecio(event)">
+            <h3>Precio en tiendas · ${esc(o.descripcion)}</h3>
+            <div class="req-sub">${esc(o.codigo)} · ${esc(o.categoria)} · costo $ ${fmt(o.costo)}${o.costoAnt ? ' (antes $ ' + fmt(o.costoAnt) + ')' : ''}${o.detalAnt ? ' · detal antes $ ' + fmt(o.detalAnt) : ''}${o.mayorAnt ? ' · mayor antes $ ' + fmt(o.mayorAnt) : ''}</div>
+            ${s ? `<div class="nota cmp-regla" style="margin-top:.4rem">Sugerencia: ${esc(s.regla)}</div>` : ''}
+            <label class="interruptor" style="margin:.5rem 0"><input type="checkbox" ${cmpPsicoActivo ? 'checked' : ''} onchange="cmpPsicoActivo=this.checked; try{localStorage.setItem('cmp_psico', this.checked?'1':'0')}catch(e){}; cmpCalcEntrada('margenDetal', cmpCalc.margenDetal)"><span class="sw-pista"></span> Terminación psicológica (7 · ,99)</label>
+            <div class="per-grid">
+                <div><label for="cmpK_merma">Merma y gastos %</label>${n('merma')}</div>
+                <div><label>Costo real</label><div style="padding:.55rem 0"><b id="cmpKcr">$ ${fmt(cr)}</b></div></div>
+                <div><label for="cmpK_margenDetal">Margen detal %</label>${n('margenDetal')}</div>
+                <div><label for="cmpK_detal">Precio al detal $</label>${n('detal')}</div>
+                ${cmpVendeMayor(p) || o.mayor ? `<div><label for="cmpK_margenMayor">Margen mayor %</label>${n('margenMayor')}</div>
+                <div><label for="cmpK_mayor">Precio al mayor $</label>${n('mayor')}</div>` : ''}
+            </div>
+            <div class="nota">Precio = costo ÷ (1 − margen), redondeado al centavo (o terminado en 7 / ,99 con la terminación psicológica). Al mayor (solo charcutería) sobre el costo de la factura, sin merma. Si cambia el precio y alguna tienda ya lo había actualizado, se le quita la marca para que lo cambie de nuevo.</div>
+            <div class="login-error" id="cmpKError"></div>
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-ghost" onclick="almCerrar()">Cancelar</button><button type="submit" class="btn-primary" id="cmpBtnK">Guardar precio</button></div></form>`);
+    }
+    function cmpCalcEntrada(c, valor) {
+        const k = cmpCalc, p = k.prod || almProducto(k.codigo), v = valor === '' ? 0 : Number(valor);
+        k[c] = v;
+        if (c === 'merma' || c === 'margenDetal' || c === 'margenMayor') {
+            k.libre = true;
+            const pr = p ? cmpPrecios(p, k.costo, k, true) : { detal: 0, mayor: 0, margenDetal: 0, margenMayor: 0 };
+            if (c === 'margenMayor') k.mayor = pr.mayor;
+            else { k.detal = pr.detal; if (c === 'merma') k.margenDetal = pr.margenDetal; }
+        }
+        const cr = k.costo * (1 + k.merma / 100);
+        if (c === 'detal') k.margenDetal = k.detal > 0 ? cmpR2((1 - cr / k.detal) * 100) : 0;
+        if (c === 'mayor') k.margenMayor = k.mayor > 0 ? cmpR2((1 - k.costo / k.mayor) * 100) : 0;
+        ['detal', 'mayor', 'margenDetal', 'margenMayor'].filter(x => x !== c).forEach(x => { const el = document.getElementById('cmpK_' + x); if (el) el.value = k[x] || ''; });
+        document.getElementById('cmpKcr').textContent = '$ ' + fmt(cr);
+    }
+    async function cmpGuardarPrecio(ev) {
+        ev.preventDefault();
+        const k = cmpCalc, btn = document.getElementById('cmpBtnK'); btnCargando(btn, 'Guardando...');
+        try {
+            const r = await llamarApi({ action: 'cmp_orden_precio', id: k.id, merma: k.merma, detal: k.detal, mayor: k.mayor, ver: cmpOrd.ver });
+            almCerrar(); cmpUsarOrdenes(r);
+            almCargar();   // los márgenes nuevos quedan para la próxima sugerencia
+        } catch (e) { document.getElementById('cmpKError').textContent = e.message; btn.disabled = false; btn.textContent = 'Guardar precio'; }
+    }
+
     // ---------- Inversión por tienda (semana de sábado a viernes): gastos de la tienda + mercancía del almacén ----------
     let almTiendas = null, almTiendasSemana = '';
     async function almCargarTiendas() {
