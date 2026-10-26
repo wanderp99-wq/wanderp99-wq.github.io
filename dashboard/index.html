@@ -6961,11 +6961,11 @@
         const sel = new Set([...fondo.querySelectorAll('input:checked')].map(i => Number(i.value)));
         if (!sel.size) { alert('Marque al menos una lista.'); return; }
         const texto = reqTextoReq(sel), caja = document.getElementById('reqDlgTexto');
-        if (!confirm(`¿Enviar a Telegram el requerimiento de ${reqImp.local}?`)) return;
+        if (!confirm(`¿Enviar el requerimiento de ${reqImp.local} al grupo de Telegram "Actividades y transporte"?`)) return;
         btnCargando(btn, 'Enviando...');
         try {
             const r = await llamarApi({ action: 'req_telegram', local: reqImp.local, texto });
-            caja.innerHTML = `<div class="banner ok" style="margin-top:.75rem">Enviado a Telegram ✓${r.partes > 1 ? ` (en ${r.partes} mensajes)` : ''}</div>`;
+            caja.innerHTML = `<div class="banner ok" style="margin-top:.75rem">Enviado a Actividades y transporte ✓${r.partes > 1 ? ` (en ${r.partes} mensajes)` : ''}</div>`;
             btn.textContent = 'Enviado ✓';
         } catch (e) {
             caja.innerHTML = `<div class="banner error" style="margin-top:.75rem">${esc(e.message)}</div>`;
