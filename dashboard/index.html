@@ -14257,8 +14257,11 @@ Reglas:
         return t;
     }
     // Tasa BCV de cada día (DolarApi, la misma fuente de la ficha). Un día sin tasa publicada (fin de semana) usa la última anterior.
-    let TASAS_BCV = null, tasasPromesa = null;
+    // Se vuelven a leer cada 30 minutos (el BCV publica en la tarde la tasa del próximo día hábil; un panel abierto la toma sola)
+    let TASAS_BCV = null, tasasPromesa = null, tasasLeidasEn = 0;
     function cargarTasasBCV() {
+        if (tasasPromesa && Date.now() - tasasLeidasEn > 30 * 60000) tasasPromesa = null;
+        if (!tasasPromesa) tasasLeidasEn = Date.now();
         if (!tasasPromesa) tasasPromesa = fetch('https://ve.dolarapi.com/v1/historicos/dolares/oficial', { cache: 'no-store' })
             .then(r => r.json())
             .then(l => (TASAS_BCV = l.filter(x => Number(x.promedio) > 0 && /^\d{4}-\d{2}-\d{2}/.test(x.fecha))
@@ -14266,8 +14269,12 @@ Reglas:
             .catch(() => { tasasPromesa = null; return null; });
         return tasasPromesa;
     }
+    setInterval(() => { if (TASAS_BCV) { tasasPromesa = null; cargarTasasBCV(); } }, 30 * 60000);   // al día aunque el panel quede abierto
+    // Hoy (o una fecha futura): la ÚLTIMA tasa publicada, aunque venga con fecha valor de mañana (como la ficha).
+    // Días anteriores: la que regía ese día (la de esa fecha o la anterior), para no cambiar lo ya registrado.
     function tasaBCVdel(fecha) {
         if (!TASAS_BCV || !TASAS_BCV.length) return null;
+        if (fecha >= fechaLocalHoy()) return TASAS_BCV[TASAS_BCV.length - 1];
         let t = null;
         for (const x of TASAS_BCV) { if (x[0] <= fecha) t = x; else break; }
         return t || TASAS_BCV[0];
