@@ -1111,6 +1111,8 @@
         .alm-lista-acc { margin-top: -.3rem; align-items: center; gap: .8rem; flex-wrap: wrap; }
         .alm-marcas { display: flex; flex-direction: column; gap: .4rem; margin-top: .7rem; } .alm-marcas div { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; } .alm-marcas small { color: var(--text-muted); }
         .alm-mod-in { width: 92px; text-align: right; }
+        .adm-seg-aviso { background: var(--amar-bg); color: var(--amar-txt); border-radius: var(--radius); padding: .55rem .8rem; margin-bottom: .5rem; font-size: .9rem; }
+        .adm-seg-aviso.mal { background: var(--bad-bg, #fde8e8); color: var(--danger); }
         .req-alm-btn { margin-top: .45rem; align-self: flex-start; position: relative; z-index: 1; }
         /* Ver nota: amplia, como la pantalla de facturar, con el total en verde */
         .req-dlg.alm-dlg-grande { width: min(1100px, 96vw); }
@@ -1676,7 +1678,7 @@
         </div>
         <div class="header-actions">
             <span class="bienvenida hidden" id="bienvenida"></span>
-            <button type="button" class="btn-ghost hidden" id="btnActualizar" onclick="actualizarModulo()" title="Volver a leer los datos de este módulo">⟳ Actualizar</button>
+            <button type="button" class="btn-ghost hidden" id="btnActualizar" onclick="actualizarModulo()" title="Volver a leer los datos de este módulo (también se actualiza solo cada 30 segundos si otro equipo hizo cambios)">⟳ Actualizar</button>
             <button type="button" class="btn-ghost hidden" id="btnAtras" onclick="irAtras()" title="Volver a la pantalla anterior (Esc)">← Atrás</button>
             <button type="button" class="btn-ghost hidden" id="btnAdelante" onclick="irAdelante()" title="Ir a la pantalla siguiente (Ctrl + Y)">Adelante →</button>
             <button type="button" class="btn-ghost hidden" id="btnClaves" onclick="irInicio()" title="Volver a las áreas">⌂ Inicio</button>
@@ -2053,6 +2055,11 @@
                 <div id="admEnLinea"></div>
             </div>
             <div class="grafico-card">
+                <div class="grafico-head"><h3>Seguridad</h3><button type="button" class="btn-ghost btn-mini act-modulo" onclick="admCargarSeguridad()">Actualizar</button></div>
+                <div class="grafico-sub">Intentos con clave incorrecta, equipos autorizados de la ficha, claves cortas y respaldo diario del libro.</div>
+                <div id="admSeguridad"></div>
+            </div>
+            <div class="grafico-card">
                 <div class="grafico-head"><h3>Personas y claves</h3>
                     <button type="button" class="btn-primary" onclick="admNuevo()">+ Nueva clave</button></div>
                 <div class="grafico-sub">Cada clave pertenece a una persona y abre solo los módulos marcados. Las claves no se pueden ver: si alguien la olvida, asígnele una nueva.</div>
@@ -2061,7 +2068,7 @@
                     <h4 id="admFormTitulo"></h4>
                     <div class="adm-grid">
                         <div><label for="admNombre">Nombre de la persona</label><input type="text" id="admNombre" required maxlength="60"></div>
-                        <div><label for="admClave">Clave</label><input type="password" id="admClave" autocomplete="new-password" minlength="4"></div>
+                        <div><label for="admClave">Clave</label><input type="password" id="admClave" autocomplete="new-password" minlength="6"></div>
                         <div><label for="admClave2">Repetir clave</label><input type="password" id="admClave2" autocomplete="new-password"></div>
                     </div>
                     <div class="adm-hint" id="admClaveHint"></div>
@@ -2086,7 +2093,7 @@
                 <form class="adm-form" onsubmit="admGuardarPrincipal(event)">
                     <div class="adm-grid">
                         <div><label for="admPrNombre">Nombre de quien la usa</label><input type="text" id="admPrNombre" maxlength="60"></div>
-                        <div><label for="admPrClave">Nueva clave principal (opcional)</label><input type="password" id="admPrClave" autocomplete="new-password"></div>
+                        <div><label for="admPrClave">Nueva clave principal (opcional)</label><input type="password" id="admPrClave" autocomplete="new-password" minlength="6" placeholder="Mínimo 6 caracteres"></div>
                         <div><label for="admPrClave2">Repetir nueva clave</label><input type="password" id="admPrClave2" autocomplete="new-password"></div>
                     </div>
                     <div class="login-error" id="admPrError"></div>
@@ -2880,7 +2887,7 @@
         if (TIEMPOS.length > 60) TIEMPOS.pop();
     }
     // Solo lectura: si la respuesta de Google no llega, se reintenta una vez sola (no cambia nada en la hoja)
-    const SOLO_LECTURA = /^(login|list|cuadre_detalle|cuadre_detalle_lote|mov_listar|cuentas_listar|conc_listar|efe_listar|cc_listar|req_datos|req_ventas|req_historial|asis_hoy|asis_listar|asisg_listar|per_listar|cxc_deudas|nom_historial|nom_autorizar|hor_datos|alm_datos|alm_notas|alm_ingresos|alm_kardex|alm_tiendas|alm_existencias|pnom_listar|ping|enlinea|marca_estado)$/;
+    const SOLO_LECTURA = /^(login|list|cuadre_detalle|cuadre_detalle_lote|mov_listar|cuentas_listar|conc_listar|efe_listar|cc_listar|req_datos|req_ventas|req_historial|asis_hoy|asis_listar|asisg_listar|per_listar|cxc_deudas|nom_historial|nom_autorizar|hor_datos|alm_datos|alm_notas|alm_ingresos|alm_kardex|alm_tiendas|alm_existencias|pnom_listar|ping|cambios|enlinea|marca_estado)$/;
     // Guardados sin repetir: cada cambio lleva un "idem". Si no llegó la respuesta y se vuelve a pulsar el MISMO cambio,
     // se manda el mismo idem y Google responde "ya estaba registrado" en vez de guardarlo otra vez.
     const idemPendientes = new Map();   // contenido del cambio -> idem del intento sin respuesta
@@ -2902,6 +2909,7 @@
         try {
             const r = await llamarApiReal(payload, t0);
             if (llaveIdem) idemPendientes.delete(llaveIdem);
+            if (r && r._ver) vivoUsar(r._ver);   // qué versión de su área trae esta respuesta (cambios en vivo)
             if (r.yaRegistrado) mostrarBanner('Ese cambio ya estaba guardado (Google lo registró la vez anterior aunque no respondió). No se repitió.', 'ok');
             return r;
         }
@@ -2928,16 +2936,18 @@
         }
     }
     // Lo que no se guarda para después (necesita respuesta en el momento o es de administración de claves)
-    const NO_COLA = /^(login|ping|enlinea|nom_autorizar|adm_|alm_)/;   // el almacén necesita internet: la nota lleva número y existencia del momento
+    const NO_COLA = /^(login|ping|cambios|enlinea|nom_autorizar|adm_|alm_)/;   // el almacén necesita internet: la nota lleva número y existencia del momento
     COLA.configurar({ url: WEB_APP_URL, clave: () => clave, usuario: () => nombreUsuario,
         alTerminar: hechos => mostrarBanner(`Se enviaron ${hechos.length} registro(s) que estaban pendientes sin conexión.` + (hechos.some(x => x.tipo === 'panel') ? ' Pulse Actualizar para verlos.' : ''), 'ok') });
+    // Identificador de este equipo (al azar, queda en el navegador): el servidor cuenta los intentos con clave incorrecta por equipo
+    const EQUIPO_ID = (() => { try { let x = localStorage.getItem('panel_eq'); if (!x) { x = nuevoIdem().replace(/-/g, '').slice(0, 24); localStorage.setItem('panel_eq', x); } return x; } catch (e) { return ''; } })();
     async function llamarApiReal(payload, t0) {
         let resp;
         try {
             resp = await fetch(WEB_APP_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({ ...payload, clave })
+                body: JSON.stringify({ ...payload, clave, eq: EQUIPO_ID, disp: payload.disp || DISPOSITIVO })
             });
         } catch (e) {
             // Google devuelve una página de error (sin permiso CORS) cuando el script falla antes de responder
@@ -3048,7 +3058,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-10-25.1';
+    const VERSION_SERVIDOR = '2026-10-25.2';
     let scriptViejo = false, servidorVersion = null;
     function avisarScriptViejo() {
         if (scriptViejo || servidorVersion !== VERSION_SERVIDOR) mostrarBanner('El script publicado en Google es una versión anterior a este panel' + (servidorVersion ? ' (' + servidorVersion + ')' : '') + ': ' +
@@ -3097,10 +3107,13 @@
                 esPrincipal = !!r.principal;
                 scriptViejo = !('nombre' in r);   // el script nuevo siempre devuelve el nombre
                 servidorVersion = r.version || null;
+                avisosSeguridad = r;
             }
             input.value = '';
-            guardarSesion();
+            guardarSesion(); sesionActividad();
             irA('menu');
+            if (avisosSeguridad.principalDeFabrica) mostrarBanner('La clave principal es la de fábrica. Cámbiela ya en Claves y permisos › Clave principal (mínimo 6 caracteres).', 'error');
+            else if (avisosSeguridad.claveCorta) mostrarBanner('Su clave tiene menos de 6 caracteres y es fácil de adivinar. ' + (esPrincipal ? 'Cámbiela en Claves y permisos.' : 'Pida a un administrador que le asigne una más larga.'), 'warn');
             setTimeout(precargarModulos, 300);   // en segundo plano: los datos de cada módulo con permiso
             avisarScriptViejo();
         } catch (e) {
@@ -3114,6 +3127,19 @@
 
     // Claves de administrador que se recuerdan mientras la sesión está abierta (para no escribirlas en cada verificación).
     // Al salir o al entrar otra persona se olvidan todas: nadie puede usar la clave que escribió otro. Toda clave nueva que se recuerde va aquí.
+    // ---------- Sesión: se cierra sola tras 30 minutos sin usar el panel (60 si hay cambios sin guardar en un cuadre) ----------
+    const SESION_INACTIVA_MIN = 30;
+    let avisosSeguridad = {}, sesionUltimoUso = Date.now();
+    function sesionActividad() {
+        sesionUltimoUso = Date.now();
+        try { sessionStorage.setItem('panel_actividad', String(sesionUltimoUso)); } catch (e) {}
+    }
+    ['pointerdown', 'keydown', 'wheel', 'touchstart'].forEach(ev => window.addEventListener(ev, () => { if (Date.now() - sesionUltimoUso > 15000) sesionActividad(); }, { capture: true, passive: true }));
+    setInterval(() => {
+        if (!clave || vistaActual === 'login' || vistaActual === 'marcaje') return;
+        const limite = (Object.keys(borradores).length ? 2 : 1) * SESION_INACTIVA_MIN * 60000;
+        if (Date.now() - sesionUltimoUso > limite) cerrarSesion(`La sesión se cerró por ${limite / 60000} minutos sin uso. Ingrese su clave de nuevo.`);
+    }, 60000);
     function olvidarClavesAdmin() { claveAdmin = null; nomClave = ''; perClaveVerif = ''; efeClaveVerif = ''; claveAdminRestaurar(); }
     // Si la sesión es de administrador, no se le pide su clave otra vez: cada campo "Clave de administrador" se llena con la de la sesión
     // y se esconde (la ventana queda como confirmación). Con otros perfiles se sigue pidiendo.
@@ -3274,6 +3300,42 @@
         nomina: () => perCargar(), talento: () => perCargar(), cxc: () => perCargar(), horarios: () => perCargar(),
         inventario: () => almCargar(), movalmacen: () => almCargar(), pagonomina: () => pnomCargar()
     };
+    // ---------- Cambios en vivo: cada 30 s se pregunta a Google qué áreas cambiaron (respuesta mínima).
+    // Si cambió la del módulo abierto, se vuelve a leer solo, sin molestar: no mientras se escribe, hay una ventana abierta o algo se guarda.
+    const VISTA_AREAS = { cuadre: ['cuadre'], ventas: ['cuadre'], pagos: ['cuadre'], efectivo: ['efe', 'cuadre'], cajachica: ['efe'], reqcharcu: ['req'],
+        asistencia: ['asis'], asisgestion: ['asis', 'per'], nomina: ['per', 'asis'], talento: ['per'], cxc: ['per', 'alm', 'cuadre'], horarios: ['per'],
+        inventario: ['alm'], movalmacen: ['alm'], pagonomina: ['per'] };
+    const VIVO_CADA = 30000;
+    let verConocida = {}, vivoOcupado = false, vivoTecleo = 0;
+    function vivoUsar(v) { Object.keys(v).forEach(k => { if (!verConocida[k] || v[k] > verConocida[k]) verConocida[k] = v[k]; }); }
+    function vivoPuede() {
+        if (!clave || !WEB_APP_URL || document.visibilityState !== 'visible' || !VISTA_AREAS[vistaActual]) return false;
+        if (apiEnCurso || (typeof almGuardando !== 'undefined' && almGuardando)) return false;     // algo se está cargando o guardando
+        if (Object.keys(borradores).length) return false;                                          // cambios sin guardar en el cuadre
+        if ([...document.querySelectorAll('.req-dlg-fondo')].some(f => !f.classList.contains('hidden'))) return false;   // ventana abierta
+        if (Date.now() - vivoTecleo < 8000) return false;                                          // está escribiendo
+        const a = document.activeElement;
+        return !(a && /^(INPUT|TEXTAREA)$/.test(a.tagName) && a.type !== 'search' && a.value);    // un campo a medio llenar
+    }
+    async function vivoRevisar() {
+        if (vivoOcupado || !vivoPuede()) return;
+        vivoOcupado = true;
+        try {
+            const r = await llamarApi({ action: 'cambios' }), vista = vistaActual, areas = VISTA_AREAS[vista] || [];
+            const nuevas = areas.filter(k => r.ver[k] && r.ver[k] !== '0' && r.ver[k] > (verConocida[k] || '0'));
+            // Las áreas que no son de este módulo solo se anotan si nunca se habían visto (se leerán al abrir su módulo)
+            Object.keys(r.ver).forEach(k => { if (!verConocida[k]) verConocida[k] = r.ver[k]; });
+            if (!nuevas.length || vista !== vistaActual || !vivoPuede()) return;
+            await ACTUALIZAR[vista]();
+            nuevas.forEach(k => { if (r.ver[k] > (verConocida[k] || '0')) verConocida[k] = r.ver[k]; });
+        } catch (e) {}
+        finally { vivoOcupado = false; }
+    }
+    window.addEventListener('input', () => { vivoTecleo = Date.now(); }, true);
+    window.addEventListener('keydown', () => { vivoTecleo = Date.now(); }, true);
+    setInterval(vivoRevisar, VIVO_CADA);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') setTimeout(vivoRevisar, 800); });   // al volver a la pestaña
+
     async function actualizarModulo() {
         // Los módulos sin datos propios (en construcción) se vuelven a dibujar
         const fn = ACTUALIZAR[vistaActual] || (() => irA(vistaActual, { sinHistorial: true })), btn = document.getElementById('btnActualizar');
@@ -5698,7 +5760,7 @@
         const conClave = !!claveAdmin;
         document.getElementById('admLogin').classList.toggle('hidden', conClave);
         document.getElementById('admPanel').classList.toggle('hidden', !conClave);
-        if (conClave) { admCargar(); admVigilarEnLinea(); }
+        if (conClave) { admCargar(); admVigilarEnLinea(); admCargarSeguridad(); }
         else setTimeout(() => document.getElementById('admClavePrincipal').focus(), 0);
     }
 
@@ -5757,6 +5819,52 @@
             if (/clave principal|clave de administrador/i.test(e.message)) { claveAdmin = null; admMostrar(); }
             mostrarBanner('No se pudo cargar la lista de claves: ' + e.message, 'error');
         }
+    }
+
+    // ---------- Seguridad (Seguridad.gs) ----------
+    let admSeg = null;
+    async function admCargarSeguridad() {
+        const cont = document.getElementById('admSeguridad');
+        if (!admSeg) cont.innerHTML = cargandoHTML('Cargando...');
+        try { admSeg = await apiAdmin({ action: 'adm_seguridad' }); admPintarSeguridad(); }
+        catch (e) { cont.innerHTML = `<div class="login-error">No se pudo cargar: ${esc(e.message)}</div>`; }
+    }
+    async function admSegAccion(action, extra, confirmar) {
+        if (confirmar && !confirm(confirmar)) { admPintarSeguridad(); return; }
+        try { admSeg = await apiAdmin(Object.assign({ action }, extra || {})); admPintarSeguridad(); if (admSeg.respaldo && action === 'adm_respaldo') mostrarBanner('Respaldo hecho: ' + admSeg.respaldo.ultimo + '.', 'ok'); }
+        catch (e) { mostrarBanner(e.message, 'error'); admPintarSeguridad(); }
+    }
+    function admRespConfig() {
+        admSegAccion('adm_respaldo_config', { cada: Number(document.getElementById('admRespCada').value), guardar: Number(document.getElementById('admRespGuardar').value) });
+    }
+    function admPintarSeguridad() {
+        const s = admSeg; if (!s) return;
+        const avisos = [];
+        if (s.principalDeFabrica) avisos.push(`<div class="adm-seg-aviso mal">La clave principal es la de fábrica: cámbiela abajo, en "Clave principal".</div>`);
+        if (s.bloqueoGeneral) avisos.push(`<div class="adm-seg-aviso mal">Ingresos nuevos bloqueados por intentos fallidos (15 min). <button type="button" class="btn-ghost btn-mini" onclick="admSegAccion('adm_desbloquear')">Quitar bloqueo</button></div>`);
+        if ((s.clavesCortas || []).length) avisos.push(`<div class="adm-seg-aviso">Clave de menos de 6 caracteres: <b>${s.clavesCortas.map(esc).join(', ')}</b>. Asígneles una más larga con "Editar".</div>`);
+        const eqs = s.equiposFicha || [];
+        document.getElementById('admSeguridad').innerHTML = `${avisos.join('')}
+            <h4 class="per-sub">Equipos de la ficha (tiendas)</h4>
+            <label class="interruptor"><input type="checkbox" ${s.exigirFicha ? 'checked' : ''} onchange="admSegAccion('adm_ficha_exigir', { activo: this.checked }, this.checked ? 'Desde ahora solo los equipos autorizados podrán enviar fichas. ¿Activar?' : '¿Permitir otra vez que cualquier equipo envíe fichas?')"><span class="sw-pista"></span>
+                Exigir equipo autorizado para enviar fichas</label>
+            <div class="nota">Cada equipo de tienda se autoriza una vez desde la ficha (botón "Autorizar este equipo") con la clave de administrador. Active este interruptor cuando todos estén autorizados.</div>
+            ${eqs.length ? `<div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">Equipo</th><th class="izq">Autorizado</th><th class="izq">Último uso</th><th></th></tr></thead><tbody>
+                ${eqs.map(e => `<tr><td class="izq"><b>${esc(e.nombre)}</b></td><td class="izq">${esc(e.creado)}</td><td class="izq">${esc(e.uso) || '—'}</td>
+                    <td><button type="button" class="btn-ghost btn-mini" style="color:var(--danger)" onclick="admSegAccion('adm_ficha_quitar', { id: '${esc(e.id)}' }, 'Ese equipo ya no podrá enviar fichas si se exige equipo autorizado. ¿Quitarlo?')">Quitar</button></td></tr>`).join('')}</tbody></table></div>`
+                : '<div class="empty">Todavía no hay equipos de ficha autorizados.</div>'}
+            <h4 class="per-sub">Respaldo del libro</h4>
+            <div class="filters" style="margin-bottom:.5rem">
+                <div><label for="admRespCada">Hacer una copia</label><select id="admRespCada" onchange="admRespConfig()">${[[1, 'Todos los días'], [2, 'Cada 2 días'], [3, 'Cada 3 días'], [7, 'Cada semana'], [15, 'Cada 15 días']].map(([v, x]) => `<option value="${v}"${v === s.respaldo.cada ? ' selected' : ''}>${x}</option>`).join('')}</select></div>
+                <div><label for="admRespGuardar">Guardar las últimas</label><select id="admRespGuardar" onchange="admRespConfig()">${[5, 10, 15, 30].map(v => `<option value="${v}"${v === s.respaldo.guardar ? ' selected' : ''}>${v} copias</option>`).join('')}</select></div>
+            </div>
+            <div class="nota" style="margin-top:0">Último respaldo: <b>${esc(s.respaldo.ultimo) || 'ninguno'}</b> · ${s.respaldo.programado === true ? 'programado (2 a. m.)' : s.respaldo.programado === false ? '<b style="color:var(--danger)">no está programado</b>: en Apps Script ejecute una vez la función instalarRespaldoDiario' : 'para programarlo, en Apps Script ejecute una vez la función instalarRespaldoDiario'}.
+                Cubre unos <b>${s.respaldo.cada * s.respaldo.guardar} días</b> hacia atrás. Las copias más viejas se borran solas (pasan a la papelera de Drive, que se vacía sola a los 30 días). Carpeta: "Respaldos Plaza Valencia".</div>
+            <div class="req-acciones"><button type="button" class="btn-ghost" id="admBtnResp" onclick="btnCargando(this, 'Copiando...'); admSegAccion('adm_respaldo')">Hacer respaldo ahora</button></div>
+            <h4 class="per-sub">Últimos accesos</h4>
+            ${(s.accesos || []).length ? `<div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">Fecha y hora</th><th class="izq">Evento</th><th class="izq">Persona</th><th class="izq">Dispositivo</th></tr></thead><tbody>
+                ${s.accesos.map(a => `<tr${a.evento === 'Ingreso' ? '' : ' style="color:var(--danger)"'}><td class="izq">${esc(a.fecha)}</td><td class="izq">${esc(a.evento)}</td><td class="izq">${esc(a.persona) || '—'}</td><td class="izq"><small>${esc(a.disp)}</small></td></tr>`).join('')}</tbody></table></div>`
+                : '<div class="empty">Sin registros todavía (hoja BD ACCESOS).</div>'}`;
     }
 
     function admRenderTabla() {
@@ -14038,7 +14146,10 @@
     (function () {
         try {
             const s = JSON.parse(sessionStorage.getItem('panel_sesion') || 'null');
+            const usoPrevio = Number(sessionStorage.getItem('panel_actividad') || 0);
+            if (s && s.clave && usoPrevio && Date.now() - usoPrevio > SESION_INACTIVA_MIN * 60000) { sessionStorage.removeItem('panel_sesion'); throw new Error('sesión vencida'); }
             if (s && s.clave) {
+                sesionActividad();
                 clave = s.clave; permisos = normalizarPermisos(s.permisos); nombreUsuario = s.nombre || ''; esPrincipal = !!s.principal;
                 irA('menu'); setTimeout(precargarModulos, 300); setTimeout(refrescarSesion, 200); return;
             }

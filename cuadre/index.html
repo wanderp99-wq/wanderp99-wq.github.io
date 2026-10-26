@@ -737,6 +737,20 @@
             <div class="mf-texto"><b>Asistencia de trabajadores</b><span>Cada trabajador pasa su carnet (lector o cámara) y queda marcada su entrada o su salida.</span></div>
             <button type="button" class="btn-cambiar mf-abrir" onclick="mfAbrir()">Marcar asistencia con carnet</button>
         </div>
+        <!-- Seguridad: este equipo autorizado para enviar fichas (una sola vez, con la clave de administrador) -->
+        <div class="mf-tarjeta" id="feTarjeta">
+            <span class="local-icono asis-icono mf-icono"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 5 6v5c0 4.5 3 8.3 7 9.5 4-1.2 7-5 7-9.5V6z"/><path d="m9 12 2 2 4-4"/></svg></span>
+            <div class="mf-texto"><b>Equipo de la ficha</b><span id="feEstado">Este equipo todavía no está autorizado para enviar fichas.</span></div>
+            <button type="button" class="btn-cambiar mf-abrir" id="feBtn" onclick="feMostrarForm()">Autorizar este equipo</button>
+        </div>
+        <form id="feForm" class="mf-caja hidden" onsubmit="feAutorizar(event)">
+            <h3>Autorizar este equipo para enviar fichas</h3>
+            <p class="selector-sub">Se hace una sola vez en cada teléfono o computadora de la tienda. Un administrador escribe su clave.</p>
+            <input type="text" id="feNombre" maxlength="60" autocomplete="off" placeholder="Nombre del equipo (ej.: Caja 1 Santa Rosa)" required>
+            <input type="password" id="feClave" autocomplete="off" placeholder="Clave de administrador" required>
+            <div class="asis-msj error" id="feError"></div>
+            <div class="asis-acciones"><button type="button" class="btn-gris" onclick="document.getElementById('feForm').classList.add('hidden')">Cancelar</button><button type="submit" class="btn-add" style="margin-top:0" id="feBtnAut">Autorizar</button></div>
+        </form>
     </section>
 
     <!-- ============ MARCAR ASISTENCIA CON CARNET ============ -->
@@ -1761,6 +1775,41 @@
     // salvo que ese turno ya la tenga registrada en la hoja (otra ficha del mismo turno la envió).
     // ==========================================
     const URL_HOJA = "https://script.google.com/macros/s/AKfycbyS0CMaKtl9A0ViefcNY_E6Mafqv1rCSFVDLbjjkZXWmtu04ZA-WjtkXyx3ZVS48CwV/exec";
+    // ---------- Seguridad: equipo autorizado para enviar fichas (lo pide el script cuando el administrador lo exige) ----------
+    const FE_LLAVE = 'ficha_equipo';
+    const feDatos = () => { try { return JSON.parse(localStorage.getItem(FE_LLAVE) || 'null') || {}; } catch (e) { return {}; } };
+    const fichaEquipo = () => feDatos().token || '';
+    function fePintar() {
+        const d = feDatos(), est = document.getElementById('feEstado'), btn = document.getElementById('feBtn');
+        if (!est) return;
+        est.textContent = d.token ? `Autorizado: ${d.nombre}. Puede enviar fichas.` : 'Este equipo todavía no está autorizado para enviar fichas.';
+        btn.textContent = d.token ? 'Cambiar' : 'Autorizar este equipo';
+        document.getElementById('feTarjeta').classList.toggle('fe-ok', !!d.token);
+    }
+    function feMostrarForm() {
+        const f = document.getElementById('feForm');
+        f.classList.remove('hidden'); document.getElementById('feError').textContent = '';
+        document.getElementById('feNombre').value = feDatos().nombre || ''; document.getElementById('feClave').value = '';
+        document.getElementById('feNombre').focus();
+        f.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    async function feAutorizar(ev) {
+        ev.preventDefault();
+        const btn = document.getElementById('feBtnAut'), err = document.getElementById('feError');
+        btn.disabled = true; btn.textContent = 'Autorizando...'; err.textContent = '';
+        try {
+            const resp = await fetch(URL_HOJA, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ consultaFicha: 'autorizar', nombre: document.getElementById('feNombre').value.trim(), claveAdmin: document.getElementById('feClave').value }) });
+            const r = JSON.parse(await resp.text());
+            if (!r || r.resultado !== 'exito') throw new Error((r && (r.detalle || r.error)) || 'No se pudo autorizar');
+            localStorage.setItem(FE_LLAVE, JSON.stringify({ token: r.equipo, nombre: r.nombre }));
+            document.getElementById('feForm').classList.add('hidden');
+            fePintar();
+            alert(`Listo: este equipo quedó autorizado como "${r.nombre}".`);
+        } catch (e) { err.textContent = /fetch|network/i.test(e.message) ? 'Sin conexión con la hoja. Revise el internet.' : e.message; }
+        finally { btn.disabled = false; btn.textContent = 'Autorizar'; document.getElementById('feClave').value = ''; }
+    }
+    setTimeout(fePintar, 0);
     COLA.configurar({ url: URL_HOJA, alEnviar: {
         ficha: (x, r) => {
             if (!r.nroFicha) { COLA.aviso(`${x.desc}: ya estaba guardada en la hoja.`); return; }
@@ -1793,7 +1842,7 @@
         try { CARNET_DESDE = localStorage.getItem('caja_carnet_desde') || ''; PAUSA_ASIS = localStorage.getItem('caja_asis_pausa') !== '0'; pintarEstadoAsis(); } catch (e) {}
         try {
             const resp = await fetch(URL_HOJA, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({ consultaFicha: 'trabajadores' }) });
+                body: JSON.stringify({ consultaFicha: 'trabajadores', equipo: fichaEquipo() }) });
             const r = JSON.parse(await resp.text());
             if (r && r.resultado === 'exito' && aplicarTrabajadores(r.trabajadores)) {
                 try { localStorage.setItem('caja_trabajadores', JSON.stringify(r.trabajadores)); } catch (e) {}
@@ -1857,7 +1906,7 @@
         if (!d.tienda || !d.fecha || !d.turno) return null;
         const clave = claveAsis();
         const resp = await fetch(URL_HOJA, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ consultaFicha: 'asistencia', tienda: d.tienda, fecha: d.fecha, turno: d.turno }) });
+            body: JSON.stringify({ consultaFicha: 'asistencia', tienda: d.tienda, fecha: d.fecha, turno: d.turno, equipo: fichaEquipo() }) });
         const r = JSON.parse(await resp.text());
         if (!r || r.resultado !== 'exito') throw new Error((r && (r.detalle || r.error)) || 'La hoja no respondió');
         asisRegistrada = { clave, lista: !!r.lista, trabajadores: r.trabajadores || [] };
@@ -2244,6 +2293,7 @@
             // Se lee la respuesta del script para confirmar que la hoja guardó la ficha
             // (antes se enviaba "a ciegas" y siempre decía "éxito", aunque fallara)
             payload.idem = COLA.nuevoIdem();   // si Google la guardó pero no respondió, al reenviarla con el mismo idem no se duplica
+            payload.equipo = fichaEquipo();    // seguridad: equipo autorizado (lo exige el script si el administrador lo activó)
             let respuesta;
             try {
                 const resp = await fetch(WEB_APP_URL, {
@@ -2264,6 +2314,8 @@
                 window.location.reload();
                 return;
             }
+            // Equipo sin autorizar (cuando el administrador lo exige): la ficha sigue llena en pantalla (el borrador se conserva)
+            if (respuesta && respuesta.equipoNoAutorizado) throw new Error(respuesta.detalle + " Después vuelva a abrir esta ficha y envíela.");
             if (!respuesta || respuesta.resultado !== "exito") {
                 const detalle = respuesta ? (respuesta.detalle || respuesta.error || JSON.stringify(respuesta)) : "sin detalle";
                 throw new Error("La hoja NO guardó la ficha: " + detalle);
