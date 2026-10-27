@@ -824,6 +824,13 @@
         .nom-dlg .per-desglose td:last-child { color: var(--text-muted); } .nom-dlg .per-desglose .per-check { display: inline-flex; margin-left: .4rem; }
         .nom-num { width: 6.5rem !important; display: inline-block; } .nom-dlg #nomMotivo { width: 100%; margin-top: .3rem; box-sizing: border-box; }
         .nom-res { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+        /* Nómina · modificar días y horas */
+        .nom-asis-tabla th { width: 6.5rem; white-space: nowrap; vertical-align: top; text-align: left; }
+        .nom-asis-fila { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .5rem; padding: .25rem 0; }
+        .nom-asis-fila + .nom-asis-fila { border-top: 1px dashed var(--border); }
+        .nom-asis-fila input[type=time] { width: 7.2rem; } .nom-asis-fila select { width: auto; }
+        .nom-asis-que { min-width: 10rem; } .nom-asis-bts { display: inline-flex; gap: .35rem; margin-left: auto; }
+        .nom-card-pie:has(> button) { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
         .nom-pie { justify-content: flex-end; margin-bottom: 0; flex-wrap: wrap; } .nom-pie input[type=password] { width: auto; flex: 1 1 200px; max-width: 260px; }
         .nom-cerrada summary { cursor: pointer; line-height: 1.6; } .nom-cerrada summary small { display: block; color: var(--text-muted); }
         /* Detalle del trabajador: como la hoja de nómina (salario y días laborados arriba, gastos, resumen) */
@@ -1177,6 +1184,8 @@
         .cmp-seg button { border: 0; background: transparent; color: var(--text-main); padding: .35rem .7rem; font-size: .85rem; font-weight: 600; cursor: pointer; }
         .cmp-seg button.act { background: #44AC00; color: #fff; }
         .cmp-desc-in { width: 64px !important; padding: .3rem .4rem !important; }
+        .cmp-tasa { display: inline-flex; align-items: center; gap: .4rem; white-space: nowrap; }   /* la tasa: etiqueta, campo y botón juntos */
+        .cmp-tasa input { width: 8.5rem !important; padding: .3rem .5rem !important; text-align: right; }
         .cmp-cant { display: inline-block; margin-right: .45rem; padding: .1rem .5rem; border-radius: 999px; background: rgba(68,172,0,.14); color: #2f8f00; font-weight: 800; font-size: .92rem; white-space: nowrap; }
         .cmp-cant.sin { background: var(--list-bg); color: var(--text-muted); font-weight: 600; font-size: .78rem; }
         .cmp-imp { margin-left: auto; }
@@ -3139,10 +3148,15 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-10-27.3';
+    const VERSION_SERVIDOR = '2026-10-27.4';
     let scriptViejo = false, servidorVersion = null;
+    // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
+    const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
+        for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
+    // Solo se avisa si el script de Google es ANTERIOR al panel (al panel le faltarían funciones). Si el script es más nuevo
+    // (se publicó el script y el panel instalado todavía no se actualizó) todo sigue funcionando: el script nuevo atiende al panel viejo.
     function avisarScriptViejo() {
-        if (scriptViejo || servidorVersion !== VERSION_SERVIDOR) mostrarBanner('El script publicado en Google es una versión anterior a este panel' + (servidorVersion ? ' (' + servidorVersion + ')' : '') + ': ' +
+        if (scriptViejo || !servidorVersion || compararVersion(servidorVersion, VERSION_SERVIDOR) < 0) mostrarBanner('El script publicado en Google es una versión anterior a este panel' + (servidorVersion ? ' (' + servidorVersion + ')' : '') + ': ' +
             'algunas funciones nuevas no van a responder. En la PC del proyecto haga doble clic en "Publicar Apps Script.cmd" (carpeta AutomatizacionPlaza) ' +
             'y espere a que diga LISTO; luego Salir y entrar de nuevo. Este panel espera la versión ' + VERSION_SERVIDOR + '.', 'warn');
     }
@@ -8231,7 +8245,14 @@
         const horFilas = (d.horario || []).filter(x => x.id === t.id);   // puede estar en dos tiendas (prestado): se unen los días
         const hor = horFilas.length ? { dias: Array.from({ length: 7 }, (_, i) => { const c = horFilas.map(x => (x.dias || [])[i] || '');
             return c.includes('C') || (c.includes('M') && c.includes('T')) ? 'C' : c.includes('M') ? 'M' : c.includes('T') ? 'T' : c.includes('L') ? 'L' : ''; }) } : null;
-        d.locales.filter(f => asisgClave(f.trabajador) === k).forEach(f => {
+        // Un mismo turno (fecha y mañana/tarde) registrado dos veces (dos fichas, o el nombre corto y el completo) se paga una sola vez:
+        // queda el del carnet, si no el que tiene salida, si no el de más horas. Los repetidos se avisan para quitarlos.
+        const turnoDe = f => f.fecha + '|' + (/^ma/i.test(f.turno) ? 'M' : /^tar/i.test(f.turno) ? 'T' : asisgClave(f.turno));
+        const puntaje = f => (/^carnet/i.test(f.responsable || '') ? 4 : 0) + (f.salida ? 2 : 0) + (Number(f.horas) || 0) / 100;
+        const unicos = new Map(), todosLoc = d.locales.filter(f => asisgClave(f.trabajador) === k);
+        todosLoc.forEach(f => { const p = unicos.get(turnoDe(f)); if (!p || puntaje(f) > puntaje(p)) unicos.set(turnoDe(f), f); });
+        const repetidos = todosLoc.filter(f => unicos.get(turnoDe(f)) !== f);
+        [...unicos.values()].forEach(f => {
             const ev = puntCorrido(puntEvaluar(puntHorario(f.tienda, f.turno, f.fecha), f.entrada, f.salida), f, d.locales);
             const cod = hor ? hor.dias[Math.round((aFecha(f.fecha) - aFecha(nomSemana)) / 864e5)] || '' : null;
             const fuera = cod !== null ? !(cod === 'C' || (cod === 'M' && /^ma/i.test(f.turno)) || (cod === 'T' && /^tar/i.test(f.turno)))
@@ -8282,7 +8303,7 @@
         if (horasExtra > 0 && tarifa === null && aj.pagarExtra) avisos.push('falta la tarifa de hora extra');
         if (bono > 0 && !String(aj.motivoBono || '').trim()) avisos.push('falta el motivo del bono');
         if (filas.some(f => f.sinSalida)) avisos.push('turno sin salida');
-        return { t, p, aj, filas, normales, extras, horasExtra, minPasados, tarde, x, tarifa, pagoExtra, bono, generado, deudas, excl, posterior, aDebitar, descontar, puntPerdido, prodPerdido,
+        return { t, p, aj, filas, normales, extras, horasExtra, minPasados, tarde, x, tarifa, pagoExtra, bono, generado, deudas, excl, posterior, aDebitar, repetidos, descontar, puntPerdido, prodPerdido,
                  neto: r2(generado - descontar), cerrada, avisos };
     }
     // Trabajadores de la semana: los activos y los inactivos que trabajaron o cobraron esa semana
@@ -8592,7 +8613,8 @@
             <div class="nom-card-cab"><b>Días laborados</b><span>${n.normales.length} turno(s)${n.extras.length ? ` + ${n.extras.length} extra` : ''}</span></div>
             <table class="nom-dias"><thead><tr><th>Día</th><th>Mañana</th><th>Tarde</th><th>Monto</th><th></th></tr></thead><tbody>${dias}</tbody></table>
             <div class="nom-total"><span>Total</span><b>${perUsd(c ? r2(c.pagoTurnos + c.pagoExtra) : r2(totalDias))}</b></div>
-            ${editable ? '<div class="nom-card-pie">Toque un turno para pagarlo como horas extra (o volverlo normal).</div>' : ''}
+            ${editable && (n.repetidos || []).length ? `<div class="banner warn" style="display:block;margin:.5rem .75rem 0">${n.repetidos.length} turno(s) repetido(s) (mismo día y turno): se pagan una sola vez. ${n.repetidos.map(f => `${fechaBonita(f.fecha).slice(0, 5)} ${esc(f.turno)}`).join(' · ')}. Quite el repetido en "Modificar días y horas".</div>` : ''}
+            ${editable ? `<div class="nom-card-pie">Toque un turno para pagarlo como horas extra (o volverlo normal).<button type="button" class="btn-ghost btn-mini" style="margin-left:auto" onclick="nomAsisAbrir('${id}')" title="${esPrincipal ? 'Corregir entradas y salidas, agregar o quitar días' : 'Requiere la clave de un administrador'}">✎ Modificar días y horas</button></div>` : ''}
         </div>`;
         // ---- Gastos ----
         let gastos;
@@ -8635,6 +8657,97 @@
             ${!c && n.avisos.length ? `<div class="banner warn">Antes de cerrar: ${n.avisos.map(esc).join(' · ')}.</div>` : ''}
             <div class="req-acciones nom-pie">${c ? '' : nomClaveCampo()}${c && !c.pagado && c.fila ? `<button type="button" class="btn-eliminar" style="margin-right:auto" onclick="nomAnular(${c.fila})" title="Por si se cerró por error: la semana se puede volver a cerrar">Anular cierre</button>` : ''}<button type="button" class="btn-ghost" onclick="nomCerrarDlg()">Cerrar</button>
                 ${c ? '' : `<button type="button" class="btn-save" id="nomBtnCerrar" onclick="nomCerrar(['${id}'], this)">Cerrar la nómina de ${esc(t.nombre.split(' ')[0])}</button>`}</div>`;
+    }
+    // ---------- Modificar los días y horas trabajados desde la nómina ----------
+    // Un administrador entra directo; otros, con la clave de un administrador (se pide una vez). Todo exige motivo y queda en
+    // BD VALIDACIONES (las mismas acciones de Gestión de asistencia, marcadas "desde Nómina"). Al guardar se recalcula la semana.
+    let nomAsisId = '', nomAsisClave = '', nomAsisAgregar = '', nomAsisMotivo = '';
+    async function nomAsisAbrir(id) {
+        if (!esPrincipal && !nomAsisClave) {
+            const c = await efePedirClave('Modificar días y horas', 'Para cambiar la asistencia desde Nómina, un administrador debe autorizarlo con su clave.');
+            if (!c) return; nomAsisClave = c;
+        }
+        nomAsisId = id; nomAsisAgregar = '';
+        let f = document.getElementById('nomAsisDlg');
+        if (!f) { f = document.createElement('div'); f.id = 'nomAsisDlg'; f.className = 'req-dlg-fondo'; f.onclick = e => { if (e.target === f) f.classList.add('hidden'); }; document.body.appendChild(f); }
+        f.classList.remove('hidden');
+        nomAsisPintar();
+    }
+    function nomAsisPintar() {
+        const f = document.getElementById('nomAsisDlg'); if (!f || f.classList.contains('hidden')) return;
+        const t = perDatos.trabajadores.find(x => x.id === nomAsisId), d = nomDatos;
+        if (!t || !d || d.error) { pintarVentana(f, `<div class="req-dlg">${cargandoHTML('Leyendo la asistencia...')}</div>`); return; }
+        const k = asisgClave(t.nombre), tiendas = perDatos.locales || [], esTienda = tiendas.includes(t.local);
+        const loc = d.locales.filter(x => asisgClave(x.trabajador) === k), ofi = d.oficina.filter(x => asisgClave(x.persona) === k);
+        const repetidas = new Set((nomCalcular(t).repetidos || []).map(x => x.fila));
+        const hora = (idc, v) => `<input type="time" id="${idc}" value="${esc(v || '')}">`;
+        const bts = (guardar, quitar) => `<span class="nom-asis-bts"><button type="button" class="btn-primary btn-mini" onclick="${guardar}">Guardar</button><button type="button" class="btn-eliminar btn-mini" onclick="${quitar}">Quitar</button></span>`;
+        const filas = [0, 1, 2, 3, 4, 5, 6].map(i => {
+            const fe = sumarDias(nomSemana, i), nd = diaSemana(fe);
+            const l = loc.filter(x => x.fecha === fe).map(x => `<div class="nom-asis-fila"><span class="nom-asis-que"><b>${esc(x.tienda)}</b> · ${esc(x.turno)}${/^carnet/i.test(x.responsable) ? ' <small>carnet</small>' : x.responsable ? ` <small>ficha ${esc(x.ficha || '')}</small>` : ''}${repetidas.has(x.fila) ? ' <span class="chip st-falta">repetido · no se paga</span>' : ''}</span>
+                ${hora('naE' + x.fila, x.entrada)}<span>a</span>${hora('naS' + x.fila, x.salida)}${bts(`nomAsisGuardarL(${x.fila})`, `nomAsisQuitar('L', ${x.fila})`)}</div>`).join('');
+            const o = ofi.filter(x => x.fecha === fe).map(x => `<div class="nom-asis-fila"><span class="nom-asis-que"><b>${esc(d.deptoDe[k] || 'Oficina')}</b> · jornada</span>
+                ${hora('naOe' + x.fila, x.entrada)}<span>almuerzo</span>${hora('naOa' + x.fila, x.salidaAlmuerzo)}<span>a</span>${hora('naOr' + x.fila, x.regresoAlmuerzo)}<span>salida</span>${hora('naOs' + x.fila, x.salida)}
+                ${bts(`nomAsisGuardarO(${x.fila})`, `nomAsisQuitar('O', ${x.fila})`)}</div>`).join('');
+            let add = '';
+            if (nomAsisAgregar === fe) {
+                const tienda = esTienda ? t.local : tiendas[0], h = (typeof puntHorario === 'function' && puntHorario(tienda, 'Mañana', fe)) || {};
+                add = esTienda || !ofi.length ? `<div class="nom-asis-fila nom-asis-nueva">
+                    ${esTienda ? `<select id="naNT">${tiendas.map(x => `<option${x === tienda ? ' selected' : ''}>${esc(x)}</option>`).join('')}</select><select id="naNU"><option>Mañana</option><option>Tarde</option></select>` : `<span class="nom-asis-que"><b>${esc(d.deptoDe[k] || 'Oficina')}</b></span>`}
+                    ${hora('naNE', h.entrada)}<span>a</span>${hora('naNS', h.salida)}
+                    <span class="nom-asis-bts"><button type="button" class="btn-primary btn-mini" onclick="nomAsisAgregarGuardar('${fe}', ${esTienda})">Agregar</button><button type="button" class="btn-ghost btn-mini" onclick="nomAsisAgregar='';nomAsisPintar()">Cancelar</button></span></div>` : '';
+            }
+            const vacio = !l && !o;
+            return `<tr><th>${fe.slice(8)} ${nd.charAt(0).toUpperCase() + nd.slice(1)}</th><td class="izq">${l}${o}${add || `${vacio ? '<span class="nota" style="margin:0">no trabajó</span> ' : ''}${esTienda || vacio ? `<button type="button" class="btn-ghost btn-mini" onclick="nomAsisAgregar='${fe}';nomAsisPintar()">＋ ${esTienda && !vacio ? 'Otro turno' : 'Agregar día'}</button>` : ''}`}</td></tr>`;
+        }).join('');
+        pintarVentana(f, `<div class="req-dlg nom-dlg"><div class="prg-head"><h3>Días y horas · ${esc(t.nombre)}</h3><button type="button" class="prg-x" title="Cerrar" onclick="document.getElementById('nomAsisDlg').classList.add('hidden')">✕</button></div>
+            <div class="req-sub">Semana ${fechaBonita(nomSemana)} – ${fechaBonita(sumarDias(nomSemana, 6))} · ${esc(t.local || 'Oficina')}${esPrincipal ? '' : ' · autorizado con clave de administrador'}</div>
+            <label for="nomAsisMot">Motivo del cambio (queda registrado)</label><input type="text" id="nomAsisMot" maxlength="150" autocomplete="off" placeholder="Ej.: olvidó marcar la salida" value="${esc(nomAsisMotivo)}" oninput="nomAsisMotivo=this.value">
+            <div class="tabla-wrap"><table class="req-tabla nom-asis-tabla" data-sin-paginar><tbody>${filas}</tbody></table></div>
+            <div class="login-error" id="nomAsisError"></div>
+            <div class="nota">Cada cambio se guarda con su botón y la nómina de la semana se vuelve a calcular. "Quitar" deja el turno sin contar (no se borra: queda anotado quién lo quitó y qué tenía).</div>
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-primary" onclick="document.getElementById('nomAsisDlg').classList.add('hidden')">Listo</button></div></div>`);
+    }
+    // Guarda un cambio y vuelve a leer la semana (la nómina se recalcula con la asistencia nueva)
+    async function nomAsisEnviar(payload, btn) {
+        const err = document.getElementById('nomAsisError'); if (err) err.textContent = '';
+        const motivo = String(nomAsisMotivo || '').trim();
+        if (!motivo) { if (err) err.textContent = 'Escriba el motivo del cambio (arriba).'; const m = document.getElementById('nomAsisMot'); if (m) m.focus(); return; }
+        if (btn) btnCargando(btn, '...');
+        try {
+            await llamarApi(Object.assign({ desdeNomina: true, motivo, claveAdmin: nomAsisClave }, payload));
+            nomAsisAgregar = '';
+            delete nomCache[nomSemana]; nomDatos = null; asisgDatos = null;
+            await nomCargar();
+            nomAsisPintar();
+            mostrarBanner('Asistencia modificada; la nómina de la semana se recalculó.', 'ok');
+        } catch (e) {
+            if (/clave/i.test(e.message)) nomAsisClave = '';
+            if (err) err.textContent = e.message; if (btn) { btn.disabled = false; btn.textContent = 'Guardar'; }
+        }
+    }
+    const nomAsisVal = idc => { const el = document.getElementById(idc); return el ? el.value : ''; };
+    const nomAsisBtn = () => document.activeElement && document.activeElement.tagName === 'BUTTON' ? document.activeElement : null;
+    function nomAsisFila(tipo, fila) { return tipo === 'L' ? nomDatos.locales.find(x => x.fila === fila) : nomDatos.oficina.find(x => x.fila === fila); }
+    function nomAsisGuardarL(fila) {
+        const x = nomAsisFila('L', fila); if (!x) return;
+        nomAsisEnviar({ action: 'asisg_local_guardar', fila, fecha: x.fecha, trabajador: x.trabajador, entrada: nomAsisVal('naE' + fila), salida: nomAsisVal('naS' + fila) }, nomAsisBtn());
+    }
+    function nomAsisGuardarO(fila) {
+        const x = nomAsisFila('O', fila); if (!x) return;
+        nomAsisEnviar({ action: 'asisg_oficina_guardar', fila, fecha: x.fecha, persona: x.persona,
+            horas: { entrada: nomAsisVal('naOe' + fila), salidaAlmuerzo: nomAsisVal('naOa' + fila), regresoAlmuerzo: nomAsisVal('naOr' + fila), salida: nomAsisVal('naOs' + fila) } }, nomAsisBtn());
+    }
+    function nomAsisQuitar(tipo, fila) {
+        const x = nomAsisFila(tipo, fila); if (!x) return;
+        if (!confirm(`¿Quitar ${tipo === 'L' ? x.tienda + ' · ' + x.turno : 'la jornada'} del ${fechaBonita(x.fecha)}? Deja de contar en la nómina.`)) return;
+        nomAsisEnviar(tipo === 'L' ? { action: 'asisg_local_quitar', fila, fecha: x.fecha, trabajador: x.trabajador } : { action: 'asisg_oficina_quitar', fila, fecha: x.fecha, persona: x.persona }, nomAsisBtn());
+    }
+    function nomAsisAgregarGuardar(fecha, esTienda) {
+        const t = perDatos.trabajadores.find(x => x.id === nomAsisId); if (!t) return;
+        const entrada = nomAsisVal('naNE'), salida = nomAsisVal('naNS');
+        nomAsisEnviar(esTienda ? { action: 'asisg_local_agregar', fecha, tienda: nomAsisVal('naNT'), turno: nomAsisVal('naNU'), trabajador: t.nombre, entrada, salida }
+                               : { action: 'asisg_oficina_guardar', fecha, persona: t.nombre, horas: { entrada, salidaAlmuerzo: '', regresoAlmuerzo: '', salida } }, nomAsisBtn());
     }
     function nomDlgTodos() {
         const pend = nomLista().filter(n => !n.cerrada && nomSel.has(n.t.id)), conAviso = pend.filter(n => n.avisos.length);
@@ -12541,8 +12654,8 @@ Reglas:
                 <span class="cmp-ver-t">Precios en:</span><span class="cmp-seg">${modos.map(([v, n]) => `<button type="button" class="${cmpPV.modo === v ? 'act' : ''}" onclick="cmpPV.modo='${v}';cmpGuardarPV();almPintar()">${n}</button>`).join('')}</span>
                 <label class="cmp-ver-t" for="cmpDesc" title="El mismo en todas las tiendas">Descuento divisas</label><input type="number" id="cmpDesc" class="cmp-desc-in" min="0" max="50" step="0.5" value="${cmpDesc()}" ${permisos.some(x => x === 'precios' || x === 'inventario') ? '' : 'disabled'} onchange="cmpCambiarDesc(this)"><span class="cmp-ver-t">% (todas las tiendas)</span>
                 ${completas ? '' : `<label class="cmp-ver-t" for="cmpComoR">Al marcar:</label><select id="cmpComoR" onchange="cmpPV.como=this.value;cmpGuardarPV()">${CMP_COMO.actualizado.map(c => `<option${c === cmpPV.como ? ' selected' : ''}>${esc(c)}</option>`).join('')}</select>`}
-                ${cmpPV.modo === 'bs' ? `<label class="cmp-ver-t" for="cmpTasaIn">Tasa (Bs por $)</label><input type="number" id="cmpTasaIn" class="cmp-desc-in" style="width:7.5rem" min="0" step="0.0001" value="${cmpTasa() || ''}" onchange="cmpCambiarTasa(this.value)">
-                    ${cmpTasaManual ? `<button type="button" class="btn-ghost btn-mini" title="Volver a la última tasa del BCV" onclick="cmpTasaManual=0;almPintar()">BCV ${almTasa() ? fmt(almTasa()) : '—'}</button>` : '<span class="cmp-ver-t">última del BCV</span>'}` : ''}
+                ${cmpPV.modo === 'bs' ? `<span class="cmp-tasa"><label class="cmp-ver-t" for="cmpTasaIn">Tasa (Bs por $)</label><input type="number" id="cmpTasaIn" min="0" step="0.0001" value="${cmpTasa() || ''}" onchange="cmpCambiarTasa(this.value)">
+                    ${cmpTasaManual ? `<button type="button" class="btn-ghost btn-mini" title="Volver a la última tasa del BCV" onclick="cmpTasaManual=0;almPintar()">BCV ${almTasa() ? fmt(almTasa()) : '—'}</button>` : '<span class="cmp-ver-t">última del BCV</span>'}</span>` : ''}
             </div>
             ${completas ? '' : `<div class="cmp-resumen"><span>Por definir precio: <b style="color:var(--amar-txt)">${cmpOrd.porDefinir || 0}</b></span><span>Por actualizar: <b>${cmpOrd.porActualizar || 0}</b></span>${f.tienda ? `<span>Pendientes en ${esc(f.tienda)}: <b>${l.length}</b></span>` : ''}
                 ${l.length ? `<button type="button" class="btn-ghost btn-mini cmp-imp" onclick="cmpImprimirPendientes()">🖨 Imprimir ${f.tienda ? 'lo de ' + esc(f.tienda) : 'la lista'}</button>` : ''}</div>`}
