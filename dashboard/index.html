@@ -2966,7 +2966,7 @@
         if (TIEMPOS.length > 60) TIEMPOS.pop();
     }
     // Solo lectura: si la respuesta de Google no llega, se reintenta una vez sola (no cambia nada en la hoja)
-    const SOLO_LECTURA = /^(login|list|cuadre_detalle|cuadre_detalle_lote|mov_listar|cuentas_listar|conc_listar|efe_listar|cc_listar|req_datos|req_ventas|req_historial|asis_hoy|asis_listar|asisg_listar|per_listar|cxc_deudas|nom_historial|nom_autorizar|nom_ajustes|hor_datos|alm_datos|alm_notas|alm_ingresos|alm_kardex|alm_tiendas|alm_existencias|cmp_compras|cmp_ordenes|cmp_enlazar|pnom_listar|ping|cambios|enlinea|marca_estado)$/;
+    const SOLO_LECTURA = /^(login|list|cuadre_detalle|cuadre_detalle_lote|mov_listar|cuentas_listar|conc_listar|efe_listar|cc_listar|req_datos|req_ventas|req_historial|asis_hoy|asis_listar|asisg_listar|per_listar|cxc_deudas|nom_historial|nom_autorizar|nom_ajustes|hor_datos|alm_datos|alm_notas|alm_ingresos|alm_kardex|alm_tiendas|alm_existencias|cmp_compras|cmp_ordenes|cmp_enlazar|cmp_borradores|cmp_borrador|pnom_listar|ping|cambios|enlinea|marca_estado)$/;
     // Guardados sin repetir: cada cambio lleva un "idem". Si no llegó la respuesta y se vuelve a pulsar el MISMO cambio,
     // se manda el mismo idem y Google responde "ya estaba registrado" en vez de guardarlo otra vez.
     const idemPendientes = new Map();   // contenido del cambio -> idem del intento sin respuesta
@@ -3139,7 +3139,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-10-26.1';
+    const VERSION_SERVIDOR = '2026-10-27.3';
     let scriptViejo = false, servidorVersion = null;
     function avisarScriptViejo() {
         if (scriptViejo || servidorVersion !== VERSION_SERVIDOR) mostrarBanner('El script publicado en Google es una versión anterior a este panel' + (servidorVersion ? ' (' + servidorVersion + ')' : '') + ': ' +
@@ -3314,7 +3314,9 @@
         if (vistaActual === 'marcaje' && vista !== 'marcaje') { marcaDetenerCamara(); clearInterval(marcaReloj); }
         if (vista !== 'cuadre' && seleccion !== null) { const v = vistaActual; vistaActual = vista; cuaCerrarCaja(); vistaActual = v; }   // la ventana de la caja no sigue abierta en otro módulo
 
+        if (vista === 'precios' && vistaActual !== 'precios') cmpTasaManual = 0;   // Precios en tiendas abre siempre con la última tasa del BCV
         vistaActual = vista;
+        atrasArmar();   // el botón atrás del teléfono vuelve dentro del panel
         claveAdminAuto(document.body);
         // login, menu, cuadre, ventas y admin tienen su propia sección; el resto usa la genérica "en construcción"
         // Caja chica usa la misma sección de Control de efectivo, mostrando solo la caja chica
@@ -3543,6 +3545,21 @@
         e.preventDefault();
         irAtras();
     }, true);
+    // Botón atrás del teléfono (Android) o del navegador = "← Atrás" del panel (igual que Esc: si hay una ventana abierta, solo la cierra).
+    // Se deja una entrada "de guardia" en el historial del navegador; al pulsar atrás se consume, se hace el Atrás del panel y se vuelve a poner.
+    // En Inicio, sin nada abierto, la primera vez avisa y la segunda sale de la aplicación.
+    function atrasArmar() {
+        if (!clave || vistaActual === 'login' || vistaActual === 'marcaje') return;
+        try { if (!(history.state && history.state.panelAtras)) history.pushState({ panelAtras: 1 }, ''); } catch (e) {}
+    }
+    window.addEventListener('popstate', () => {
+        if (!clave || vistaActual === 'login' || vistaActual === 'marcaje') return;
+        const visible = el => el && !el.classList.contains('hidden') && el.getClientRects().length > 0;
+        const abierto = [...document.querySelectorAll('.req-dlg-fondo, .efe-modal, #perDlg, [role="dialog"]')].some(visible) || document.querySelector('.ms.abierto');
+        if (!abierto && vistaActual === 'menu' && !areaActual && !historialVistas.length) { mostrarBanner('Pulse atrás otra vez para salir.', 'ok'); return; }
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+        atrasArmar();
+    });
     document.addEventListener('visibilitychange', () => { if (!document.hidden) avisarEnLinea(true); });
 
     // ==========================================
@@ -3650,14 +3667,28 @@
                 if (n && !almNotas) almNotas = n.notas || [];
                 if (o && !almIngresos) almIngresos = o.ingresos || [];
                 if (!almTiendas) { almTiendasSemana = almTiendasSemana || inicioSemana(fechaLocalHoy()); almTiendas = await llamarApi({ action: 'alm_tiendas', semana: almTiendasSemana }); }
+                if (!cmpCompras) {   // Compra con foto: las compras recientes y las que están en curso
+                    const [c, b] = await Promise.all([llamarApi({ action: 'cmp_compras' }), llamarApi({ action: 'cmp_borradores' }).catch(() => ({ borradores: [] }))]);
+                    if (!cmpCompras) { cmpCompras = c.compras || []; cmpBorradores = b.borradores || []; }
+                }
             }
+        }]);
+        // Precios en tiendas: el catálogo y las órdenes pendientes
+        if (tiene('precios')) tareas.push([['precios'], async () => {
+            if (!almDatos) almUsar(await llamarApi({ action: 'alm_datos' }));
+            if (!cmpOrd || !cmpOrd.ordenes) { const r = await llamarApi({ action: 'cmp_ordenes', ver: 'pendientes' }); if (!cmpOrd || !cmpOrd.ordenes) cmpOrd = r; }
+        }]);
+        // Pagos de nómina: lo cerrado por pagar
+        if (tiene('pagonomina')) tareas.push([['pagonomina'], async () => {
+            if (!pnomDatos) { const r = await llamarApi({ action: 'pnom_listar' }); if (!pnomDatos) pnomDatos = r.pagos || []; }
         }]);
         if (tiene('nomina') || tiene('talento') || tiene('cxc') || tiene('horarios')) tareas.push([['nomina', 'talento', 'cxc', 'horarios'], async () => {
             if (!perDatos) perUsar(await llamarApi({ action: 'per_listar' }));
             if (tiene('cxc') && !perDeudasPend) perDeudasPend = await llamarApi({ action: 'cxc_deudas' });
-            if (tiene('nomina')) {   // la nómina de la semana en curso y la de la semana anterior
+            if (tiene('nomina')) {   // la nómina de la semana en curso y las 2 anteriores, y las nóminas cerradas
                 const s = inicioSemana(fechaLocalHoy());
-                await Promise.all([nomTraer(s), nomTraer(sumarDias(s, -7))]);
+                await Promise.all([nomTraer(s), nomTraer(sumarDias(s, -7)), nomTraer(sumarDias(s, -14)),
+                    nomHist ? null : llamarApi({ action: 'nom_historial' }).then(r => { if (!nomHist) nomHist = r.pagos || []; })]);
             }
         }]);
         tareas.forEach(([mods]) => mods.forEach(m => { if (tiene(m) && !precargaEstado[m]) precargaEstado[m] = 'espera'; }));
@@ -8602,7 +8633,7 @@
             <h4 class="per-sub">Gastos del trabajador</h4>${gastos}
             <h4 class="per-sub">Resumen</h4>${resumen}
             ${!c && n.avisos.length ? `<div class="banner warn">Antes de cerrar: ${n.avisos.map(esc).join(' · ')}.</div>` : ''}
-            <div class="req-acciones nom-pie">${c ? '' : nomClaveCampo()}<button type="button" class="btn-ghost" onclick="nomCerrarDlg()">Cerrar</button>
+            <div class="req-acciones nom-pie">${c ? '' : nomClaveCampo()}${c && !c.pagado && c.fila ? `<button type="button" class="btn-eliminar" style="margin-right:auto" onclick="nomAnular(${c.fila})" title="Por si se cerró por error: la semana se puede volver a cerrar">Anular cierre</button>` : ''}<button type="button" class="btn-ghost" onclick="nomCerrarDlg()">Cerrar</button>
                 ${c ? '' : `<button type="button" class="btn-save" id="nomBtnCerrar" onclick="nomCerrar(['${id}'], this)">Cerrar la nómina de ${esc(t.nombre.split(' ')[0])}</button>`}</div>`;
     }
     function nomDlgTodos() {
@@ -8657,20 +8688,67 @@
             btn.disabled = false; btn.textContent = 'Cerrar';
         }
     }
+    // Anular un cierre (se cerró por error): clave de administrador y motivo. Los gastos descontados vuelven a Cuentas por cobrar
+    // y la semana de ese trabajador se puede volver a cerrar (sus ajustes guardados siguen ahí). Si ya se pagó, primero se deshace el pago.
+    function nomAnular(fila) {
+        const c = [].concat(Array.isArray(nomHist) ? nomHist : [], (nomDatos && nomDatos.cerradas) || []).find(p => p.fila === fila);
+        if (!c) return;
+        let f = document.getElementById('nomAnularDlg');
+        if (!f) { f = document.createElement('div'); f.id = 'nomAnularDlg'; f.className = 'req-dlg-fondo'; f.onclick = e => { if (e.target === f) f.classList.add('hidden'); }; document.body.appendChild(f); }
+        pintarVentana(f, `<form class="req-dlg" onsubmit="nomAnularListo(event, ${fila})"><h3>Anular el cierre de ${esc(c.trabajador)}</h3>
+            <div class="req-sub">Nómina ${esc(c.id)} · semana ${fechaBonita(c.desde)} – ${fechaBonita(c.hasta)} · a cobrar ${perUsd(c.neto)}</div>
+            <div class="nota" style="margin:0 0 .6rem">Deja de estar en Pagos de nómina${c.descontado ? `, los gastos descontados (${perUsd(c.descontado)}) vuelven a quedar pendientes en Cuentas por cobrar` : ''} y esa semana se le puede volver a cerrar. Queda registrado quién lo anuló y por qué.</div>
+            <label for="nomAnuMot">Motivo</label><input type="text" id="nomAnuMot" maxlength="150" required autocomplete="off" placeholder="Ej.: se cerró sin sus turnos">
+            <label for="nomAnuClave">Clave de administrador</label><input type="password" id="nomAnuClave" autocomplete="off" required>
+            <div class="login-error" id="nomAnuError"></div>
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-ghost" onclick="document.getElementById('nomAnularDlg').classList.add('hidden')">Cancelar</button>
+                <button type="submit" class="btn-eliminar" id="nomAnuBtn">Anular cierre</button></div></form>`);
+        f.classList.remove('hidden');
+        setTimeout(() => { const m = document.getElementById('nomAnuMot'); if (m) m.focus(); }, 50);
+    }
+    async function nomAnularListo(ev, fila) {
+        ev.preventDefault();
+        const btn = document.getElementById('nomAnuBtn'); btnCargando(btn, 'Anulando...');
+        try {
+            const r = await llamarApi({ action: 'nom_anular', fila, motivo: document.getElementById('nomAnuMot').value.trim(), claveAdmin: document.getElementById('nomAnuClave').value });
+            nomHist = r.pagos || null;
+            Object.keys(nomCache).forEach(k => delete nomCache[k]); nomDatos = null;   // la semana vuelve a tener a ese trabajador por cerrar
+            perDeudasPend = null; perDeudasHistDatos = null; nomDeudasTodas = null; pnomDatos = null;
+            document.getElementById('nomAnularDlg').classList.add('hidden'); nomCerrarDlg();
+            perPintar();
+            mostrarBanner(`Cierre anulado: ${r.trabajadores.join(', ')}. Ya se puede volver a cerrar esa semana.`, 'ok');
+        } catch (e) { document.getElementById('nomAnuError').textContent = e.message; btn.disabled = false; btn.textContent = 'Anular cierre'; }
+    }
     // ---------- Nóminas cerradas (BD PAGOS NOMINA), por ID ----------
     async function nomCargarHist() {
         try { nomHist = (await llamarApi({ action: 'nom_historial' })).pagos || []; }
         catch (e) { nomHist = { error: e.message }; }
         if (perTab === 'cerradas') perPintar();
     }
+    // Filtros: un trabajador y un rango de fechas (semanas que caen en el rango); con un trabajador elegido sale el resumen de lo que cobró
+    let nomHistF = { trab: '', desde: '', hasta: '' };
+    function nomHistFiltrar(k, v) { nomHistF[k] = v; perPintar(); }
     function nomCerradas() {
         if (!nomHist) { setTimeout(nomCargarHist, 0); return cargandoHTML('Cargando las nóminas cerradas...'); }
         if (nomHist.error) return `<div class="banner error">${esc(nomHist.error)}</div>`;
+        const f = nomHistF, trabs = [...new Map(nomHist.map(p => [p.trabajadorId, p.trabajador])).entries()].sort((a, b) => a[1].localeCompare(b[1], 'es', { sensitivity: 'base' }));
+        const filtros = `<div class="filters alm-filtros">
+                <div><label for="nomHT">Trabajador</label><select id="nomHT" onchange="nomHistFiltrar('trab', this.value)"><option value="">Todos</option>${trabs.map(([id, n]) => `<option value="${esc(id)}"${id === f.trab ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select></div>
+                <div><label for="nomHD">Desde</label><input type="date" id="nomHD" value="${esc(f.desde)}" onchange="nomHistFiltrar('desde', this.value)"></div>
+                <div><label for="nomHH">Hasta</label><input type="date" id="nomHH" value="${esc(f.hasta)}" onchange="nomHistFiltrar('hasta', this.value)"></div>
+                ${f.trab || f.desde || f.hasta ? `<div style="align-self:end"><button type="button" class="btn-ghost" onclick="nomHistF={trab:'',desde:'',hasta:''};perPintar()">Quitar filtros</button></div>` : ''}
+            </div>`;
+        const lista = nomHist.filter(p => perPasa(p.id, p.trabajador, p.trabajadorId, p.local) && (!f.trab || p.trabajadorId === f.trab) && (!f.desde || p.hasta >= f.desde) && (!f.hasta || p.desde <= f.hasta));
         const grupos = new Map();
-        nomHist.filter(p => perPasa(p.id, p.trabajador, p.trabajadorId, p.local)).forEach(p => { const g = grupos.get(p.id) || (grupos.set(p.id, []), grupos.get(p.id)); g.push(p); });
-        if (!grupos.size) return '<div class="empty">No hay nóminas cerradas' + (document.getElementById('perBuscar').value ? ' con esa búsqueda' : '') + '.</div>';
+        lista.forEach(p => { const g = grupos.get(p.id) || (grupos.set(p.id, []), grupos.get(p.id)); g.push(p); });
+        if (!grupos.size) return filtros + '<div class="empty">No hay nóminas cerradas' + (document.getElementById('perBuscar').value || f.trab || f.desde || f.hasta ? ' con esos filtros' : '') + '.</div>';
         const s = (arr, k) => arr.reduce((a, p) => a + p[k], 0);
-        return [...grupos.entries()].map(([id, ps]) => { const nPag = ps.filter(p => p.pagado).length; return `<details class="grafico-card nom-cerrada"><summary><b>${esc(id)}</b> · semana ${fechaBonita(ps[0].desde)} – ${fechaBonita(ps[0].hasta)} · ${ps.length} trabajador(es) ·
+        const resumen = f.trab ? `<div class="kpis">
+                <div class="kpi"><div class="k-label">Semanas</div><div class="k-value">${lista.length}</div><div class="k-label">${esc((trabs.find(([id]) => id === f.trab) || [])[1] || '')}</div></div>
+                <div class="kpi"><div class="k-label">Generado</div><div class="k-value">${perUsd(s(lista, 'generado'))}</div><div class="k-label">${s(lista, 'turnos')} turno(s)</div></div>
+                <div class="kpi bad"><div class="k-label">Gastos descontados</div><div class="k-value">${perUsd(s(lista, 'descontado'))}</div></div>
+                <div class="kpi ok"><div class="k-label">Cobró</div><div class="k-value">${perUsd(s(lista, 'neto'))}</div><div class="k-label">${s(lista, 'netoBs') ? 'Bs ' + fmt(r2(s(lista, 'netoBs'))) + ' · ' : ''}${lista.filter(p => p.pagado).length} pagada(s) · ${lista.filter(p => !p.pagado).length} por pagar</div></div></div>` : '';
+        return filtros + resumen + [...grupos.entries()].map(([id, ps]) => { const nPag = ps.filter(p => p.pagado).length; return `<details class="grafico-card nom-cerrada"><summary><b>${esc(id)}</b> · semana ${fechaBonita(ps[0].desde)} – ${fechaBonita(ps[0].hasta)} · ${ps.length} trabajador(es) ·
                 a pagar <b>${perUsd(s(ps, 'neto'))}</b>${s(ps, 'netoBs') ? ` (Bs ${fmt(s(ps, 'netoBs'))})` : ''} · gastos descontados ${perUsd(s(ps, 'descontado'))}
                 <span class="chip ${nPag === ps.length ? 'st-ok' : 'st-amar'}">${nPag === ps.length ? 'Pagada' : nPag + ' de ' + ps.length + ' pagados'}</span>
                 <button type="button" class="btn-ghost btn-mini" onclick="event.preventDefault(); event.stopPropagation(); nomImprimir('${esc(id)}')">Imprimir</button>
@@ -8680,7 +8758,7 @@
                 <td>${p.horasExtra ? reqN(p.horasExtra, 2) + ' h' : '—'}${p.pagoExtra ? `<small>${perUsd(p.pagoExtra)}</small>` : ''}</td>
                 <td>${perUsd(p.bonoPuntualidad + p.bonoProductividad + p.bonoAdicional)}${p.bonoAdicional ? `<small>adicional ${perUsd(p.bonoAdicional)}: ${esc(p.motivoBono)}</small>` : ''}</td>
                 <td>${perUsd(p.generado)}</td><td>${perUsd(p.descontado)}${p.deudasExcluidas ? `<small>excluidas: ${esc(p.deudasExcluidas)}</small>` : ''}</td><td><b>${perUsd(p.neto)}</b>${p.netoBs ? `<small>Bs ${fmt(p.netoBs)} · tasa ${fmt(p.tasa)}</small>` : ''}</td>
-                <td class="izq">${p.pagado ? `<span class="chip st-ok">Pagado</span><small>${fechaBonita(p.fechaPago)}${p.referencia ? ' · ref. ' + esc(p.referencia) : ''}${p.comprobante ? ` · <a href="${esc(p.comprobante)}" target="_blank" rel="noopener">comprobante</a>` : ''}</small>` : '<span class="chip st-amar">Por pagar</span>'}</td>
+                <td class="izq">${p.pagado ? `<span class="chip st-ok">Pagado</span><small>${fechaBonita(p.fechaPago)}${p.referencia ? ' · ref. ' + esc(p.referencia) : ''}${p.comprobante ? ` · <a href="${esc(p.comprobante)}" target="_blank" rel="noopener">comprobante</a>` : ''}</small>` : `<span class="chip st-amar">Por pagar</span> <button type="button" class="btn-ghost btn-mini" onclick="nomAnular(${p.fila})" title="Por si se cerró por error">Anular</button>`}</td>
                 <td class="izq">${esc(p.movimiento || '—')}</td></tr>`).join('')}
             </tbody></table></div></details>`; }).join('') + '<div class="nota">Toque un trabajador para ver su hoja de nómina tal como quedó al cerrar (turnos, bonos, quién autorizó y los gastos descontados). Cada nómina cerrada queda en BD PAGOS NOMINA con su ID. Los gastos descontados aparecen en Cuentas por cobrar como "Descuento de nómina" con el mismo ID (también en el historial completo de cada trabajador).</div>';
     }
@@ -10098,14 +10176,20 @@
             claveAdm = perClaveVerif || await efePedirClave('Verificar gasto de tienda', x ? `${x.nombre} · ${fechaBonita(x.fecha)} · ${x.descripcion} · ${perUsd(x.usd)}` : 'Confirmar el gasto');
             if (!claveAdm) return;
         }
-        btnCargando(btn, '...');
+        // Al instante: sale de los pendientes y se guarda en segundo plano (si falla, vuelve y avisa)
+        const ref = btn.dataset.ref, usd = Number(btn.dataset.usd), lista = perDeudasPend ? perDeudasPend.deudas : null, i = lista && x ? lista.indexOf(x) : -1;
+        if (i >= 0) { lista.splice(i, 1); perPintar(); mostrarBanner('Gasto verificado.', 'ok'); } else btnCargando(btn, '...');
         try {
-            const r = await llamarApi({ action: 'cxc_verificar', ref: btn.dataset.ref, usd: Number(btn.dataset.usd), claveAdmin: claveAdm });
+            const r = await llamarApi({ action: 'cxc_verificar', ref, usd, claveAdmin: claveAdm });
             if (claveAdm) perClaveVerif = claveAdm;
             perDeudasPend = r; perDeudasHistDatos = null;
-            mostrarBanner('Gasto verificado.', 'ok');
+            if (i < 0) mostrarBanner('Gasto verificado.', 'ok');
             perPintar();
-        } catch (e) { if (/clave/i.test(e.message)) perClaveVerif = ''; mostrarBanner('No se pudo verificar: ' + e.message, 'error'); perPintar(); }
+        } catch (e) {
+            if (/clave/i.test(e.message)) perClaveVerif = '';
+            if (i >= 0 && perDeudasPend && perDeudasPend.deudas === lista && !lista.includes(x)) lista.splice(i, 0, x);
+            mostrarBanner('No se pudo verificar (se deshizo): ' + e.message, 'error'); perPintar();
+        }
     }
 
     // ---------- Registrar: deuda, gasto de tienda o abono (BD CXC) ----------
@@ -11371,7 +11455,7 @@
             const r = await llamarApi({ action: 'alm_proveedor_guardar', nombre: v('almNpN'), rif: v('almNpR'), telefono: v('almNpT'), contacto: v('almNpC') });
             almCerrar(); almUsar(r);
             if (almTab === 'ingresar' && !almIng.listo) almProvElegir(r.proveedorId);
-            if (almTab === 'compra') { cmp.proveedorId = r.proveedorId; cmpPintarCompra(document.getElementById('almContenido'), true); }
+            if (almTab === 'compra') { cmp.proveedorId = r.proveedorId; cmpPintarCompra(document.getElementById('almContenido'), true); cmpAvanceProgramar(); }
             mostrarBanner('Proveedor registrado: ' + r.proveedorId + '.', 'ok');
         } catch (e) { document.getElementById('almNpError').textContent = e.message; btn.disabled = false; btn.textContent = 'Registrar'; }
     }
@@ -11685,11 +11769,15 @@
     async function almMarcarNota(numero, campo, valor) {
         const titulo = campo === 'verificada' ? (valor ? 'Verificar la recepción' : 'Quitar la verificación') : (valor ? 'Marcar ingresada en tienda' : 'Quitar "ingresada en tienda"');
         const claveAdmin = await efePedirClave(titulo, 'Nota N° ' + numero + ': un administrador debe autorizarlo.'); if (!claveAdmin) return;
+        // Al instante en pantalla; se guarda en segundo plano (si falla, se deshace y avisa)
+        const n = almNotaDe(numero), antes = n ? n[campo] : '';
+        const pintar = () => { almPintar(); const d = document.getElementById('almDlg'); if (d && !d.classList.contains('hidden')) almVerNota(numero); };
+        if (n) { n[campo] = valor ? nombreUsuario + ' · guardando...' : ''; pintar(); }
         try {
             const r = await llamarApi({ action: 'alm_nota_marcar', numero, campo, valor, claveAdmin });
             almReemplazarNota(r.nota); if (r.pendientes) almDatos.pendientes = r.pendientes;
-            almPintar(); almVerNota(numero);
-        } catch (e) { mostrarBanner(e.message, 'error'); }
+            pintar();
+        } catch (e) { if (n) n[campo] = antes; pintar(); mostrarBanner('No se pudo guardar la marca (se deshizo): ' + e.message, 'error'); }
     }
     // Modificar una nota (clave): cantidades y precios; quitar o agregar renglones con su código
     let almMod = null;
@@ -11783,12 +11871,16 @@
     async function almVerificarOp(numero, valor) {
         const claveAdmin = await efePedirClave(valor ? 'Verificar la operación' : 'Quitar la verificación', 'Operación N° ' + numero + ': un supervisor debe autorizarlo.');
         if (!claveAdmin) return;
+        // Al instante en pantalla; se guarda en segundo plano (si falla, se deshace y avisa)
+        const o = (almIngresos || []).find(x => x.numero === numero), antes = o ? o.verificada : '';
+        const pintar = () => { almPintar(); const d = document.getElementById('almDlg'); if (d && !d.classList.contains('hidden')) almVerOperacion(numero); };
+        if (o) { o.verificada = valor ? nombreUsuario + ' · guardando...' : ''; pintar(); }
         try {
             const r = await llamarApi({ action: 'alm_ingreso_verificar', numero, valor, claveAdmin });
             const i = (almIngresos || []).findIndex(x => x.numero === numero); if (i >= 0) almIngresos[i] = r.ingreso;
             if (r.pendientes) almDatos.pendientes = r.pendientes;
-            almPintar(); almVerOperacion(numero);
-        } catch (e) { mostrarBanner(e.message, 'error'); }
+            pintar();
+        } catch (e) { if (o) o.verificada = antes; pintar(); mostrarBanner('No se pudo guardar la verificación (se deshizo): ' + e.message, 'error'); }
     }
     // ---------- Exportar a Excel (lo que se ve con los filtros) ----------
     async function almExportarNotas() {
@@ -11916,12 +12008,13 @@
     }
     const cmpClaveProd = p => p.codigo || cmpClaveLibre(p.descripcion);
     // Sugerencia: los márgenes de la última vez (si tuvo precio) o la regla del manual
-    function cmpSugerir(p, costo) {
+    // sinMerma: la compra con foto no usa merma (los víveres no tienen); el precio sale del costo de la factura
+    function cmpSugerir(p, costo, sinMerma) {
         if (typeof p === 'string') p = almProducto(p);
         if (!p) return null;
         const r = cmpRegla(p, costo), ant = (almDatos.precios || {})[cmpClaveProd(p)];
         const usaAnt = !!(ant && !r.especial && typeof r.detal === 'number' && r.detal > 0 && ant.margenDetal > 0);
-        const v = { merma: usaAnt ? ant.merma : (r.merma || 0), margenDetal: usaAnt ? ant.margenDetal : (typeof r.detal === 'number' ? r.detal : 0),
+        const v = { merma: sinMerma ? 0 : usaAnt ? ant.merma : (r.merma || 0), margenDetal: usaAnt ? ant.margenDetal : (typeof r.detal === 'number' ? r.detal : 0),
                     margenMayor: !cmpVendeMayor(p) ? 0 : usaAnt && ant.margenMayor > 0 ? ant.margenMayor : (typeof r.mayor === 'number' ? r.mayor : 0) };
         const pr = cmpPrecios(p, costo, v, usaAnt);
         return Object.assign(v, pr, { regla: usaAnt ? `Márgenes de la última vez (${fmt(ant.margenDetal)} % al detal)` : r.n, libre: usaAnt, ant: ant || null });
@@ -12050,6 +12143,7 @@ Reglas:
                     <button type="button" class="btn-ghost" onclick="cmp.modoTexto=true;cmpPintarCompra(document.getElementById('almContenido'), true)">Pegar texto de otra IA</button>
                     <button type="button" class="btn-primary" id="cmpBtnLeer" onclick="cmpLeer()" ${cmp.fotos.length && !cmp.leyendo ? '' : 'disabled'}>${cmp.leyendo ? 'Leyendo la factura...' : 'Leer factura'}</button></div>
             </div>
+            ${cmpBorradoresHTML()}
             <div class="grafico-card"><div class="grafico-head"><h3>Compras recientes</h3></div>
                 ${!ultimas ? cargandoHTML('Cargando compras...') : !ultimas.length ? '<div class="empty">Todavía no hay compras registradas con foto.</div>'
                 : `<div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">N°</th><th class="izq">Fecha</th><th class="izq">Proveedor · factura</th><th>Renglones</th><th>Costo $</th><th class="izq">Notas a tiendas</th><th class="izq">Quedó en almacén</th><th></th></tr></thead><tbody>
@@ -12060,7 +12154,71 @@ Reglas:
     }
     async function cmpCargarCompras() {
         cmpCompras = [];   // mientras carga no se vuelve a pedir
-        try { cmpCompras = (await llamarApi({ action: 'cmp_compras' })).compras || []; } catch (e) { mostrarBanner('No se pudieron leer las compras: ' + e.message, 'error'); }
+        const [c, b] = await Promise.all([llamarApi({ action: 'cmp_compras' }).catch(e => { mostrarBanner('No se pudieron leer las compras: ' + e.message, 'error'); return {}; }),
+                                          llamarApi({ action: 'cmp_borradores' }).catch(() => ({ borradores: [] }))]);   // script anterior sin compras en curso: lista vacía
+        cmpCompras = c.compras || []; cmpBorradores = b.borradores || [];
+        if (almTab === 'compra' && cmp.paso === 'foto') cmpPintarCompra(document.getElementById('almContenido'), true);
+    }
+    // ---------- Compras en curso: el avance se guarda en Google (solo, en segundo plano) para seguir después o en otro equipo ----------
+    let cmpBorradores = [], cmpAvanceEspera = 0, cmpAvanceEnviando = false, cmpAvanceEstado = '';
+    function cmpBorradoresHTML() {
+        if (!cmpBorradores.length) return '';
+        return `<div class="grafico-card"><div class="grafico-head"><h3>Compras en curso</h3><small class="nota" style="margin:0">Guardadas sin terminar: se pueden seguir aquí o en otro equipo</small></div>
+            <div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">N°</th><th class="izq">Proveedor · factura</th><th>Renglones</th><th class="izq">Última vez</th><th></th></tr></thead><tbody>
+            ${cmpBorradores.map(b => `<tr><td class="izq"><b>${esc(b.id)}</b></td><td class="izq">${esc(b.proveedor || 'Sin proveedor')}<small>Factura ${esc(b.factura || 's/n')} · empezó ${esc(b.creo)}</small></td><td>${b.renglones}</td>
+                <td class="izq">${esc(b.actualizada)}<small>${esc(b.actualizo)}</small></td>
+                <td><button type="button" class="btn-primary btn-mini" onclick="cmpSeguirBorrador('${esc(b.id)}', this)">Seguir</button> <button type="button" class="btn-ghost btn-mini" onclick="cmpBorrarBorrador('${esc(b.id)}')">Descartar</button></td></tr>`).join('')}
+            </tbody></table></div></div>`;
+    }
+    // Lo que se guarda del avance (las fotos ya están en Drive: van sus enlaces)
+    const cmpAvanceDatos = () => ({ proveedorId: cmp.proveedorId, proveedorLeido: cmp.proveedorLeido, factura: cmp.factura, fechaFactura: cmp.fechaFactura, enlaces: cmp.enlaces,
+                                    leido: cmp.leido ? { total: cmp.leido.total, moneda: cmp.leido.moneda, tasa: cmp.leido.tasa } : null, lineas: cmp.lineas });
+    // Cada cambio en la compra: se guarda solo 2 s después de dejar de escribir
+    function cmpAvanceProgramar() {
+        if (cmp.paso !== 'revisar') return;
+        clearTimeout(cmpAvanceEspera);
+        cmpAvanceEstadoPintar('Cambios sin guardar...');
+        cmpAvanceEspera = setTimeout(cmpAvanceGuardar, 2000);
+    }
+    async function cmpAvanceGuardar() {
+        clearTimeout(cmpAvanceEspera);
+        if (cmp.paso !== 'revisar') return;
+        if (cmpAvanceEnviando) { cmpAvanceEspera = setTimeout(cmpAvanceGuardar, 800); return; }   // uno a la vez
+        cmpAvanceEnviando = true; cmpAvanceEstadoPintar('Guardando el avance...');
+        try {
+            const r = await llamarApi({ action: 'cmp_borrador_guardar', id: cmp.borradorId || '', version: cmp.borradorVer || '', datos: cmpAvanceDatos() });
+            cmp.borradorId = r.id; cmp.borradorVer = r.version;
+            cmpAvanceEstadoPintar(`✓ Avance guardado (${r.id}) a las ${String(r.actualizada).slice(11)}`);
+        } catch (e) { cmpAvanceEstadoPintar(e.enCola ? 'Sin conexión: se guardará al volver' : 'No se pudo guardar el avance: ' + e.message, true); }
+        finally { cmpAvanceEnviando = false; }
+    }
+    // Cualquier cosa que se escriba o elija en la compra (menos los filtros de columnas) programa el guardado del avance
+    ['input', 'change'].forEach(t => document.addEventListener(t, e => {
+        if (typeof almTab === 'undefined' || almTab !== 'compra' || cmp.paso !== 'revisar' || !e.target.closest || e.target.closest('#cmpVer') || !e.target.closest('#almContenido')) return;
+        cmpAvanceProgramar();
+    }));
+    function cmpAvanceEstadoPintar(txt, mal) {
+        cmpAvanceEstado = txt;
+        const el = document.getElementById('cmpAvance'); if (el) { el.textContent = txt; el.style.color = mal ? 'var(--danger)' : ''; }
+    }
+    async function cmpSeguirBorrador(id, btn) {
+        if (btn) btnCargando(btn, 'Abriendo...');
+        try {
+            const b = (await llamarApi({ action: 'cmp_borrador', id })).borrador, x = b.datos || {};
+            Object.assign(cmp, { paso: 'revisar', fotos: [], leyendo: false, proveedorId: x.proveedorId || '', proveedorLeido: x.proveedorLeido || null, factura: x.factura || '', fechaFactura: x.fechaFactura || '',
+                                 enlaces: x.enlaces || [], leido: x.leido || null, lineas: (x.lineas || []).map(l => cmpLineaNueva(Object.assign({}, l, { merma: 0 }))), borradorId: b.id, borradorVer: b.version });
+            if (!cmp.lineas.length) cmp.lineas.push(cmpLineaNueva());
+            cmpAvanceEstado = `Compra en curso ${b.id} · guardada por ${b.actualizo} a las ${String(b.actualizada).slice(11)}`;
+            cmpPintarCompra(document.getElementById('almContenido'), true);
+        } catch (e) { mostrarBanner(e.message, 'error'); cmpCompras = null; cmpPintarCompra(document.getElementById('almContenido'), true); }
+    }
+    async function cmpBorrarBorrador(id) {
+        if (!confirm(`¿Descartar la compra en curso ${id}? Se pierde lo que se había avanzado.`)) return;
+        const b = cmpBorradores.find(x => x.id === id), i = cmpBorradores.indexOf(b);
+        cmpBorradores = cmpBorradores.filter(x => x.id !== id);   // al instante; se borra en segundo plano
+        cmpPintarCompra(document.getElementById('almContenido'), true);
+        try { cmpBorradores = (await llamarApi({ action: 'cmp_borrador_borrar', id })).borradores || cmpBorradores; }
+        catch (e) { if (b && !cmpBorradores.includes(b)) cmpBorradores.splice(i, 0, b); mostrarBanner('No se pudo descartar: ' + e.message, 'error'); }
         if (almTab === 'compra' && cmp.paso === 'foto') cmpPintarCompra(document.getElementById('almContenido'), true);
     }
     // La foto se achica en el equipo (1800 px, JPEG): sube rápido y Gemini la lee igual de bien
@@ -12115,13 +12273,17 @@ Reglas:
             cmpAplicarSugerencia(x);
             return x;
         });
-        Object.assign(cmp, { paso: 'revisar', leido: r, proveedorId: r.proveedorId || '', proveedorLeido: r.proveedorLeido || null, factura: r.factura || '', fechaFactura: r.fechaFactura || '', enlaces: r.fotos || [], lineas });
+        Object.assign(cmp, { paso: 'revisar', leido: r, proveedorId: r.proveedorId || '', proveedorLeido: r.proveedorLeido || null, factura: r.factura || '', fechaFactura: r.fechaFactura || '', enlaces: r.fotos || [], lineas,
+                             borradorId: null, borradorVer: '' });
         if (!cmp.lineas.length) cmp.lineas.push(cmpLineaNueva());
+        cmpAvanceEstado = '';
         cmpPintarCompra(document.getElementById('almContenido'), true);
+        cmpAvanceProgramar();   // lo leído queda guardado en "Compras en curso" (no se pierde si se cierra la página)
         if (tasa > 0) mostrarBanner(`La factura está en bolívares: los costos se pasaron a $ con la tasa ${fmt(tasa)}. Revíselos.`, 'warn');
     }
     function cmpSinFoto() {
-        Object.assign(cmp, { paso: 'revisar', leido: null, proveedorId: '', proveedorLeido: null, factura: '', fechaFactura: fechaLocalHoy(), enlaces: [], lineas: [cmpLineaNueva()] });
+        Object.assign(cmp, { paso: 'revisar', leido: null, proveedorId: '', proveedorLeido: null, factura: '', fechaFactura: fechaLocalHoy(), enlaces: [], lineas: [cmpLineaNueva()], borradorId: null, borradorVer: '' });
+        cmpAvanceEstado = '';
         cmpPintarCompra(document.getElementById('almContenido'), true);
     }
     // Interruptor "terminación psicológica": se recalculan los precios de la compra (respetando los márgenes escritos)
@@ -12132,16 +12294,16 @@ Reglas:
         if (almTab === 'compra' && cmp.paso === 'revisar') cmpPintarCompra(document.getElementById('almContenido'), true);
     }
     function cmpAplicarSugerencia(l) {
-        const s = cmpSugerir(cmpProd(l), l.costo);
+        const s = cmpSugerir(cmpProd(l), l.costo, true);
         if (!s) { l.regla = ''; return; }
-        Object.assign(l, { merma: s.merma, margenDetal: s.margenDetal, detal: s.detal, margenMayor: s.margenMayor, mayor: s.mayor, regla: s.regla, libre: s.libre,
+        Object.assign(l, { merma: 0, margenDetal: s.margenDetal, detal: s.detal, margenMayor: s.margenMayor, mayor: s.mayor, regla: s.regla, libre: s.libre,
                            detalAnt: s.ant ? s.ant.detal : 0, mayorAnt: s.ant ? s.ant.mayor : 0 });
     }
     const cmpRepartido = l => CMP_TIENDAS.reduce((s, t) => s + (Number(l.dist[t]) || 0), 0);
     function cmpFilaHTML(l, i) {
         const p = cmpProd(l), mal = l.codigo && !p, tasa = almTasa(), mayor = cmpVendeMayor(p);
         const n = (c, v, cls, extra) => `<input type="number" class="${cls}" step="${c === 'cantidad' ? 'any' : '0.01'}" min="0" value="${v ? v : ''}" data-i="${i}" data-c="${c}" oninput="cmpEntrada(this)" ${extra || ''}>`;
-        const costoReal = l.costo * (1 + (l.merma || 0) / 100), queda = cmpR2(l.cantidad - cmpRepartido(l));
+        const queda = cmpR2(l.cantidad - cmpRepartido(l));
         const bs = v => v > 0 && tasa ? fmt(v * tasa) : '—';
         return `<tr id="cmpF${i}" class="${mal ? 'cmp-mal' : ''}">
             <td>${i + 1}</td>
@@ -12153,9 +12315,7 @@ Reglas:
                 ${l.descripcionFactura ? `<small>Factura: ${esc(l.descripcionFactura)}${l.unidad ? ' (' + esc(l.unidad) + ')' : ''}${l.origenCodigo === 'recordado' ? ' · ✓ recordado' : l.origenCodigo === 'barras' ? ' · ✓ por código de barras' : l.origenCodigo === 'parecido' ? ' · <b>parecido: revíselo</b>' : l.origenCodigo === 'sugerido' ? ' · sugerido' : ''}</small>` : ''}
                 <small class="cmp-regla">${esc(l.regla || '')}</small></td>
             <td>${n('cantidad', l.cantidad, 'cmp-n')}<small>${p ? almUnidad(p.tipo) : ''}</small></td>
-            <td class="g-c">${n('costo', l.costo, 'cmp-n', 'data-step="0.0001"')}${l.iva ? `<small>con IVA ${l.iva} %</small>` : ''}</td>
-            <td class="g-c">${n('merma', l.merma, 'cmp-p')}</td>
-            <td class="g-c"><span id="cmpCr${i}">${fmt(costoReal)}</span>${l.detalAnt ? `<small>Antes detal ${fmt(l.detalAnt)}</small>` : ''}</td>
+            <td class="g-c">${n('costo', l.costo, 'cmp-n', 'data-step="0.0001"')}${l.iva ? `<small>con IVA ${l.iva} %</small>` : ''}${l.detalAnt ? `<small>Antes detal ${fmt(l.detalAnt)}</small>` : ''}</td>
             <td class="g-m">${n('margenDetal', l.margenDetal, 'cmp-p')}</td>
             <td class="g-u">${n('detal', l.detal, 'cmp-n')}</td>
             <td class="g-b"><span id="cmpDb${i}">${bs(l.detal)}</span></td>
@@ -12164,7 +12324,7 @@ Reglas:
             <td class="g-b"><span id="cmpMb${i}">${bs(l.mayor)}</span></td>` : '<td class="g-m"></td><td class="g-u"><small class="cmp-nomayor">Solo detal</small></td><td class="g-b"></td>'}
             ${CMP_TIENDAS.map(t => `<td class="cmp-t g-d g-t g-t-${CMP_SIGLA[t]}">${n('dist:' + t, l.dist[t], 'cmp-d')}</td>`).join('')}
             <td class="g-d"><b id="cmpQ${i}" style="${queda < 0 || (p && p.libre && queda > 0) ? 'color:var(--danger)' : ''}">${almCant(queda, p && p.tipo)}</b></td>
-            <td><button type="button" class="btn-ghost btn-mini" title="Quitar renglón" onclick="cmp.lineas.splice(${i},1);cmpPintarCompra(document.getElementById('almContenido'), true)">✕</button></td></tr>`;
+            <td><button type="button" class="btn-ghost btn-mini" title="Quitar renglón" onclick="cmp.lineas.splice(${i},1);cmpPintarCompra(document.getElementById('almContenido'), true);cmpAvanceProgramar()">✕</button></td></tr>`;
     }
     // ---------- Qué columnas se ven (se recuerda en el equipo) ----------
     const CMP_GRUPOS = [['c', 'Costos'], ['m', 'Márgenes'], ['u', 'Precios $'], ['b', 'Precios Bs'], ['d', 'Distribución']];
@@ -12200,27 +12360,35 @@ Reglas:
                 <div class="grafico-head"><h3>Revisar la compra</h3><div class="req-acciones" style="margin:0">${cmp.enlaces.map((u, i) => `<a class="btn-ghost btn-mini" href="${esc(u)}" target="_blank" rel="noopener">Ver foto${cmp.enlaces.length > 1 ? ' ' + (i + 1) : ''}</a>`).join('')}
                     <button type="button" class="btn-ghost btn-mini" onclick="cmpDescartar()">Descartar</button></div></div>
                 <div class="filters">
-                    <div><label for="cmpProv">Proveedor</label><select id="cmpProv" onchange="cmp.proveedorId=this.value"><option value="">Elegir...</option>${almDatos.proveedores.map(p => `<option value="${esc(p.id)}"${p.id === cmp.proveedorId ? ' selected' : ''}>${esc(p.nombre)}</option>`).join('')}</select>
+                    <div><label for="cmpProv">Proveedor <a href="#" style="font-weight:400" onclick="event.preventDefault(); cmpNuevoProveedor()">＋ Nuevo proveedor</a></label><select id="cmpProv" onchange="cmp.proveedorId=this.value"><option value="">Elegir...</option>${almDatos.proveedores.map(p => `<option value="${esc(p.id)}"${p.id === cmp.proveedorId ? ' selected' : ''}>${esc(p.nombre)}</option>`).join('')}</select>
                         ${!prov && pl && pl.nombre ? `<small class="nota">Leído: <b>${esc(pl.nombre)}</b> ${esc(pl.rif || '')} — no está registrado. <a href="#" onclick="event.preventDefault(); cmpRegistrarProveedor()">Registrarlo</a></small>` : ''}</div>
                     <div><label for="cmpFac">N° de factura</label><input type="text" id="cmpFac" maxlength="40" autocomplete="off" value="${esc(cmp.factura)}" oninput="cmp.factura=this.value"></div>
                     <div><label for="cmpFecha">Fecha de la factura</label><input type="date" id="cmpFecha" value="${esc(cmp.fechaFactura)}" oninput="cmp.fechaFactura=this.value"></div>
                 </div>
                 <div class="nota">Escriba el <b>%</b> y el precio de venta sale solo (costo ÷ (1 − %)); también puede escribir el precio y el % se calcula. El % sale sugerido según el manual (o el de la última vez). Los productos <b>sin código</b> se trabajan con su descripción y se reparten completos; solo lo que queda en el almacén necesita estar registrado. Las cajas y bultos se pasan a unidades.</div>
                 ${cmpVerHTML()}
-                <div class="tabla-wrap"><table class="${cmpClaseVer()}" id="cmpTabla" data-sin-paginar><thead><tr><th>#</th><th class="izq">Producto</th><th>Cant.</th><th class="g-c">Costo $</th><th class="g-c">Merma %</th><th class="g-c">Costo real</th><th class="g-m">% detal</th><th class="g-u">Detal $</th><th class="g-b">Detal Bs</th><th class="g-m">% mayor</th><th class="g-u">Mayor $</th><th class="g-b">Mayor Bs</th>
+                <div class="tabla-wrap"><table class="${cmpClaseVer()}" id="cmpTabla" data-sin-paginar><thead><tr><th>#</th><th class="izq">Producto</th><th>Cant.</th><th class="g-c">Costo $</th><th class="g-m">% detal</th><th class="g-u">Detal $</th><th class="g-b">Detal Bs</th><th class="g-m">% mayor</th><th class="g-u">Mayor $</th><th class="g-b">Mayor Bs</th>
                     ${CMP_TIENDAS.map(t => `<th class="cmp-t g-d g-t g-t-${CMP_SIGLA[t]}" title="${esc(t)}">${CMP_SIGLA[t]}</th>`).join('')}<th class="g-d">Queda</th><th></th></tr></thead>
                     <tbody>${cmp.lineas.map(cmpFilaHTML).join('')}</tbody></table></div>
-                <div class="req-acciones"><button type="button" class="btn-ghost" onclick="cmp.lineas.push(cmpLineaNueva());cmpPintarCompra(document.getElementById('almContenido'), true)">＋ Agregar renglón</button></div>
+                <div class="req-acciones"><button type="button" class="btn-ghost" onclick="cmp.lineas.push(cmpLineaNueva());cmpPintarCompra(document.getElementById('almContenido'), true);cmpAvanceProgramar()">＋ Agregar renglón</button></div>
                 <div class="cmp-pie" id="cmpPie">${cmpPieHTML()}</div>
                 <div class="login-error" id="cmpError"></div>
-                <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-primary" id="cmpBtnGuardar" onclick="cmpGuardar()">Guardar compra y emitir notas</button></div>
+                <div class="req-acciones" style="justify-content:flex-end;align-items:center;margin-bottom:0"><small class="nota" id="cmpAvance" style="margin:0 auto 0 0" title="El avance se guarda solo en Google: se puede seguir después o en otro equipo (Compras en curso)">${esc(cmpAvanceEstado || 'El avance se guarda solo mientras trabaja')}</small>
+                    <button type="button" class="btn-ghost" onclick="cmpAvanceGuardar()">Guardar avance</button>
+                    <button type="button" class="btn-primary" id="cmpBtnGuardar" onclick="cmpGuardar()">Guardar compra y emitir notas</button></div>
             </div>`;
     }
     function cmpDescartar() {
-        if (!confirm('¿Descartar esta compra sin guardar?')) return;
-        Object.assign(cmp, { paso: 'foto', fotos: [], lineas: [], leido: null, enlaces: [] });
+        if (!confirm(cmp.borradorId ? `¿Descartar esta compra? También se borra de "Compras en curso" (${cmp.borradorId}).` : '¿Descartar esta compra sin guardar?')) return;
+        clearTimeout(cmpAvanceEspera);
+        const id = cmp.borradorId;
+        Object.assign(cmp, { paso: 'foto', fotos: [], lineas: [], leido: null, enlaces: [], borradorId: null, borradorVer: '' });
+        cmpAvanceEstado = '';
+        if (id) { cmpBorradores = cmpBorradores.filter(x => x.id !== id); llamarApi({ action: 'cmp_borrador_borrar', id }).then(r => { cmpBorradores = r.borradores || cmpBorradores; }).catch(e => mostrarBanner('No se pudo borrar la compra en curso: ' + e.message, 'error')); }
         cmpPintarCompra(document.getElementById('almContenido'), true);
     }
+    // Proveedor que no salió en la foto (o compra sin foto): se registra aquí mismo y queda elegido
+    function cmpNuevoProveedor() { almProvTexto = ''; almNuevoProveedor(); }
     function cmpRegistrarProveedor() {
         const pl = cmp.proveedorLeido || {};
         almProvTexto = pl.nombre || ''; almNuevoProveedor();
@@ -12260,7 +12428,6 @@ Reglas:
         if (c === 'mayor') l.margenMayor = l.mayor > 0 ? cmpR2((1 - l.costo / l.mayor) * 100) : 0;
         const fila = document.getElementById('cmpF' + i);
         ['detal', 'mayor', 'margenDetal', 'margenMayor'].filter(k => k !== c).forEach(k => { const x = fila.querySelector(`input[data-c="${k}"]`); if (x && x !== document.activeElement) x.value = l[k] || ''; });
-        document.getElementById('cmpCr' + i).textContent = fmt(l.costo * (1 + (l.merma || 0) / 100));
         const tasa = almTasa(), db = document.getElementById('cmpDb' + i), mb = document.getElementById('cmpMb' + i);
         if (db) db.textContent = l.detal > 0 && tasa ? fmt(l.detal * tasa) : '—';
         if (mb) mb.textContent = l.mayor > 0 && tasa ? fmt(l.mayor * tasa) : '—';
@@ -12286,8 +12453,10 @@ Reglas:
         const sinPrecio = lineas.filter(l => !(l.detal > 0) && cmpProd(l).categoria !== 'Insumos').length;
         if (!confirm(`${alAlmacen ? alAlmacen + ' producto(s) con código entran al almacén. ' : ''}${notas.length ? 'Se emite una nota a: ' + notas.join(', ') + '.' : ''}` + (sinPrecio ? `\n${sinPrecio} producto(s) sin precio al detal: quedan "por definir precio".` : '') + '\n\n¿Guardar la compra?')) return;
         const btn = document.getElementById('cmpBtnGuardar'); btnCargando(btn, 'Guardando...');
+        clearTimeout(cmpAvanceEspera);
+        while (cmpAvanceEnviando) await new Promise(r => setTimeout(r, 200));   // que termine el guardado del avance (si no, podría volver a crearla en curso)
         try {
-            const r = await llamarApi({ action: 'cmp_guardar', proveedorId: cmp.proveedorId, factura: cmp.factura.trim(), fechaFactura: cmp.fechaFactura, tasa: almTasa(), fotos: cmp.enlaces,
+            const r = await llamarApi({ action: 'cmp_guardar', borradorId: cmp.borradorId || '', proveedorId: cmp.proveedorId, factura: cmp.factura.trim(), fechaFactura: cmp.fechaFactura, tasa: almTasa(), fotos: cmp.enlaces,
                 tasaFactura: cmp.leido && cmp.leido.moneda === 'BS' ? (cmp.leido.tasa || almTasa()) : almTasa(),
                 lineas: lineas.map(l => ({ codigo: l.codigo, descripcion: cmpProd(l).descripcion, categoria: cmpProd(l).categoria, claveProveedor: l.claveProveedor, cantidad: l.cantidad, costo: l.costo, merma: l.merma, margenDetal: l.margenDetal, detal: l.detal,
                                            margenMayor: l.margenMayor, mayor: l.mayor, dist: l.dist })) });
@@ -12295,7 +12464,8 @@ Reglas:
             if (r.proximoIngreso) almDatos.proximoIngreso = r.proximoIngreso;
             (r.notas || []).forEach(n => almEnviarTelegram(n));   // cada nota a su grupo de Telegram, igual que al facturar
             almNotas = null; almIngresos = null; almTiendas = null; cmpCompras = null; cmpOrd = null;
-            Object.assign(cmp, { paso: 'listo', resultado: r, fotos: [] });
+            Object.assign(cmp, { paso: 'listo', resultado: r, fotos: [], borradorId: null, borradorVer: '' });
+            cmpAvanceEstado = '';   // "Compras en curso" se vuelve a leer con las compras (cmpCompras = null)
             cmpPintarCompra(document.getElementById('almContenido'), true);
             almCargar();
         } catch (e) { err.textContent = e.message; btn.disabled = false; btn.textContent = 'Guardar compra y emitir notas'; }
@@ -12319,7 +12489,11 @@ Reglas:
     function cmpGuardarPV() { try { localStorage.setItem('cmp_pv', JSON.stringify(cmpPV)); } catch (e) {} }
     // El descuento por divisas es uno solo para todas las tiendas (lo guarda el servidor)
     const cmpDesc = () => cmpOrd && cmpOrd.descDivisas != null ? Number(cmpOrd.descDivisas) : 8;
-    const cmpEnModo = v => !(v > 0) ? 0 : cmpPV.modo === 'bs' ? v * (almTasa() || 0) : cmpPV.modo === 'desc' ? v * (1 - cmpDesc() / 100) : v;
+    // Tasa para ver los precios en Bs: la última del BCV, o la que se escriba (solo en este equipo y hasta salir del módulo; al entrar vuelve la del BCV)
+    let cmpTasaManual = 0;
+    const cmpTasa = () => cmpTasaManual > 0 ? cmpTasaManual : almTasa();
+    function cmpCambiarTasa(v) { const n = almNum ? almNum(v) : Number(v); cmpTasaManual = n > 0 && Math.abs(n - (almTasa() || 0)) > 1e-9 ? n : 0; almPintar(); }
+    const cmpEnModo = v => !(v > 0) ? 0 : cmpPV.modo === 'bs' ? v * (cmpTasa() || 0) : cmpPV.modo === 'desc' ? v * (1 - cmpDesc() / 100) : v;
     async function cmpCambiarDesc(el) {
         const v = Number(el.value);
         if (!(v >= 0 && v <= 50)) { mostrarBanner('El descuento debe estar entre 0 y 50 %', 'warn'); el.value = cmpDesc(); return; }
@@ -12329,7 +12503,7 @@ Reglas:
         try { cmpUsarOrdenes(await llamarApi({ action: 'cmp_desc_divisas', valor: v, claveAdmin: c, ver: cmpOrd.ver })); mostrarBanner(`Descuento por divisas: ${v} % en todas las tiendas.`, 'ok'); }
         catch (e) { el.value = cmpDesc(); mostrarBanner(e.message, 'error'); }
     }
-    const cmpMon = v => !(v > 0) ? '—' : cmpPV.modo === 'bs' ? (almTasa() ? 'Bs ' + fmt(cmpEnModo(v)) : 'sin tasa') : (cmpPV.modo === 'desc' ? new Intl.NumberFormat('es-VE', { minimumFractionDigits: 3, maximumFractionDigits: 3 }).format(cmpEnModo(v)) : fmt(v));   // con descuento: 3 decimales, como en el libro
+    const cmpMon = v => !(v > 0) ? '—' : cmpPV.modo === 'bs' ? (cmpTasa() ? 'Bs ' + fmt(cmpEnModo(v)) : 'sin tasa') : (cmpPV.modo === 'desc' ? new Intl.NumberFormat('es-VE', { minimumFractionDigits: 3, maximumFractionDigits: 3 }).format(cmpEnModo(v)) : fmt(v));   // con descuento: 3 decimales, como en el libro
     async function cmpCargarOrdenes() {
         const ver = almTab === 'completas' ? 'completas' : 'pendientes';
         cmpOrd = { cargando: ver, ver: '' };
@@ -12362,7 +12536,8 @@ Reglas:
                 <span class="cmp-ver-t">Precios en:</span><span class="cmp-seg">${modos.map(([v, n]) => `<button type="button" class="${cmpPV.modo === v ? 'act' : ''}" onclick="cmpPV.modo='${v}';cmpGuardarPV();almPintar()">${n}</button>`).join('')}</span>
                 <label class="cmp-ver-t" for="cmpDesc" title="El mismo en todas las tiendas">Descuento divisas</label><input type="number" id="cmpDesc" class="cmp-desc-in" min="0" max="50" step="0.5" value="${cmpDesc()}" ${permisos.some(x => x === 'precios' || x === 'inventario') ? '' : 'disabled'} onchange="cmpCambiarDesc(this)"><span class="cmp-ver-t">% (todas las tiendas)</span>
                 ${completas ? '' : `<label class="cmp-ver-t" for="cmpComoR">Al marcar:</label><select id="cmpComoR" onchange="cmpPV.como=this.value;cmpGuardarPV()">${CMP_COMO.actualizado.map(c => `<option${c === cmpPV.como ? ' selected' : ''}>${esc(c)}</option>`).join('')}</select>`}
-                ${cmpPV.modo === 'bs' ? `<span class="cmp-ver-t">Tasa BCV ${almTasa() ? fmt(almTasa()) : '—'}</span>` : ''}
+                ${cmpPV.modo === 'bs' ? `<label class="cmp-ver-t" for="cmpTasaIn">Tasa (Bs por $)</label><input type="number" id="cmpTasaIn" class="cmp-desc-in" style="width:7.5rem" min="0" step="0.0001" value="${cmpTasa() || ''}" onchange="cmpCambiarTasa(this.value)">
+                    ${cmpTasaManual ? `<button type="button" class="btn-ghost btn-mini" title="Volver a la última tasa del BCV" onclick="cmpTasaManual=0;almPintar()">BCV ${almTasa() ? fmt(almTasa()) : '—'}</button>` : '<span class="cmp-ver-t">última del BCV</span>'}` : ''}
             </div>
             ${completas ? '' : `<div class="cmp-resumen"><span>Por definir precio: <b style="color:var(--amar-txt)">${cmpOrd.porDefinir || 0}</b></span><span>Por actualizar: <b>${cmpOrd.porActualizar || 0}</b></span>${f.tienda ? `<span>Pendientes en ${esc(f.tienda)}: <b>${l.length}</b></span>` : ''}
                 ${l.length ? `<button type="button" class="btn-ghost btn-mini cmp-imp" onclick="cmpImprimirPendientes()">🖨 Imprimir ${f.tienda ? 'lo de ' + esc(f.tienda) : 'la lista'}</button>` : ''}</div>`}
@@ -12417,7 +12592,7 @@ Reglas:
             .pie{margin-top:4mm;color:#475569;font-size:8pt}.firma{margin-top:10mm;display:flex;gap:10mm}.firma div{flex:1;border-top:.3mm solid #0f172a;text-align:center;padding-top:1mm;font-size:8pt;color:#475569}
             </style></head><body>
             <h1>Pendientes por actualizar${f.tienda ? ' · ' + esc(f.tienda) : ' · todas las tiendas'}</h1>
-            <div class="sub">${fechaBonita(fechaLocalHoy())} · ${l.length} producto(s) · precios en ${esc(etiqueta)}${cmpPV.modo === 'bs' && almTasa() ? ' (tasa ' + fmt(almTasa()) + ')' : ''} · impreso por ${esc(nombreUsuario)}</div>
+            <div class="sub">${fechaBonita(fechaLocalHoy())} · ${l.length} producto(s) · precios en ${esc(etiqueta)}${cmpPV.modo === 'bs' && cmpTasa() ? ' (tasa ' + fmt(cmpTasa()) + ')' : ''} · impreso por ${esc(nombreUsuario)}</div>
             <table><thead><tr><th>#</th>${f.tienda ? '<th>Recibe</th>' : ''}<th>Producto</th><th class="m">Costo</th><th class="m">Detal</th>${conMayor ? '<th class="m">Mayor</th>' : ''}
                 ${tiendas.map(t => `<th class="c">${f.tienda ? 'Ingresó · Precio' : esc(CMP_SIGLA[t])}</th>`).join('')}</tr></thead><tbody>${filas}</tbody></table>
             <div class="pie">${f.tienda ? 'Tilde cada casilla al ingresar la mercancía y al cambiar el precio en el sistema de la tienda.' : 'En cada tienda: la primera casilla es "ingresó" (solo si recibe mercancía) y la segunda "precio actualizado".'} ✓ = ya marcado en el sistema.</div>
@@ -12447,8 +12622,12 @@ Reglas:
             && (!q || cmpN(o.codigo + ' ' + o.descripcion + ' ' + o.proveedor + ' ' + o.origen).includes(q)) && (!f.estado || o.estado === f.estado)).map(o => ({ id: o.id, local, tipo: 'actualizado' }));
         if (!items.length) { mostrarBanner(`No hay precios pendientes en ${local} en esta lista.`, 'warn'); return; }
         if (!confirm(`¿Marcar ${items.length} precio(s) como actualizados en ${local}?\nQueda a su nombre: "${cmpPV.como}".`)) return;
+        // Al instante en pantalla; se guarda en segundo plano (si falla, se desmarcan y avisa)
+        const ords = items.map(it => cmpOrd.ordenes.find(o => o.id === it.id)).filter(Boolean);
+        ords.forEach(o => { o.marcas[local] = o.marcas[local] || {}; o.marcas[local].actualizado = { por: nombreUsuario, en: 'guardando...', como: cmpPV.como }; });
+        almPintar();
         try { cmpUsarOrdenes(await llamarApi({ action: 'cmp_marcar_lote', items, como: cmpPV.como, ver: cmpOrd.ver })); mostrarBanner(`${items.length} precio(s) marcados en ${local}.`, 'ok'); }
-        catch (e) { mostrarBanner('No se pudo marcar: ' + e.message, 'error'); }
+        catch (e) { ords.forEach(o => { if (o.marcas[local]) delete o.marcas[local].actualizado; }); almPintar(); mostrarBanner('No se pudo marcar (se deshizo): ' + e.message, 'error'); }
     }
     function cmpMarcaInfo(id, local, tipo) {
         const o = cmpOrd.ordenes.find(x => x.id === id), m = o && (o.marcas[local] || {})[tipo]; if (!m) return;
@@ -12474,9 +12653,12 @@ Reglas:
     async function cmpMarcar(ev, id, local, tipo) {
         ev.preventDefault();
         const r1 = document.querySelector('input[name="cmpComo"]:checked'), det = document.getElementById('cmpComoTxt').value.trim();
-        const btn = document.getElementById('cmpBtnMar'); btnCargando(btn, 'Guardando...');
-        try { const r = await llamarApi({ action: 'cmp_marcar', id, local, tipo, como: [r1 ? r1.value : '', det].filter(Boolean).join(' · '), ver: cmpOrd.ver }); almCerrar(); cmpUsarOrdenes(r); }
-        catch (e) { document.getElementById('cmpMarError').textContent = e.message; btn.disabled = false; btn.textContent = 'Marcar'; }
+        // Se cierra y se marca al instante; se guarda en segundo plano (si falla, se desmarca y avisa)
+        const como = [r1 ? r1.value : '', det].filter(Boolean).join(' · '), o = cmpOrd.ordenes.find(x => x.id === id);
+        almCerrar();
+        if (o) { o.marcas[local] = o.marcas[local] || {}; o.marcas[local][tipo] = { por: nombreUsuario, en: 'guardando...', como }; almPintar(); }
+        try { cmpUsarOrdenes(await llamarApi({ action: 'cmp_marcar', id, local, tipo, como, ver: cmpOrd.ver })); }
+        catch (e) { if (o && o.marcas[local]) delete o.marcas[local][tipo]; almPintar(); mostrarBanner('No se pudo marcar (se deshizo): ' + e.message, 'error'); }
     }
     async function cmpQuitarMarca(id, local, tipo) {
         const c = await efePedirClave('Quitar la marca', `Se quita "${tipo === 'ingresado' ? 'ingresado' : 'precio actualizado'}" en ${local}. Queda registrado quién la quitó.`);
@@ -14725,7 +14907,8 @@ Reglas:
     }
 
     // Lee el comprobante como base64. Las fotos se reducen (máx. 1600 px, JPEG) para que suban rápido.
-    async function efeLeerComprobante(archivo) {
+    // opc.fuerte: lo más liviano que siga leyéndose (comprobantes de transferencia): hasta 1280 px y se baja la calidad (y luego el tamaño) hasta ~120 KB
+    async function efeLeerComprobante(archivo, opc = {}) {
         const aBase64 = blob => new Promise((ok, mal) => {
             const lector = new FileReader();
             lector.onload = () => ok(String(lector.result).split(',')[1]);
@@ -14739,11 +14922,24 @@ Reglas:
         if (!/^image\//.test(archivo.type)) throw new Error('El comprobante debe ser una foto o un PDF.');
         try {
             const img = await new Promise((ok, mal) => { const i = new Image(); i.onload = () => ok(i); i.onerror = mal; i.src = URL.createObjectURL(archivo); });
-            const escala = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight));
-            const c = document.createElement('canvas');
-            c.width = Math.round(img.naturalWidth * escala); c.height = Math.round(img.naturalHeight * escala);
-            c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-            const blob = await new Promise(ok => c.toBlob(ok, 'image/jpeg', 0.82));
+            const mayor = Math.max(img.naturalWidth, img.naturalHeight);
+            const dibujar = async (lado, calidad) => {
+                const escala = Math.min(1, lado / mayor), c = document.createElement('canvas');
+                c.width = Math.round(img.naturalWidth * escala); c.height = Math.round(img.naturalHeight * escala);
+                const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);   // capturas con fondo transparente: blanco, no negro
+                g.drawImage(img, 0, 0, c.width, c.height);
+                return new Promise(ok => c.toBlob(ok, 'image/jpeg', calidad));
+            };
+            let blob;
+            if (!opc.fuerte) blob = await dibujar(1600, 0.82);
+            else {
+                const META = 120 * 1024;
+                let lado = 1280, calidad = 0.6;
+                blob = await dibujar(lado, calidad);
+                while (blob.size > META && calidad > 0.41) { calidad -= 0.1; blob = await dibujar(lado, calidad); }
+                while (blob.size > META && lado > 900) { lado = Math.round(lado * 0.85); blob = await dibujar(lado, calidad); }
+                if (archivo.size < blob.size && /jpe?g/i.test(archivo.type)) blob = archivo;   // ya venía más liviana
+            }
             return { nombre: archivo.name.replace(/\.[^.]+$/, '') + '.jpg', tipo: 'image/jpeg', base64: await aBase64(blob) };
         } catch (e) {
             // Formato que el navegador no puede dibujar (p. ej. HEIC): se manda tal cual
