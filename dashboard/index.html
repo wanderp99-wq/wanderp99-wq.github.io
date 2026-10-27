@@ -872,6 +872,8 @@
         label.interruptor.sw-desde > input:not(:checked) ~ .sw-pista::after { translate: var(--sw-viaje) 0; }
         label.interruptor > input:focus-visible ~ .sw-pista { outline: 2px solid var(--primary); outline-offset: 2px; }
         label.interruptor > input:disabled ~ .sw-pista { opacity: .45; } label.interruptor:has(input:disabled) { cursor: not-allowed; }
+        /* Nómina cerrada: el interruptor muestra cómo quedó (encendido o apagado se debe distinguir bien) */
+        label.interruptor.fijo > input:disabled ~ .sw-pista { opacity: .85; } label.interruptor.fijo { cursor: default; }
         :root:not([data-theme="light"]) .sw-pista { --sw-apagado: #48484d; }
         /* Ventanas: se abren creciendo desde donde se tocó, con el fondo difuminado */
         .req-dlg-fondo, .asis-fondo { -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
@@ -8338,20 +8340,21 @@
                 Se descuenta todo lo que debe, sin pasar de lo que generó; lo que falte (y lo excluido) queda pendiente en Cuentas por cobrar.</div>`;
     }
     // Ventana: un trabajador (nomAbierto = su ID) o el cierre de toda la semana (nomAbierto = '*')
-    function nomAbrir(id) {
+    // cerrada: una fila de BD PAGOS NOMINA (desde "Nóminas cerradas"): su hoja de solo lectura, con lo que quedó guardado al cerrar
+    function nomAbrir(id, cerrada = null) {
         let fondo = document.getElementById('nomDlg');
         if (!fondo) {
             fondo = document.createElement('div'); fondo.id = 'nomDlg'; fondo.className = 'req-dlg-fondo';
             fondo.onclick = e => { if (e.target === fondo) nomCerrarDlg(); };
             document.body.appendChild(fondo);
         }
-        nomAbierto = id; fondo.classList.remove('hidden');
+        nomAbierto = id; nomVerCerrada = cerrada; fondo.classList.remove('hidden');
         nomPintarDlg();
     }
-    function nomCerrarDlg() { const f = document.getElementById('nomDlg'); if (f) f.classList.add('hidden'); nomAbierto = ''; }
+    function nomCerrarDlg() { const f = document.getElementById('nomDlg'); if (f) f.classList.add('hidden'); nomAbierto = ''; nomVerCerrada = null; }
     function nomPintarDlg() {
         const fondo = document.getElementById('nomDlg');
-        if (!fondo || fondo.classList.contains('hidden') || !nomAbierto || !nomDatos || nomDatos.error) return;
+        if (!fondo || fondo.classList.contains('hidden') || !nomAbierto || (!nomVerCerrada && (!nomDatos || nomDatos.error))) return;
         pintarVentana(fondo, `<div class="req-dlg nom-dlg">${nomAbierto === '*' ? nomDlgTodos() : nomDlgTrabajador()}</div>`);
     }
     const nomCab = titulo => `<div class="prg-head"><h3>${titulo}</h3><button type="button" class="prg-x" title="Cerrar" onclick="nomCerrarDlg()">✕</button></div>`;
@@ -8430,7 +8433,33 @@
     }
     const nomBonoAdicGuardado = c => { const m = /Bono adicional autorizado por ([^|]+)/.exec((c && c.detalle) || ''); return m ? `<em class="nom-autorizado">Autorizado por ${esc(m[1].trim())}</em>` : ''; };
     const nomExtraGuardado = c => { const m = /Horas extra autorizadas por ([^|]+)/.exec((c && c.detalle) || ''); return m ? `<em class="nom-autorizado">Autorizado por ${esc(m[1].trim())}</em>` : ''; };
-    const nomAutorizadoGuardado = (c, bono) => { const m = new RegExp('Bono de ' + bono + ' autorizado por ([^|]+)').exec(c.detalle || ''); return m ? `<em class="nom-autorizado">Autorizado por ${esc(m[1].trim())}</em>` : ''; };
+    const nomAutorizadoGuardado = (c, bono) => { const m = new RegExp('Bono de ' + bono + ' autorizado por ([^|·]+)').exec(c.detalle || ''); return m ? `<em class="nom-autorizado">Autorizado por ${esc(m[1].trim())}</em>`
+                                                    : new RegExp('Bono de ' + bono + ' quitado esta semana').test(c.detalle || '') ? '<span class="nom-nota">quitado esta semana</span>' : ''; };
+    // ---------- Hoja de una nómina cerrada (solo lectura): todo sale de lo guardado al cerrar, no de la asistencia de hoy ----------
+    let nomVerCerrada = null, nomDeudasTodas = null;
+    function nomAbrirCerrada(fila) { const c = (nomHist || []).find(p => p.fila === fila); if (c) nomAbrir(c.trabajadorId, c); }
+    // Interruptor que muestra cómo quedó (no se puede cambiar)
+    const nomFijo = (si, txt = 'Pagar') => `<label class="nom-switch interruptor fijo" title="Nómina cerrada: no se puede cambiar"><input type="checkbox" disabled ${si ? 'checked' : ''}><span class="sw-pista"></span>${txt}</label>`;
+    // Turnos guardados en el detalle al cerrar: "2026-10-17 Santa Rosa Tarde 14:00-21:30 (extra) tarde 122 min"
+    function nomFilasGuardadas(c) {
+        const min = h => { const m = /^(\d{1,2}):(\d{2})$/.exec(h || ''); return m ? +m[1] * 60 + +m[2] : null; };
+        return String(c.detalle || '').split(' | ').map(s => /^(\d{4}-\d{2}-\d{2}) (.+?) (D[ií]a libre|\S+) (\d{1,2}:\d{2}|)-(\d{1,2}:\d{2}|\?)( \(extra\))?(?: tarde (\d+) min)?$/.exec(s.trim())).filter(Boolean)
+            .map(m => { const e = min(m[4]), s = min(m[5]), oficina = /^(jornada|d[ií]a libre)$/i.test(m[3]);
+                return { clave: (oficina ? 'O' : 'L') + m[1] + m[3], fecha: m[1], lugar: m[2], turno: m[3], entrada: m[4], salida: m[5] === '?' ? '' : m[5],
+                         horas: e !== null && s !== null && s > e ? (s - e) / 60 : 0, extra: !!m[6], ev: m[7] ? { tarde: Number(m[7]) } : null, sinSalida: m[5] === '?' }; });
+    }
+    function nomDesdeCerrada(t, c) {
+        const filas = nomFilasGuardadas(c);
+        return { t, p: perDatos.perfiles.find(x => x.nombre === c.perfil) || null, aj: {}, filas, normales: filas.filter(f => !f.extra), extras: filas.filter(f => f.extra),
+                 x: null, cerrada: c, avisos: [], tarifa: c.tarifaExtra, deudas: [], excl: new Set(), posterior: new Set() };
+    }
+    // Fecha y descripción de los gastos descontados o excluidos (BD PAGOS NOMINA solo guarda el número y el monto)
+    async function nomCargarDeudasTodas() {
+        nomDeudasTodas = { cargando: true };
+        try { nomDeudasTodas = new Map(((await llamarApi({ action: 'cxc_deudas', historico: true })).deudas || []).map(y => [y.num, y])); }
+        catch (e) { nomDeudasTodas = { error: e.message }; }
+        nomPintarDlg();
+    }
     // Quién autoriza con esa clave (debe ser administrador). Con el script nuevo: "nom_autorizar".
     // Con un script anterior que no la tiene: se identifica la clave con "login", que existe en todas las versiones.
     async function nomQuienAutoriza(claveAdm) {
@@ -8467,9 +8496,12 @@
         setTimeout(() => document.getElementById(conMonto ? 'nomClaveMonto' : 'nomClaveAut').focus(), 50);
     }
     function nomDlgTrabajador() {
-        const t = perDatos.trabajadores.find(x => x.id === nomAbierto);
+        const vc = nomVerCerrada;
+        const t = perDatos.trabajadores.find(x => x.id === nomAbierto) || (vc ? { id: vc.trabajadorId, nombre: vc.trabajador, local: vc.local } : null);
         if (!t) return nomCab('Trabajador') + '<div class="empty">No se encontró el trabajador.</div>';
-        const n = nomCalcular(t), id = esc(t.id), c = n.cerrada, editable = !c;
+        let n = vc ? null : nomCalcular(t);
+        const c = vc || n.cerrada, editable = !c, id = esc(t.id), sem = c ? c.desde : nomSemana;
+        if (c) n = nomDesdeCerrada(t, c);   // cerrada: los turnos y montos guardados al cerrar (la asistencia pudo cambiar después)
         if (!TASAS_BCV && !nomPidioTasa && typeof cargarTasasBCV === 'function') { nomPidioTasa = true; cargarTasasBCV().then(() => nomPintarDlg()).catch(() => {}); }
         const tasa = c && c.tasa ? c.tasa : nomTasa() || null;   // pagado: la tasa con que se pagó
         const x = n.x || { ganado: 0, base: 0, ayuda: 0, punt: 0, prod: 0, cumple: false, minTurnos: 0, minimo: 0 };
@@ -8488,18 +8520,18 @@
             <table class="nom-sal"><tbody>
                 ${fila('Sueldo base', V.base, x.minimo || c ? '' : 'falta configurar el sueldo mínimo')}
                 ${fila('Ayuda social', V.ayuda)}
-                ${fila('Bono de puntualidad', V.punt, c ? nomAutorizadoGuardado(c, 'puntualidad') : n.p ? nomBonoCtl(n, id, 'Punt',
+                ${fila('Bono de puntualidad', V.punt, c ? nomFijo(V.punt > 0) + nomAutorizadoGuardado(c, 'puntualidad') : n.p ? nomBonoCtl(n, id, 'Punt',
                     !(Number(n.p.bonoPuntualidad) > 0) ? 'su perfil no tiene este bono' : sinBono || (n.tarde ? 'llegó tarde esta semana' : '')) : '')}
-                ${fila('Bono de productividad', V.prod, c ? nomAutorizadoGuardado(c, 'productividad') : n.p ? nomBonoCtl(n, id, 'Prod',
+                ${fila('Bono de productividad', V.prod, c ? nomFijo(V.prod > 0) + nomAutorizadoGuardado(c, 'productividad') : n.p ? nomBonoCtl(n, id, 'Prod',
                     !(Number(n.p.bonoProductividad) > 0) ? 'su perfil no tiene este bono' : sinBono) : '')}
-                <tr><td>Horas extra<small>${editable ? `<label class="nom-switch interruptor"><input type="checkbox" ${n.aj.pagarExtra ? 'checked' : ''} onchange="nomExtraCambiar('${id}', this)"><span class="sw-pista"></span>Pagar</label>` : ''}<span class="nom-nota">${reqN(V.horas, 2)} h${editable ? (!n.aj.pagarExtra ? (V.horas ? ' · no se pagan (requiere autorización)' : '') : ` × <input type="number" id="nomTarifa" class="nom-num" min="0" step="0.01" value="${n.tarifa === null ? '' : n.tarifa}" placeholder="${sug ? reqN(sug, 2) : '0,00'}" oninput="nomAjustar('${id}', { tarifa: this.value }, false)" onchange="nomAjustar('${id}', { tarifa: this.value })"> $/h${sug && n.tarifa === null && V.horas ? ` · <a href="#" onclick="nomAjustar('${id}', { tarifa: '${sug}' }); return false;">usar ${perUsd(sug)}</a>` : ''}`) : V.horas && !V.extra ? ' · no se pagaron' : ` × ${perUsd(V.tarifa)}`}</span>${editable && n.aj.pagarExtra ? `<em class="nom-autorizado">Autorizado por ${esc(n.aj.pagarExtra.por || 'Administrador')}</em>` : !editable ? nomExtraGuardado(c) : ''}</small></td><td>${perUsd(V.extra)}</td></tr>
+                <tr><td>Horas extra<small>${editable ? `<label class="nom-switch interruptor"><input type="checkbox" ${n.aj.pagarExtra ? 'checked' : ''} onchange="nomExtraCambiar('${id}', this)"><span class="sw-pista"></span>Pagar</label>` : nomFijo(V.extra > 0)}<span class="nom-nota">${reqN(V.horas, 2)} h${editable ? (!n.aj.pagarExtra ? (V.horas ? ' · no se pagan (requiere autorización)' : '') : ` × <input type="number" id="nomTarifa" class="nom-num" min="0" step="0.01" value="${n.tarifa === null ? '' : n.tarifa}" placeholder="${sug ? reqN(sug, 2) : '0,00'}" oninput="nomAjustar('${id}', { tarifa: this.value }, false)" onchange="nomAjustar('${id}', { tarifa: this.value })"> $/h${sug && n.tarifa === null && V.horas ? ` · <a href="#" onclick="nomAjustar('${id}', { tarifa: '${sug}' }); return false;">usar ${perUsd(sug)}</a>` : ''}`) : V.horas && !V.extra ? ' · no se pagaron' : ` × ${perUsd(V.tarifa)}`}</span>${editable && n.aj.pagarExtra ? `<em class="nom-autorizado">Autorizado por ${esc(n.aj.pagarExtra.por || 'Administrador')}</em>` : !editable ? nomExtraGuardado(c) : ''}</small></td><td>${perUsd(V.extra)}</td></tr>
                 <tr><td>Bono adicional${editable ? `<small><label class="nom-switch interruptor"><input type="checkbox" ${n.aj.bonoAut ? 'checked' : ''} onchange="nomBonoAdicCambiar('${id}', this)"><span class="sw-pista"></span>Pagar</label>
                     ${n.aj.bonoAut ? `<span class="nom-nota"><input type="number" id="nomBono" class="nom-num" min="0" step="0.01" value="${n.aj.bono || ''}" placeholder="0,00" oninput="nomAjustar('${id}', { bono: this.value }, false)" onchange="nomAjustar('${id}', { bono: this.value })"> $</span>
                     <input type="text" id="nomMotivo" maxlength="150" value="${esc(n.aj.motivoBono || '')}" placeholder="motivo" oninput="nomAjustar('${id}', { motivoBono: this.value }, false)" onchange="nomAjustar('${id}', { motivoBono: this.value })">
-                    <em class="nom-autorizado">Autorizado por ${esc(n.aj.bonoAut.por || 'Administrador')}</em>` : '<span class="nom-nota">sin bono adicional (requiere autorización)</span>'}</small>` : (c.motivoBono ? `<small>${esc(c.motivoBono)}</small>${nomBonoAdicGuardado(c)}` : '')}</td><td>${perUsd(V.adic)}</td></tr>
+                    <em class="nom-autorizado">Autorizado por ${esc(n.aj.bonoAut.por || 'Administrador')}</em>` : '<span class="nom-nota">sin bono adicional (requiere autorización)</span>'}</small>` : `<small>${nomFijo(V.adic > 0)}${c.motivoBono ? `<span class="nom-nota">${esc(c.motivoBono)}</span>` : V.adic ? '' : '<span class="nom-nota">sin bono adicional</span>'}${nomBonoAdicGuardado(c)}</small>`}</td><td>${perUsd(V.adic)}</td></tr>
             </tbody></table>
             <div class="nom-total"><span>TOTAL</span><b>${perUsd(V.total)}</b></div>
-            <div class="nom-card-pie">Desde el ${fechaBonita(nomSemana)} hasta el ${fechaBonita(sumarDias(nomSemana, 6))}${tasa ? `<span>Tasa $ ${fmt(tasa)}</span>` : ''}</div>
+            <div class="nom-card-pie">Desde el ${fechaBonita(sem)} hasta el ${fechaBonita(sumarDias(sem, 6))}${tasa ? `<span>Tasa $ ${fmt(tasa)}</span>` : ''}</div>
         </div>`;
         // ---- Días laborados: un renglón por día (sábado a viernes) ----
         let totalDias = 0;
@@ -8509,11 +8541,15 @@
             const chk = `<span class="nom-chk si ${ex ? 'ex' : ''}">✓</span>${ex ? '<em class="nom-ex">extra</em>' : ''}${nota || ''}${tarde ? `<small class="hor-mal">${puntDur(tarde.ev.tarde)} tarde</small>` : ''}${rs.some(r => r.sinSalida) ? '<small class="hor-mal">sin salida</small>' : ''}`;
             return editable ? `<td><button type="button" class="nom-dia" title="${ex ? 'Pagar como turno normal' : 'Pagar como horas extra'}" onclick="nomDiaToggle('${id}', '${claves}', ${!ex})">${chk}</button></td>` : `<td>${chk}</td>`;
         };
+        // Cerrada: lo que se pagó por turno (u hora) y por hora extra sale de los montos guardados, no del perfil de hoy
+        const hNorm = n.normales.reduce((s, r) => s + r.horas, 0);
+        const unidad = c ? (porHora ? (hNorm ? c.pagoTurnos / hNorm : 0) : (c.turnos ? c.pagoTurnos / c.turnos : 0)) : pago;
+        const tarifaDia = c ? (c.pagoExtra ? c.tarifaExtra : 0) : (n.aj.pagarExtra ? n.tarifa || 0 : 0);
         const dias = [0, 1, 2, 3, 4, 5, 6].map(i => {
-            const f = sumarDias(nomSemana, i), del = n.filas.filter(r => r.fecha === f);
+            const f = sumarDias(sem, i), del = n.filas.filter(r => r.fecha === f);
             const ofi = del.filter(r => r.clave[0] === 'O'), man = del.filter(r => r.clave[0] === 'L' && /^ma/i.test(r.turno)), tar = del.filter(r => r.clave[0] === 'L' && /^tar/i.test(r.turno));
             const normales = del.filter(r => !r.extra), extras = del.filter(r => r.extra);
-            const monto = r2((porHora ? normales.reduce((s, r) => s + r.horas, 0) * pago : normales.length * pago) + extras.reduce((s, r) => s + r.horas, 0) * (n.aj.pagarExtra ? n.tarifa || 0 : 0));
+            const monto = r2((porHora ? normales.reduce((s, r) => s + r.horas, 0) * unidad : normales.length * unidad) + extras.reduce((s, r) => s + r.horas, 0) * tarifaDia);
             totalDias += monto;
             const lugares = [...new Set(del.filter(r => r.clave[0] === 'L').map(r => nomSigla(r.lugar)))].join('/');
             const nombreDia = diaSemana(f);
@@ -8530,10 +8566,21 @@
         // ---- Gastos ----
         let gastos;
         if (c) {
-            const filasG = (c.deudasDescontadas || '').split(' ; ').filter(Boolean).map(s => { const [num, monto] = s.split(' '); return `<tr><td>${perUsd(monto)}</td><td></td><td class="izq">${esc(num)}</td></tr>`; }).join('');
-            gastos = `<table class="nom-gas"><thead><tr><th>Monto $</th><th>Fecha</th><th class="izq">Descripción</th></tr></thead><tbody>${filasG || '<tr><td colspan="3" class="izq nota">No se descontaron gastos.</td></tr>'}</tbody>
-                <tfoot><tr><td class="nom-rojo">${perUsd(c.descontado)}</td><td colspan="2" class="izq">TOTAL descontado${c.movimiento ? ` · movimiento ${esc(c.movimiento)} en Cuentas por cobrar` : ''}</td></tr></tfoot></table>
-                ${c.deudasExcluidas ? `<div class="nota">Excluidos (siguen pendientes en Cuentas por cobrar): ${esc(c.deudasExcluidas)}</div>` : ''}`;
+            // Los descontados y los excluidos, como antes de cerrar (el interruptor muestra cómo quedó); fecha y descripción desde Cuentas por cobrar
+            if (!nomDeudasTodas) setTimeout(nomCargarDeudasTodas, 0);
+            const mapa = nomDeudasTodas instanceof Map ? nomDeudasTodas : null;
+            const filaG = (s, excluida) => {
+                const [num, monto] = s.split(' '), y = mapa && mapa.get(num);
+                return `<tr class="${excluida ? 'nom-excl' : ''}"><td>${perUsd(monto)}</td><td>${y ? fechaBonita(y.fecha).slice(0, 5) : ''}</td>
+                    <td class="izq">${y ? esc([y.local ? nomSigla(y.local) : '', y.tipo === 'DEUDA' ? '' : y.tipo, y.descripcion].filter(Boolean).join(' · ')) : ''}<small>${esc(num)}${excluida ? ' · excluido: sigue pendiente en Cuentas por cobrar' : ''}</small></td>
+                    <td><label class="interruptor interruptor-solo fijo" title="Nómina cerrada: no se puede cambiar"><input type="checkbox" disabled ${excluida ? 'checked' : ''}><span class="sw-pista"></span></label></td></tr>`;
+            };
+            const lista = s => String(s || '').split(' ; ').filter(Boolean);
+            const filasG = lista(c.deudasDescontadas).map(s => filaG(s, false)).concat(lista(c.deudasExcluidas).map(s => filaG(s, true))).join('');
+            const nExcl = lista(c.deudasExcluidas).length;
+            gastos = `<table class="nom-gas"><thead><tr><th>Monto $</th><th>Fecha</th><th class="izq">Descripción</th><th>Excluir</th></tr></thead><tbody>${filasG || '<tr><td colspan="4" class="izq nota">No tenía gastos.</td></tr>'}</tbody>
+                <tfoot><tr><td class="nom-rojo">${perUsd(c.descontado)}</td><td colspan="3" class="izq">TOTAL descontado${nExcl ? ` · ${nExcl} excluido(s)` : ''}${c.movimiento ? ` · movimiento ${esc(c.movimiento)} en Cuentas por cobrar` : ''}</td></tr></tfoot></table>
+                ${nomDeudasTodas && nomDeudasTodas.cargando ? '<div class="nota">Cargando la fecha y la descripción de los gastos...</div>' : ''}`;
         } else {
             gastos = n.deudas.length ? `<table class="nom-gas"><thead><tr><th>Monto $</th><th>Fecha</th><th class="izq">Descripción</th><th title="No descontarlo en esta nómina: queda pendiente en Cuentas por cobrar">Excluir</th></tr></thead><tbody>
                 ${n.deudas.map(y => `<tr class="${n.excl.has(y.ref) ? 'nom-excl' : ''}"><td>${perUsd(y.usd)}</td><td>${fechaBonita(y.fecha).slice(0, 5)}</td>
@@ -8546,11 +8593,11 @@
         const resumen = `<div class="kpis nom-res">
                 <div class="kpi"><div class="k-label">Total generado</div><div class="k-value">${perUsd(V.total)}</div><div class="k-label">incluye bonos</div></div>
                 <div class="kpi bad"><div class="k-label">Gastos que se debitan</div><div class="k-value">${perUsd(V.gastos)}</div>${!c && n.aDebitar > n.descontar + 0.004 ? `<div class="k-label">no alcanza: quedan ${perUsd(n.aDebitar - n.descontar)} pendientes</div>` : ''}</div>
-                <div class="kpi ok"><div class="k-label">${c ? 'Cobró' : 'Va a cobrar'}</div><div class="k-value">${perUsd(V.neto)}</div>${tasa ? `<div class="k-label">Bs ${fmt(r2(V.neto * tasa))} a tasa ${fmt(tasa)}</div>` : ''}</div>
+                <div class="kpi ok"><div class="k-label">${c ? (c.pagado ? 'Cobró' : 'A cobrar (por pagar)') : 'Va a cobrar'}</div><div class="k-value">${perUsd(V.neto)}</div>${c && c.netoBs ? `<div class="k-label">Bs ${fmt(c.netoBs)} a tasa ${fmt(c.tasa)}</div>` : tasa ? `<div class="k-label">Bs ${fmt(r2(V.neto * tasa))} a tasa ${fmt(tasa)}</div>` : ''}</div>
             </div>`;
-        const sub = `<div class="req-sub">${id} · ${esc(t.local || 'sin local')} · ${n.p ? `perfil ${esc(n.p.nombre)} (${perPagoTxt(n.p)})` : '<b>sin perfil</b>: asígnelo en Talento humano › Trabajadores'}</div>`;
+        const sub = `<div class="req-sub">${id} · ${esc((c && c.local) || t.local || 'sin local')} · ${c ? (c.perfil ? `perfil ${esc(c.perfil)}${n.p ? ` (${perPagoTxt(n.p)})` : ''}` : 'sin perfil') : n.p ? `perfil ${esc(n.p.nombre)} (${perPagoTxt(n.p)})` : '<b>sin perfil</b>: asígnelo en Talento humano › Trabajadores'}</div>`;
         return nomCab('Nómina · ' + esc(t.nombre)) + sub +
-            (c ? `<div class="banner ok">Cerrada en la nómina <b>${esc(c.id)}</b> por ${esc(c.cerro)} el ${esc(c.fechaCierre)}.</div>` : '') +
+            (c ? `<div class="banner ok">Cerrada en la nómina <b>${esc(c.id)}</b> por ${esc(c.cerro)} el ${esc(c.fechaCierre)}. Ya no se puede modificar. ${c.pagado ? `Pagada el ${esc(fechaBonita(c.fechaPago))}${c.referencia ? ' · ref. ' + esc(c.referencia) : ''}${c.comprobante ? ` · <a href="${esc(c.comprobante)}" target="_blank" rel="noopener">comprobante</a>` : ''}.` : '<b>Por pagar.</b>'}</div>` : '') +
             `<div class="nom-hoja">${salario}${diasCard}</div>
             <h4 class="per-sub">Gastos del trabajador</h4>${gastos}
             <h4 class="per-sub">Resumen</h4>${resumen}
@@ -8597,7 +8644,7 @@
             const r = await llamarApi({ action: 'nom_cerrar', semana: nomSemana, claveAdmin: clave, tasa, items: lista.map(nomItem) });
             lista.forEach(n => nomSel.delete(n.t.id));
             nomDatos.cerradas = r.pagos || nomDatos.cerradas; nomDatos.deudas = r.deudas || nomDatos.deudas;
-            perDeudasPend = null; perDeudasHistDatos = null; nomHist = null;   // Cuentas por cobrar y las nóminas cerradas se vuelven a leer
+            perDeudasPend = null; perDeudasHistDatos = null; nomHist = null; nomDeudasTodas = null;   // Cuentas por cobrar y las nóminas cerradas se vuelven a leer
             Object.keys(nomCache).forEach(k => { if (k !== nomSemana) delete nomCache[k]; });   // las otras semanas precargadas tenían las deudas de antes
             nomClave = '';
             const s = nomAjSemana(); lista.forEach(n => delete s[n.t.id]); try { localStorage.setItem('nom_aj_' + nomSemana, JSON.stringify(s)); } catch (e) {}
@@ -8629,13 +8676,13 @@
                 <button type="button" class="btn-ghost btn-mini" onclick="event.preventDefault(); event.stopPropagation(); nomImprimir('${esc(id)}')">Imprimir</button>
                 <small>cerró ${esc(ps[0].cerro)} el ${esc(ps[0].fechaCierre)}</small></summary>
             <div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">Trabajador</th><th>Turnos</th><th>Horas extra</th><th>Bonos</th><th>Generado</th><th>Descontado</th><th>Cobró</th><th class="izq">Pago</th><th class="izq">Movimiento CxC</th></tr></thead><tbody>
-            ${ps.map(p => `<tr><td class="izq"><b>${esc(p.trabajador)}</b><small>${esc(p.trabajadorId)} · ${esc(p.local)}</small></td><td>${p.turnos}</td>
+            ${ps.map(p => `<tr><td class="izq"><button type="button" class="chip st-pend chip-nombre" title="Ver su hoja de nómina" onclick="nomAbrirCerrada(${p.fila})">${esc(p.trabajador)}</button><small>${esc(p.trabajadorId)} · ${esc(p.local)}</small></td><td>${p.turnos}</td>
                 <td>${p.horasExtra ? reqN(p.horasExtra, 2) + ' h' : '—'}${p.pagoExtra ? `<small>${perUsd(p.pagoExtra)}</small>` : ''}</td>
                 <td>${perUsd(p.bonoPuntualidad + p.bonoProductividad + p.bonoAdicional)}${p.bonoAdicional ? `<small>adicional ${perUsd(p.bonoAdicional)}: ${esc(p.motivoBono)}</small>` : ''}</td>
                 <td>${perUsd(p.generado)}</td><td>${perUsd(p.descontado)}${p.deudasExcluidas ? `<small>excluidas: ${esc(p.deudasExcluidas)}</small>` : ''}</td><td><b>${perUsd(p.neto)}</b>${p.netoBs ? `<small>Bs ${fmt(p.netoBs)} · tasa ${fmt(p.tasa)}</small>` : ''}</td>
                 <td class="izq">${p.pagado ? `<span class="chip st-ok">Pagado</span><small>${fechaBonita(p.fechaPago)}${p.referencia ? ' · ref. ' + esc(p.referencia) : ''}${p.comprobante ? ` · <a href="${esc(p.comprobante)}" target="_blank" rel="noopener">comprobante</a>` : ''}</small>` : '<span class="chip st-amar">Por pagar</span>'}</td>
                 <td class="izq">${esc(p.movimiento || '—')}</td></tr>`).join('')}
-            </tbody></table></div></details>`; }).join('') + '<div class="nota">Cada nómina cerrada queda en BD PAGOS NOMINA con su ID. Los gastos descontados aparecen en Cuentas por cobrar como "Descuento de nómina" con el mismo ID (también en el historial completo de cada trabajador).</div>';
+            </tbody></table></div></details>`; }).join('') + '<div class="nota">Toque un trabajador para ver su hoja de nómina tal como quedó al cerrar (turnos, bonos, quién autorizó y los gastos descontados). Cada nómina cerrada queda en BD PAGOS NOMINA con su ID. Los gastos descontados aparecen en Cuentas por cobrar como "Descuento de nómina" con el mismo ID (también en el historial completo de cada trabajador).</div>';
     }
 
     // ==========================================
@@ -8664,7 +8711,7 @@
                 <td class="nom-col-check">${p.pagado ? '' : `<input type="checkbox" class="nom-check" aria-label="Pagar a ${esc(p.trabajador)}" ${pnomSel.has(p.fila) ? 'checked' : ''} onchange="pnomMarcar(${p.fila}, this.checked)">`}</td>
                 <td class="izq"><b>${esc(p.trabajador)}</b><small>${esc(p.trabajadorId)} · ${esc(p.local)}</small></td>
                 <td><b>${perUsd(p.neto)}</b></td><td><b>${pnomBs(p) || '—'}</b>${p.tasa ? `<small>tasa ${fmt(p.tasa)}</small>` : ''}</td>
-                <td class="izq">${p.pagado ? `<span class="chip st-ok">Pagado</span><small>${fechaBonita(p.fechaPago)}${p.referencia ? ' · ref. ' + esc(p.referencia) : ''} · ${esc(String(p.pagadoPor).split(' · ')[0])}</small>${p.comprobante ? `<small><a href="${esc(p.comprobante)}" target="_blank" rel="noopener">Ver comprobante</a></small>` : ''}`
+                <td class="izq">${p.pagado ? `<span class="chip st-ok">Pagado</span><small>${fechaBonita(p.fechaPago)}${p.referencia ? ' · ref. ' + esc(p.referencia) : ''} · ${esc(String(p.pagadoPor).split(' · ')[0])}</small>${p.comprobante ? `<small><a href="${esc(p.comprobante)}" target="_blank" rel="noopener">Ver comprobante</a></small>` : '<small>sin comprobante</small>'}`
                     : '<span class="chip st-amar">Por pagar</span>'}</td>
                 <td>${p.pagado ? `<button type="button" class="btn-ghost btn-mini" onclick="pnomDeshacer(${p.fila})">Deshacer</button>` : ''}</td></tr>`;
         pintarConservando(document.getElementById('pnomContenido'), `<div class="filters alm-filtros">
@@ -8697,19 +8744,35 @@
         pnomVentana(`<form class="req-dlg" onsubmit="pnomGuardar(event)"><h3>Registrar pago</h3>
             <div class="req-sub">${sel.length} trabajador(es) · <b>${perUsd(usd)}</b>${bs ? ` · <b>Bs ${fmt(bs)}</b>` : ''}</div>
             <div class="pnom-lista">${sel.map(p => `<div><span>${esc(p.trabajador)}</span><b>${perUsd(p.neto)}${p.netoBs ? ' · Bs ' + fmt(p.netoBs) : ''}</b></div>`).join('')}</div>
-            <label for="pnomArch">Comprobante del pago (foto o PDF)</label><input type="file" id="pnomArch" accept="image/*,application/pdf" required>
+            <label for="pnomArch">Comprobante del pago (foto o PDF)${esPrincipal ? ' · opcional para administradores' : ''}</label>
+            <input type="file" id="pnomArch" accept="image/*,application/pdf" ${esPrincipal ? '' : 'required'} onchange="pnomPrepararArchivo(this)">
+            <div class="nota" id="pnomArchInfo" style="margin:.25rem 0 0">${esPrincipal ? 'Como administrador puede registrar el pago sin comprobante; quedará anotado "sin comprobante".' : 'La foto se comprime antes de subirla.'}</div>
             <div class="per-grid"><div><label for="pnomRef">Referencia (opcional)</label><input type="text" id="pnomRef" maxlength="60" autocomplete="off"></div>
                 <div><label for="pnomFecha">Fecha del pago</label><input type="date" id="pnomFecha" value="${fechaLocalHoy()}" max="${fechaLocalHoy()}" required></div></div>
             <div class="login-error" id="pnomError"></div>
             <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-ghost" onclick="pnomCerrar()">Cancelar</button><button type="submit" class="btn-save" id="pnomBtn">Registrar pago</button></div></form>`);
     }
+    // El comprobante se comprime apenas se elige (lo más posible sin que deje de leerse) y se muestra cuánto pesa
+    let pnomArchListo = null;
+    async function pnomPrepararArchivo(inp) {
+        const info = document.getElementById('pnomArchInfo'), arch = inp.files[0];
+        pnomArchListo = null;
+        if (!arch) { info.textContent = esPrincipal ? 'Sin comprobante: quedará anotado "sin comprobante".' : ''; return; }
+        info.textContent = 'Comprimiendo...';
+        const p = pnomArchListo = efeLeerComprobante(arch, { fuerte: true });
+        try {
+            const c = await p, kb = n => n >= 1024 * 1024 ? fmt(r2(n / 1048576)) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB', peso = Math.round(c.base64.length * 3 / 4);
+            if (pnomArchListo === p) info.textContent = c.tipo === 'application/pdf' ? `PDF: ${kb(peso)}` : `Comprimido: ${kb(arch.size)} → ${kb(peso)}`;
+        } catch (e) { if (pnomArchListo === p) info.textContent = e.message; }
+    }
     async function pnomGuardar(ev) {
         ev.preventDefault();
         const btn = document.getElementById('pnomBtn'), err = document.getElementById('pnomError'), arch = document.getElementById('pnomArch').files[0];
-        if (!arch) { err.textContent = 'Adjunte el comprobante'; return; }
-        btnCargando(btn, 'Subiendo el comprobante...');
+        if (!arch && !esPrincipal) { err.textContent = 'Adjunte el comprobante'; return; }
+        if (!arch && !confirm('¿Registrar el pago sin comprobante?')) return;
+        btnCargando(btn, arch ? 'Subiendo el comprobante...' : 'Guardando...');
         try {
-            const comprobante = await efeLeerComprobante(arch);
+            const comprobante = arch ? await (pnomArchListo || efeLeerComprobante(arch, { fuerte: true })) : null;
             const r = await llamarApi({ action: 'pnom_pagar', filas: [...pnomSel], comprobante, referencia: document.getElementById('pnomRef').value.trim(), fecha: document.getElementById('pnomFecha').value });
             pnomSel = new Set(); pnomDatos = r.pagos || pnomDatos; nomHist = null; Object.keys(nomCache || {}).forEach(k => delete nomCache[k]); nomDatos = null;
             pnomCerrar(); pnomPintar();
