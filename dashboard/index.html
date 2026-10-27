@@ -3143,8 +3143,8 @@
     let scriptViejo = false, servidorVersion = null;
     function avisarScriptViejo() {
         if (scriptViejo || servidorVersion !== VERSION_SERVIDOR) mostrarBanner('El script publicado en Google es una versión anterior a este panel' + (servidorVersion ? ' (' + servidorVersion + ')' : '') + ': ' +
-            'algunas funciones nuevas no van a responder. En Apps Script pegue CuadreSistema.gs y Personal.gs de la carpeta sistema, guarde y publique una "Nueva versión" ' +
-            '(Implementar › Gestionar implementaciones › lápiz); luego Salir y entrar de nuevo.', 'warn');
+            'algunas funciones nuevas no van a responder. En la PC del proyecto haga doble clic en "Publicar Apps Script.cmd" (carpeta AutomatizacionPlaza) ' +
+            'y espere a que diga LISTO; luego Salir y entrar de nuevo. Este panel espera la versión ' + VERSION_SERVIDOR + '.', 'warn');
     }
     // Talento humano salió de Nómina: quien tiene Nómina también lo ve (el servidor le permite lo mismo)
     const normalizarPermisos = p => { p = (p || []).slice(); if (p.includes('nomina') && !p.includes('talento')) p.push('talento'); return p; };
@@ -8121,7 +8121,7 @@
         if (perTab === 'registrar') perTab = 'deudas';   // Registrar es una ventana, no una pestaña
         const out = document.getElementById('perContenido');
         document.getElementById('perFiltroEstado').classList.toggle('hidden', perTab !== 'trabajadores');
-        document.getElementById('perBuscarCaja').classList.toggle('hidden', ['perfiles', 'registrar', 'horario', 'composicion'].includes(perTab));
+        document.getElementById('perBuscarCaja').classList.toggle('hidden', ['registrar', 'horario', 'composicion'].includes(perTab));
         pintarConservando(out, perTab === 'perfiles' ? perPerfiles() : perTab === 'clientes' ? perClientes() : perTab === 'deudas' ? perDeudas() : perTab === 'registrar' ? perRegistrar()
                       : perTab === 'semanal' ? nomVista() : perTab === 'cerradas' ? nomCerradas() : perTab === 'horario' ? horVista() : perTab === 'composicion' ? horComposicionVista() : perTrabajadores());
         if (perTab === 'registrar') { perRegCalcular(); perRegVenceCambio('fecha'); }
@@ -8725,26 +8725,27 @@
         catch (e) { nomHist = { error: e.message }; }
         if (perTab === 'cerradas') perPintar();
     }
-    // Filtros: un trabajador y un rango de fechas (semanas que caen en el rango); con un trabajador elegido sale el resumen de lo que cobró
-    let nomHistF = { trab: '', desde: '', hasta: '' };
+    // Filtros: el trabajador se busca con "Buscar" (arriba) y aquí el rango de fechas (semanas que caen en el rango).
+    // Si la búsqueda deja un solo trabajador, sale el resumen de lo que cobró en ese período.
+    let nomHistF = { desde: '', hasta: '' };
     function nomHistFiltrar(k, v) { nomHistF[k] = v; perPintar(); }
     function nomCerradas() {
         if (!nomHist) { setTimeout(nomCargarHist, 0); return cargandoHTML('Cargando las nóminas cerradas...'); }
         if (nomHist.error) return `<div class="banner error">${esc(nomHist.error)}</div>`;
-        const f = nomHistF, trabs = [...new Map(nomHist.map(p => [p.trabajadorId, p.trabajador])).entries()].sort((a, b) => a[1].localeCompare(b[1], 'es', { sensitivity: 'base' }));
+        const f = nomHistF;
         const filtros = `<div class="filters alm-filtros">
-                <div><label for="nomHT">Trabajador</label><select id="nomHT" onchange="nomHistFiltrar('trab', this.value)"><option value="">Todos</option>${trabs.map(([id, n]) => `<option value="${esc(id)}"${id === f.trab ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select></div>
                 <div><label for="nomHD">Desde</label><input type="date" id="nomHD" value="${esc(f.desde)}" onchange="nomHistFiltrar('desde', this.value)"></div>
                 <div><label for="nomHH">Hasta</label><input type="date" id="nomHH" value="${esc(f.hasta)}" onchange="nomHistFiltrar('hasta', this.value)"></div>
-                ${f.trab || f.desde || f.hasta ? `<div style="align-self:end"><button type="button" class="btn-ghost" onclick="nomHistF={trab:'',desde:'',hasta:''};perPintar()">Quitar filtros</button></div>` : ''}
+                ${f.desde || f.hasta ? `<div style="align-self:end"><button type="button" class="btn-ghost" onclick="nomHistF={desde:'',hasta:''};perPintar()">Quitar fechas</button></div>` : ''}
             </div>`;
-        const lista = nomHist.filter(p => perPasa(p.id, p.trabajador, p.trabajadorId, p.local) && (!f.trab || p.trabajadorId === f.trab) && (!f.desde || p.hasta >= f.desde) && (!f.hasta || p.desde <= f.hasta));
+        const lista = nomHist.filter(p => perPasa(p.id, p.trabajador, p.trabajadorId, p.local) && (!f.desde || p.hasta >= f.desde) && (!f.hasta || p.desde <= f.hasta));
         const grupos = new Map();
         lista.forEach(p => { const g = grupos.get(p.id) || (grupos.set(p.id, []), grupos.get(p.id)); g.push(p); });
-        if (!grupos.size) return filtros + '<div class="empty">No hay nóminas cerradas' + (document.getElementById('perBuscar').value || f.trab || f.desde || f.hasta ? ' con esos filtros' : '') + '.</div>';
+        if (!grupos.size) return filtros + '<div class="empty">No hay nóminas cerradas' + (document.getElementById('perBuscar').value || f.desde || f.hasta ? ' con esos filtros' : '') + '.</div>';
         const s = (arr, k) => arr.reduce((a, p) => a + p[k], 0);
-        const resumen = f.trab ? `<div class="kpis">
-                <div class="kpi"><div class="k-label">Semanas</div><div class="k-value">${lista.length}</div><div class="k-label">${esc((trabs.find(([id]) => id === f.trab) || [])[1] || '')}</div></div>
+        const unSolo = document.getElementById('perBuscar').value.trim() && new Set(lista.map(p => p.trabajadorId)).size === 1;
+        const resumen = unSolo ? `<div class="kpis">
+                <div class="kpi"><div class="k-label">Semanas</div><div class="k-value">${lista.length}</div><div class="k-label">${esc(lista[0].trabajador)}</div></div>
                 <div class="kpi"><div class="k-label">Generado</div><div class="k-value">${perUsd(s(lista, 'generado'))}</div><div class="k-label">${s(lista, 'turnos')} turno(s)</div></div>
                 <div class="kpi bad"><div class="k-label">Gastos descontados</div><div class="k-value">${perUsd(s(lista, 'descontado'))}</div></div>
                 <div class="kpi ok"><div class="k-label">Cobró</div><div class="k-value">${perUsd(s(lista, 'neto'))}</div><div class="k-label">${s(lista, 'netoBs') ? 'Bs ' + fmt(r2(s(lista, 'netoBs'))) + ' · ' : ''}${lista.filter(p => p.pagado).length} pagada(s) · ${lista.filter(p => !p.pagado).length} por pagar</div></div></div>` : '';
@@ -9654,11 +9655,14 @@
             <div class="req-acciones" style="margin-top:0"><button type="button" class="btn-primary" onclick="perEditarPerfil('')">+ Nuevo perfil</button></div>
             ${perDatos.perfiles.length ? `<div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">Perfil</th><th class="izq">Cargo</th><th class="izq">Local · turno</th>
                 <th>Pago</th><th>Bono puntualidad<small>por semana</small></th><th>Bono productividad<small>por semana</small></th><th>Turnos mínimos<small>para los bonos</small></th><th>Hora extra<small>sugerida</small></th><th>Semana de 7 turnos</th><th>Trabajadores</th><th></th></tr></thead><tbody>
-            ${perDatos.perfiles.map((p, i) => { const d = perDesglose(p, 7, 56, false);
+            ${perDatos.perfiles.map((p, i) => {
+                // Buscar: por nombre del perfil, cargo, local o turno, o por el nombre de un trabajador que lo tenga
+                if (!perPasa(p.nombre, p.cargo, p.local, p.turno, ...perDatos.trabajadores.filter(t => t.perfil === p.nombre).map(t => t.nombre))) return '';
+                const d = perDesglose(p, 7, 56, false);
                 return `<tr><td class="izq"><b>${esc(p.nombre)}</b></td><td class="izq">${esc(p.cargo) || '—'}</td><td class="izq">${esc([p.local, p.turno].filter(Boolean).join(' · ')) || 'Cualquiera'}</td>
                 <td><b>${perPagoTxt(p)}</b></td><td>${perUsd(p.bonoPuntualidad)}</td><td>${perUsd(p.bonoProductividad)}</td><td>${p.turnosMinimos || '—'}</td><td>${p.horaExtra ? perUsd(p.horaExtra) + '<small>por hora</small>' : '—'}</td>
                 <td><b>${perUsd(d.total)}</b><small>${perPorHora(p) ? '56 h · ' : ''}base ${perUsd(d.base)} · ayuda ${perUsd(d.ayuda)}</small></td>
-                <td>${usan(p.nombre)}</td><td><button type="button" class="btn-ghost btn-mini" onclick="perEditarPerfil(${i + 1})">Modificar</button></td></tr>`; }).join('')}
+                <td>${usan(p.nombre)}</td><td><button type="button" class="btn-ghost btn-mini" onclick="perEditarPerfil(${i + 1})">Modificar</button></td></tr>`; }).join('') || `<tr><td colspan="11" class="izq nota">Ningún perfil coincide con la búsqueda.</td></tr>`}
             </tbody></table></div>` : '<div class="empty">Todavía no hay perfiles. Cree uno por cada grupo de trabajadores con el mismo cargo y pago (por ejemplo "Cajero mañana").</div>'}
             <div class="nota">Montos en dólares; la nómina los paga en Bs a la tasa del día (se puede ajustar al pagar). El sueldo base y la ayuda social salen solos de lo ganado. Los bonos son por semana y solo se ganan con los turnos mínimos.</div>
             <div class="grafico-card" style="margin-top:1rem"><div class="grafico-head"><h3>Horario por departamento</h3>
@@ -12137,7 +12141,8 @@ Reglas:
                 <h3 style="margin-top:0">Compra con foto de la factura</h3>
                 <div class="nota" style="margin-top:0">Tome la foto derecha, completa y con buena luz. Si la factura tiene varias páginas, una foto por página (hasta 4). Gemini lee proveedor, productos, cantidades y costos; usted revisa todo antes de guardar.</div>
                 <div class="cmp-fotos">${cmp.fotos.map((f, i) => `<div class="cmp-foto"><img src="${f}" alt="Página ${i + 1}"><button type="button" title="Quitar" onclick="cmp.fotos.splice(${i},1);almPintar()">✕</button></div>`).join('')}
-                    ${cmp.fotos.length < 4 ? `<label class="cmp-agregar">＋ ${cmp.fotos.length ? 'Otra página' : 'Tomar o elegir foto'}<input type="file" accept="image/*" capture="environment" multiple hidden onchange="cmpAgregarFotos(this.files); this.value=''"></label>` : ''}</div>
+                    ${cmp.fotos.length < 4 ? `<label class="cmp-agregar">📷 ${cmp.fotos.length ? 'Tomar otra página' : 'Tomar foto'}<input type="file" accept="image/*" capture="environment" hidden onchange="cmpAgregarFotos(this.files); this.value=''"></label>
+                        <label class="cmp-agregar">🖼 ${cmp.fotos.length ? 'Elegir otra foto' : 'Elegir foto ya tomada'}<input type="file" accept="image/*" multiple hidden onchange="cmpAgregarFotos(this.files); this.value=''"></label>` : ''}</div>
                 <div class="login-error" id="cmpError"></div>
                 <div class="req-acciones" style="margin-bottom:0"><button type="button" class="btn-ghost" onclick="cmpSinFoto()">Escribir sin foto</button>
                     <button type="button" class="btn-ghost" onclick="cmp.modoTexto=true;cmpPintarCompra(document.getElementById('almContenido'), true)">Pegar texto de otra IA</button>
