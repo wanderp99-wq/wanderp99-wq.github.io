@@ -824,6 +824,27 @@
         .nom-dlg .per-desglose td:last-child { color: var(--text-muted); } .nom-dlg .per-desglose .per-check { display: inline-flex; margin-left: .4rem; }
         .nom-num { width: 6.5rem !important; display: inline-block; } .nom-dlg #nomMotivo { width: 100%; margin-top: .3rem; box-sizing: border-box; }
         .nom-res { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+        /* Pendientes: campanita (sutil), su panel desplegable por módulo y el contador de las tarjetas del menú */
+        .header-actions { position: relative; }
+        .campana { position: relative; padding: .45rem .6rem; line-height: 0; color: var(--text-muted); }
+        .campana.con-pend { color: var(--text); }
+        .campana-n { position: absolute; top: -.35rem; right: -.35rem; min-width: 1.15rem; height: 1.15rem; padding: 0 .3rem; border-radius: 999px; background: var(--amar-bg); color: var(--amar-txt);
+                     border: 1px solid var(--amar); font-size: .66rem; font-weight: 800; line-height: 1.05rem; text-align: center; }
+        .pend-panel { position: absolute; right: 0; top: calc(100% + .5rem); z-index: 950; width: min(380px, calc(100vw - 2rem)); max-height: min(70vh, 560px); overflow: auto;
+                      background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 12px 32px var(--shadow); padding: .6rem .7rem; text-align: left; }
+        .pend-cab { display: flex; justify-content: space-between; align-items: center; margin-bottom: .35rem; }
+        .header-actions .pend-panel button { flex: none !important; width: auto !important; min-width: 0 !important; }   /* en el teléfono los botones del encabezado se estiran: aquí no */
+        .header-actions .pend-panel .pend-item { width: 100% !important; }
+        .header-actions .campana { flex: none !important; }
+        .pend-grupo { border-top: 1px solid var(--border); padding: .35rem 0; }
+        .pend-grupo summary { display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: 700; font-size: .9rem; list-style: none; }
+        .pend-grupo summary::-webkit-details-marker { display: none; }
+        .pend-grupo summary b { font-size: .72rem; background: var(--amar-bg); color: var(--amar-txt); border-radius: 999px; padding: .05rem .5rem; }
+        .pend-item { display: block; width: 100%; text-align: left; background: none; border: 0; padding: .35rem .3rem; border-radius: 8px; font-size: .82rem; color: var(--text); cursor: pointer; }
+        .pend-item:hover, .pend-item:focus-visible { background: var(--list-bg); }
+        .pend-vacio { color: var(--ok); font-size: .88rem; padding: .6rem 0; }
+        .pend-pie { display: flex; justify-content: space-between; align-items: center; gap: .5rem; flex-wrap: wrap; border-top: 1px solid var(--border); margin-top: .35rem; padding-top: .45rem; font-size: .72rem; color: var(--text-muted); }
+        .m-pend { font-size: .72rem; font-weight: 700; color: var(--amar-txt); } .m-pend:empty { display: none; }
         /* Nómina · modificar días y horas */
         .nom-asis-tabla th { width: 6.5rem; white-space: nowrap; vertical-align: top; text-align: left; }
         .nom-asis-fila { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .5rem; padding: .25rem 0; }
@@ -1767,6 +1788,10 @@
         </div>
         <div class="header-actions">
             <span class="bienvenida hidden" id="bienvenida"></span>
+            <button type="button" class="btn-ghost campana hidden" id="btnCampana" onclick="pendAlternar(event)" title="Pendientes de sus módulos" aria-label="Pendientes" aria-expanded="false">
+                <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+                <span class="campana-n hidden" id="campanaN"></span></button>
+            <div class="pend-panel hidden" id="pendPanel" role="dialog" aria-label="Pendientes"></div>
             <button type="button" class="btn-ghost hidden" id="btnActualizar" onclick="actualizarModulo()" title="Volver a leer los datos de este módulo (también se actualiza solo cada 30 segundos si otro equipo hizo cambios)">⟳ Actualizar</button>
             <button type="button" class="btn-ghost hidden" id="btnAtras" onclick="irAtras()" title="Volver a la pantalla anterior (Esc)">← Atrás</button>
             <button type="button" class="btn-ghost hidden" id="btnAdelante" onclick="irAdelante()" title="Ir a la pantalla siguiente (Ctrl + Y)">Adelante →</button>
@@ -2976,7 +3001,7 @@
         if (TIEMPOS.length > 60) TIEMPOS.pop();
     }
     // Solo lectura: si la respuesta de Google no llega, se reintenta una vez sola (no cambia nada en la hoja)
-    const SOLO_LECTURA = /^(login|list|cuadre_detalle|cuadre_detalle_lote|mov_listar|cuentas_listar|conc_listar|efe_listar|cc_listar|req_datos|req_ventas|req_historial|asis_hoy|asis_listar|asisg_listar|per_listar|cxc_deudas|nom_historial|nom_autorizar|nom_ajustes|hor_datos|alm_datos|alm_notas|alm_ingresos|alm_kardex|alm_tiendas|alm_existencias|cmp_compras|cmp_ordenes|cmp_enlazar|cmp_borradores|cmp_borrador|pnom_listar|ping|cambios|enlinea|marca_estado)$/;
+    const SOLO_LECTURA = /^(login|list|cuadre_detalle|cuadre_detalle_lote|mov_listar|cuentas_listar|conc_listar|efe_listar|cc_listar|req_datos|req_ventas|req_historial|asis_hoy|asis_listar|asisg_listar|per_listar|cxc_deudas|nom_historial|nom_autorizar|nom_ajustes|hor_datos|alm_datos|alm_notas|alm_ingresos|alm_kardex|alm_tiendas|alm_existencias|cmp_compras|cmp_ordenes|cmp_enlazar|cmp_borradores|cmp_borrador|pnom_listar|ping|cambios|pendientes|enlinea|marca_estado)$/;
     // Guardados sin repetir: cada cambio lleva un "idem". Si no llegó la respuesta y se vuelve a pulsar el MISMO cambio,
     // se manda el mismo idem y Google responde "ya estaba registrado" en vez de guardarlo otra vez.
     const idemPendientes = new Map();   // contenido del cambio -> idem del intento sin respuesta
@@ -3149,7 +3174,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-10-27.5';
+    const VERSION_SERVIDOR = '2026-10-28.4';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -3464,7 +3489,9 @@
                     <span class="m-title">${a.titulo}</span>
                     <span class="m-desc">${a.desc}</span>
                     ${listos ? `<span class="m-estado listo-n">${mods.length} módulo${mods.length === 1 ? '' : 's'}</span>` : '<span class="chip st-pend">En construcción</span>'}
+                    <span class="m-pend" data-pend-area="${a.id}"></span>
                 </button>`; }).join('');
+            pendPintarMenu();
             return;
         }
         const area = AREAS.find(a => a.id === abierta);
@@ -3479,9 +3506,11 @@
                     <span class="m-title">${m.titulo}</span>
                     <span class="m-desc">${m.desc}</span>
                     ${m.listo ? `<span class="m-estado" data-mod="${m.id}"></span>` : '<span class="chip st-pend">En construcción</span>'}
+                    <span class="m-pend" data-pend-mod="${m.id}"></span>
                 </button>`).join('')
             : '<div class="empty">Esta clave no tiene módulos habilitados.</div>';
         pintarEstadoMenu();
+        pendPintarMenu();
     }
 
     // ==========================================
@@ -3681,6 +3710,7 @@
                 const [n, o] = await Promise.all([almNotas ? null : llamarApi({ action: 'alm_notas', ultimas: true }), almIngresos ? null : llamarApi({ action: 'alm_ingresos', ultimas: true })]);
                 if (n && !almNotas) almNotas = n.notas || [];
                 if (o && !almIngresos) almIngresos = o.ingresos || [];
+                almTgReintentar();   // notas que quedaron sin enviar a Telegram en este equipo
                 if (!almTiendas) { almTiendasSemana = almTiendasSemana || inicioSemana(fechaLocalHoy()); almTiendas = await llamarApi({ action: 'alm_tiendas', semana: almTiendasSemana }); }
                 if (!cmpCompras) {   // Compra con foto: las compras recientes y las que están en curso
                     const [c, b] = await Promise.all([llamarApi({ action: 'cmp_compras' }), llamarApi({ action: 'cmp_borradores' }).catch(() => ({ borradores: [] }))]);
@@ -3726,6 +3756,102 @@
             pintarEstadoMenu();
         }
     }
+    // ==========================================
+    // PENDIENTES: campanita del encabezado (lista por módulo) y contador sutil en cada tarjeta del menú.
+    // Se pregunta a Google cada 5 minutos (acción "pendientes": solo los módulos de esta clave). Cuando algo AUMENTA respecto a lo
+    // último que se vio en este equipo, sale un aviso del teléfono o la PC (si se activaron los avisos en este equipo).
+    // ==========================================
+    const PEND_CADA = 5 * 60000;
+    let pendDatos = null, pendUltima = 0, pendCargando = false;
+    const pendModTitulo = id => (MODULOS.find(m => m.id === id) || {}).titulo || id;
+    const pendTotal = grupos => (grupos || []).reduce((s, g) => s + g.items.reduce((a, x) => a + x.n, 0), 0);
+    const pendBaseClave = () => 'pend_base_' + asisgClave(nombreUsuario);
+    async function pendRevisar(forzar) {
+        if (!clave || !WEB_APP_URL || pendCargando || vistaActual === 'login' || vistaActual === 'marcaje') return;
+        if (!forzar && Date.now() - pendUltima < PEND_CADA) return;
+        pendCargando = true; pendUltima = Date.now();
+        try {
+            const r = await llamarApi({ action: 'pendientes' });
+            pendDatos = { grupos: r.grupos || [], hora: r.hora || '' };
+            pendAvisarNuevos(pendDatos.grupos);
+        } catch (e) { if (!pendDatos) pendDatos = { grupos: [], hora: '', error: e.message }; }
+        finally { pendCargando = false; }
+        pendPintar();
+    }
+    // Lo que aumentó desde la última vez (en este equipo y para este usuario): un solo aviso con lo nuevo
+    function pendAvisarNuevos(grupos) {
+        let base = null; try { base = JSON.parse(localStorage.getItem(pendBaseClave()) || 'null'); } catch (e) {}
+        const ahora = {}, nuevos = [];
+        grupos.forEach(g => g.items.forEach(x => { ahora[x.clave] = x.n; if (base && x.n > (base[x.clave] || 0)) nuevos.push(pendModTitulo(g.modulo) + ': ' + x.texto); }));
+        try { localStorage.setItem(pendBaseClave(), JSON.stringify(ahora)); } catch (e) {}
+        if (nuevos.length) pendNotificar(nuevos);   // la primera vez en este equipo no avisa (solo guarda lo que hay)
+    }
+    function pendNotificar(lineas) {
+        if (!('Notification' in window) || Notification.permission !== 'granted') return;
+        const titulo = 'Plaza Valencia · ' + (lineas.length === 1 ? 'nuevo pendiente' : lineas.length + ' pendientes nuevos');
+        const op = { body: lineas.slice(0, 4).join('\n') + (lineas.length > 4 ? '\n…' : ''), tag: 'plaza-pendientes', renotify: true, icon: 'iconos/icon-192.png', badge: 'iconos/icon-192.png' };
+        // En Android solo se puede desde el service worker de la app; en la PC también con Notification
+        const sw = navigator.serviceWorker, conSW = sw && sw.getRegistration ? sw.getRegistration().catch(() => null) : Promise.resolve(null);
+        conSW.then(reg => { if (reg && reg.showNotification) return reg.showNotification(titulo, op); const n = new Notification(titulo, op); n.onclick = () => { window.focus(); pendAbrir(); }; })
+             .catch(() => {});
+    }
+    async function pendActivarAvisos() {
+        if (!('Notification' in window)) { mostrarBanner('Este navegador no permite avisos. En el teléfono, instale la app (menú ⋮ › Instalar app) y actívelos ahí.', 'warn'); return; }
+        const p = await Notification.requestPermission();
+        if (p === 'granted') { mostrarBanner('Avisos activados en este equipo: le avisará cuando aparezcan pendientes nuevos.', 'ok'); pendNotificar(['Así se verán los avisos de pendientes.']); }
+        else mostrarBanner('Los avisos quedaron bloqueados. Para activarlos, permítalos en la configuración del navegador para esta página.', 'warn');
+        pendPintar();
+    }
+    function pendPintar() {
+        const btn = document.getElementById('btnCampana'), n = document.getElementById('campanaN');
+        if (!btn) return;
+        const total = pendDatos ? pendTotal(pendDatos.grupos) : 0;
+        n.textContent = total > 99 ? '99+' : String(total); n.classList.toggle('hidden', !total);
+        btn.classList.toggle('con-pend', !!total);
+        btn.title = total ? `${total} pendiente(s) en sus módulos` : 'Sin pendientes en sus módulos';
+        pendPintarMenu();
+        const p = document.getElementById('pendPanel');
+        if (p && !p.classList.contains('hidden')) pintarConservando(p, pendPanelHTML());
+    }
+    function pendPanelHTML() {
+        const g = pendDatos ? pendDatos.grupos : null, permiso = 'Notification' in window ? Notification.permission : 'no';
+        const cuerpo = !pendDatos ? cargandoHTML('Revisando pendientes...') : pendDatos.error && !g.length ? `<div class="nota">${esc(pendDatos.error)}</div>`
+            : !g.length ? '<div class="pend-vacio">✓ Nada pendiente en sus módulos</div>'
+            : g.map(x => { const t = x.items.reduce((s, i) => s + i.n, 0);
+                return `<details class="pend-grupo"${g.length <= 2 ? ' open' : ''}><summary><span>${esc(pendModTitulo(x.modulo))}</span><b>${t > 999 ? '999+' : t}</b></summary>
+                    ${x.items.map(i => `<button type="button" class="pend-item" onclick="pendIr('${esc(x.modulo)}')">${esc(i.texto)}</button>`).join('')}</details>`; }).join('');
+        return `<div class="pend-cab"><b>Pendientes</b><button type="button" class="btn-ghost btn-mini" onclick="pendRevisar(true)" ${pendCargando ? 'disabled' : ''}>⟳</button></div>${cuerpo}
+            <div class="pend-pie">${pendDatos && pendDatos.hora ? `Revisado ${esc(pendDatos.hora.slice(11))} · cada 5 min` : ''}
+                ${permiso === 'default' ? '<button type="button" class="btn-ghost btn-mini" onclick="pendActivarAvisos()">🔔 Activar avisos en este equipo</button>'
+                  : permiso === 'granted' ? '<span>Avisos activados</span>' : permiso === 'denied' ? '<span title="Permítalos en la configuración del navegador">Avisos bloqueados</span>' : ''}</div>`;
+    }
+    function pendAbrir() {
+        const p = document.getElementById('pendPanel'); if (!p) return;
+        p.classList.remove('hidden'); document.getElementById('btnCampana').setAttribute('aria-expanded', 'true');
+        pintarConservando(p, pendPanelHTML());
+        if (!pendDatos || Date.now() - pendUltima > 60000) pendRevisar(true);
+    }
+    function pendCerrar() { const p = document.getElementById('pendPanel'); if (p) p.classList.add('hidden'); const b = document.getElementById('btnCampana'); if (b) b.setAttribute('aria-expanded', 'false'); }
+    function pendAlternar(e) { if (e) e.stopPropagation(); const p = document.getElementById('pendPanel'); if (p && p.classList.contains('hidden')) pendAbrir(); else pendCerrar(); }
+    function pendIr(modulo) { pendCerrar(); if (permisos.includes(modulo)) irA(modulo); }
+    document.addEventListener('click', e => { const p = document.getElementById('pendPanel'); if (p && !p.classList.contains('hidden') && !e.target.closest('#pendPanel, #btnCampana')) pendCerrar(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') { const p = document.getElementById('pendPanel'); if (p && !p.classList.contains('hidden')) { e.stopPropagation(); pendCerrar(); } } }, true);
+    // Contador sutil en las tarjetas del menú (módulo y área)
+    function pendPintarMenu() {
+        const por = {}, porArea = {};
+        ((pendDatos && pendDatos.grupos) || []).forEach(g => { const t = g.items.reduce((s, i) => s + i.n, 0); por[g.modulo] = t; const a = (MODULOS.find(m => m.id === g.modulo) || {}).area; if (a) porArea[a] = (porArea[a] || 0) + t; });
+        document.querySelectorAll('[data-pend-mod]').forEach(el => { const t = por[el.dataset.pendMod] || 0; el.textContent = t ? (t > 999 ? '999+' : t) + ' pendiente' + (t === 1 ? '' : 's') : ''; el.classList.toggle('activo', !!t); });
+        document.querySelectorAll('[data-pend-area]').forEach(el => { const t = porArea[el.dataset.pendArea] || 0; el.textContent = t ? (t > 999 ? '999+' : t) + ' pendiente' + (t === 1 ? '' : 's') : ''; el.classList.toggle('activo', !!t); });
+    }
+    // Reloj: al entrar, cada 5 minutos y al volver a la app. Al salir de la sesión se limpia.
+    setInterval(() => {
+        const btn = document.getElementById('btnCampana'), dentro = !!clave && vistaActual !== 'login' && vistaActual !== 'marcaje';
+        if (btn) btn.classList.toggle('hidden', !dentro);
+        if (!dentro) { if (pendDatos) { pendDatos = null; pendUltima = 0; pendCerrar(); pendPintar(); } return; }
+        pendRevisar(!pendDatos);
+    }, 5000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && clave) pendRevisar(); });
+
     // Estado en cada tarjeta del menú: cargando / listo
     function pintarEstadoMenu() {
         document.querySelectorAll('.m-estado[data-mod]').forEach(el => {
@@ -11504,6 +11630,7 @@
                 nota._guardada = r.nota;
                 if (almUltimaNota === nota) almUltimaNota = r.nota;
                 if (r.nota.numero !== nota.numero) mostrarBanner(`La nota de ${nota.cliente} quedó guardada con el N° ${r.nota.numero} (no ${nota.numero}). Si ya la imprimió, reimprímala desde Notas emitidas.`, 'warn');
+                else if (r.telegram && !r.telegram.ok) mostrarBanner(`Nota ${r.nota.numero} guardada. Telegram no la aceptó todavía (${r.telegram.error}); Google la reintenta solo.`, 'warn');
                 almPintar();
             } catch (e) {
                 // No se guardó: la venta vuelve a "ventas en espera" (F7) y se vuelve a leer la existencia
@@ -11513,7 +11640,7 @@
                 await almCargar();
             }
         });
-        almEnviarTelegram(nota);   // siempre, sin preguntar: va a la cola después de guardarla (si no se guardó, avisa)
+        // El envío al grupo de Telegram lo hace Google al guardar la nota (almFacturar): no depende de este equipo
     }
     function almPreguntarImprimir(tipo, doc) {
         // La nota se imprime con la versión que guardó Google (si ya llegó)
@@ -11841,7 +11968,7 @@
     const almPasaLista = (...t) => { const q = asisgClave((document.getElementById('almListaBus') || {}).value || ''); return !q || t.some(x => asisgClave(x).includes(q)); };
     const almPedido = f => f.modo === 'fechas' ? { desde: f.desde || sumarDias(fechaLocalHoy(), -30), hasta: f.hasta || fechaLocalHoy() } : { ultimas: true };
     async function almCargarNotas() {
-        try { const r = await llamarApi(Object.assign({ action: 'alm_notas' }, almPedido(almNotasF))); almNotas = r.notas || []; if (r.pendientes && almDatos) almDatos.pendientes = r.pendientes; }
+        try { const r = await llamarApi(Object.assign({ action: 'alm_notas' }, almPedido(almNotasF))); almNotas = r.notas || []; if (r.pendientes && almDatos) almDatos.pendientes = r.pendientes; almTgReintentar(); }
         catch (e) { almNotas = []; mostrarBanner(e.message, 'error'); }
         almPintar();
     }
@@ -11923,7 +12050,7 @@
                 ${tienda ? marca('ingresada', n.ingresada, 'Ingresada en tienda', 'Por ingresar en tienda', 'amar') : ''}${marca('verificada', n.verificada, 'Recepción verificada', 'Sin verificar')}</div>`}
             <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0;flex-wrap:wrap">
                 ${anulada ? '' : `<button type="button" class="btn-eliminar" onclick="almAnular('${esc(n.numero)}')">Anular</button><button type="button" class="btn-ghost" onclick="almModificarNota('${esc(n.numero)}')">Modificar (clave)</button>`}
-                <button type="button" class="btn-ghost" onclick="almEnviarTelegram(almNotaDe('${esc(n.numero)}'))">Enviar a Telegram</button>
+                ${esPrincipal ? `<button type="button" class="btn-ghost" onclick="almEnviarTelegram(almNotaDe('${esc(n.numero)}'))" title="Las notas se envían solas al guardarlas">Reenviar a Telegram</button>` : ''}
                 <button type="button" class="btn-ghost" onclick="almImprimir('nota', almNotaDe('${esc(n.numero)}'))">Imprimir</button><button type="button" class="btn-primary" onclick="almCerrar()" autofocus>Cerrar</button></div></div>`);
     }
     function almReemplazarNota(n) {
@@ -12627,7 +12754,8 @@ Reglas:
                                            margenMayor: l.margenMayor, mayor: l.mayor, dist: l.dist })) });
             almAplicarCambios(r.cambios);
             if (r.proximoIngreso) almDatos.proximoIngreso = r.proximoIngreso;
-            (r.notas || []).forEach(cmpTelegramNota);   // cada nota al grupo "Control de depósito" sola, sin imprimir (el estado sale en la pantalla)
+            // Google ya envió cada nota al grupo "Control de depósito" al guardarla (si Telegram falló, la reintenta solo)
+            (r.notas || []).forEach(n => { n._tg = !n.telegram || n.telegram.ok ? 'ok' : 'error'; n._tgMsg = n.telegram && n.telegram.error || ''; });
             almNotas = null; almIngresos = null; almTiendas = null; cmpCompras = null; cmpOrd = null;
             Object.assign(cmp, { paso: 'listo', resultado: r, fotos: [], borradorId: null, borradorVer: '' });
             cmpAvanceEstado = '';   // "Compras en curso" se vuelve a leer con las compras (cmpCompras = null)
@@ -12635,23 +12763,18 @@ Reglas:
             almCargar();
         } catch (e) { err.textContent = e.message; btn.disabled = false; btn.textContent = 'Guardar compra y emitir notas'; }
     }
-    // Envío de una nota de la compra a Telegram, con su estado en la pantalla (enviando / enviada / no se envió + reintentar)
-    function cmpTelegramNota(n) {
-        n._tg = 'enviando'; n._tgMsg = '';
-        const repintar = () => { if (almTab === 'compra' && cmp.paso === 'listo' && cmp.resultado && (cmp.resultado.notas || []).includes(n)) cmpPintarCompra(document.getElementById('almContenido'), true); };
-        repintar();
-        almEnviarTelegram(n, (ok, m) => { n._tg = ok ? 'ok' : 'error'; n._tgMsg = m || ''; repintar(); });
-    }
-    const cmpTelegramEstado = (n, i) => n._tg === 'ok' ? '<span class="chip st-ok">✓ Enviada a Telegram</span>'
-        : n._tg === 'error' ? `<span class="chip st-falta" title="${esc(n._tgMsg)}">No se envió a Telegram</span> <button type="button" class="btn-ghost btn-mini" onclick="cmpTelegramNota(cmp.resultado.notas[${i}])">Reintentar</button>`
-        : n._tg === 'enviando' ? '<span class="chip st-pend">Enviando a Telegram...</span>' : '';
+    // Estado del envío que hizo Google al guardar cada nota
+    const cmpTelegramEstado = n => n._tg === 'ok' ? '<span class="chip st-ok">✓ Enviada a Telegram</span>'
+        : n._tg === 'error' ? `<span class="chip st-amar" title="${esc(n._tgMsg)}">Telegram no la aceptó: Google la reintenta solo</span>` : '';
     function cmpListoVista() {
         const r = cmp.resultado || {};
         return `<div class="grafico-card">
             <h3 style="margin-top:0;color:#3a9400">✓ Compra ${esc(r.compra || '')} guardada</h3>
             <div class="nota" style="margin-top:0">${r.ingreso ? `Entró al almacén con la operación de inventario N° ${esc(r.ingreso.numero)}. ` : ''}${(r.ordenes || []).length} orden(es) de actualización en "Precios en tiendas".${r.libro ? ` Anotada en el Libro de compras (pestaña ${esc(r.libro.hoja)}, NRO ${esc(r.libro.nro)}, ${r.libro.renglones} renglón(es)).` : ''}</div>
+            ${(() => { const ns = r.notas || [], ok = ns.filter(n => n._tg === 'ok').length;
+                return ns.length && ok === ns.length ? `<div class="banner ok" style="display:block">✓ Las ${ns.length} nota(s) se enviaron al grupo "Control de depósito".</div>` : ''; })()}
             ${(r.notas || []).length ? `<h4 class="per-sub">Notas de entrega a las tiendas (se envían solas al grupo "Control de depósito"; imprimir es opcional)</h4>
-                ${(r.notas || []).map((n, i) => `<div class="cmp-marca"><span><b>N° ${esc(n.numero)}</b> · ${esc(n.cliente)} · ${n.renglones} renglón(es)</span><span>${cmpTelegramEstado(n, i)} <button type="button" class="btn-ghost btn-mini" onclick="almImprimir('nota', cmp.resultado.notas[${i}])">Imprimir</button></span></div>`).join('')}`
+                ${(r.notas || []).map((n, i) => `<div class="cmp-marca"><span><b>N° ${esc(n.numero)}</b> · ${esc(n.cliente)} · ${n.renglones} renglón(es)</span><span>${cmpTelegramEstado(n)} <button type="button" class="btn-ghost btn-mini" onclick="almImprimir('nota', cmp.resultado.notas[${i}])">Imprimir</button></span></div>`).join('')}`
               : '<div class="nota">No se emitieron notas de entrega: no se repartió nada a las tiendas (todo quedó en el almacén), así que no hay nada que enviar a Telegram. Para enviar a una tienda, reparta en las columnas de las tiendas antes de guardar, o facture desde "Facturar".</div>'}
             ${Object.keys(r.queda || {}).length ? `<h4 class="per-sub">Quedó en el almacén (por distribuir o facturar)</h4><div class="nota" style="margin-top:0">${Object.keys(r.queda).map(k => { const p = almProducto(k); return esc(p ? p.descripcion : k) + ': <b>' + almCant(r.queda[k], p && p.tipo) + ' ' + almUnidad(p && p.tipo) + '</b>'; }).join(' · ')}</div>` : ''}
             ${(r.errores || []).length ? `<div class="banner error">No se pudo emitir: ${r.errores.map(esc).join(' · ')}. Esa mercancía quedó en el almacén: emita la nota desde Facturar.</div>` : ''}
@@ -13185,8 +13308,10 @@ Reglas:
             td,.tot,.num b{font-family:Arial,Helvetica,sans-serif;font-variant-numeric:tabular-nums}td{padding:.9mm .8mm}td.cod{font-size:6.6pt}
             .cab img{width:12mm;height:12mm}.num b{letter-spacing:.3pt}.tot{gap:1.5mm 5mm;padding-top:1.5mm}.tot .g{color:#2f7a00}.firmas{display:none}</style>`);
         if (logo && png) html = html.split(`src="${logo}"`).join(`src="${png}"`);
+        // Dentro de la pantalla pero invisible: un marco fuera de la pantalla el navegador lo deja de dibujar y la imagen se queda esperando
         const fr = document.createElement('iframe');
-        fr.style.cssText = 'position:fixed;left:-10000px;top:0;width:5.5in;height:2000px;border:0';
+        fr.setAttribute('aria-hidden', 'true');
+        fr.style.cssText = 'position:fixed;left:0;top:0;width:5.5in;height:2000px;border:0;opacity:0;pointer-events:none;z-index:-1';
         document.body.appendChild(fr);
         try {
             const w = fr.contentWindow;
@@ -13200,19 +13325,16 @@ Reglas:
         } finally { fr.remove(); }
     }
     // Enviar la nota al grupo "Control de depósito Plaza Valencia" (después de que Google la guarde, en orden)
-    // alTerminar(ok, mensaje): opcional, para mostrar el estado del envío (p. ej. en la pantalla de la compra guardada)
-    function almEnviarTelegram(nLocal, alTerminar) {
-        almEnSegundoPlano(async () => {
-            const n = nLocal._guardada || nLocal, fin = (ok, m) => { if (alTerminar) try { alTerminar(ok, m); } catch (e) {} };
-            if (nLocal._fallo) { mostrarBanner(`La nota ${nLocal.numero} no se envió a Telegram porque no se guardó.`, 'warn'); fin(false, 'no se guardó'); return; }
-            try {
-                const imagen = await almImagenNota(n);
-                await llamarApi({ action: 'alm_telegram_nota', numero: n.numero, imagen });
-                mostrarBanner(`Nota ${n.numero} enviada a Telegram (Control de depósito).`, 'ok');
-                fin(true);
-            } catch (e) { mostrarBanner(`La nota ${n.numero} no se pudo enviar a Telegram: ${e.message}`, 'error'); fin(false, e.message); }
-        });
+    // Las notas las envía Google al guardarlas (almFacturar, como PDF al grupo "Control de depósito"): este equipo no interviene.
+    // Aquí solo queda el reenvío a mano, para un administrador (el servidor también lo exige).
+    async function almEnviarTelegram(n) {
+        if (!n) return;
+        if (!esPrincipal) { mostrarBanner('Las notas se envían solas a Telegram al guardarlas. Solo un administrador puede reenviarlas.', 'warn'); return; }
+        if (!confirm(`¿Reenviar la nota N° ${n.numero} al grupo "Control de depósito"?`)) return;
+        try { await llamarApi({ action: 'alm_telegram_nota', numero: n.numero }); mostrarBanner(`Nota ${n.numero} reenviada a Telegram (Control de depósito).`, 'ok'); }
+        catch (e) { mostrarBanner(`No se pudo reenviar la nota ${n.numero}: ${e.message}`, 'error'); }
     }
+    const almTgReintentar = () => {};   // (antes: reintento desde este equipo; ahora lo hace Google)
     // sinPrecios: la versión para el grupo de Telegram (la ven los trabajadores): solo cantidades, sin precios ni totales en $
     function almDocumentoHTML(tipo, d, sinPrecios) {
         const logo = (document.querySelector('link[rel="icon"]') || {}).href || '';

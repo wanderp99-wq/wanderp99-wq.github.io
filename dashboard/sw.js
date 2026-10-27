@@ -1,6 +1,6 @@
 // Guarda la página y sus librerías para abrir rápido y sin internet; siempre intenta la versión nueva primero. Los datos (Apps Script) no se guardan:
 // lo que se registra sin conexión queda en la cola del equipo (COLA, IndexedDB) y se envía al volver internet.
-const CACHE = 'dashboard-202610271304';
+const CACHE = 'dashboard-202610271330';
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(['./', './manifest.webmanifest', './iconos/icon-192.png', './iconos/icon-fondo-192.png']))); self.skipWaiting(); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(k => Promise.all(k.filter(x => x !== CACHE).map(x => caches.delete(x))))); self.clients.claim(); });
 self.addEventListener('fetch', e => {
@@ -11,4 +11,9 @@ self.addEventListener('fetch', e => {
   // La página de la app siempre se pide nueva a GitHub (sin la copia que el navegador guarda hasta 10 minutos); las librerías, normal
   const pedido = u.origin === location.origin ? fetch(e.request, { cache: 'no-cache' }) : fetch(e.request);
   e.respondWith(pedido.then(r => { const c = r.clone(); caches.open(CACHE).then(x => x.put(e.request, c)); return r; }).catch(() => caches.match(e.request)));
+});
+// Aviso de pendientes: al tocarlo se abre (o se trae al frente) la app
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(l => { const c = l.find(x => 'focus' in x); return c ? c.focus() : self.clients.openWindow('./'); }));
 });
