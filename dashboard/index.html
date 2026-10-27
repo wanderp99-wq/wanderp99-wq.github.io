@@ -928,6 +928,7 @@
         .punt-extra { color: var(--primary); background: color-mix(in srgb, var(--primary) 12%, transparent); }
         .punt-ok { color: var(--ok); background: var(--ok-bg); }
         .punt-lista { display: flex; flex-wrap: wrap; gap: .25rem; }
+        .punt-toca { cursor: help; } .punt-toca.abierto { white-space: normal; }
         .hor-tarde { font-style: normal; font-size: .68rem; font-weight: 700; color: var(--bad); margin-left: .25rem; white-space: nowrap; }
         .per-dlg { width: min(640px, 100%); }
         .per-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem .9rem; margin-top: .75rem; }
@@ -3148,7 +3149,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-10-27.4';
+    const VERSION_SERVIDOR = '2026-10-27.5';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -7411,7 +7412,7 @@
                     onclick="asisMarcar('${k}')">Marcar ${t.toLowerCase()}</button>`}</div>`;
         }).join('');
         document.getElementById('asisResumen').innerHTML = r.salida
-            ? `<div class="banner ok">Jornada completa: <b>${reqN(r.horasTrabajadas, 1)} h</b> trabajadas${r.horasAlmuerzo !== '' ? ` · ${reqN(r.horasAlmuerzo, 1)} h de almuerzo` : ''}.</div>`
+            ? `<div class="banner ok">Jornada completa: <b>${horasHM(r.horasTrabajadas, asisgMinOficina(r))}</b> trabajadas${r.horasAlmuerzo !== '' ? ` · ${horasHM(r.horasAlmuerzo, minEntre(r.salidaAlmuerzo, r.regresoAlmuerzo))} de almuerzo` : ''}.</div>`
             : r.entrada ? `<div class="nota">Entrada a las ${r.entrada}${r.nota ? ` · Nota: ${esc(r.nota)}` : ''}</div>` : '';
     }
     async function asisMarcar(paso) {
@@ -7473,7 +7474,7 @@
             ${lista.map(f => `<tr class="${!f.salida && f.fecha < fechaLocalHoy() ? 'req-alerta' : ''}"><td class="izq">${diaSemana(f.fecha)} ${fechaBonita(f.fecha)}</td>
                 ${asisHist.todos ? `<td class="izq">${esc(f.persona)}</td>` : ''}
                 <td>${f.entrada || '—'}</td><td>${f.salidaAlmuerzo || '—'}</td><td>${f.regresoAlmuerzo || '—'}</td><td>${f.salida || '<span class="chip st-sobra">Sin salida</span>'}</td>
-                <td>${f.horasAlmuerzo !== '' ? reqN(f.horasAlmuerzo, 1) + ' h' : '—'}</td><td><b>${f.horasTrabajadas !== '' ? reqN(f.horasTrabajadas, 1) + ' h' : '—'}</b></td>
+                <td>${f.horasAlmuerzo !== '' ? horasHM(f.horasAlmuerzo, minEntre(f.salidaAlmuerzo, f.regresoAlmuerzo)) : '—'}</td><td><b>${f.horasTrabajadas !== '' ? horasHM(f.horasTrabajadas, asisgMinOficina(f)) : '—'}</b></td>
                 <td class="izq"><small>${esc(f.nota)}</small></td>
                 </tr>`).join('')}
             </tbody></table>` : '<div class="empty">No hay asistencia marcada en esas fechas.</div>';
@@ -7516,17 +7517,29 @@
                  extra: extra >= PUNT_MARGEN_EXTRA ? extra : 0, menos: falta > PUNT_TOLERANCIA ? falta : 0, trabajadas, esperadas: minimo };
     }
     const puntDur = n => { const h = Math.floor(n / 60), m = n % 60; return h ? `${h} h${m ? ` ${m} min` : ''}` : `${m} min`; };
-    // Mensajes cortos para mostrar: [{ tipo: 'mal' | 'extra' | 'ok', texto }]
+    // Horas trabajadas en horas y minutos ("9 h 23 min"): v en horas con decimales, o min (exacto, de la entrada y la salida) si se conoce
+    const horasHM = (v, min) => { const m = min != null ? min : Math.round((Number(v) || 0) * 60); return m > 0 ? puntDur(m) : '0 min'; };
+    const minEntre = (e, s) => { const a = puntMin(e), b = puntMin(s); if (a === null || b === null) return null; let d = b - a; if (d < 0) d += 24 * 60; return d; };
+    // Mensajes para mostrar: [{ tipo: 'mal' | 'extra' | 'ok', texto (completo), corto (la etiqueta) }]
     function puntMensajes(ev) {
         if (!ev) return [];
         const out = [];
-        if (ev.tarde) out.push({ tipo: 'mal', texto: `Llegó ${puntDur(ev.tarde)} tarde · pierde el bono de puntualidad de la semana` });
-        if (ev.salioAntes) out.push({ tipo: 'mal', texto: `Salió ${puntDur(ev.salioAntes)} antes de lo permitido` });
-        if (ev.extra) out.push({ tipo: 'extra', texto: `${puntDur(ev.extra)} de más (horas extra)` });
-        else if (ev.menos) out.push({ tipo: 'mal', texto: `Trabajó ${puntDur(ev.menos)} menos que su turno` });
-        if (!out.length) out.push({ tipo: 'ok', texto: 'A tiempo' });
+        if (ev.tarde) out.push({ tipo: 'mal', corto: `${puntDur(ev.tarde)} tarde`, texto: `Llegó ${puntDur(ev.tarde)} tarde · pierde el bono de puntualidad de la semana` });
+        if (ev.salioAntes) out.push({ tipo: 'mal', corto: `salió ${puntDur(ev.salioAntes)} antes`, texto: `Salió ${puntDur(ev.salioAntes)} antes de lo permitido` });
+        if (ev.extra) out.push({ tipo: 'extra', corto: `+${puntDur(ev.extra)}`, texto: `${puntDur(ev.extra)} de más (horas extra)` });
+        else if (ev.menos) out.push({ tipo: 'mal', corto: `−${puntDur(ev.menos)}`, texto: `Trabajó ${puntDur(ev.menos)} menos que su turno` });
+        if (!out.length) out.push({ tipo: 'ok', corto: 'A tiempo', texto: 'A tiempo' });
         return out;
     }
+    // Etiqueta corta; el texto completo sale al pasar el cursor (title) o al tocarla (cambia a completo y vuelve)
+    const puntChip = m => m.corto && m.corto !== m.texto
+        ? `<span class="punt punt-${m.tipo} punt-toca" tabindex="0" role="button" title="${esc(m.texto)}" data-corto="${esc(m.corto)}" data-largo="${esc(m.texto)}">${esc(m.corto)}</span>`
+        : `<span class="punt punt-${m.tipo}">${esc(m.texto)}</span>`;
+    document.addEventListener('click', e => {
+        const c = e.target.closest && e.target.closest('.punt-toca'); if (!c) return;
+        const largo = !c.classList.contains('abierto');
+        c.classList.toggle('abierto', largo); c.textContent = largo ? c.dataset.largo : c.dataset.corto;
+    });
 
     // ==========================================
     // RECURSOS HUMANOS · GESTIÓN DE ASISTENCIA (ver y modificar la de todos: oficina y locales)
@@ -7599,7 +7612,9 @@
         else if (asisgTab === 'horarios') out.innerHTML = asisgHorarios();
         else out.innerHTML = graf + asisgLocales();
     }
-    const asisgH = v => (v === '' || v == null ? '—' : reqN(v, 1) + ' h');
+    // Horas en "9 h 23 min" (min: los minutos exactos de la entrada y la salida, si se conocen)
+    const asisgH = (v, min) => (v === '' || v == null ? '—' : horasHM(v, min));
+    const asisgMinOficina = f => { const t = minEntre(f.entrada, f.salida); if (t === null) return null; const a = minEntre(f.salidaAlmuerzo, f.regresoAlmuerzo); return Math.max(0, t - (a || 0)); };
     // Día corrido: trabajó la mañana y vuelve en la tarde. Tiene 1 hora para comer desde que salió: la primera vuelta del día
     // no es retraso si llega dentro de esa hora más la tolerancia (las mismas reglas que el equipo de marcaje, Personal.gs)
     const PUNT_COMIDA_CORRIDO = 60;
@@ -7629,8 +7644,8 @@
     }
     const asisgPuntChipsOficina = f => { const h = asisgHorarioOficina(f.persona, f.fecha);
         if (!h) return f.entrada ? '<span class="punt punt-extra">Día libre</span>' : '';
-        return puntMensajes(asisgPuntOficina(f)).map(m => `<span class="punt punt-${m.tipo}">${esc(m.texto)}</span>`).join(''); };
-    const asisgPuntChips = f => puntMensajes(asisgPunt(f)).map(m => `<span class="punt punt-${m.tipo}">${esc(m.texto)}</span>`).join('');
+        return puntMensajes(asisgPuntOficina(f)).map(puntChip).join(''); };
+    const asisgPuntChips = f => puntMensajes(asisgPunt(f)).map(puntChip).join('');
     // Nombre como botón gris: al tocarlo se ve el historial de ese trabajador (su gráfica y sus registros)
     const asisgBotonNombre = (nombre, tab, texto, verde) => `<button type="button" class="chip ${verde ? 'st-ok' : 'st-pend'} chip-nombre" data-n="${esc(nombre)}" title="Ver el historial de ${esc(nombre)}"
         onclick="event.stopPropagation(); asisgVerPersona(this.dataset.n, '${tab}')">${esc(texto || nombre)}</button>`;
@@ -7678,7 +7693,7 @@
         dias.forEach((d, i) => {
             const x0 = mi + i * band + (band - bw) / 2, v = pd.get(d) || { of: 0, loc: 0, detalle: [] };
             const hLoc = v.loc / tope * ah, hOf = v.of / tope * ah, gap = v.loc > 0 && v.of > 0 ? 2 : 0;
-            const tit = `${DIAS_LARGOS[aFecha(d).getDay()]} ${fechaBonita(d)}: ${reqN(v.of + v.loc, 1)} h` + (v.detalle.length ? ' · ' + v.detalle.join(' · ') : ' · no trabajó');
+            const tit = `${DIAS_LARGOS[aFecha(d).getDay()]} ${fechaBonita(d)}: ${horasHM(v.of + v.loc)}` + (v.detalle.length ? ' · ' + v.detalle.join(' · ') : ' · no trabajó');
             svg += `<g class="barra-dia"><title>${esc(tit)}</title><rect x="${mi + i * band}" y="${ms}" width="${band}" height="${ah}" fill="transparent"/>`;
             // Locales abajo (base recta); oficina encima con 2px de separación. Solo el segmento de arriba lleva esquinas redondeadas.
             if (hLoc > 0) svg += `<path d="${v.of > 0 ? `M${x0},${y(0)}V${y(0) - hLoc}H${x0 + bw}V${y(0)}Z` : asisgBarra(x0, y(0) - hLoc, bw, hLoc, 4)}" fill="${ASISG_COLOR.loc}"/>`;
@@ -7693,7 +7708,7 @@
             .map(([k, t]) => `<span class="ley-item"><i style="background:${ASISG_COLOR[k]}"></i>${t}</span>`).join('');
         return `<div class="grafico-card asisg-graf">
             <div class="grafico-head"><h3>${esc(nombre)} · horas por día</h3><div class="leyenda">${leyenda}</div></div>
-            <div class="grafico-sub">${trabajados.length} día${trabajados.length === 1 ? '' : 's'} trabajado${trabajados.length === 1 ? '' : 's'} · <b>${reqN(total, 1)} h</b> en total · promedio ${trabajados.length ? reqN(total / trabajados.length, 1) : '0'} h por día trabajado</div>
+            <div class="grafico-sub">${trabajados.length} día${trabajados.length === 1 ? '' : 's'} trabajado${trabajados.length === 1 ? '' : 's'} · <b>${horasHM(total)}</b> en total · promedio ${trabajados.length ? horasHM(total / trabajados.length) : '0 min'} por día trabajado</div>
             <div class="grafico-wrap"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Horas por día de ${esc(nombre)}">${svg}</svg></div>
             <div class="nota">Pase el mouse (o toque) una barra para ver el detalle del día. <a href="#" onclick="document.getElementById('asisgBuscar').value=''; asisgPintar(); return false;">Ver todos</a></div></div>`;
     }
@@ -7705,7 +7720,7 @@
         let x = 0, svg = '';
         dias.forEach(d => {
             const v = pd.get(d), t = v ? v.of + v.loc : 0;
-            const tit = `${diaSemana(d)} ${fechaBonita(d)}: ${t ? reqN(t, 1) + ' h' : 'no trabajó'}`;
+            const tit = `${diaSemana(d)} ${fechaBonita(d)}: ${t ? horasHM(t) : 'no trabajó'}`;
             if (!t) svg += `<rect x="${x}" y="${H - 2}" width="${w}" height="2" rx="1" class="mini-vacio"><title>${tit}</title></rect>`;
             else {
                 const hl = Math.min(H, v.loc / tope * H), ho = Math.min(H - hl, v.of / tope * H);
@@ -7761,7 +7776,7 @@
             ${lista.length ? `<div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">Fecha</th><th class="izq">Trabajador</th><th>Entrada</th><th>Salida alm.</th><th>Regreso</th><th>Salida</th><th>Almuerzo</th><th>Trabajadas</th><th class="izq">Puntualidad</th><th class="izq">Nota</th><th></th></tr></thead><tbody>
             ${lista.map(f => `<tr class="${!f.salida && f.fecha < fechaLocalHoy() ? 'req-alerta' : ''}"><td class="izq">${diaSemana(f.fecha)} ${fechaBonita(f.fecha)}</td><td class="izq">${asisgBotonNombre(f.persona, 'oficina')}<small>${esc((asisgDepDe(f.persona) || {}).nombre || '')}</small></td>
                 <td>${f.entrada || '—'}</td><td>${f.salidaAlmuerzo || '—'}</td><td>${f.regresoAlmuerzo || '—'}</td><td>${f.salida || '<span class="chip st-sobra">Sin salida</span>'}</td>
-                <td>${asisgH(f.horasAlmuerzo)}</td><td><b>${asisgH(f.horasTrabajadas)}</b></td><td class="izq"><div class="punt-lista">${asisgPuntChipsOficina(f)}</div></td><td class="izq"><small>${esc(f.nota)}</small></td>
+                <td>${asisgH(f.horasAlmuerzo, minEntre(f.salidaAlmuerzo, f.regresoAlmuerzo))}</td><td><b>${asisgH(f.horasTrabajadas, asisgMinOficina(f))}</b></td><td class="izq"><div class="punt-lista">${asisgPuntChipsOficina(f)}</div></td><td class="izq"><small>${esc(f.nota)}</small></td>
                 <td><button type="button" class="btn-ghost btn-mini" onclick="asisgEditarOficina(${f.fila})">Modificar</button></td></tr>`).join('')}
             </tbody></table></div>` : '<div class="empty">No hay asistencia de oficina con estos filtros.</div>'}`;
     }
@@ -7775,7 +7790,7 @@
             ${faltan.length ? `<div class="banner warn"><b>Turnos sin asistencia registrada (${faltan.length}):</b> ${faltan.map(f => `${esc(f.tienda)} · ${esc(f.turno)} · ${fechaBonita(f.fecha)} (ficha ${esc(f.ficha)}, ${esc(f.cajero)})`).join(' — ')}</div>` : ''}
             ${lista.length ? `<div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">Fecha</th><th class="izq">Local</th><th class="izq">Turno</th><th class="izq">Trabajador</th><th>Entrada</th><th>Salida</th><th>Horas</th><th class="izq">Puntualidad</th><th class="izq">Registró</th><th>Ficha</th><th></th></tr></thead><tbody>
             ${lista.map(f => `<tr><td class="izq">${diaSemana(f.fecha)} ${fechaBonita(f.fecha)}</td><td class="izq">${esc(f.tienda)}</td><td class="izq">${esc(f.turno)}</td><td class="izq">${asisgBotonNombre(f.trabajador, 'locales')}</td>
-                <td>${f.entrada || '—'}</td><td>${f.salida || '—'}</td><td><b>${asisgH(f.horas)}</b></td><td class="izq"><div class="punt-lista">${asisgPuntChips(f)}</div></td><td class="izq"><small>${esc(f.responsable)}</small></td><td>${esc(f.ficha)}</td>
+                <td>${f.entrada || '—'}</td><td>${f.salida || '—'}</td><td><b>${f.salida ? asisgH(f.horas, minEntre(f.entrada, f.salida)) : '—'}</b></td><td class="izq"><div class="punt-lista">${asisgPuntChips(f)}</div></td><td class="izq"><small>${esc(f.responsable)}</small></td><td>${esc(f.ficha)}</td>
                 <td><button type="button" class="btn-ghost btn-mini" onclick="asisgEditarLocal(${f.fila})">Modificar</button></td></tr>`).join('')}
             </tbody></table></div>` : '<div class="empty">No hay asistencia de locales con estos filtros.</div>'}
             <div class="nota">La asistencia de los locales la registra la ficha de cada caja (BD ASISTENCIA).</div>`;
@@ -7823,7 +7838,7 @@
                        (sinAsis ? `<span class="chip st-sobra"${personas ? ' style="margin-top:.25rem"' : ''}>${personas ? 'Ficha sin asistencia' : 'Sin asistencia'}</span>` : '');
             };
             return `<div class="grafico-card hor-card">
-                <div class="grafico-head"><h3>${esc(loc)}</h3><span class="nota" style="margin:0">${regs.length} registros · ${reqN(horas, 1)} h</span></div>
+                <div class="grafico-head"><h3>${esc(loc)}</h3><span class="nota" style="margin:0">${regs.length} registros · ${horasHM(horas)}</span></div>
                 <div class="tabla-wrap"><table class="hor-tabla"><thead><tr><th class="hor-turno"></th>${dias.map(d => `<th>${DIAS_LARGOS[aFecha(d).getDay()]}<small>${fechaBonita(d)}</small></th>`).join('')}</tr></thead>
                 <tbody>${turnos.map(t => `<tr><th class="hor-turno">${nombreTurno(t)}<small>${esc(t)}</small></th>${dias.map(d => `<td>${celda(d, t)}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>`;
         }).join('');
@@ -7845,7 +7860,7 @@
                         <span>${f.entrada || '—'}–${f.salida || '…'}${ev && ev.tarde ? ' <em class="hor-tarde">tarde</em>' : ''}${ev && ev.extra ? ' <em class="hor-doble">+' + puntDur(ev.extra) + '</em>' : ''}</span></div>`; }).join('') || '<span class="hor-vacio">—</span>';
             };
             return `<div class="grafico-card hor-card">
-                <div class="grafico-head"><h3>${esc(dep.nombre)}</h3><span class="nota" style="margin:0">${regs.length} registros · ${reqN(horas, 1)} h</span></div>
+                <div class="grafico-head"><h3>${esc(dep.nombre)}</h3><span class="nota" style="margin:0">${regs.length} registros · ${horasHM(horas)}</span></div>
                 <div class="tabla-wrap"><table class="hor-tabla"><thead><tr><th class="hor-turno"></th>${dias.map(d => { const h = dep.dias[K[aFecha(d).getDay()]];
                     return `<th>${DIAS_LARGOS[aFecha(d).getDay()]}<small>${fechaBonita(d)} · ${h ? hh(h.entrada) + ' a ' + hh(h.salida) : 'libre'}</small></th>`; }).join('')}</tr></thead>
                 <tbody><tr><th class="hor-turno">Jornada<small>oficina</small></th>${dias.map(d => `<td>${celda(d)}</td>`).join('')}</tr></tbody></table></div></div>`;
@@ -7966,14 +7981,14 @@
             <h3>Modificar asistencia de local</h3>
             <div class="req-sub">${esc(f.trabajador)} · ${esc(f.tienda)} · ${esc(f.turno)} · ${diaSemana(f.fecha)} ${fechaBonita(f.fecha)} (ficha ${esc(f.ficha)})</div>
             <div class="filters" style="margin:.75rem 0"><div><label>Entrada</label><input type="time" id="asisgLE" required value="${f.entrada}"></div>
-                <div><label>Salida</label><input type="time" id="asisgLS" required value="${f.salida}"></div></div>
+                <div><label>Salida <small>(vacía si no ha terminado)</small></label><input type="time" id="asisgLS" value="${f.salida}"></div></div>
             ${asisgPie}</form>`);
     }
     async function asisgGuardarLocal(ev, fila) {
         ev.preventDefault();
         const f = asisgDatos.locales.find(x => x.fila === fila), err = document.getElementById('asisgError'), btn = document.getElementById('asisgBtnG');
         const entrada = document.getElementById('asisgLE').value, salida = document.getElementById('asisgLS').value;
-        if (!entrada || !salida) { err.textContent = 'La entrada y la salida son obligatorias.'; return; }
+        if (!entrada) { err.textContent = 'La entrada es obligatoria (la salida puede quedar vacía si no ha terminado el turno).'; return; }
         btnCargando(btn, 'Guardando...');
         try {
             const r = await llamarApi({ action: 'asisg_local_guardar', fila, fecha: f.fecha, trabajador: f.trabajador, entrada, salida, motivo: document.getElementById('asisgMotivo').value });
@@ -7997,7 +8012,7 @@
                 <div><label>Local</label><select id="asisgLL" required>${TIENDAS_ORDEN.map(t => `<option${t.nombre === local ? ' selected' : ''}>${esc(t.nombre)}</option>`).join('')}</select></div>
                 <div><label>Turno</label><select id="asisgLTu" required onchange="asisgTurnoHoras()"><option>Mañana</option><option>Tarde</option></select></div></div>
             <div class="filters" style="margin:.75rem 0"><div><label>Entrada</label><input type="time" id="asisgLE" required value="07:00"></div>
-                <div><label>Salida</label><input type="time" id="asisgLS" required value="15:00"></div></div>
+                <div><label>Salida <small>(vacía si no ha terminado)</small></label><input type="time" id="asisgLS" value="15:00"></div></div>
             ${asisgPie}</form>`);
         document.getElementById('asisgLT').focus();
     }
@@ -8014,7 +8029,7 @@
                           tienda: document.getElementById('asisgLL').value, turno: document.getElementById('asisgLTu').value,
                           entrada: document.getElementById('asisgLE').value, salida: document.getElementById('asisgLS').value, motivo: document.getElementById('asisgMotivo').value };
         if (!payload.trabajador || !payload.fecha) { err.textContent = 'Escriba el trabajador y la fecha.'; return; }
-        if (!payload.entrada || !payload.salida) { err.textContent = 'La entrada y la salida son obligatorias.'; return; }
+        if (!payload.entrada) { err.textContent = 'La entrada es obligatoria (la salida puede quedar vacía si no ha terminado el turno).'; return; }
         btnCargando(btn, 'Guardando...');
         try {
             const r = await llamarApi(payload);
@@ -12601,7 +12616,7 @@ Reglas:
         }
         const notas = CMP_TIENDAS.filter(t => lineas.some(l => Number(l.dist[t]) > 0)), alAlmacen = lineas.filter(l => l.codigo).length;
         const sinPrecio = lineas.filter(l => !(l.detal > 0) && cmpProd(l).categoria !== 'Insumos').length;
-        if (!confirm(`${alAlmacen ? alAlmacen + ' producto(s) con código entran al almacén. ' : ''}${notas.length ? 'Se emite una nota a: ' + notas.join(', ') + '.' : ''}` + (sinPrecio ? `\n${sinPrecio} producto(s) sin precio al detal: quedan "por definir precio".` : '') + '\n\n¿Guardar la compra?')) return;
+        if (!confirm(`${alAlmacen ? alAlmacen + ' producto(s) con código entran al almacén. ' : ''}${notas.length ? 'Se emite una nota a: ' + notas.join(', ') + ' (se envían solas a Telegram).' : 'No se reparte nada a las tiendas: no se emiten notas ni se envía nada a Telegram.'}` + (sinPrecio ? `\n${sinPrecio} producto(s) sin precio al detal: quedan "por definir precio".` : '') + '\n\n¿Guardar la compra?')) return;
         const btn = document.getElementById('cmpBtnGuardar'); btnCargando(btn, 'Guardando...');
         clearTimeout(cmpAvanceEspera);
         while (cmpAvanceEnviando) await new Promise(r => setTimeout(r, 200));   // que termine el guardado del avance (si no, podría volver a crearla en curso)
@@ -12612,7 +12627,7 @@ Reglas:
                                            margenMayor: l.margenMayor, mayor: l.mayor, dist: l.dist })) });
             almAplicarCambios(r.cambios);
             if (r.proximoIngreso) almDatos.proximoIngreso = r.proximoIngreso;
-            (r.notas || []).forEach(n => almEnviarTelegram(n));   // cada nota a su grupo de Telegram, igual que al facturar
+            (r.notas || []).forEach(cmpTelegramNota);   // cada nota al grupo "Control de depósito" sola, sin imprimir (el estado sale en la pantalla)
             almNotas = null; almIngresos = null; almTiendas = null; cmpCompras = null; cmpOrd = null;
             Object.assign(cmp, { paso: 'listo', resultado: r, fotos: [], borradorId: null, borradorVer: '' });
             cmpAvanceEstado = '';   // "Compras en curso" se vuelve a leer con las compras (cmpCompras = null)
@@ -12620,13 +12635,24 @@ Reglas:
             almCargar();
         } catch (e) { err.textContent = e.message; btn.disabled = false; btn.textContent = 'Guardar compra y emitir notas'; }
     }
+    // Envío de una nota de la compra a Telegram, con su estado en la pantalla (enviando / enviada / no se envió + reintentar)
+    function cmpTelegramNota(n) {
+        n._tg = 'enviando'; n._tgMsg = '';
+        const repintar = () => { if (almTab === 'compra' && cmp.paso === 'listo' && cmp.resultado && (cmp.resultado.notas || []).includes(n)) cmpPintarCompra(document.getElementById('almContenido'), true); };
+        repintar();
+        almEnviarTelegram(n, (ok, m) => { n._tg = ok ? 'ok' : 'error'; n._tgMsg = m || ''; repintar(); });
+    }
+    const cmpTelegramEstado = (n, i) => n._tg === 'ok' ? '<span class="chip st-ok">✓ Enviada a Telegram</span>'
+        : n._tg === 'error' ? `<span class="chip st-falta" title="${esc(n._tgMsg)}">No se envió a Telegram</span> <button type="button" class="btn-ghost btn-mini" onclick="cmpTelegramNota(cmp.resultado.notas[${i}])">Reintentar</button>`
+        : n._tg === 'enviando' ? '<span class="chip st-pend">Enviando a Telegram...</span>' : '';
     function cmpListoVista() {
         const r = cmp.resultado || {};
         return `<div class="grafico-card">
             <h3 style="margin-top:0;color:#3a9400">✓ Compra ${esc(r.compra || '')} guardada</h3>
             <div class="nota" style="margin-top:0">${r.ingreso ? `Entró al almacén con la operación de inventario N° ${esc(r.ingreso.numero)}. ` : ''}${(r.ordenes || []).length} orden(es) de actualización en "Precios en tiendas".${r.libro ? ` Anotada en el Libro de compras (pestaña ${esc(r.libro.hoja)}, NRO ${esc(r.libro.nro)}, ${r.libro.renglones} renglón(es)).` : ''}</div>
-            ${(r.notas || []).length ? `<h4 class="per-sub">Notas de entrega a las tiendas (se envían solas a Telegram)</h4>
-                ${(r.notas || []).map((n, i) => `<div class="cmp-marca"><span><b>N° ${esc(n.numero)}</b> · ${esc(n.cliente)} · ${n.renglones} renglón(es)</span><button type="button" class="btn-ghost btn-mini" onclick="almImprimir('nota', cmp.resultado.notas[${i}])">Imprimir</button></div>`).join('')}` : ''}
+            ${(r.notas || []).length ? `<h4 class="per-sub">Notas de entrega a las tiendas (se envían solas al grupo "Control de depósito"; imprimir es opcional)</h4>
+                ${(r.notas || []).map((n, i) => `<div class="cmp-marca"><span><b>N° ${esc(n.numero)}</b> · ${esc(n.cliente)} · ${n.renglones} renglón(es)</span><span>${cmpTelegramEstado(n, i)} <button type="button" class="btn-ghost btn-mini" onclick="almImprimir('nota', cmp.resultado.notas[${i}])">Imprimir</button></span></div>`).join('')}`
+              : '<div class="nota">No se emitieron notas de entrega: no se repartió nada a las tiendas (todo quedó en el almacén), así que no hay nada que enviar a Telegram. Para enviar a una tienda, reparta en las columnas de las tiendas antes de guardar, o facture desde "Facturar".</div>'}
             ${Object.keys(r.queda || {}).length ? `<h4 class="per-sub">Quedó en el almacén (por distribuir o facturar)</h4><div class="nota" style="margin-top:0">${Object.keys(r.queda).map(k => { const p = almProducto(k); return esc(p ? p.descripcion : k) + ': <b>' + almCant(r.queda[k], p && p.tipo) + ' ' + almUnidad(p && p.tipo) + '</b>'; }).join(' · ')}</div>` : ''}
             ${(r.errores || []).length ? `<div class="banner error">No se pudo emitir: ${r.errores.map(esc).join(' · ')}. Esa mercancía quedó en el almacén: emita la nota desde Facturar.</div>` : ''}
             <div class="req-acciones" style="margin-bottom:0">${permisos.includes('precios') ? `<button type="button" class="btn-ghost" onclick="irA('precios')">Ver precios en tiendas</button>` : ''}<button type="button" class="btn-primary" onclick="cmp.paso='foto';cmp.resultado=null;cmpPintarCompra(document.getElementById('almContenido'), true)">Nueva compra</button></div></div>`;
@@ -13174,15 +13200,17 @@ Reglas:
         } finally { fr.remove(); }
     }
     // Enviar la nota al grupo "Control de depósito Plaza Valencia" (después de que Google la guarde, en orden)
-    function almEnviarTelegram(nLocal) {
+    // alTerminar(ok, mensaje): opcional, para mostrar el estado del envío (p. ej. en la pantalla de la compra guardada)
+    function almEnviarTelegram(nLocal, alTerminar) {
         almEnSegundoPlano(async () => {
-            const n = nLocal._guardada || nLocal;
-            if (nLocal._fallo) { mostrarBanner(`La nota ${nLocal.numero} no se envió a Telegram porque no se guardó.`, 'warn'); return; }
+            const n = nLocal._guardada || nLocal, fin = (ok, m) => { if (alTerminar) try { alTerminar(ok, m); } catch (e) {} };
+            if (nLocal._fallo) { mostrarBanner(`La nota ${nLocal.numero} no se envió a Telegram porque no se guardó.`, 'warn'); fin(false, 'no se guardó'); return; }
             try {
                 const imagen = await almImagenNota(n);
                 await llamarApi({ action: 'alm_telegram_nota', numero: n.numero, imagen });
                 mostrarBanner(`Nota ${n.numero} enviada a Telegram (Control de depósito).`, 'ok');
-            } catch (e) { mostrarBanner(`La nota ${n.numero} no se pudo enviar a Telegram: ${e.message}`, 'error'); }
+                fin(true);
+            } catch (e) { mostrarBanner(`La nota ${n.numero} no se pudo enviar a Telegram: ${e.message}`, 'error'); fin(false, e.message); }
         });
     }
     // sinPrecios: la versión para el grupo de Telegram (la ven los trabajadores): solo cantidades, sin precios ni totales en $
@@ -13331,7 +13359,7 @@ Reglas:
             caja.className = 'marca-resultado ' + (r.pregunta ? '' : r.alerta ? 'alerta' : 'ok');
             caja.innerHTML = `<div class="marca-persona">${foto ? `<img src="${foto}" alt="">` : `<span class="marca-inicial">${esc(r.nombre.slice(0, 1))}</span>`}
                 <div><div class="marca-nombre">${esc(r.nombre)}</div><div class="marca-titulo">${esc(accion)}</div>
-                ${r.accion === 'salida' && r.entrada ? `<div class="marca-msj">Entró ${horaAmPm(r.entrada)} · ${reqN(r.horas, 1)} h</div>` : ''}
+                ${r.accion === 'salida' && r.entrada ? `<div class="marca-msj">Entró ${horaAmPm(r.entrada)} · ${horasHM(r.horas)}</div>` : ''}
                 ${(r.mensajes || []).map(m => `<div class="marca-msj">${esc(m)}</div>`).join('')}</div></div>`;
         }
         marcaLimpiar = setTimeout(() => { marcaResultado(null); marcaEnfocar(); }, r.pregunta ? 20000 : 12000);   // 12 s para que alcancen a leerlo
