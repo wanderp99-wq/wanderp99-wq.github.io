@@ -9624,7 +9624,7 @@
             <div class="req-acciones" style="margin-top:0">
                 <button type="button" class="btn-primary" onclick="perEditarTrabajador('')">+ Nuevo trabajador</button>
                 <button type="button" class="btn-ghost" id="perBtnImportar" onclick="perImportar()">Importar la lista de la ficha</button>
-                ${lista.some(t => t.activo) ? `<button type="button" class="btn-ghost" onclick="perImprimirCarnets([${lista.filter(t => t.activo).map(t => `'${esc(t.id)}'`).join(',')}])">Imprimir carnets (${lista.filter(t => t.activo).length})</button>` : ''}
+                ${lista.some(t => t.activo) ? `<button type="button" class="btn-ghost" onclick="perElegirCarnets([${lista.filter(t => t.activo).map(t => `'${esc(t.id)}'`).join(',')}])">Imprimir carnets…</button>` : ''}
             </div>
             ${lista.length ? `<div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">ID</th><th class="izq">Trabajador</th><th class="izq">Cargo</th><th class="izq">Perfil</th>
                 <th class="izq">Local · turno</th><th>Pago</th><th class="izq">Teléfono</th><th class="izq">Estado</th><th></th></tr></thead><tbody>
@@ -10789,7 +10789,38 @@
         if (a) v.innerHTML = `<img src="${URL.createObjectURL(a)}" alt="Foto nueva">`;
     }
 
-    // Imprime los carnets verticales (54 × 85,6 mm): cada carnet completo (anverso y reverso juntos, para doblar), 3 por hoja
+    // Antes de imprimir varios: elegir cuáles (buscar, filtrar por local, marcar todos o ninguno). Ninguno marcado al abrir.
+    let perCarIds = [], perCarSel = new Set(), perCarBus = '', perCarLocal = '';
+    function perElegirCarnets(ids) {
+        perCarIds = ids; perCarSel = new Set(); perCarBus = ''; perCarLocal = '';
+        let f = document.getElementById('perCarDlg');
+        if (!f) { f = document.createElement('div'); f.id = 'perCarDlg'; f.className = 'req-dlg-fondo'; f.onclick = e => { if (e.target === f) f.classList.add('hidden'); }; document.body.appendChild(f); }
+        f.classList.remove('hidden');
+        perCarPintar();
+        setTimeout(() => { const b = document.getElementById('perCarBus'); if (b) b.focus(); }, 50);
+    }
+    const perCarLista = () => perCarIds.map(id => perDatos.trabajadores.find(t => t.id === id)).filter(t => t && t.carnet);
+    const perCarVisibles = () => { const q = asisgClave(perCarBus); return perCarLista().filter(t => (!perCarLocal || t.local === perCarLocal) && (!q || asisgClave([t.nombre, t.id, t.cargo, t.local, t.cedula].join(' ')).includes(q))); };
+    function perCarPintar() {
+        const f = document.getElementById('perCarDlg'); if (!f || f.classList.contains('hidden')) return;
+        const todos = perCarLista(), vis = perCarVisibles(), n = perCarSel.size, hojas = Math.ceil(n / 4);
+        const locales = [...new Set(todos.map(t => t.local).filter(Boolean))].sort();
+        pintarVentana(f, `<div class="req-dlg per-dlg-ancho"><div class="prg-head"><h3>¿Qué carnets imprimir?</h3><button type="button" class="prg-x" title="Cerrar" onclick="document.getElementById('perCarDlg').classList.add('hidden')">✕</button></div>
+            <div class="req-sub">Marque los trabajadores. Salen 4 carnets por hoja (horizontal).</div>
+            <div class="filters" style="margin-bottom:.5rem"><div><label for="perCarBus">Buscar</label><input type="search" id="perCarBus" autocomplete="off" placeholder="Nombre, ID, cargo..." value="${esc(perCarBus)}" oninput="perCarBus=this.value;perCarPintar()"></div>
+                <div><label for="perCarLoc">Local o departamento</label><select id="perCarLoc" onchange="perCarLocal=this.value;perCarPintar()"><option value="">Todos</option>${locales.map(l => `<option${l === perCarLocal ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></div></div>
+            <div class="req-acciones" style="margin:.25rem 0 .5rem"><button type="button" class="btn-ghost btn-mini" onclick="perCarVisibles().forEach(t=>perCarSel.add(t.id));perCarPintar()">Marcar ${vis.length === todos.length ? 'todos' : 'los de la lista'} (${vis.length})</button>
+                <button type="button" class="btn-ghost btn-mini" onclick="perCarSel=new Set();perCarPintar()" ${n ? '' : 'disabled'}>Desmarcar todos</button></div>
+            <div class="tabla-wrap" style="max-height:min(50vh,420px);overflow:auto"><table class="req-tabla" data-sin-paginar><tbody>
+                ${vis.map(t => `<tr class="${perCarSel.has(t.id) ? 'nom-sel' : ''}"><td class="nom-col-check"><input type="checkbox" id="perCar_${esc(t.id)}" ${perCarSel.has(t.id) ? 'checked' : ''} onchange="if(this.checked)perCarSel.add('${esc(t.id)}');else perCarSel.delete('${esc(t.id)}');perCarPintar()"></td>
+                    <td class="izq"><label for="perCar_${esc(t.id)}" style="cursor:pointer"><b>${esc(t.nombre)}</b><small>${esc(t.id)}${t.cargo ? ' · ' + esc(t.cargo) : ''}${t.local ? ' · ' + esc(t.local) : ''}</small></label></td>
+                    <td>${t.foto ? '<small>con foto</small>' : '<small style="color:var(--amar-txt)">sin foto</small>'}</td></tr>`).join('') || '<tr><td class="izq nota" colspan="3">Nadie coincide con la búsqueda.</td></tr>'}
+            </tbody></table></div>
+            <div class="req-acciones" style="justify-content:flex-end;align-items:center;margin-bottom:0"><span class="nota" style="margin:0 auto 0 0">${n ? `${n} carnet(s) · ${hojas} hoja(s)` : 'Ninguno marcado'}</span>
+                <button type="button" class="btn-ghost" onclick="document.getElementById('perCarDlg').classList.add('hidden')">Cancelar</button>
+                <button type="button" class="btn-primary" ${n ? '' : 'disabled'} onclick="document.getElementById('perCarDlg').classList.add('hidden');perImprimirCarnets(perCarLista().filter(t=>perCarSel.has(t.id)).map(t=>t.id))">Imprimir ${n || ''}</button></div></div>`);
+    }
+    // Imprime los carnets verticales (54 × 85,6 mm): cada carnet completo (anverso y reverso juntos, para doblar), 4 por hoja horizontal
     async function perImprimirCarnets(ids) {
         const lista = ids.map(id => perDatos.trabajadores.find(t => t.id === id)).filter(t => t && t.carnet);
         if (!lista.length) { mostrarBanner('No hay carnets para imprimir.', 'warn'); return; }
@@ -10822,12 +10853,12 @@
             <div class="frase">Recuerda siempre sonreír</div>
             <div class="pie"></div></div>`;
         const estilos = `*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}body{margin:0;font-family:Arial,sans-serif;color:#0f172a;background:#fff}
-            @page{size:letter;margin:6mm}
-            .hoja{display:grid;grid-template-columns:repeat(3,54mm);grid-template-rows:repeat(3,85.6mm);gap:4mm 6mm;justify-content:center;break-after:page;page-break-after:always}
-            .hoja:last-child{break-after:auto;page-break-after:auto}
-            .individual{display:flex;justify-content:center;align-items:stretch;margin-top:6mm}.individual .carnet{border-radius:0}
-            .hoja-tres{display:flex;flex-direction:column;align-items:center;gap:3mm;break-after:page;page-break-after:always}
-            .hoja-tres:last-child{break-after:auto;page-break-after:auto}.hoja-tres .individual{margin-top:0;break-inside:avoid}
+            /* Hoja horizontal (carta o A4, la que tenga la impresora) con márgenes holgados: 4 carnets completos (2 × 2), cada uno de 108 × 85,6 mm.
+               Ocupa 228 × 180 mm: cabe con margen de sobra aunque la impresora no imprima en los bordes (antes 3 por hoja vertical se cortaban). */
+            @page{size:landscape;margin:10mm}
+            .individual{display:flex;justify-content:center;align-items:stretch;margin-top:6mm;break-inside:avoid;page-break-inside:avoid}.individual .carnet{border-radius:0}
+            .hoja-cuatro{display:grid;grid-template-columns:repeat(2,109mm);grid-auto-rows:86mm;gap:8mm 10mm;justify-content:center;align-content:start;break-after:page;page-break-after:always}
+            .hoja-cuatro:last-child{break-after:auto;page-break-after:auto}.hoja-cuatro .individual{margin-top:0}
             .individual .frente{border-radius:3mm 0 0 3mm;border-right:0}.individual .dorso{border-radius:0 3mm 3mm 0;border-left:0}
             .doblez{width:0;border-left:.35mm dashed #94a3b8;position:relative;z-index:2}
             .ayuda{font-size:13px;color:#475569;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;padding:8px 12px;margin:10px auto 14px;max-width:180mm}
@@ -10858,15 +10889,16 @@
             .barras{width:52mm;margin:0 -2mm}.barras svg{width:100%;height:13mm;display:block}
             .barras .num{display:none}   /* sin los números debajo del código de barras */
             .frase{text-align:center;font-size:9pt;font-weight:700;font-style:italic;color:#FF4000}`;
-        // Cada carnet completo: anverso y reverso juntos (se recorta, se dobla por la línea y queda de dos caras). 3 por hoja carta.
+        // Cada carnet completo: anverso y reverso juntos (se recorta, se dobla por la línea y queda de dos caras). 4 por hoja horizontal.
         const completo = t => `<div class="individual">${anverso(t, 0).replace(/style="grid-row:[^"]*"/, '')}<div class="doblez"></div>${reverso(t, 0).replace(/style="grid-row:[^"]*"/, '')}</div>`;
-        const individual = lista.length === 1, hojas = [];
+        const individual = lista.length === 1, hojas = [], POR_HOJA = 4, nHojas = Math.ceil(lista.length / POR_HOJA);
         if (individual) hojas.push(`<div class="titulo-hoja">Carnet de ${esc(lista[0].nombre)}</div>${completo(lista[0])}`);
-        else for (let i = 0; i < lista.length; i += 3)
-            hojas.push(`<div class="titulo-hoja">Hoja ${i / 3 + 1} de ${Math.ceil(lista.length / 3)}</div><div class="hoja-tres">${lista.slice(i, i + 3).map(completo).join('')}</div>`);
+        else for (let i = 0; i < lista.length; i += POR_HOJA)
+            hojas.push(`<div class="titulo-hoja">Hoja ${i / POR_HOJA + 1} de ${nHojas}</div><div class="hoja-cuatro">${lista.slice(i, i + POR_HOJA).map(completo).join('')}</div>`);
+        const comoImprimir = 'En la ventana de impresión: <b>orientación horizontal</b>, márgenes <b>predeterminados</b> y escala <b>100 %</b> (no "Ajustar a la página"), a una sola cara.';
         w.document.open();
         w.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Carnets</title><style>${estilos}</style></head><body>
-            ${individual ? '<div class="ayuda"><b>Un solo carnet:</b> el anverso y el reverso salen juntos en esta hoja. Recorte por el contorno de los dos, doble por la línea punteada del medio (las caras quedan hacia afuera) y péguelo o plastifíquelo.</div>' : `<div class="ayuda"><b>3 carnets completos por hoja</b> (${lista.length} carnets, ${Math.ceil(lista.length / 3)} hoja${lista.length > 3 ? 's' : ''}). Imprima a una sola cara en tamaño carta, escala 100 %. Recorte cada carnet por su contorno, doble por la línea punteada del medio (las caras quedan hacia afuera) y péguelo o plastifíquelo.</div>`}
+            ${individual ? `<div class="ayuda"><b>Un solo carnet:</b> el anverso y el reverso salen juntos en esta hoja. ${comoImprimir} Recorte por el contorno de los dos, doble por la línea punteada del medio (las caras quedan hacia afuera) y péguelo o plastifíquelo.</div>` : `<div class="ayuda"><b>4 carnets completos por hoja</b> (${lista.length} carnets, ${nHojas} hoja${nHojas > 1 ? 's' : ''}). ${comoImprimir} Recorte cada carnet por su contorno, doble por la línea punteada del medio (las caras quedan hacia afuera) y péguelo o plastifíquelo.</div>`}
             ${hojas.join('')}
             <script>window.onload=function(){setTimeout(function(){window.print()},600)}<\/script></body></html>`);        w.document.close();
     }
