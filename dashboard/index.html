@@ -2964,7 +2964,7 @@
         if (TIEMPOS.length > 60) TIEMPOS.pop();
     }
     // Solo lectura: si la respuesta de Google no llega, se reintenta una vez sola (no cambia nada en la hoja)
-    const SOLO_LECTURA = /^(login|list|cuadre_detalle|cuadre_detalle_lote|mov_listar|cuentas_listar|conc_listar|efe_listar|cc_listar|req_datos|req_ventas|req_historial|asis_hoy|asis_listar|asisg_listar|per_listar|cxc_deudas|nom_historial|nom_autorizar|hor_datos|alm_datos|alm_notas|alm_ingresos|alm_kardex|alm_tiendas|alm_existencias|cmp_compras|cmp_ordenes|cmp_enlazar|pnom_listar|ping|cambios|enlinea|marca_estado)$/;
+    const SOLO_LECTURA = /^(login|list|cuadre_detalle|cuadre_detalle_lote|mov_listar|cuentas_listar|conc_listar|efe_listar|cc_listar|req_datos|req_ventas|req_historial|asis_hoy|asis_listar|asisg_listar|per_listar|cxc_deudas|nom_historial|nom_autorizar|nom_ajustes|hor_datos|alm_datos|alm_notas|alm_ingresos|alm_kardex|alm_tiendas|alm_existencias|cmp_compras|cmp_ordenes|cmp_enlazar|pnom_listar|ping|cambios|enlinea|marca_estado)$/;
     // Guardados sin repetir: cada cambio lleva un "idem". Si no llegó la respuesta y se vuelve a pulsar el MISMO cambio,
     // se manda el mismo idem y Google responde "ya estaba registrado" en vez de guardarlo otra vez.
     const idemPendientes = new Map();   // contenido del cambio -> idem del intento sin respuesta
@@ -3137,7 +3137,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-10-25.2';
+    const VERSION_SERVIDOR = '2026-10-26.1';
     let scriptViejo = false, servidorVersion = null;
     function avisarScriptViejo() {
         if (scriptViejo || servidorVersion !== VERSION_SERVIDOR) mostrarBanner('El script publicado en Google es una versión anterior a este panel' + (servidorVersion ? ' (' + servidorVersion + ')' : '') + ': ' +
@@ -3229,7 +3229,8 @@
             const lab = inp.id ? document.querySelector(`label[for="${inp.id}"]`) : null, padre = inp.closest('label');
             if (!/clave de administrador/i.test([inp.placeholder, lab && lab.textContent, padre && padre.textContent].join(' '))) return;
             inp.dataset.claveAuto = '1'; inp.value = clave; inp.dispatchEvent(new Event('input', { bubbles: true }));
-            const caja = inp.parentElement && inp.parentElement.tagName === 'DIV' && inp.parentElement.querySelectorAll('input,select,textarea').length === 1 ? inp.parentElement : null;
+            // La caja del campo se esconde solo si no tiene nada más (p. ej. la fila de botones de Nómina tiene el campo y "Cerrar")
+            const caja = inp.parentElement && inp.parentElement.tagName === 'DIV' && inp.parentElement.querySelectorAll('input,select,textarea,button,a').length === 1 ? inp.parentElement : null;
             [padre, lab, caja, inp].forEach(el => { if (el) { el.dataset.claveOculta = '1'; el.style.display = 'none'; } });
         });
     }
@@ -8102,18 +8103,51 @@
     // ==========================================
     let nomSemana = '', nomDatos = null, nomCargando = false, nomLugar = '', nomAbierto = '', nomClave = '', nomHist = null;
     const r2 = n => Math.round((Number(n) || 0) * 100) / 100;
-    // Ajustes de la semana hasta cerrarla (tarifa de hora extra, bono adicional, turnos extra, deudas excluidas, sin productividad).
-    // Se recuerdan en este equipo; al cerrar quedan guardados en BD PAGOS NOMINA.
+    // Ajustes de la semana hasta cerrarla (tarifa de hora extra, bono adicional, turnos extra, gastos excluidos o incluidos, bonos quitados o autorizados).
+    // Se guardan en Google (BD NOMINA AJUSTES · nom_ajuste_guardar): los ve cualquier equipo o persona del departamento. Este equipo guarda
+    // una copia para mostrarlos al instante; al cerrar quedan en BD PAGOS NOMINA.
     const nomAj = {};
-    function nomAjSemana() {
-        if (!nomAj[nomSemana]) { let g = {}; try { g = JSON.parse(localStorage.getItem('nom_aj_' + nomSemana) || '{}') || {}; } catch (e) {} nomAj[nomSemana] = g; }
-        return nomAj[nomSemana];
+    function nomAjSemana(sem = nomSemana) {
+        if (!nomAj[sem]) { let g = {}; try { g = JSON.parse(localStorage.getItem('nom_aj_' + sem) || '{}') || {}; } catch (e) {} nomAj[sem] = g; }
+        return nomAj[sem];
     }
     const nomAjDe = id => nomAjSemana()[id] || {};
+    const nomAjCopia = sem => { try { localStorage.setItem('nom_aj_' + sem, JSON.stringify(nomAj[sem] || {})); } catch (e) {} };
     function nomAjustar(id, cambios, repintar = true) {
         const s = nomAjSemana(); s[id] = Object.assign({}, s[id], cambios);
-        try { localStorage.setItem('nom_aj_' + nomSemana, JSON.stringify(s)); } catch (e) {}
+        nomAjCopia(nomSemana);
+        nomAjEnviar(nomSemana, id);
         if (repintar) { nomPintarDlg(); if (perTab === 'semanal') perPintar(); }
+    }
+    // Envío a Google: espera a que se deje de escribir (motivo, tarifa, monto) y manda el ajuste completo de ese trabajador
+    const nomAjEspera = {}, nomAjEnviando = {};
+    function nomAjEnviar(sem, id) {
+        const k = sem + '|' + id;
+        clearTimeout(nomAjEspera[k]);
+        nomAjEspera[k] = setTimeout(async () => {
+            delete nomAjEspera[k];
+            if (nomAjEnviando[k]) { nomAjEnviar(sem, id); return; }   // uno a la vez: el siguiente sale cuando responda el anterior
+            nomAjEnviando[k] = true;
+            try { await llamarApi({ action: 'nom_ajuste_guardar', semana: sem, id, ajustes: nomAjSemana(sem)[id] || {} }); }
+            catch (e) { if (!e.enCola) mostrarBanner('No se pudo guardar el ajuste de nómina en Google: ' + e.message + '. Quedó en este equipo; vuelva a intentarlo.', 'error'); }
+            finally { delete nomAjEnviando[k]; }
+        }, 700);
+    }
+    // Al leer la semana: lo guardado en Google manda (salvo lo que este equipo está por enviar). Lo que solo estaba en este equipo
+    // (ajustes hechos antes de guardarse en Google) se sube una vez.
+    // Se usa una sola vez por lectura (d.ajustes), para no pisar con datos viejos lo que se cambió después.
+    function nomAjUsar(d) {
+        if (!d || !d.ajustes || d.ajUsados) return;   // script anterior sin nom_ajustes: se sigue con la copia de este equipo
+        d.ajUsados = true;
+        const sem = d.semana, delServidor = d.ajustes, local = nomAjSemana(sem), cerrados = new Set((d.cerradas || []).map(c => c.trabajadorId));
+        const final = Object.assign({}, delServidor);
+        Object.keys(local).forEach(id => {
+            const pendiente = nomAjEspera[sem + '|' + id] || nomAjEnviando[sem + '|' + id];
+            if (pendiente) final[id] = local[id];
+            else if (!(id in delServidor) && Object.keys(local[id] || {}).length && !cerrados.has(id)) { final[id] = local[id]; nomAjEnviar(sem, id); }
+        });
+        nomAj[sem] = final;
+        nomAjCopia(sem);
     }
     function nomMoverSemana(dias) { nomSemana = sumarDias(nomSemana, dias); nomDatos = null; perPintar(); }
     function nomElegirLugar(v) { nomLugar = v; perPintar(); }
@@ -8121,13 +8155,14 @@
     const nomCache = {};
     function nomTraer(sem) {
         if (!nomCache[sem]) nomCache[sem] = (async () => {
-            const [asis, deu, cer, hor] = await Promise.all([llamarApi({ action: 'asisg_listar', desde: sem, hasta: sumarDias(sem, 6) }), llamarApi({ action: 'cxc_deudas' }),
+            const [asis, deu, cer, hor, aju] = await Promise.all([llamarApi({ action: 'asisg_listar', desde: sem, hasta: sumarDias(sem, 6) }), llamarApi({ action: 'cxc_deudas' }),
                                                         llamarApi({ action: 'nom_historial', desde: sem, hasta: sem }),
-                                                        llamarApi({ action: 'hor_datos', semana: sem }).catch(() => ({ horarios: [] }))]);   // el horario guardado de la semana (si hay)
+                                                        llamarApi({ action: 'hor_datos', semana: sem }).catch(() => ({ horarios: [] })),   // el horario guardado de la semana (si hay)
+                                                        llamarApi({ action: 'nom_ajustes', semana: sem }).catch(() => ({ ajustes: null }))]);   // bonos, extras y gastos excluidos guardados
             if (Array.isArray(asis.horarios) && asis.horarios.length) PUNT_HORARIOS = asis.horarios;
             if (asis.toleranciaMin) PUNT_TOLERANCIA = Number(asis.toleranciaMin) || 5;
             return { semana: sem, locales: asis.locales || [], oficina: asis.oficina || [], departamentos: asis.departamentos || [], deptoDe: asis.deptoDe || {},
-                     deudas: deu.deudas || [], cerradas: cer.pagos || [], horario: hor.horarios || [] };
+                     deudas: deu.deudas || [], cerradas: cer.pagos || [], horario: hor.horarios || [], ajustes: aju.ajustes || null, leido: Date.now() };
         })().catch(e => { delete nomCache[sem]; throw e; });   // si falla, se vuelve a intentar al entrar
         return nomCache[sem];
     }
@@ -8136,6 +8171,9 @@
         nomCargando = true;
         try {
             const d = await nomTraer(sem);
+            if (d.ajustes && !d.ajUsados && Date.now() - d.leido > 30000)   // precargada hace rato: los ajustes pudo cambiarlos otra persona
+                try { d.ajustes = (await llamarApi({ action: 'nom_ajustes', semana: sem })).ajustes || d.ajustes; } catch (e) {}
+            nomAjUsar(d);
             if (sem === nomSemana) nomDatos = d;   // si se cambió de semana mientras tanto, al repintar se carga la nueva
         } catch (e) { if (sem === nomSemana) nomDatos = { semana: sem, error: e.message }; }
         finally { nomCargando = false; }
@@ -8199,7 +8237,10 @@
         // Gastos: todo lo que debe (menos los gastos de tienda). Los excluidos quedan pendientes en Cuentas por cobrar.
         const deudas = d.deudas.filter(y => y.estado !== 'pagado' && y.tipoPersona !== 'Gasto de tienda' && (y.id === t.id || asisgClave(y.nombre) === k))
             .sort((a, b) => a.fecha.localeCompare(b.fecha) || a.ref.localeCompare(b.ref));
-        const excl = new Set(aj.excluir || []);
+        // Los gastos de después del viernes de esta semana salen excluidos solos (son de la nómina siguiente), salvo que se incluyan a mano
+        const fin = sumarDias(nomSemana, 6), incl = new Set(aj.incluir || []);
+        const posterior = new Set(deudas.filter(y => y.fecha > fin).map(y => y.ref));
+        const excl = new Set((aj.excluir || []).concat([...posterior].filter(r => !incl.has(r))));
         const aDebitar = r2(deudas.filter(y => !excl.has(y.ref)).reduce((s, y) => s + y.usd, 0));
         const descontar = r2(Math.min(aDebitar, generado));
         const cerrada = d.cerradas.find(c => c.trabajadorId === t.id || asisgClave(c.trabajador) === k) || null;
@@ -8208,7 +8249,7 @@
         if (horasExtra > 0 && tarifa === null && aj.pagarExtra) avisos.push('falta la tarifa de hora extra');
         if (bono > 0 && !String(aj.motivoBono || '').trim()) avisos.push('falta el motivo del bono');
         if (filas.some(f => f.sinSalida)) avisos.push('turno sin salida');
-        return { t, p, aj, filas, normales, extras, horasExtra, minPasados, tarde, x, tarifa, pagoExtra, bono, generado, deudas, excl, aDebitar, descontar, puntPerdido, prodPerdido,
+        return { t, p, aj, filas, normales, extras, horasExtra, minPasados, tarde, x, tarifa, pagoExtra, bono, generado, deudas, excl, posterior, aDebitar, descontar, puntPerdido, prodPerdido,
                  neto: r2(generado - descontar), cerrada, avisos };
     }
     // Trabajadores de la semana: los activos y los inactivos que trabajaron o cobraron esa semana
@@ -8319,6 +8360,13 @@
     // en el centro los gastos y abajo el resumen. Cerrada: muestra lo que quedó guardado.
     let nomPidioTasa = false;
     const nomSigla = l => { const p = String(l || '').trim().split(/\s+/); return (p.length > 1 ? p.map(x => x[0]).join('') : p[0].slice(0, 2)).toUpperCase(); };
+    // Excluir (o no) un gasto de esta nómina. Los de después de la semana ya salen excluidos: para ellos se guarda "incluir"
+    function nomExcluir(id, ref, excluir, posterior) {
+        const a = nomAjDe(id), ex = (a.excluir || []).filter(r => r !== ref), inc = (a.incluir || []).filter(r => r !== ref);
+        if (excluir && !posterior) ex.push(ref);
+        if (!excluir && posterior) inc.push(ref);
+        nomAjustar(id, { excluir: ex, incluir: inc });
+    }
     function nomDiaToggle(id, claves, extra) {
         const ex = Object.assign({}, nomAjDe(id).extra);
         claves.split(',').forEach(k => { ex[k] = extra; });
@@ -8489,8 +8537,8 @@
         } else {
             gastos = n.deudas.length ? `<table class="nom-gas"><thead><tr><th>Monto $</th><th>Fecha</th><th class="izq">Descripción</th><th title="No descontarlo en esta nómina: queda pendiente en Cuentas por cobrar">Excluir</th></tr></thead><tbody>
                 ${n.deudas.map(y => `<tr class="${n.excl.has(y.ref) ? 'nom-excl' : ''}"><td>${perUsd(y.usd)}</td><td>${fechaBonita(y.fecha).slice(0, 5)}</td>
-                    <td class="izq">${esc([y.local ? nomSigla(y.local) : '', y.tipo === 'DEUDA' ? '' : y.tipo, y.descripcion].filter(Boolean).join(' · '))}${y.abonado ? `<small>ya abonó ${perUsd(y.abonado)}</small>` : ''}</td>
-                    <td><label class="interruptor interruptor-solo" title="Excluir de esta nómina (queda pendiente en Cuentas por cobrar)"><input type="checkbox" ${n.excl.has(y.ref) ? 'checked' : ''} onchange="nomAjustar('${id}', { excluir: this.checked ? [...new Set((nomAjDe('${id}').excluir || []).concat('${y.ref}'))] : (nomAjDe('${id}').excluir || []).filter(r => r !== '${y.ref}') })"><span class="sw-pista"></span></label></td></tr>`).join('')}
+                    <td class="izq">${esc([y.local ? nomSigla(y.local) : '', y.tipo === 'DEUDA' ? '' : y.tipo, y.descripcion].filter(Boolean).join(' · '))}${y.abonado ? `<small>ya abonó ${perUsd(y.abonado)}</small>` : ''}${n.posterior.has(y.ref) ? `<small>${n.excl.has(y.ref) ? 'de después de esta semana: excluido solo' : 'de después de esta semana: incluido a mano'}</small>` : ''}</td>
+                    <td><label class="interruptor interruptor-solo" title="Excluir de esta nómina (queda pendiente en Cuentas por cobrar)"><input type="checkbox" ${n.excl.has(y.ref) ? 'checked' : ''} onchange="nomExcluir('${id}', '${esc(y.ref)}', this.checked, ${n.posterior.has(y.ref)})"><span class="sw-pista"></span></label></td></tr>`).join('')}
                 </tbody><tfoot><tr><td class="nom-rojo">${perUsd(n.aDebitar)}</td><td colspan="3" class="izq">TOTAL${n.excl.size ? ` · ${n.excl.size} excluido(s), quedan pendientes` : ''}</td></tr></tfoot></table>`
                 : '<div class="empty">No debe nada.</div>';
         }
