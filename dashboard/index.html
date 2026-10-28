@@ -1167,6 +1167,8 @@
         .cmp-tabla input { padding: .35rem .4rem; font-size: .88rem; }
         .cmp-tabla .cmp-cod { width: 92px; } .cmp-tabla .cmp-n { width: 74px; text-align: right; } .cmp-tabla .cmp-p { width: 58px; text-align: right; } .cmp-tabla .cmp-d { width: 58px; text-align: right; }
         .cmp-tabla small { display: block; color: var(--text-muted); font-size: .74rem; line-height: 1.25; max-width: 230px; text-align: left; }
+        .cmp-tabla small.cmp-ant { white-space: nowrap; text-align: right; margin-top: 2px; }
+        .cmp-tabla .cmp-ant .sube { color: var(--danger); font-weight: 600; } .cmp-tabla .cmp-ant .baja { color: #16a34a; font-weight: 600; }
         .cmp-regla { color: #3a9400; }
         .cmp-tabla .cmp-mal input.cmp-cod { border-color: var(--danger); }
         .cmp-tabla th.cmp-t, .cmp-tabla td.cmp-t { background: var(--list-bg); }
@@ -3019,7 +3021,9 @@
     async function llamarApiPedido(payload) {
         const t0 = performance.now();
         let llaveIdem = '';
-        if (!SOLO_LECTURA.test(payload.action)) {
+        // Leer la factura no guarda nada: sin idem (si no, pulsar Leer otra vez mientras Google seguía con el primero daba "todavía se está guardando").
+        // La imagen de una nota para Telegram tampoco: Google la acepta una sola vez por nota.
+        if (!SOLO_LECTURA.test(payload.action) && !/^(cmp_leer|alm_tg_imagen)$/.test(payload.action)) {
             llaveIdem = JSON.stringify(payload);
             payload = Object.assign({}, payload, { idem: idemPendientes.get(llaveIdem) || nuevoIdem() });
         }
@@ -3177,7 +3181,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-10-29.2';
+    const VERSION_SERVIDOR = '2026-10-29.5';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -3474,6 +3478,7 @@
     function abrirArea(id) {
         if (id !== areaActual) { recordarVista(); ANIM.pantalla(document.getElementById('vistaMenu'), !id); }   // submenú: entra desde la derecha (o desde la izquierda al salir)
         areaActual = id; renderMenu(); pintarAtras(); window.scrollTo(0, 0);
+        atrasArmar();   // dentro de un área, el atrás del teléfono vuelve a las áreas (antes salía de la aplicación)
     }
 
     function renderMenu() {
@@ -3595,15 +3600,31 @@
     // Botón atrás del teléfono (Android) o del navegador = "← Atrás" del panel (igual que Esc: si hay una ventana abierta, solo la cierra).
     // Se deja una entrada "de guardia" en el historial del navegador; al pulsar atrás se consume, se hace el Atrás del panel y se vuelve a poner.
     // En Inicio, sin nada abierto, la primera vez avisa y la segunda sale de la aplicación.
+    // Chrome en Android salta las entradas del historial que la página puso sin que la persona tocara la pantalla: la guardia que se
+    // vuelve a poner justo después de pulsar atrás puede quedar "saltable" (el siguiente atrás se la pasaba y la aplicación se recargaba
+    // en Inicio o se cerraba). Por eso, después de cada atrás, al siguiente toque se pone una guardia nueva (con el toque sí cuenta).
+    let atrasPendiente = false, atrasAvisoEn = 0;
     function atrasArmar() {
         if (!clave || vistaActual === 'login' || vistaActual === 'marcaje') return;
         try { if (!(history.state && history.state.panelAtras)) history.pushState({ panelAtras: 1 }, ''); } catch (e) {}
     }
+    ['pointerdown', 'keydown'].forEach(tipo => document.addEventListener(tipo, e => {
+        if (!e.isTrusted || !atrasPendiente || !clave || vistaActual === 'login' || vistaActual === 'marcaje') return;
+        atrasPendiente = false;
+        try { history.pushState({ panelAtras: 2 }, ''); } catch (e) {}
+    }, true));
     window.addEventListener('popstate', () => {
         if (!clave || vistaActual === 'login' || vistaActual === 'marcaje') return;
+        atrasPendiente = true;
         const visible = el => el && !el.classList.contains('hidden') && el.getClientRects().length > 0;
         const abierto = [...document.querySelectorAll('.req-dlg-fondo, .efe-modal, #perDlg, [role="dialog"]')].some(visible) || document.querySelector('.ms.abierto');
-        if (!abierto && vistaActual === 'menu' && !areaActual && !historialVistas.length) { mostrarBanner('Pulse atrás otra vez para salir.', 'ok'); return; }
+        if (!abierto && vistaActual === 'menu' && !areaActual && !historialVistas.length) {
+            if (Date.now() - atrasAvisoEn > 1500) mostrarBanner('Pulse atrás otra vez para salir.', 'ok');
+            atrasAvisoEn = Date.now();
+            // Si debajo quedó otra guardia, se baja hasta la entrada de la página: el siguiente atrás sí sale
+            if (history.state && history.state.panelAtras) { atrasPendiente = false; history.back(); }
+            return;
+        }
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
         atrasArmar();
     });
@@ -3694,7 +3715,7 @@
             if (!document.getElementById('asisgDesde').value) {   // el mismo período con que abre el módulo (la semana actual)
                 const hoy = fechaLocalHoy();
                 document.getElementById('asisgDesde').value = inicioSemana(hoy);
-                document.getElementById('asisgHasta').value = hoy;
+                document.getElementById('asisgHasta').value = hoy; asisgAutoHasta = hoy;
                 document.getElementById('asisgLocal').insertAdjacentHTML('beforeend', TIENDAS_ORDEN.map(t => `<option>${t.nombre}</option>`).join(''));
             }
             const desde = document.getElementById('asisgDesde').value, hasta = document.getElementById('asisgHasta').value;
@@ -3702,6 +3723,7 @@
             const r = await llamarApi({ action: 'asisg_listar', desde, hasta });
             asisgDatos = { desde, hasta, oficina: r.oficina || [], locales: r.locales || [], faltantes: r.faltantes || [], departamentos: r.departamentos || [], deptoDe: r.deptoDe || {} };
             if (Array.isArray(r.horarios) && r.horarios.length) PUNT_HORARIOS = r.horarios;
+            if (r.propios) PUNT_PROPIOS = r.propios;
             if (r.toleranciaMin) PUNT_TOLERANCIA = Number(r.toleranciaMin) || 5;
             const nombres = [...new Set(asisgDatos.oficina.map(x => x.persona).concat(asisgDatos.locales.map(x => x.trabajador)))].sort();
             document.getElementById('asisgNombres').innerHTML = nombres.map(n => `<option value="${esc(n)}">`).join('');
@@ -7623,8 +7645,12 @@
     let PUNT_HORARIOS = PUNT_HORARIOS_RESPALDO;
     const puntSinTildes = t => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
     const puntMin = h => { const x = /^(\d{1,2}):(\d{2})/.exec(h || ''); return x ? +x[1] * 60 + +x[2] : null; };
-    // Horario que le toca a ese local, turno y fecha (el domingo en la tarde cierra a las 9:30 PM)
-    function puntHorario(local, turno, fecha) {
+    // Horario propio de algunos trabajadores (el de su perfil, p. ej. PCP de 5 a 9 PM): { 'NOMBRE EN MAYÚSCULAS': { entrada, salida, salidaPermitida } }
+    let PUNT_PROPIOS = {};
+    // Horario que le toca a ese local, turno y fecha (el domingo en la tarde cierra a las 9:30 PM); con persona, primero su horario propio
+    function puntHorario(local, turno, fecha, persona) {
+        const propio = persona && PUNT_PROPIOS[asisgClave(persona)];
+        if (propio) return propio;
         const fila = PUNT_HORARIOS.find(h => puntSinTildes(h.local) === puntSinTildes(local));
         if (!fila) return null;
         const t = puntSinTildes(turno);
@@ -7676,12 +7702,18 @@
     let asisgDatos = null, asisgTab = 'resumen';
     const asisgClave = t => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
 
+    // "Hasta" que puso el panel solo (hoy, al abrir). Si la app quedó abierta y cambió el día, al entrar se mueve a la semana de hoy;
+    // si la persona eligió otras fechas, se respetan.
+    let asisgAutoHasta = '';
     async function asisgIniciar() {
+        const hoy = fechaLocalHoy();
         if (!document.getElementById('asisgDesde').value) {
-            const hoy = fechaLocalHoy();
             document.getElementById('asisgDesde').value = inicioSemana(hoy);
-            document.getElementById('asisgHasta').value = hoy;
+            document.getElementById('asisgHasta').value = hoy; asisgAutoHasta = hoy;
             document.getElementById('asisgLocal').insertAdjacentHTML('beforeend', TIENDAS_ORDEN.map(t => `<option>${t.nombre}</option>`).join(''));
+        } else if (asisgAutoHasta && asisgAutoHasta !== hoy && document.getElementById('asisgHasta').value === asisgAutoHasta) {
+            document.getElementById('asisgDesde').value = inicioSemana(hoy);
+            document.getElementById('asisgHasta').value = hoy; asisgAutoHasta = hoy;
         }
         asisgModo(asisgTab);
         await asisgCargar();
@@ -7716,6 +7748,7 @@
             if (pedido !== asisgPedido) return;   // llegó tarde: ya se pidió otro período
             asisgDatos = { desde, hasta, oficina: r.oficina || [], locales: r.locales || [], faltantes: r.faltantes || [], departamentos: r.departamentos || [], deptoDe: r.deptoDe || {} };
             if (Array.isArray(r.horarios) && r.horarios.length) PUNT_HORARIOS = r.horarios;
+            if (r.propios) PUNT_PROPIOS = r.propios;
             if (r.toleranciaMin) PUNT_TOLERANCIA = Number(r.toleranciaMin) || 5;
             const sel = document.getElementById('asisgLocal');
             asisgDatos.departamentos.forEach(dp => { if (![...sel.options].some(o => o.value === dp.nombre)) sel.insertAdjacentHTML('beforeend', `<option>${esc(dp.nombre)}</option>`); });
@@ -7753,11 +7786,11 @@
         const man = filas.find(x => mismo(x) && /^ma/i.test(x.turno || '') && x.salida);
         const primera = filas.filter(x => mismo(x) && /^tar/i.test(x.turno || '')).sort((a, b) => String(a.entrada).localeCompare(String(b.entrada)))[0];
         if (!man || primera !== f) return ev;
-        const h = puntHorario(f.tienda, f.turno, f.fecha);
+        const h = puntHorario(f.tienda, f.turno, f.fecha, f.trabajador);
         const r = puntMin(f.entrada) - Math.max(h ? puntMin(h.entrada) : 0, puntMin(man.salida) + PUNT_COMIDA_CORRIDO);
         return Object.assign({}, ev, { tarde: r > PUNT_TOLERANCIA ? r : 0, pierdeBono: r > PUNT_TOLERANCIA, corrido: true });
     }
-    const asisgPunt = f => puntCorrido(puntEvaluar(puntHorario(f.tienda, f.turno, f.fecha), f.entrada, f.salida), f, asisgDatos.locales);
+    const asisgPunt = f => puntCorrido(puntEvaluar(puntHorario(f.tienda, f.turno, f.fecha, f.trabajador), f.entrada, f.salida), f, asisgDatos.locales);
     // Oficina: horario del departamento de la persona ese día (null = día libre)
     const asisgDepDe = persona => { const deps = asisgDatos.departamentos || [], n = (asisgDatos.deptoDe || {})[asisgClave(persona)]; return deps.find(d => d.nombre === n) || deps[0] || null; };
     function asisgHorarioOficina(persona, fecha) {
@@ -8351,6 +8384,7 @@
                                                         llamarApi({ action: 'hor_datos', semana: sem }).catch(() => ({ horarios: [] })),   // el horario guardado de la semana (si hay)
                                                         llamarApi({ action: 'nom_ajustes', semana: sem }).catch(() => ({ ajustes: null }))]);   // bonos, extras y gastos excluidos guardados
             if (Array.isArray(asis.horarios) && asis.horarios.length) PUNT_HORARIOS = asis.horarios;
+            if (asis.propios) PUNT_PROPIOS = asis.propios;
             if (asis.toleranciaMin) PUNT_TOLERANCIA = Number(asis.toleranciaMin) || 5;
             return { semana: sem, locales: asis.locales || [], oficina: asis.oficina || [], departamentos: asis.departamentos || [], deptoDe: asis.deptoDe || {},
                      deudas: deu.deudas || [], cerradas: cer.pagos || [], horario: hor.horarios || [], ajustes: aju.ajustes || null, leido: Date.now() };
@@ -8397,7 +8431,7 @@
         todosLoc.forEach(f => { const p = unicos.get(turnoDe(f)); if (!p || puntaje(f) > puntaje(p)) unicos.set(turnoDe(f), f); });
         const repetidos = todosLoc.filter(f => unicos.get(turnoDe(f)) !== f);
         [...unicos.values()].forEach(f => {
-            const ev = puntCorrido(puntEvaluar(puntHorario(f.tienda, f.turno, f.fecha), f.entrada, f.salida), f, d.locales);
+            const ev = puntCorrido(puntEvaluar(puntHorario(f.tienda, f.turno, f.fecha, f.trabajador), f.entrada, f.salida), f, d.locales);
             const cod = hor ? hor.dias[Math.round((aFecha(f.fecha) - aFecha(nomSemana)) / 864e5)] || '' : null;
             const fuera = cod !== null ? !(cod === 'C' || (cod === 'M' && /^ma/i.test(f.turno)) || (cod === 'T' && /^tar/i.test(f.turno)))
                                        : (turnoPerfil.startsWith('man') && /^tar/i.test(f.turno)) || (turnoPerfil.startsWith('tar') && /^ma/i.test(f.turno));
@@ -9916,7 +9950,7 @@
                 // Buscar: por nombre del perfil, cargo, local o turno, o por el nombre de un trabajador que lo tenga
                 if (!perPasa(p.nombre, p.cargo, p.local, p.turno, ...perDatos.trabajadores.filter(t => t.perfil === p.nombre).map(t => t.nombre))) return '';
                 const d = perDesglose(p, 7, 56, false);
-                return `<tr><td class="izq"><b>${esc(p.nombre)}</b></td><td class="izq">${esc(p.cargo) || '—'}</td><td class="izq">${esc([p.local, p.turno].filter(Boolean).join(' · ')) || 'Cualquiera'}</td>
+                return `<tr><td class="izq"><b>${esc(p.nombre)}</b></td><td class="izq">${esc(p.cargo) || '—'}</td><td class="izq">${esc([p.local, p.turno].filter(Boolean).join(' · ')) || 'Cualquiera'}${p.horaEntrada && p.horaSalida ? `<small>horario ${esc(horaAmPm(p.horaEntrada))} a ${esc(horaAmPm(p.horaSalida))}</small>` : ''}</td>
                 <td><b>${perPagoTxt(p)}</b></td><td>${perUsd(p.bonoPuntualidad)}</td><td>${perUsd(p.bonoProductividad)}</td><td>${p.turnosMinimos || '—'}</td><td>${p.horaExtra ? perUsd(p.horaExtra) + '<small>por hora</small>' : '—'}</td>
                 <td><b>${perUsd(d.total)}</b><small>${perPorHora(p) ? '56 h · ' : ''}base ${perUsd(d.base)} · ayuda ${perUsd(d.ayuda)}</small></td>
                 <td>${usan(p.nombre)}</td><td><button type="button" class="btn-ghost btn-mini" onclick="perEditarPerfil(${i + 1})">Modificar</button></td></tr>`; }).join('') || `<tr><td colspan="11" class="izq nota">Ningún perfil coincide con la búsqueda.</td></tr>`}
@@ -9948,6 +9982,9 @@
                 <div><label for="perPP">Bono puntualidad $ por semana</label><input type="number" id="perPP" min="0" step="0.01" value="${p.bonoPuntualidad ?? ''}" oninput="perVistaPerfil()"></div>
                 <div><label for="perPR">Bono productividad $ por semana</label><input type="number" id="perPR" min="0" step="0.01" value="${p.bonoProductividad ?? ''}" oninput="perVistaPerfil()"></div>
                 <div><label for="perPX">Hora extra $ sugerida</label><input type="number" id="perPX" min="0" step="0.01" value="${p.horaExtra || ''}" placeholder="0,00" title="Turnos u horas fuera de su perfil. Es una sugerencia: el monto real se pone en la nómina."></div>
+                <div class="per-ancho"><label>Horario propio <small>(opcional: si no, el de la tienda)</small></label>
+                    <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap"><input type="time" id="perPHE" value="${esc(p.horaEntrada || '')}" aria-label="Hora de entrada" style="width:auto"><span>a</span><input type="time" id="perPHS" value="${esc(p.horaSalida || '')}" aria-label="Hora de salida" style="width:auto"></div>
+                    <small class="nota" style="margin:.2rem 0 0">Para cargos con otro horario que la tienda (p. ej. PCP de 5:00 PM a 9:00 PM): la puntualidad y las horas se miden con este horario.</small></div>
                 <div class="per-ancho"><label for="perPNo">Notas</label><input type="text" id="perPNo" maxlength="150" value="${esc(p.notas || '')}"></div>
             </div>
             <div class="per-calculo" id="perPCalc"></div>
@@ -9975,7 +10012,8 @@
         const err = document.getElementById('perError'), btn = document.getElementById('perBtnG');
         const v = k => document.getElementById(k).value.trim();
         const payload = { action: 'per_perfil_guardar', original: n ? perDatos.perfiles[n - 1].nombre : '', nombre: v('perPN'), cargo: v('perPC'), local: v('perPL'), turno: v('perPT'),
-                          formaPago: v('perPF'), pago: v('perPB'), turnosMinimos: v('perPM'), bonoPuntualidad: v('perPP'), bonoProductividad: v('perPR'), horaExtra: v('perPX'), notas: v('perPNo') };
+                          formaPago: v('perPF'), pago: v('perPB'), turnosMinimos: v('perPM'), bonoPuntualidad: v('perPP'), bonoProductividad: v('perPR'), horaExtra: v('perPX'), notas: v('perPNo'), horaEntrada: v('perPHE'), horaSalida: v('perPHS') };
+        if (!!payload.horaEntrada !== !!payload.horaSalida) { err.textContent = 'Para el horario propio escriba la hora de entrada y la de salida (o deje las dos vacías).'; return; }
         btnCargando(btn, 'Guardando...');
         try {
             const r = await llamarApi(payload);
@@ -11612,7 +11650,7 @@
         const nota = { numero: almDatos.proximaNota || '—', fecha: fechaLocalHoy(), hora: ahora.toTimeString().slice(0, 5), clienteId: cli.id, cliente: cli.nombre, cedula: cli.cedula, telefono: cli.telefono, direccion: cli.direccion,
                        condicion, vence: credito && !tienda ? sumarDias(fechaLocalHoy(), dias) : '', subtotal, descuento, total, tasa, totalBs: tasa ? almR(total * tasa) : 0, estado: 'Emitida',
                        usuario: nombreUsuario, renglones: detalle.length, detalle, comentario: (document.getElementById('almComentario') || {}).value ? document.getElementById('almComentario').value.trim() : '', ingresada: '', verificada: '', modificaciones: '' };
-        const pedido = { action: 'alm_facturar', clienteId: cli.id, condicion, diasCredito: dias, tasa, descuento: venta.descuento || 0, claveAdmin: venta.claveDesc || venta.claveStock || '', comentario: nota.comentario,
+        const pedido = { action: 'alm_facturar', clienteId: cli.id, condicion, diasCredito: dias, tasa, descuento: venta.descuento || 0, claveAdmin: venta.claveDesc || venta.claveStock || '', comentario: nota.comentario, tgEquipo: true,
                          items: venta.items.map(x => ({ codigo: x.codigo, cantidad: x.cantidad })) };
         // La pantalla queda lista para la siguiente venta
         almMoverLocal(venta.items, -1);
@@ -11626,6 +11664,7 @@
                 const r = await llamarApi(pedido);
                 almTiendas = null;
                 if (!r.nota) { almNotas = null; await almCargar(); return; }   // ya estaba guardada (reintento): se vuelve a leer
+                if (r.telegram && r.telegram.espera) almTgImagenAuto(r.nota);
                 if (almNotas && almNotasF.modo === 'ultimas') almReemplazarNota(r.nota);
                 if (almDatos.pendientes) { almDatos.pendientes.notasPorVerificar++; if (r.nota.condicion === 'Tienda') { almDatos.pendientes.porIngresar++; almDatos.pendientes.porIngresarUsd = almR(almDatos.pendientes.porIngresarUsd + r.nota.total); } }
                 almAplicarCambios(r.cambios);
@@ -12484,8 +12523,24 @@ Reglas:
             const r = await llamarApi({ action: 'cmp_borrador_guardar', id: cmp.borradorId || '', version: cmp.borradorVer || '', datos: cmpAvanceDatos() });
             cmp.borradorId = r.id; cmp.borradorVer = r.version;
             cmpAvanceEstadoPintar(`✓ Avance guardado (${r.id}) a las ${String(r.actualizada).slice(11)}`);
-        } catch (e) { cmpAvanceEstadoPintar(e.enCola ? 'Sin conexión: se guardará al volver' : 'No se pudo guardar el avance: ' + e.message, true); }
+            return true;
+        } catch (e) { cmpAvanceEstadoPintar(e.enCola ? 'Sin conexión: se guardará al volver' : 'No se pudo guardar el avance: ' + e.message, true); return false; }
         finally { cmpAvanceEnviando = false; }
+    }
+    // "Guardar en curso": guarda el avance y deja la compra en blanco; se sigue después con "Seguir" en Compras en curso
+    async function cmpGuardarEnCurso(btn) {
+        if (btn) { btn.disabled = true; btnCargando(btn, 'Guardando...'); }
+        if (cmpFotosPromesa) await cmpFotosPromesa;   // que los enlaces de las fotos queden en la compra en curso
+        while (cmpAvanceEnviando) await new Promise(r => setTimeout(r, 200));
+        if (!(await cmpAvanceGuardar())) { if (btn) { btn.disabled = false; btn.textContent = 'Guardar en curso'; } return; }
+        const id = cmp.borradorId;
+        clearTimeout(cmpAvanceEspera);
+        Object.assign(cmp, { paso: 'foto', fotos: [], lineas: [], leido: null, enlaces: [], proveedorId: '', proveedorLeido: null, factura: '', fechaFactura: '', borradorId: null, borradorVer: '' });
+        cmpAvanceEstado = '';
+        mostrarBanner(`Compra guardada en curso (${id}). Para seguirla, pulse "Seguir" en Compras en curso.`, 'ok');
+        cmpPintarCompra(document.getElementById('almContenido'), true);
+        try { cmpBorradores = (await llamarApi({ action: 'cmp_borradores' })).borradores || cmpBorradores; } catch (e) {}
+        if (almTab === 'compra' && cmp.paso === 'foto') cmpPintarCompra(document.getElementById('almContenido'), true);
     }
     // Cualquier cosa que se escriba o elija en la compra (menos los filtros de columnas) programa el guardado del avance
     ['input', 'change'].forEach(t => document.addEventListener(t, e => {
@@ -12545,7 +12600,7 @@ Reglas:
                 new Promise((_, mal) => setTimeout(() => mal(new Error('Gemini tardó más de 2 minutos sin responder. Vuelva a intentar; si se repite, recorte la foto a solo la factura.')), 120000))]);
             cmp.leyendo = false;
             cmpUsarLectura(r);
-            if (r.segundos) cmpAvanceEstadoPintar(`Factura leída en ${String(r.segundos).replace('.', ',')} s`);
+            if (r.segundos) cmpAvanceEstadoPintar(`Factura leída en ${String(r.segundos).replace('.', ',')} s` + (r.modelo ? ` · ${r.modelo}` : ''));
             // Las fotos a Drive, en segundo plano (la lectura ya no las espera). Guardar la compra espera a que terminen.
             if (!(r.fotos || []).length) cmpFotosPromesa = llamarApi({ action: 'cmp_fotos', imagenes, proveedor: (r.proveedorLeido || {}).nombre || '', factura: r.factura || '' })
                 .then(x => { if (cmp.paso === 'revisar' && x.fotos && x.fotos.length) { cmp.enlaces = x.fotos; cmpAvanceProgramar(); } })
@@ -12608,6 +12663,10 @@ Reglas:
         const n = (c, v, cls, extra) => `<input type="number" class="${cls}" step="${c === 'cantidad' ? 'any' : '0.01'}" min="0" value="${v ? v : ''}" data-i="${i}" data-c="${c}" oninput="cmpEntrada(this)" ${extra || ''}>`;
         const queda = cmpR2(l.cantidad - cmpRepartido(l));
         const bs = v => v > 0 && tasa ? fmt(v * tasa) : '—';
+        // Lo de la última vez (Precios en tiendas); el costo, si no tiene precio guardado, el del almacén (todavía sin esta compra)
+        const ant = p ? (almDatos.precios || {})[cmpClaveProd(p)] || null : null, costoAnt = (ant && ant.costo) || (p && !p.libre ? p.costo || 0 : 0);
+        const antes = (v, txt) => v > 0 ? `<small class="cmp-ant">Antes ${txt}</small>` : '';
+        const varia = (a, b) => !(a > 0) || !(b > 0) || Math.abs(a - b) < 0.00005 ? '' : ` <span class="${b > a ? 'sube' : 'baja'}">${b > a ? '▲' : '▼'} ${fmt(Math.abs(b / a - 1) * 100)} %</span>`;
         return `<tr id="cmpF${i}" class="${mal ? 'cmp-mal' : ''}">
             <td>${i + 1}</td>
             <td class="izq"><div class="cmp-prod"><input type="text" class="cmp-cod" list="cmpProds" value="${esc(l.codigo)}" placeholder="Código" autocomplete="off" onchange="cmpCodigo(${i}, this.value)">
@@ -12618,13 +12677,13 @@ Reglas:
                 ${l.descripcionFactura ? `<small>Factura: ${esc(l.descripcionFactura)}${l.unidad ? ' (' + esc(l.unidad) + ')' : ''}${l.origenCodigo === 'recordado' ? ' · ✓ recordado' : l.origenCodigo === 'barras' ? ' · ✓ por código de barras' : l.origenCodigo === 'parecido' ? ' · <b>parecido: revíselo</b>' : l.origenCodigo === 'sugerido' ? ' · sugerido' : ''}</small>` : ''}
                 <small class="cmp-regla">${esc(l.regla || '')}</small></td>
             <td>${n('cantidad', l.cantidad, 'cmp-n')}<small>${p ? almUnidad(p.tipo) : ''}</small></td>
-            <td class="g-c">${n('costo', l.costo, 'cmp-n', 'data-step="0.0001"')}${l.iva ? `<small>con IVA ${l.iva} %</small>` : ''}${l.detalAnt ? `<small>Antes detal ${fmt(l.detalAnt)}</small>` : ''}</td>
-            <td class="g-m">${n('margenDetal', l.margenDetal, 'cmp-p')}</td>
-            <td class="g-u">${n('detal', l.detal, 'cmp-n')}</td>
-            <td class="g-b"><span id="cmpDb${i}">${bs(l.detal)}</span></td>
-            ${mayor ? `<td class="g-m">${n('margenMayor', l.margenMayor, 'cmp-p')}</td>
-            <td class="g-u">${n('mayor', l.mayor, 'cmp-n')}${l.mayorAnt ? `<small>Antes ${fmt(l.mayorAnt)}</small>` : ''}</td>
-            <td class="g-b"><span id="cmpMb${i}">${bs(l.mayor)}</span></td>` : '<td class="g-m"></td><td class="g-u"><small class="cmp-nomayor">Solo detal</small></td><td class="g-b"></td>'}
+            <td class="g-c">${n('costo', l.costo, 'cmp-n', 'data-step="0.0001"')}${l.iva ? `<small>con IVA ${l.iva} %</small>` : ''}<span id="cmpAc${i}">${antes(costoAnt, '$ ' + fmt(costoAnt) + varia(costoAnt, l.costo))}</span>${p && !costoAnt && !(ant && ant.detal) ? '<small class="cmp-ant">Sin compra anterior</small>' : ''}</td>
+            <td class="g-m">${n('margenDetal', l.margenDetal, 'cmp-p')}${antes(ant && ant.margenDetal, fmt(ant && ant.margenDetal) + ' %')}</td>
+            <td class="g-u">${n('detal', l.detal, 'cmp-n')}${antes(ant && ant.detal, '$ ' + fmt(ant && ant.detal))}</td>
+            <td class="g-b"><span id="cmpDb${i}">${bs(l.detal)}</span>${antes(ant && ant.detal && tasa, 'Bs ' + bs(ant && ant.detal))}</td>
+            ${mayor ? `<td class="g-m">${n('margenMayor', l.margenMayor, 'cmp-p')}${antes(ant && ant.margenMayor, fmt(ant && ant.margenMayor) + ' %')}</td>
+            <td class="g-u">${n('mayor', l.mayor, 'cmp-n')}${antes(ant && ant.mayor, '$ ' + fmt(ant && ant.mayor))}</td>
+            <td class="g-b"><span id="cmpMb${i}">${bs(l.mayor)}</span>${antes(ant && ant.mayor && tasa, 'Bs ' + bs(ant && ant.mayor))}</td>` : '<td class="g-m"></td><td class="g-u"><small class="cmp-nomayor">Solo detal</small></td><td class="g-b"></td>'}
             ${CMP_TIENDAS.map(t => `<td class="cmp-t g-d g-t g-t-${CMP_SIGLA[t]}">${n('dist:' + t, l.dist[t], 'cmp-d')}</td>`).join('')}
             <td class="g-d"><b id="cmpQ${i}" style="${queda < 0 || (p && p.libre && queda > 0) ? 'color:var(--danger)' : ''}">${almCant(queda, p && p.tipo)}</b></td>
             <td><button type="button" class="btn-ghost btn-mini" title="Quitar renglón" onclick="cmp.lineas.splice(${i},1);cmpPintarCompra(document.getElementById('almContenido'), true);cmpAvanceProgramar()">✕</button></td></tr>`;
@@ -12677,7 +12736,7 @@ Reglas:
                 <div class="cmp-pie" id="cmpPie">${cmpPieHTML()}</div>
                 <div class="login-error" id="cmpError"></div>
                 <div class="req-acciones" style="justify-content:flex-end;align-items:center;margin-bottom:0"><small class="nota" id="cmpAvance" style="margin:0 auto 0 0" title="El avance se guarda solo en Google: se puede seguir después o en otro equipo (Compras en curso)">${esc(cmpAvanceEstado || 'El avance se guarda solo mientras trabaja')}</small>
-                    <button type="button" class="btn-ghost" onclick="cmpAvanceGuardar()">Guardar avance</button>
+                    <button type="button" class="btn-ghost" onclick="cmpGuardarEnCurso(this)" title="Guarda lo avanzado y deja la compra en blanco. Se sigue después con &quot;Seguir&quot; en Compras en curso">Guardar en curso</button>
                     <button type="button" class="btn-primary" id="cmpBtnGuardar" onclick="cmpGuardar()">Guardar compra y emitir notas</button></div>
             </div>`;
     }
@@ -12734,6 +12793,8 @@ Reglas:
         const tasa = almTasa(), db = document.getElementById('cmpDb' + i), mb = document.getElementById('cmpMb' + i);
         if (db) db.textContent = l.detal > 0 && tasa ? fmt(l.detal * tasa) : '—';
         if (mb) mb.textContent = l.mayor > 0 && tasa ? fmt(l.mayor * tasa) : '—';
+        const ac = document.getElementById('cmpAc' + i);   // "Antes $ X ▲ %" del costo, con el costo que se está escribiendo
+        if (ac && c === 'costo') { const t = document.createElement('tbody'); t.innerHTML = cmpFilaHTML(l, i); const nuevo = t.querySelector('#cmpAc' + i); if (nuevo) ac.innerHTML = nuevo.innerHTML; }
         const q = cmpR2(l.cantidad - cmpRepartido(l)), qe = document.getElementById('cmpQ' + i);
         qe.textContent = almCant(q, p && p.tipo); qe.style.color = q < 0 || (p && p.libre && q > 0) ? 'var(--danger)' : '';
         document.getElementById('cmpPie').innerHTML = cmpPieHTML();
@@ -12760,14 +12821,20 @@ Reglas:
         if (cmpFotosPromesa) { btn.textContent = 'Guardando las fotos...'; await cmpFotosPromesa; btn.textContent = 'Guardando...'; }   // que la compra lleve sus fotos
         while (cmpAvanceEnviando) await new Promise(r => setTimeout(r, 200));   // que termine el guardado del avance (si no, podría volver a crearla en curso)
         try {
-            const r = await llamarApi({ action: 'cmp_guardar', borradorId: cmp.borradorId || '', proveedorId: cmp.proveedorId, factura: cmp.factura.trim(), fechaFactura: cmp.fechaFactura, tasa: almTasa(), fotos: cmp.enlaces,
+            const r = await llamarApi({ action: 'cmp_guardar', tgEquipo: true, borradorId: cmp.borradorId || '', proveedorId: cmp.proveedorId, factura: cmp.factura.trim(), fechaFactura: cmp.fechaFactura, tasa: almTasa(), fotos: cmp.enlaces,
                 tasaFactura: cmp.leido && cmp.leido.moneda === 'BS' ? (cmp.leido.tasa || almTasa()) : almTasa(),
                 lineas: lineas.map(l => ({ codigo: l.codigo, descripcion: cmpProd(l).descripcion, categoria: cmpProd(l).categoria, claveProveedor: l.claveProveedor, cantidad: l.cantidad, costo: l.costo, merma: l.merma, margenDetal: l.margenDetal, detal: l.detal,
                                            margenMayor: l.margenMayor, mayor: l.mayor, dist: l.dist })) });
             almAplicarCambios(r.cambios);
             if (r.proximoIngreso) almDatos.proximoIngreso = r.proximoIngreso;
-            // Google ya envió cada nota al grupo "Control de depósito" al guardarla (si Telegram falló, la reintenta solo)
-            (r.notas || []).forEach(n => { n._tg = !n.telegram || n.telegram.ok ? 'ok' : 'error'; n._tgMsg = n.telegram && n.telegram.error || ''; });
+            // Cada nota va al grupo "Control de depósito": este equipo manda su imagen enseguida (o Google la envía; si Telegram falla, la reintenta solo)
+            (r.notas || []).forEach(n => {
+                n._tg = n.telegram && n.telegram.espera ? 'enviando' : !n.telegram || n.telegram.ok ? 'ok' : 'error'; n._tgMsg = n.telegram && n.telegram.error || '';
+                if (n._tg === 'enviando') almTgImagenAuto(n).then(x => {
+                    n._tg = x.enviada || x.yaEnviada || x.google ? 'ok' : 'error'; n._tgMsg = x.error || '';
+                    if (almTab === 'compra' && cmp.paso === 'listo' && cmp.resultado === r) cmpPintarCompra(document.getElementById('almContenido'), true);
+                });
+            });
             almNotas = null; almIngresos = null; almTiendas = null; cmpCompras = null; cmpOrd = null;
             Object.assign(cmp, { paso: 'listo', resultado: r, fotos: [], borradorId: null, borradorVer: '' });
             cmpAvanceEstado = '';   // "Compras en curso" se vuelve a leer con las compras (cmpCompras = null)
@@ -12777,6 +12844,7 @@ Reglas:
     }
     // Estado del envío que hizo Google al guardar cada nota
     const cmpTelegramEstado = n => n._tg === 'ok' ? '<span class="chip st-ok">✓ Enviada a Telegram</span>'
+        : n._tg === 'enviando' ? '<span class="chip st-info">Enviando a Telegram...</span>'
         : n._tg === 'error' ? `<span class="chip st-amar" title="${esc(n._tgMsg)}">Telegram no la aceptó: Google la reintenta solo</span>` : '';
     function cmpListoVista() {
         const r = cmp.resultado || {};
@@ -12851,6 +12919,7 @@ Reglas:
                     ${cmpTasaManual ? `<button type="button" class="btn-ghost btn-mini" title="Volver a la última tasa del BCV" onclick="cmpTasaManual=0;almPintar()">BCV ${almTasa() ? fmt(almTasa()) : '—'}</button>` : '<span class="cmp-ver-t">última del BCV</span>'}</span>` : ''}
             </div>
             ${completas ? '' : `<div class="cmp-resumen"><span>Por definir precio: <b style="color:var(--amar-txt)">${cmpOrd.porDefinir || 0}</b></span><span>Por actualizar: <b>${cmpOrd.porActualizar || 0}</b></span>${f.tienda ? `<span>Pendientes en ${esc(f.tienda)}: <b>${l.length}</b></span>` : ''}
+                ${permisos.some(x => x === 'precios' || x === 'inventario') ? `<button type="button" class="btn-primary btn-mini cmp-imp" onclick="cmpNuevaOrdenDlg()" title="Cargar un precio nuevo aunque no haya llegado mercancía">＋ Cambio de precio sin compra</button>` : ''}
                 ${l.length ? `<button type="button" class="btn-ghost btn-mini cmp-imp" onclick="cmpImprimirPendientes()">🖨 Imprimir ${f.tienda ? 'lo de ' + esc(f.tienda) : 'la lista'}</button>` : ''}</div>`}
             ${!l.length ? `<div class="empty">${completas ? 'Todavía no hay órdenes completas.' : 'No hay nada pendiente con estos filtros.'}</div>` : `<div class="tabla-wrap"><table class="req-tabla cmp-otabla" data-sin-paginar><thead><tr>
                 <th class="izq">Producto</th><th>Costo ${etiqueta}</th><th>Detal ${etiqueta}</th>${conMayor ? `<th>Mayor ${etiqueta}</th>` : ''}
@@ -13044,7 +13113,70 @@ Reglas:
             </div>
             <div class="nota">Precio = costo ÷ (1 − margen), redondeado al centavo (o terminado en 7 / ,99 con la terminación psicológica). Al mayor (solo charcutería) sobre el costo de la factura, sin merma. Si cambia el precio y alguna tienda ya lo había actualizado, se le quita la marca para que lo cambie de nuevo.</div>
             <div class="login-error" id="cmpKError"></div>
-            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-ghost" onclick="almCerrar()">Cancelar</button><button type="submit" class="btn-primary" id="cmpBtnK">Guardar precio</button></div></form>`);
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0">${o.detal > 0 || o.mayor > 0 ? `<button type="button" class="btn-ghost" style="margin-right:auto" onclick="cmpAvisarOrden('${esc(o.id)}', this)" title="Envía el precio de esta orden al grupo de Telegram &quot;Control de depósito&quot;">📣 Avisar por Telegram</button>` : ''}<button type="button" class="btn-ghost" onclick="almCerrar()">Cancelar</button><button type="submit" class="btn-primary" id="cmpBtnK">Guardar precio</button></div></form>`);
+    }
+    async function cmpAvisarOrden(id, btn) {
+        if (!confirm('¿Enviar el precio de esta orden al grupo "Control de depósito"?')) return;
+        btnCargando(btn, 'Enviando...');
+        try {
+            const r = await llamarApi({ action: 'cmp_orden_avisar', id });
+            if (r.telegram && r.telegram.ok) mostrarBanner('Aviso enviado al grupo "Control de depósito".', 'ok');
+            else mostrarBanner('Telegram no aceptó el aviso: ' + ((r.telegram || {}).error || 'sin respuesta'), 'error');
+        } catch (e) { mostrarBanner(e.message, 'error'); }
+        btn.disabled = false; btn.textContent = '📣 Avisar por Telegram';
+    }
+    // Cambio de precio sin compra: se elige el producto del catálogo, se calcula igual que en una orden y queda "Por actualizar" en las tiendas
+    function cmpNuevaOrdenDlg() {
+        const ps = (almDatos && almDatos.productos || []).filter(p => p.activo).sort((a, b) => a.descripcion.localeCompare(b.descripcion, 'es'));
+        cmpCalc = null;
+        almVentana(`<form class="req-dlg" onsubmit="cmpGuardarNuevaOrden(event)">
+            <h3>Cambio de precio sin compra</h3>
+            <div class="req-sub">Para cargar un precio nuevo aunque no haya llegado mercancía. Queda en "Por actualizar" para que cada tienda lo marque.</div>
+            <div><label for="cmpNProd">Producto</label><input id="cmpNProd" list="cmpNProdL" autocomplete="off" placeholder="Escriba el nombre o el código..." oninput="cmpNuevaOrdenProducto(this.value)" autofocus>
+                <datalist id="cmpNProdL">${ps.map(p => `<option value="${esc(p.codigo + ' · ' + p.descripcion)}">`).join('')}</datalist></div>
+            <div id="cmpNCalc"></div>
+            <div><label for="cmpNMotivo">Motivo (opcional)</label><input id="cmpNMotivo" maxlength="150" placeholder="Ej.: subió el proveedor, oferta..."></div>
+            <label class="interruptor" style="margin:.6rem 0"><input type="checkbox" id="cmpNAvisar" checked><span class="sw-pista"></span> Enviar aviso al grupo de Telegram "Control de depósito"</label>
+            <div class="login-error" id="cmpKError"></div>
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-ghost" onclick="almCerrar()">Cancelar</button><button type="submit" class="btn-primary" id="cmpBtnK" disabled>Guardar precio</button></div></form>`);
+    }
+    function cmpNuevaOrdenProducto(valor) {
+        const cod = String(valor || '').split(' · ')[0].trim(), p = cod && almProducto(cod), caja = document.getElementById('cmpNCalc'), btn = document.getElementById('cmpBtnK');
+        if (!p) { if (cmpCalc) { cmpCalc = null; caja.innerHTML = ''; } btn.disabled = true; return; }
+        if (cmpCalc && cmpCalc.codigo === p.codigo) return;
+        const ant = (almDatos.precios || {})[p.codigo] || {}, costo = p.costo || ant.costo || 0, s = cmpSugerir(p, costo);
+        cmpCalc = { id: null, prod: p, codigo: p.codigo, costo, merma: ant.merma || 0, libre: true, detal: ant.detal || (s ? s.detal : 0), mayor: ant.mayor || (s ? s.mayor : 0), margenDetal: 0, margenMayor: 0 };
+        const cr = costo * (1 + cmpCalc.merma / 100);
+        cmpCalc.margenDetal = cmpCalc.detal > 0 ? cmpR2((1 - cr / cmpCalc.detal) * 100) : 0;
+        cmpCalc.margenMayor = cmpCalc.mayor > 0 ? cmpR2((1 - costo / cmpCalc.mayor) * 100) : 0;
+        const n = c => `<input type="number" step="0.01" min="0" id="cmpK_${c}" value="${cmpCalc[c] ? cmpCalc[c] : ''}" oninput="cmpCalcEntrada('${c}', this.value)">`;
+        caja.innerHTML = `<div class="nota" style="margin:.5rem 0">${esc(p.codigo)} · ${esc(p.categoria || '')}${ant.detal ? ' · detal actual $ ' + fmt(ant.detal) : ''}${ant.mayor ? ' · mayor actual $ ' + fmt(ant.mayor) : ''}${ant.actualizado ? ' (desde ' + esc(ant.actualizado) + ')' : ''}</div>
+            <div class="per-grid">
+                <div><label for="cmpK_costo">Costo $</label><input type="number" step="0.0001" min="0" id="cmpK_costo" value="${costo || ''}" oninput="cmpCalc.costo=Number(this.value)||0;cmpCalcEntrada('margenDetal', cmpCalc.margenDetal);if(cmpCalc.margenMayor)cmpCalcEntrada('margenMayor', cmpCalc.margenMayor)"></div>
+                <div><label for="cmpK_merma">Merma y gastos %</label>${n('merma')}</div>
+                <div><label>Costo real</label><div style="padding:.55rem 0"><b id="cmpKcr">$ ${fmt(cr)}</b></div></div>
+                <div><label for="cmpK_margenDetal">Margen detal %</label>${n('margenDetal')}</div>
+                <div><label for="cmpK_detal">Precio al detal $</label>${n('detal')}</div>
+                ${cmpVendeMayor(p) || cmpCalc.mayor ? `<div><label for="cmpK_margenMayor">Margen mayor %</label>${n('margenMayor')}</div>
+                <div><label for="cmpK_mayor">Precio al mayor $</label>${n('mayor')}</div>` : ''}
+            </div>`;
+        btn.disabled = false;
+    }
+    async function cmpGuardarNuevaOrden(ev) {
+        ev.preventDefault();
+        const k = cmpCalc, btn = document.getElementById('cmpBtnK'), err = document.getElementById('cmpKError');
+        if (!k) { err.textContent = 'Elija el producto de la lista'; return; }
+        if (!(k.detal > 0) && !(k.mayor > 0)) { err.textContent = 'Escriba el precio al detal o al mayor'; return; }
+        const avisar = document.getElementById('cmpNAvisar').checked;
+        btnCargando(btn, 'Guardando...');
+        try {
+            const r = await llamarApi({ action: 'cmp_orden_nueva', codigo: k.codigo, costo: k.costo, merma: k.merma, detal: k.detal, mayor: k.mayor,
+                                        motivo: document.getElementById('cmpNMotivo').value.trim(), avisar, ver: cmpOrd.ver });
+            almCerrar(); cmpUsarOrdenes(r);
+            if (avisar && r.telegram && !r.telegram.ok) mostrarBanner(`Precio guardado (${r.orden}), pero Telegram no aceptó el aviso: ${r.telegram.error}. Puede reenviarlo desde la orden.`, 'warn');
+            else mostrarBanner(`Precio guardado (${r.orden})${avisar ? ' y avisado al grupo "Control de depósito"' : ''}. Queda por actualizar en las tiendas.`, 'ok');
+            almCargar();   // los márgenes nuevos quedan para la próxima sugerencia
+        } catch (e) { err.textContent = e.message; btn.disabled = false; btn.textContent = 'Guardar precio'; }
     }
     function cmpCalcEntrada(c, valor) {
         const k = cmpCalc, p = k.prod || almProducto(k.codigo), v = valor === '' ? 0 : Number(valor);
@@ -13383,10 +13515,25 @@ Reglas:
         if (!n) return;
         if (!esPrincipal) { mostrarBanner('Las notas se envían solas a Telegram al guardarlas. Solo un administrador puede reenviarlas.', 'warn'); return; }
         if (!confirm(`¿Reenviar la nota N° ${n.numero} al grupo "Control de depósito"?`)) return;
-        try { await llamarApi({ action: 'alm_telegram_nota', numero: n.numero }); mostrarBanner(`Nota ${n.numero} reenviada a Telegram (Control de depósito).`, 'ok'); }
+        let imagen = ''; try { imagen = await almImagenNota(n); } catch (e) {}   // con el formato de siempre; si no se puede, Google envía la suya
+        try { await llamarApi(Object.assign({ action: 'alm_telegram_nota', numero: n.numero }, imagen ? { imagen } : {})); mostrarBanner(`Nota ${n.numero} reenviada a Telegram (Control de depósito).`, 'ok'); }
         catch (e) { mostrarBanner(`No se pudo reenviar la nota ${n.numero}: ${e.message}`, 'error'); }
     }
     const almTgReintentar = () => {};   // (antes: reintento desde este equipo; ahora lo hace Google)
+    // Al guardar una nota (Facturar o Compra con foto), Google la deja esperando su imagen: este equipo la dibuja con el formato de
+    // siempre (almImagenNota) y la manda sola, una tras otra y sin botón. Si no puede dibujarla, se manda vacía y Google envía la suya;
+    // si no llega nada (se cerró la página), Google la envía igual a los 3 minutos.
+    let almTgCola = Promise.resolve();
+    function almTgImagenAuto(nota) {
+        const p = almTgCola.then(async () => {
+            let imagen = '';
+            try { imagen = await almImagenNota(nota); } catch (e) { console.warn('Imagen de la nota ' + nota.numero + ': ' + e.message); }
+            try { return await llamarApi({ action: 'alm_tg_imagen', numero: nota.numero, imagen }); }
+            catch (e) { console.warn('Nota ' + nota.numero + ' a Telegram: ' + e.message); return { enviada: false, error: e.message, google: true }; }
+        });
+        almTgCola = p;
+        return p;
+    }
     // sinPrecios: la versión para el grupo de Telegram (la ven los trabajadores): solo cantidades, sin precios ni totales en $
     function almDocumentoHTML(tipo, d, sinPrecios) {
         const logo = (document.querySelector('link[rel="icon"]') || {}).href || '';
