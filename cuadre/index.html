@@ -1594,7 +1594,7 @@
             const foto = mfFoto(r.foto);
             caja.className = 'mf-resultado ' + (r.pregunta ? '' : r.alerta ? 'alerta' : 'ok');
             caja.innerHTML = `<div class="mf-persona">${foto ? `<img src="${foto}" alt="">` : `<span class="mf-inicial">${escAsis(r.nombre.slice(0, 1))}</span>`}
-                <div><div class="mf-nombre">${escAsis(r.nombre)}</div><div class="mf-titulo">${r.pregunta ? '¿Qué va a marcar?' : escAsis((MF_PASOS[r.accion] || r.accion) + ' · ' + mfHora(r.hora))}</div>
+                <div><div class="mf-nombre">${escAsis(r.nombre)}</div><div class="mf-titulo">${r.pregunta ? '¿Qué va a marcar?' : escAsis((r.repetido ? 'Ya tenía marcada: ' : '') + (MF_PASOS[r.accion] || r.accion) + ' · ' + mfHora(r.hora))}</div>
                 ${r.accion === 'salida' && r.entrada ? `<div class="mf-msj">Entró ${mfHora(r.entrada)} · ${String(r.horas).replace('.', ',')} h</div>` : ''}
                 ${(r.mensajes || []).map(m => `<div class="mf-msj">${escAsis(m)}</div>`).join('')}</div></div>`;
         }

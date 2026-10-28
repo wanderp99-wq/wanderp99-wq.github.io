@@ -1197,6 +1197,9 @@
         .cmp-todo { margin-top: .25rem; border: 1px solid var(--border); background: transparent; color: var(--text-muted); border-radius: 999px; font-size: .7rem; padding: .1rem .5rem; cursor: pointer; }
         .cmp-otd { text-align: center; }
         .cmp-bts { display: flex; gap: .3rem; justify-content: center; flex-wrap: wrap; }
+        .cmp-marca-q { display: inline-flex; flex-direction: column; align-items: center; gap: .15rem; }
+        .cmp-marca-q small { font-size: .7rem; line-height: 1.2; color: var(--text-muted); text-align: center; white-space: nowrap; }
+        .cmp-marca-q small b { display: block; color: var(--text); font-weight: 700; }
         .cmp-bt { border: 1px solid var(--border); background: var(--card-bg, transparent); color: var(--text-main); border-radius: 8px; padding: .3rem .55rem; font-size: .8rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
         .cmp-bt:hover:not(:disabled) { border-color: #44AC00; }
         .cmp-bt.hecho { background: #44AC00; border-color: #44AC00; color: #fff; }
@@ -3174,7 +3177,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-10-28.4';
+    const VERSION_SERVIDOR = '2026-10-29.2';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -12530,16 +12533,24 @@ Reglas:
         cmpPintarCompra(document.getElementById('almContenido'), true);
     }
     // Leer: con reloj en el botón y un límite de 2 minutos; cualquier error (también al armar la tabla) se muestra
+    let cmpFotosPromesa = null;   // subida de las fotos a Drive en curso (después de leer)
     async function cmpLeer() {
         if (!cmp.fotos.length || cmp.leyendo) return;
         const out = () => document.getElementById('almContenido'), desde = Date.now();
         cmp.leyendo = true; cmpPintarCompra(out(), true);
         const reloj = setInterval(() => { const b = document.getElementById('cmpBtnLeer'); if (b && cmp.leyendo) b.textContent = `Leyendo la factura... ${Math.round((Date.now() - desde) / 1000)} s`; }, 1000);
         try {
-            const r = await Promise.race([llamarApi({ action: 'cmp_leer', imagenes: cmp.fotos }),
+            const imagenes = cmp.fotos.slice();
+            const r = await Promise.race([llamarApi({ action: 'cmp_leer', imagenes, fotosAparte: true }),
                 new Promise((_, mal) => setTimeout(() => mal(new Error('Gemini tardó más de 2 minutos sin responder. Vuelva a intentar; si se repite, recorte la foto a solo la factura.')), 120000))]);
             cmp.leyendo = false;
             cmpUsarLectura(r);
+            if (r.segundos) cmpAvanceEstadoPintar(`Factura leída en ${String(r.segundos).replace('.', ',')} s`);
+            // Las fotos a Drive, en segundo plano (la lectura ya no las espera). Guardar la compra espera a que terminen.
+            if (!(r.fotos || []).length) cmpFotosPromesa = llamarApi({ action: 'cmp_fotos', imagenes, proveedor: (r.proveedorLeido || {}).nombre || '', factura: r.factura || '' })
+                .then(x => { if (cmp.paso === 'revisar' && x.fotos && x.fotos.length) { cmp.enlaces = x.fotos; cmpAvanceProgramar(); } })
+                .catch(e => console.warn('Fotos de la factura sin guardar en Drive: ' + e.message))
+                .finally(() => { cmpFotosPromesa = null; });
         } catch (e) {
             cmp.leyendo = false; cmp.paso = 'foto';
             cmpPintarCompra(out(), true);
@@ -12746,6 +12757,7 @@ Reglas:
         if (!confirm(`${alAlmacen ? alAlmacen + ' producto(s) con código entran al almacén. ' : ''}${notas.length ? 'Se emite una nota a: ' + notas.join(', ') + ' (se envían solas a Telegram).' : 'No se reparte nada a las tiendas: no se emiten notas ni se envía nada a Telegram.'}` + (sinPrecio ? `\n${sinPrecio} producto(s) sin precio al detal: quedan "por definir precio".` : '') + '\n\n¿Guardar la compra?')) return;
         const btn = document.getElementById('cmpBtnGuardar'); btnCargando(btn, 'Guardando...');
         clearTimeout(cmpAvanceEspera);
+        if (cmpFotosPromesa) { btn.textContent = 'Guardando las fotos...'; await cmpFotosPromesa; btn.textContent = 'Guardando...'; }   // que la compra lleve sus fotos
         while (cmpAvanceEnviando) await new Promise(r => setTimeout(r, 200));   // que termine el guardado del avance (si no, podría volver a crearla en curso)
         try {
             const r = await llamarApi({ action: 'cmp_guardar', borradorId: cmp.borradorId || '', proveedorId: cmp.proveedorId, factura: cmp.factura.trim(), fechaFactura: cmp.fechaFactura, tasa: almTasa(), fotos: cmp.enlaces,
@@ -12810,7 +12822,7 @@ Reglas:
         catch (e) { cmpOrd = { ver, ordenes: [], error: e.message }; }
         almPintar();
     }
-    function cmpUsarOrdenes(r) { if (r && r.ordenes) cmpOrd = { ordenes: r.ordenes, ver: r.ver, descDivisas: r.descDivisas, porDefinir: r.porDefinir, porActualizar: r.porActualizar }; almPintar(); }
+    function cmpUsarOrdenes(r) { if (r && r.ordenes) cmpOrd = { ordenes: r.ordenes, ver: r.ver, descDivisas: r.descDivisas, porDefinir: r.porDefinir, porActualizar: r.porActualizar }; cmpPonerPendientes(); almPintar(); }   // las marcas en camino no se pierden
     const cmpFlecha = (a, b) => !a || !b || Math.abs(a - b) < 0.005 ? '' : b > a ? ` <span class="sube">▲ ${fmt((b / a - 1) * 100)} %</span>` : ` <span class="baja">▼ ${fmt((1 - b / a) * 100)} %</span>`;
     // Lista práctica, como el libro de compras: un renglón por producto y, por tienda, botones "Ingresó" y "Precio" (un clic marca)
     const cmpPendienteEn = (o, t) => { const m = o.marcas[t] || {}; return !m.actualizado || (((o.dist[t] || {}).cant > 0) && !m.ingresado); };
@@ -12846,12 +12858,19 @@ Reglas:
                 </tr></thead><tbody>${l.map(o => cmpOrdenFila(o, tiendas, completas, conMayor)).join('')}</tbody></table></div>`}
             <div class="nota">Un clic en <b>Ingresó</b> o <b>Precio</b> lo marca a su nombre con la hora (y el "cómo" elegido arriba). Un clic en uno marcado muestra quién y cómo, y permite quitarlo. Los precios "$ −${String(cmpDesc()).replace('.', ',')} %" son los que se cargan en el sistema de la tienda para pago en divisas.</div>`;
     }
+    // "Wander Daniel Paredes" -> "Wander D."; "2026-10-26 14:32" -> "26/10 · 2:32 p. m."
+    const cmpNombreCorto = n => { const p = String(n || '').replace(/\s*\(.*\)\s*$/, '').trim().split(/\s+/); return p.length > 1 ? p[0] + ' ' + p[1].charAt(0) + '.' : p[0] || ''; };
+    const cmpCuandoCorto = en => { const m = /^(\d{4})-(\d{2})-(\d{2})(?:\s+(\d{2}:\d{2}))?/.exec(String(en || '')); return m ? `${m[3]}/${m[2]}${m[4] ? ' · ' + horaAmPm(m[4]) : ''}` : String(en || ''); };
     function cmpOrdenFila(o, tiendas, completas, conMayor) {
         const definir = o.estado === 'Por definir precio', puedePrecio = !completas && permisos.some(x => x === 'precios' || x === 'inventario');
         const flecha = (a, b) => !a || !b || Math.abs(a - b) < 0.005 ? '' : `<small class="${b > a ? 'sube' : 'baja'}">${b > a ? '▲' : '▼'} ${fmt(Math.abs(b / a - 1) * 100)} %</small>`;
         const boton = (t, k) => {
             const m = (o.marcas[t] || {})[k], txt = k === 'ingresado' ? 'Ingresó' : 'Precio';
-            if (m) return `<button type="button" class="cmp-bt hecho" title="${esc(m.por + ' · ' + m.en + (m.como ? ' · ' + m.como : ''))}" onclick="cmpMarcaInfo('${esc(o.id)}','${esc(t)}','${k}')">✓ ${txt}</button>`;
+            if (m) {
+                const b = `<button type="button" class="cmp-bt hecho" title="${esc(m.por + ' · ' + m.en + (m.como ? ' · ' + m.como : ''))}" onclick="cmpMarcaInfo('${esc(o.id)}','${esc(t)}','${k}')">✓ ${txt}</button>`;
+                // Historial: debajo de cada marca, quién y cuándo (día y hora); el "cómo" sale al tocarla
+                return completas ? `<span class="cmp-marca-q">${b}<small><b>${esc(cmpNombreCorto(m.por))}</b>${esc(cmpCuandoCorto(m.en))}</small></span>` : b;
+            }
             if (completas) return '';
             if (k === 'actualizado' && definir) return `<button type="button" class="cmp-bt" disabled title="Primero defina el precio">${txt}</button>`;
             return `<button type="button" class="cmp-bt" onclick="cmpMarcarRapido('${esc(o.id)}','${esc(t)}','${k}')">${txt}</button>`;
@@ -12860,6 +12879,7 @@ Reglas:
         return `<tr class="${definir ? 'cmp-definir' : ''}">
             <td class="izq">${una ? (una.cant > 0 ? `<span class="cmp-cant">${almCant(una.cant, o.tipo)} ${almUnidad(o.tipo)}</span>` : '<span class="cmp-cant sin">solo precio</span>') : ''}<b>${esc(o.descripcion)}</b>${definir ? ' <span class="chip st-sobra">Por definir precio</span>' : ''}
                 <small>${o.codigo ? esc(o.codigo) : 'sin código'} · ${esc(o.categoria)} · ${esc(o.proveedor || o.origen)} · ${esc(String(o.fecha).slice(0, 10))}</small>
+                ${completas && o.definidoPor ? (() => { const [q, cu] = String(o.definidoPor).split(' · '); return `<small>Precio definido por <b>${esc(cmpNombreCorto(q))}</b>${cu ? ' · ' + esc(cmpCuandoCorto(cu)) : ''}</small>`; })() : ''}
                 ${puedePrecio ? `<button type="button" class="cmp-link" onclick="cmpPrecioDlg('${esc(o.id)}')">${definir ? 'Definir precio' : 'Cambiar precio'}</button>` : ''}</td>
             <td><b>${cmpMon(o.costo)}</b>${flecha(o.costoAnt, o.costo)}</td>
             <td><b>${cmpMon(o.detal)}</b>${o.detalAnt ? `<small>antes ${cmpMon(o.detalAnt)}</small>` : ''}</td>
@@ -12903,16 +12923,52 @@ Reglas:
         const w = fr.contentWindow; w.document.open(); w.document.write(html); w.document.close();
         setTimeout(() => { try { w.focus(); w.print(); } catch (e) { mostrarBanner('No se pudo abrir la impresión: ' + e.message, 'error'); } }, 200);
     }
-    // Un clic: se marca al instante en pantalla y se guarda en segundo plano (si falla, se desmarca y avisa)
-    function cmpMarcarRapido(id, local, tipo) {
+    // ---------- Marcas al instante: los clics se juntan y se guardan juntos en segundo plano ----------
+    // Cada clic se ve marcado de inmediato. Los clics seguidos (700 ms) van en un solo pedido "cmp_marcar_lote" (ligero: Google devuelve
+    // solo las órdenes que cambiaron). Mientras una marca no esté confirmada, ninguna respuesta (ni la actualización en vivo) la quita.
+    const cmpMarcasPend = new Map();   // 'id|local|tipo' -> { id, local, tipo, como }
+    let cmpMarcasEspera = 0, cmpMarcasEnviando = false;
+    const cmpMarcaClave = (id, local, tipo) => id + '|' + local + '|' + tipo;
+    function cmpPonerPendientes() {
+        if (!cmpOrd || !cmpOrd.ordenes) return;
+        cmpMarcasPend.forEach(p => { const o = cmpOrd.ordenes.find(x => x.id === p.id); if (!o) return; o.marcas[p.local] = o.marcas[p.local] || {}; if (!o.marcas[p.local][p.tipo]) o.marcas[p.local][p.tipo] = { por: nombreUsuario, en: 'guardando...', como: p.como }; });
+    }
+    function cmpEncolarMarca(id, local, tipo, como) {
         const o = cmpOrd.ordenes.find(x => x.id === id); if (!o) return;
-        const como = tipo === 'ingresado' ? 'Ingresado en el sistema de la tienda' : cmpPV.como;
-        o.marcas[local] = o.marcas[local] || {};
-        o.marcas[local][tipo] = { por: nombreUsuario, en: 'guardando...', como };
-        almPintar();
-        llamarApi({ action: 'cmp_marcar', id, local, tipo, como, ver: cmpOrd.ver })
-            .then(r => cmpUsarOrdenes(r))
-            .catch(e => { if (o.marcas[local]) delete o.marcas[local][tipo]; almPintar(); mostrarBanner('No se pudo marcar: ' + e.message, 'error'); });
+        cmpMarcasPend.set(cmpMarcaClave(id, local, tipo), { id, local, tipo, como });
+        cmpPonerPendientes(); almPintar();
+        clearTimeout(cmpMarcasEspera); cmpMarcasEspera = setTimeout(cmpEnviarMarcas, 700);
+    }
+    async function cmpEnviarMarcas() {
+        clearTimeout(cmpMarcasEspera);
+        if (cmpMarcasEnviando) { cmpMarcasEspera = setTimeout(cmpEnviarMarcas, 400); return; }   // uno a la vez
+        const lote = [...cmpMarcasPend.values()]; if (!lote.length) return;
+        cmpMarcasEnviando = true;
+        try {
+            const r = await llamarApi({ action: 'cmp_marcar_lote', ligero: true, items: lote.map(p => ({ id: p.id, local: p.local, tipo: p.tipo, como: p.como })), como: cmpPV.como });
+            lote.forEach(p => cmpMarcasPend.delete(cmpMarcaClave(p.id, p.local, p.tipo)));
+            cmpAplicarCambiadas(r);
+            if (r.marcadas < lote.length) mostrarBanner(`${lote.length - r.marcadas} marca(s) no se guardaron (ya estaban marcadas o el producto no tiene precio).`, 'warn');
+        } catch (e) {
+            // No se guardó: esas marcas se quitan de la pantalla y se avisa
+            lote.forEach(p => { cmpMarcasPend.delete(cmpMarcaClave(p.id, p.local, p.tipo)); const o = cmpOrd && cmpOrd.ordenes.find(x => x.id === p.id); if (o && o.marcas[p.local] && o.marcas[p.local][p.tipo] && o.marcas[p.local][p.tipo].en === 'guardando...') delete o.marcas[p.local][p.tipo]; });
+            almPintar(); mostrarBanner('No se pudieron guardar ' + lote.length + ' marca(s) (se quitaron): ' + e.message, 'error');
+        } finally { cmpMarcasEnviando = false; }
+    }
+    // Respuesta ligera: se reemplazan solo las órdenes que cambiaron (y los totales); las marcas aún en camino se mantienen
+    function cmpAplicarCambiadas(r) {
+        if (!cmpOrd || !cmpOrd.ordenes || !r) return;
+        (r.cambiadas || []).forEach(o => {
+            const i = cmpOrd.ordenes.findIndex(x => x.id === o.id); if (i < 0) return;
+            if (cmpOrd.ver === 'pendientes' && o.estado === 'Completa') cmpOrd.ordenes.splice(i, 1); else cmpOrd.ordenes[i] = o;
+        });
+        if (r.porDefinir != null) cmpOrd.porDefinir = r.porDefinir;
+        if (r.porActualizar != null) cmpOrd.porActualizar = r.porActualizar;
+        cmpPonerPendientes(); almPintar();
+    }
+    // Un clic en "Ingresó" o "Precio": al instante en pantalla y a la cola
+    function cmpMarcarRapido(id, local, tipo) {
+        cmpEncolarMarca(id, local, tipo, tipo === 'ingresado' ? 'Ingresado en el sistema de la tienda' : cmpPV.como);
     }
     // Toda una tienda: los precios pendientes (ya definidos) de lo que se ve en la lista
     async function cmpMarcarTienda(local) {
@@ -12921,12 +12977,10 @@ Reglas:
             && (!q || cmpN(o.codigo + ' ' + o.descripcion + ' ' + o.proveedor + ' ' + o.origen).includes(q)) && (!f.estado || o.estado === f.estado)).map(o => ({ id: o.id, local, tipo: 'actualizado' }));
         if (!items.length) { mostrarBanner(`No hay precios pendientes en ${local} en esta lista.`, 'warn'); return; }
         if (!confirm(`¿Marcar ${items.length} precio(s) como actualizados en ${local}?\nQueda a su nombre: "${cmpPV.como}".`)) return;
-        // Al instante en pantalla; se guarda en segundo plano (si falla, se desmarcan y avisa)
-        const ords = items.map(it => cmpOrd.ordenes.find(o => o.id === it.id)).filter(Boolean);
-        ords.forEach(o => { o.marcas[local] = o.marcas[local] || {}; o.marcas[local].actualizado = { por: nombreUsuario, en: 'guardando...', como: cmpPV.como }; });
-        almPintar();
-        try { cmpUsarOrdenes(await llamarApi({ action: 'cmp_marcar_lote', items, como: cmpPV.como, ver: cmpOrd.ver })); mostrarBanner(`${items.length} precio(s) marcados en ${local}.`, 'ok'); }
-        catch (e) { ords.forEach(o => { if (o.marcas[local]) delete o.marcas[local].actualizado; }); almPintar(); mostrarBanner('No se pudo marcar (se deshizo): ' + e.message, 'error'); }
+        // Al instante en pantalla; van a la misma cola que los clics sueltos (un solo pedido)
+        items.forEach(it => cmpMarcasPend.set(cmpMarcaClave(it.id, it.local, it.tipo), { id: it.id, local: it.local, tipo: it.tipo, como: cmpPV.como }));
+        cmpPonerPendientes(); almPintar();
+        cmpEnviarMarcas();
     }
     function cmpMarcaInfo(id, local, tipo) {
         const o = cmpOrd.ordenes.find(x => x.id === id), m = o && (o.marcas[local] || {})[tipo]; if (!m) return;
@@ -12953,11 +13007,9 @@ Reglas:
         ev.preventDefault();
         const r1 = document.querySelector('input[name="cmpComo"]:checked'), det = document.getElementById('cmpComoTxt').value.trim();
         // Se cierra y se marca al instante; se guarda en segundo plano (si falla, se desmarca y avisa)
-        const como = [r1 ? r1.value : '', det].filter(Boolean).join(' · '), o = cmpOrd.ordenes.find(x => x.id === id);
+        const como = [r1 ? r1.value : '', det].filter(Boolean).join(' · ');
         almCerrar();
-        if (o) { o.marcas[local] = o.marcas[local] || {}; o.marcas[local][tipo] = { por: nombreUsuario, en: 'guardando...', como }; almPintar(); }
-        try { cmpUsarOrdenes(await llamarApi({ action: 'cmp_marcar', id, local, tipo, como, ver: cmpOrd.ver })); }
-        catch (e) { if (o && o.marcas[local]) delete o.marcas[local][tipo]; almPintar(); mostrarBanner('No se pudo marcar (se deshizo): ' + e.message, 'error'); }
+        cmpEncolarMarca(id, local, tipo, como);
     }
     async function cmpQuitarMarca(id, local, tipo) {
         const c = await efePedirClave('Quitar la marca', `Se quita "${tipo === 'ingresado' ? 'ingresado' : 'precio actualizado'}" en ${local}. Queda registrado quién la quitó.`);
@@ -13477,7 +13529,7 @@ Reglas:
         if (r.error) { caja.className = 'marca-resultado mal'; caja.innerHTML = `<div class="marca-titulo">No se marcó</div><div class="marca-msj">${esc(r.error)}</div>`; }
         else {
             const foto = fotoDrive(r.foto, 300);
-            const accion = r.pregunta ? '¿Qué va a marcar?' : (MARCA_PASOS[r.accion] || r.accion) + ' · ' + horaAmPm(r.hora);
+            const accion = r.pregunta ? '¿Qué va a marcar?' : (r.repetido ? 'Ya tenía marcada: ' : '') + (MARCA_PASOS[r.accion] || r.accion) + ' · ' + horaAmPm(r.hora);   // pase repetido: no se marcó nada nuevo
             caja.className = 'marca-resultado ' + (r.pregunta ? '' : r.alerta ? 'alerta' : 'ok');
             caja.innerHTML = `<div class="marca-persona">${foto ? `<img src="${foto}" alt="">` : `<span class="marca-inicial">${esc(r.nombre.slice(0, 1))}</span>`}
                 <div><div class="marca-nombre">${esc(r.nombre)}</div><div class="marca-titulo">${esc(accion)}</div>
