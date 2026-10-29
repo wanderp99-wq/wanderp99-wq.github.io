@@ -3600,29 +3600,32 @@
     // Botón atrás del teléfono (Android) o del navegador = "← Atrás" del panel (igual que Esc: si hay una ventana abierta, solo la cierra).
     // Se deja una entrada "de guardia" en el historial del navegador; al pulsar atrás se consume, se hace el Atrás del panel y se vuelve a poner.
     // En Inicio, sin nada abierto, la primera vez avisa y la segunda sale de la aplicación.
-    // Chrome en Android salta las entradas del historial que la página puso sin que la persona tocara la pantalla: la guardia que se
-    // vuelve a poner justo después de pulsar atrás puede quedar "saltable" (el siguiente atrás se la pasaba y la aplicación se recargaba
-    // en Inicio o se cerraba). Por eso, después de cada atrás, al siguiente toque se pone una guardia nueva (con el toque sí cuenta).
-    let atrasPendiente = false, atrasAvisoEn = 0;
+    // Chrome (sobre todo en Android) SALTA las entradas del historial que la página puso sin que la persona tocara la pantalla.
+    // La guardia se ponía así: al abrir la app (se retoma la sesión sola), al terminar de entrar (después de esperar a Google) y justo
+    // después de cada atrás. Como ya había una guardia, nunca se ponía otra "con toque": el atrás se la saltaba y la app se recargaba
+    // (se veía Inicio y luego cargaba) o, sin nada antes, se cerraba. Ahora se sabe si la guardia actual se puso con un toque; si no,
+    // el siguiente toque o tecla real pone una nueva. "click" y "touchend" sí cuentan como toque (pointerdown en pantalla táctil no).
+    let atrasConGesto = false, atrasAvisoEn = 0;
+    const atrasHayGesto = () => !navigator.userActivation || navigator.userActivation.isActive;
     function atrasArmar() {
         if (!clave || vistaActual === 'login' || vistaActual === 'marcaje') return;
-        try { if (!(history.state && history.state.panelAtras)) history.pushState({ panelAtras: 1 }, ''); } catch (e) {}
+        const gesto = atrasHayGesto();
+        try {
+            if (!(history.state && history.state.panelAtras)) { history.pushState({ panelAtras: 1 }, ''); atrasConGesto = gesto; }
+            else if (!atrasConGesto && gesto) { history.pushState({ panelAtras: 2 }, ''); atrasConGesto = true; }
+        } catch (e) {}
     }
-    ['pointerdown', 'keydown'].forEach(tipo => document.addEventListener(tipo, e => {
-        if (!e.isTrusted || !atrasPendiente || !clave || vistaActual === 'login' || vistaActual === 'marcaje') return;
-        atrasPendiente = false;
-        try { history.pushState({ panelAtras: 2 }, ''); } catch (e) {}
-    }, true));
+    ['click', 'touchend', 'keydown'].forEach(tipo => document.addEventListener(tipo, e => { if (e.isTrusted) atrasArmar(); }, true));
     window.addEventListener('popstate', () => {
         if (!clave || vistaActual === 'login' || vistaActual === 'marcaje') return;
-        atrasPendiente = true;
+        atrasConGesto = false;   // la entrada a la que se volvió puede ser una saltable: el siguiente toque pone una guardia nueva
         const visible = el => el && !el.classList.contains('hidden') && el.getClientRects().length > 0;
         const abierto = [...document.querySelectorAll('.req-dlg-fondo, .efe-modal, #perDlg, [role="dialog"]')].some(visible) || document.querySelector('.ms.abierto');
         if (!abierto && vistaActual === 'menu' && !areaActual && !historialVistas.length) {
             if (Date.now() - atrasAvisoEn > 1500) mostrarBanner('Pulse atrás otra vez para salir.', 'ok');
             atrasAvisoEn = Date.now();
             // Si debajo quedó otra guardia, se baja hasta la entrada de la página: el siguiente atrás sí sale
-            if (history.state && history.state.panelAtras) { atrasPendiente = false; history.back(); }
+            if (history.state && history.state.panelAtras) history.back();
             return;
         }
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
@@ -12484,7 +12487,7 @@ Reglas:
                     ${ultimas.map(c => `<tr><td class="izq"><b>${esc(c.numero)}</b></td><td class="izq">${fechaBonita(c.fecha)} <small>${esc(c.hora)}</small></td><td class="izq">${esc(c.proveedor)}<small>Factura ${esc(c.factura || 's/n')} · ${esc(c.usuario)}</small></td>
                         <td>${c.renglones}</td><td>${fmt(c.total)}</td><td class="izq"><small>${Object.keys(c.notas).map(k => esc(CMP_SIGLA[k] || k) + ' ' + esc(c.notas[k])).join(' · ') || '—'}</small></td>
                         <td class="izq"><small>${Object.keys(c.queda).map(k => { const p = almProducto(k); return esc(p ? p.descripcion : k) + ': ' + almCant(c.queda[k], p && p.tipo) + ' ' + almUnidad(p && p.tipo); }).join('<br>') || 'Nada'}</small></td>
-                        <td>${c.fotos.map((u, i) => `<a class="btn-ghost btn-mini" href="${esc(u)}" target="_blank" rel="noopener">Foto${c.fotos.length > 1 ? ' ' + (i + 1) : ''}</a>`).join(' ')}</td></tr>`).join('')}</tbody></table></div>`}</div>`;
+                        <td style="white-space:nowrap">${(c.detalle || []).length ? `<button type="button" class="btn-ghost btn-mini" title="Imprimir cuánto va a cada tienda" onclick="cmpImprimirDistribucion('${esc(c.numero)}')">🖨 Distribución</button> ` : ''}${c.fotos.map((u, i) => `<a class="btn-ghost btn-mini" href="${esc(u)}" target="_blank" rel="noopener">Foto${c.fotos.length > 1 ? ' ' + (i + 1) : ''}</a>`).join(' ')}</td></tr>`).join('')}</tbody></table></div>`}</div>`;
     }
     async function cmpCargarCompras() {
         cmpCompras = [];   // mientras carga no se vuelve a pedir
@@ -12985,6 +12988,48 @@ Reglas:
                 ${tiendas.map(t => `<th class="c">${f.tienda ? 'Ingresó · Precio' : esc(CMP_SIGLA[t])}</th>`).join('')}</tr></thead><tbody>${filas}</tbody></table>
             <div class="pie">${f.tienda ? 'Tilde cada casilla al ingresar la mercancía y al cambiar el precio en el sistema de la tienda.' : 'En cada tienda: la primera casilla es "ingresó" (solo si recibe mercancía) y la segunda "precio actualizado".'} ✓ = ya marcado en el sistema.</div>
             <div class="firma"><div>Actualizado por</div><div>Revisado por</div></div></body></html>`;
+        let fr = document.getElementById('almImprimeMarco'); if (fr) fr.remove();
+        fr = document.createElement('iframe'); fr.id = 'almImprimeMarco'; fr.setAttribute('aria-hidden', 'true');
+        fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+        document.body.appendChild(fr);
+        const w = fr.contentWindow; w.document.open(); w.document.write(html); w.document.close();
+        setTimeout(() => { try { w.focus(); w.print(); } catch (e) { mostrarBanner('No se pudo abrir la impresión: ' + e.message, 'error'); } }, 200);
+    }
+    // Distribución de una compra guardada (Compras recientes): cuánto de cada producto va a cada tienda y cuánto queda en el almacén,
+    // con el N° de la nota de cada tienda y espacio para firmar el despacho
+    function cmpImprimirDistribucion(numero) {
+        const c = (cmpCompras || []).find(x => x.numero === numero);
+        if (!c || !(c.detalle || []).length) { mostrarBanner('Esa compra no tiene el detalle guardado.', 'warn'); return; }
+        const tipo = l => (almProducto(l.codigo) || {}).tipo, cant = (v, l) => v > 0 ? almCant(v, tipo(l)) : '';
+        const reparte = l => CMP_TIENDAS.reduce((s, t) => s + (Number((l.dist || {})[t]) || 0), 0);
+        const filas = c.detalle.map((l, i) => {
+            const queda = cmpR2(l.cantidad - reparte(l));
+            return `<tr><td class="n">${i + 1}</td><td class="cod">${esc(l.codigo || '—')}</td><td class="prod">${esc(l.descripcion)}</td>
+                <td class="c lleg">${cant(l.cantidad, l)} <small>${almUnidad(tipo(l))}</small></td>
+                ${CMP_TIENDAS.map(t => `<td class="c t">${cant((l.dist || {})[t], l) || '<span class="nada">—</span>'}</td>`).join('')}
+                <td class="c q">${queda > 0 ? cant(queda, l) : '<span class="nada">—</span>'}</td></tr>`;
+        }).join('');
+        const renglonesDe = t => c.detalle.filter(l => (Number((l.dist || {})[t]) || 0) > 0).length;
+        const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Distribución compra ${esc(c.numero)}</title><style>
+            @page{size:letter;margin:10mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+            body{margin:0;font-family:Arial,Helvetica,sans-serif;color:#0f172a;font-size:9.5pt}
+            h1{font-size:13pt;margin:0}.sub{color:#475569;font-size:8.5pt;margin:1mm 0 3mm;border-bottom:.5mm solid #44AC00;padding-bottom:2mm}
+            table{width:100%;border-collapse:collapse}th{font-size:7.5pt;text-transform:uppercase;color:#475569;text-align:left;border-bottom:.3mm solid #0f172a;padding:1.2mm 1mm}
+            th small{display:block;text-transform:none;font-weight:400}
+            td{border-bottom:.2mm solid #cbd5e1;padding:1.6mm 1mm;vertical-align:middle}tr{break-inside:avoid}
+            td.n{color:#64748b;width:6mm}td.cod{color:#475569;font-size:8pt;white-space:nowrap}
+            td.c,th.c{text-align:center;white-space:nowrap}td.lleg{font-weight:700}td.lleg small{color:#64748b;font-weight:400}
+            td.t{font-weight:700;color:#2f7a00;font-size:10.5pt;border-left:.2mm solid #e2e8f0}td.q{font-weight:700;border-left:.3mm solid #0f172a}
+            .nada{color:#cbd5e1;font-weight:400}tfoot td{border-bottom:0;border-top:.3mm solid #0f172a;font-size:8pt;color:#475569;text-align:center}
+            .firma{margin-top:12mm;display:grid;grid-template-columns:repeat(${CMP_TIENDAS.length + 1},1fr);gap:6mm}.firma div{border-top:.3mm solid #0f172a;text-align:center;padding-top:1mm;font-size:7.5pt;color:#475569}
+            </style></head><body>
+            <h1>Distribución · compra ${esc(c.numero)}</h1>
+            <div class="sub">${esc(c.proveedor)} · factura ${esc(c.factura || 's/n')}${c.fechaFactura ? ' del ' + esc(fechaBonita(c.fechaFactura)) : ''} · registrada ${esc(fechaBonita(c.fecha))} ${esc(c.hora || '')} por ${esc(c.usuario)} · ${c.detalle.length} renglón(es) · impreso por ${esc(nombreUsuario)}</div>
+            <table><thead><tr><th>#</th><th>Código</th><th>Producto</th><th class="c">Llegó</th>
+                ${CMP_TIENDAS.map(t => `<th class="c">${esc(CMP_SIGLA[t])}<small>${esc(t)}${c.notas[t] ? '<br>Nota ' + esc(c.notas[t]) : ''}</small></th>`).join('')}<th class="c">Queda<small>almacén</small></th></tr></thead>
+                <tbody>${filas}</tbody>
+                <tfoot><tr><td colspan="4"></td>${CMP_TIENDAS.map(t => `<td>${renglonesDe(t)} renglón(es)</td>`).join('')}<td></td></tr></tfoot></table>
+            <div class="firma"><div>Despachado por</div>${CMP_TIENDAS.map(t => `<div>Recibido ${esc(CMP_SIGLA[t])}</div>`).join('')}</div></body></html>`;
         let fr = document.getElementById('almImprimeMarco'); if (fr) fr.remove();
         fr = document.createElement('iframe'); fr.id = 'almImprimeMarco'; fr.setAttribute('aria-hidden', 'true');
         fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
