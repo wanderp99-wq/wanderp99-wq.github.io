@@ -828,8 +828,8 @@
         .header-actions { position: relative; }
         .campana { position: relative; padding: .45rem .6rem; line-height: 0; color: var(--text-muted); }
         .campana.con-pend { color: var(--text); }
-        .campana-n { position: absolute; top: -.35rem; right: -.35rem; min-width: 1.15rem; height: 1.15rem; padding: 0 .3rem; border-radius: 999px; background: var(--amar-bg); color: var(--amar-txt);
-                     border: 1px solid var(--amar); font-size: .66rem; font-weight: 800; line-height: 1.05rem; text-align: center; }
+        .campana-n { position: absolute; top: -.35rem; right: -.35rem; min-width: 1.15rem; height: 1.15rem; padding: 0 .3rem; border-radius: 999px; background: var(--ok-bg); color: var(--ok);
+                     border: 1px solid var(--ok); font-size: .66rem; font-weight: 800; line-height: 1.05rem; text-align: center; }
         .pend-panel { position: absolute; right: 0; top: calc(100% + .5rem); z-index: 950; width: min(380px, calc(100vw - 2rem)); max-height: min(70vh, 560px); overflow: auto;
                       background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 12px 32px var(--shadow); padding: .6rem .7rem; text-align: left; }
         .pend-cab { display: flex; justify-content: space-between; align-items: center; margin-bottom: .35rem; }
@@ -839,12 +839,12 @@
         .pend-grupo { border-top: 1px solid var(--border); padding: .35rem 0; }
         .pend-grupo summary { display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: 700; font-size: .9rem; list-style: none; }
         .pend-grupo summary::-webkit-details-marker { display: none; }
-        .pend-grupo summary b { font-size: .72rem; background: var(--amar-bg); color: var(--amar-txt); border-radius: 999px; padding: .05rem .5rem; }
+        .pend-grupo summary b { font-size: .72rem; background: var(--ok-bg); color: var(--ok); border-radius: 999px; padding: .05rem .5rem; }
         .pend-item { display: block; width: 100%; text-align: left; background: none; border: 0; padding: .35rem .3rem; border-radius: 8px; font-size: .82rem; color: var(--text); cursor: pointer; }
         .pend-item:hover, .pend-item:focus-visible { background: var(--list-bg); }
         .pend-vacio { color: var(--ok); font-size: .88rem; padding: .6rem 0; }
         .pend-pie { display: flex; justify-content: space-between; align-items: center; gap: .5rem; flex-wrap: wrap; border-top: 1px solid var(--border); margin-top: .35rem; padding-top: .45rem; font-size: .72rem; color: var(--text-muted); }
-        .m-pend { font-size: .72rem; font-weight: 700; color: var(--amar-txt); } .m-pend:empty { display: none; }
+        .m-pend { font-size: .72rem; font-weight: 700; color: var(--ok); } .m-pend:empty { display: none; }
         /* Nómina · modificar días y horas */
         .nom-asis-tabla th { width: 6.5rem; white-space: nowrap; vertical-align: top; text-align: left; }
         .nom-asis-fila { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .5rem; padding: .25rem 0; }
@@ -3198,7 +3198,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-10-29.9';
+    const VERSION_SERVIDOR = '2026-10-29.11';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -13558,16 +13558,22 @@ Reglas:
 
     // ---------- Productos e inventario ----------
     let almProdFiltro = { bus: '', cat: '', ver: 'activos' };
+    const ALM_ORDEN = new Intl.Collator('es');   // ordenar 1.000+ descripciones: mucho más rápido que localeCompare uno por uno
+    // Buscar: se redibuja cuando se deja de escribir un momento (no con cada letra)
+    let almProdBusEspera = 0;
+    function almProdBuscar(v) { almProdFiltro.bus = v; clearTimeout(almProdBusEspera); almProdBusEspera = setTimeout(almPintar, 180); }
     function almProductosVista() {
         const ps = almDatos.productos, f = almProdFiltro;
         const bajo = p => p.activo && p.minimo > 0 && p.existencia <= p.minimo;
         const q = asisgClave(f.bus);
-        const l = ps.filter(p => (!q || asisgClave(p.codigo + ' ' + p.descripcion + ' ' + p.proveedor).includes(q)) && (!f.cat || p.categoria === f.cat)
+        // La clave de búsqueda de cada producto se arma una vez (no en cada letra que se escribe)
+        const clave = p => p._bus || (p._bus = asisgClave(p.codigo + ' ' + p.descripcion + ' ' + p.proveedor));
+        const l = ps.filter(p => (!q || clave(p).includes(q)) && (!f.cat || p.categoria === f.cat)
             && (f.ver === 'todos' || (f.ver === 'inactivos' ? !p.activo : p.activo && (f.ver === 'activos' || (f.ver === 'bajo' ? bajo(p) : f.ver === 'sin' ? p.existencia <= 0 : p.existencia > 0)))))
-            .sort((a, b) => a.descripcion.localeCompare(b.descripcion, 'es'));
+            .sort((a, b) => ALM_ORDEN.compare(a.descripcion, b.descripcion));
         const activos = ps.filter(p => p.activo);
         return `<div class="filters alm-filtros">
-                <div><label for="almPBus">Buscar</label><input type="search" id="almPBus" autocomplete="off" placeholder="Código, descripción, proveedor..." value="${esc(f.bus)}" oninput="almProdFiltro.bus=this.value;almPintar()" data-primero></div>
+                <div><label for="almPBus">Buscar</label><input type="search" id="almPBus" autocomplete="off" placeholder="Código, descripción, proveedor..." value="${esc(f.bus)}" oninput="almProdBuscar(this.value)" data-primero></div>
                 <div><label for="almPCat">Categoría</label><select id="almPCat" onchange="almProdFiltro.cat=this.value;almPintar()"><option value="">Todas</option>${almDatos.categorias.map(c => `<option value="${esc(c.nombre)}"${c.nombre === f.cat ? ' selected' : ''}>${esc(c.codigo + ' · ' + c.nombre)}</option>`).join('')}</select></div>
                 <div><label for="almPVer">Mostrar</label><select id="almPVer" onchange="almProdFiltro.ver=this.value;almPintar()">
                     ${[['activos', 'Activos'], ['con', 'Con existencia'], ['sin', 'Sin existencia'], ['bajo', 'Bajo el mínimo'], ['inactivos', 'Inactivos'], ['todos', 'Todos']].map(([v, t]) => `<option value="${v}"${v === f.ver ? ' selected' : ''}>${t}</option>`).join('')}</select></div>
@@ -14217,7 +14223,9 @@ Reglas:
             const limpio = r.replace(/\t/g, ' ').replace(/\s+/g, ' ');
             const mf = limpio.match(/^(\d{2})[\/-](\d{2})[\/-](\d{4})(?:\s+(\d{1,2}:\d{2}))?\s+(\S+)\s*(.*)$/);
             if (!mf) return;
-            const [, d, m, a, hora, ref, resto] = mf;
+            let [, d, m, a, hora, ref, resto] = mf;
+            // BDV a veces trae "25/10/2026 - 15:36 0050938806029 OP PAGOMOVIL...": el "-" no es la referencia; va después de la hora
+            if (!/\d/.test(ref)) { const x = /^(?:(\d{1,2}:\d{2})\s+)?(\d{6,})\s*(.*)$/.exec(resto); if (x) { hora = hora || x[1]; ref = x[2]; resto = x[3]; } }
             const dc = resto.match(/\b(D[EÉ]BITO|CR[EÉ]DITO)\b/i);
             const despues = dc ? resto.slice(dc.index + dc[0].length) : resto;
             const montos = despues.match(dinero) || [];
