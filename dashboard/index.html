@@ -3198,7 +3198,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-10-29.8';
+    const VERSION_SERVIDOR = '2026-10-29.9';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -12407,6 +12407,22 @@
         if (p && !sinPrecios) { const pr = cmpPrecios(p, l.costo, l, l.libre); Object.assign(l, { detal: pr.detal, mayor: pr.mayor }, l.margenDetal ? {} : { margenDetal: pr.margenDetal }, l.margenMayor ? {} : { margenMayor: pr.margenMayor }); }
         return true;
     }
+    // Unidades por bulto escritas en la descripción: "170GR X 24" / "1KG X 12" (el número va después de la X porque antes hay una medida)
+    // o "30X1K", "6X28G", "12X1.5L", "48 X1" (el número va antes). 0 si no dice.
+    const CMP_MEDIDA = '(?:KGS?|K|GRS?|G|LTS?|L|ML|CC|OZ|UND|UN|U)';
+    function cmpUnidadesEnDescripcion(d) {
+        const m = new RegExp(`(\\d+(?:[.,]\\d+)?)\\s*(${CMP_MEDIDA})?\\.?\\s*X\\s*(\\d+(?:[.,]\\d+)?)\\s*(${CMP_MEDIDA})?\\b`, 'i').exec(String(d || ''));
+        if (!m) return 0;
+        const v = Number(String(m[2] && !m[4] ? m[3] : m[1]).replace(',', '.'));
+        return Number.isInteger(v) && v > 1 && v <= 500 ? v : 0;
+    }
+    // Bulto que no se detectó: se escribe cuántas unidades trae
+    function cmpEmpaquePedir(i) {
+        const l = cmp.lineas[i]; if (!l || !l.leido) return;
+        const n = Math.round(Number(String(prompt('¿Cuántas unidades trae cada bulto, caja o paquete?', l.leido.pe || '') || '').replace(',', '.')) || 0);
+        if (!(n > 1)) return;
+        l.leido.pe = n; cmpEmpaque(i, true);
+    }
     function cmpEmpaque(i, si) { const l = cmp.lineas[i]; if (!l) return; l.empaque = si; cmpLineaRecalc(l); cmpPintarCompra(document.getElementById('almContenido'), true); cmpAvanceProgramar(); }
     function cmpEmpaqueTodos(si) { cmp.lineas.forEach(l => { if (l.leido && l.leido.pe > 1) { l.empaque = si; cmpLineaRecalc(l); } }); cmpPintarCompra(document.getElementById('almContenido'), true); cmpAvanceProgramar(); }
     function cmpCambiarMoneda(v) { if (!cmp.leido) cmp.leido = {}; cmp.leido.moneda = v; cmpTasaAplicar(true); }
@@ -12446,8 +12462,10 @@ Reglas:
 - Números con punto decimal y sin separador de miles (ejemplo: 1234.50).
 - COSTO_UNITARIO = precio unitario SIN IVA, tal como aparece en la factura.
 - IVA = 16 si el producto es gravado (G) y 0 si es exento (E).
-- UNIDAD: UND, KG, CAJA, BULTO, PAQUETE o FARDO, como diga la factura.
-- UNIDADES_POR_EMPAQUE: si es CAJA, BULTO, PAQUETE o FARDO, cuántas unidades trae (por ejemplo 12X800ML = 12); si no, 0.
+- UNIDAD: UND, KG, CAJA, BULTO, PAQUETE o FARDO, como diga la factura. Si la descripción dice cuántas unidades trae, es BULTO.
+- UNIDADES_POR_EMPAQUE: cuántas unidades trae cada bulto, caja o paquete, según la factura o la descripción. Ejemplos: "SARDINA 170GR X 24" = 24, "DETERGENTE 1KG X 12" = 12, "AZUCAR 30X1K" = 30, "JUGO 12X1.5L" = 12, "GALLETA 6X28G" = 6, "CHUPETA 48 X1" = 48. Si no lo dice, 0.
+- Si el renglón solo muestra el total (sin precio unitario), COSTO_UNITARIO = total ÷ cantidad. La cantidad a veces va al final de la descripción ("... 30X1K 1 (E)" = cantidad 1).
+- (E) = exento (IVA 0); T16,00% o (G) = gravado (IVA 16).
 - CODIGO: el código del producto del proveedor. BARRAS: el código de barras si aparece; si no, déjalo vacío.
 - No inventes datos: si algo no se ve, déjalo vacío.`;
     // Lee el texto que devolvió la IA: el formato de arriba, una tabla con | o el JSON de Gemini
@@ -12690,8 +12708,9 @@ Reglas:
             const iva = 1 + (l.iva || 0) / 100;
             let q = Number(l.cantidad) || 0, cu = Number(l.costoUnitario) || 0;
             // Caja, bulto o paquete: se pasa a unidades (se ingresa y se reparte por unidad). "12X800ML" = 12 unidades por caja
-            const pe = l.porEmpaque > 1 ? l.porEmpaque : Number((/(\d+)\s*[Xx]\s*\d/.exec(l.descripcionFactura || '') || [])[1]) || 0;
-            let empaque = /CAJA|BULTO|BUL|FARDO|PAQ|BOLSA|DOCENA|\bCJ\b|\bBL\b/i.test(l.unidad || '') && pe > 1;
+            // Los mayoristas no dicen "bulto": lo dice la descripción ("170GR X 24", "30X1K"). Se pasa a unidades salvo que se venda por kilo
+            const peDesc = cmpUnidadesEnDescripcion(l.descripcionFactura), pe = l.porEmpaque > 1 ? l.porEmpaque : peDesc;
+            let empaque = pe > 1 && !/^(KG|KGS|KILO)/i.test(String(l.unidad || '').trim());
             // Se compara con el total del renglón (con o sin IVA): si la IA puso el costo por unidad y la cantidad en bultos (o al revés), se corrige
             const cerca = (a, b) => b > 0 && Math.abs(a - b) <= Math.max(0.02, b * 0.015);
             const cuadra = c => cerca(q * c, l.total) || cerca(q * c * iva, l.total);
@@ -12751,6 +12770,7 @@ Reglas:
                 ${p && p.libre ? `<small>Sin código: se reparte completo a las tiendas${queda > 0 ? ' · <a href="#" onclick="event.preventDefault(); almEditarProducto(\'\', \'\')">registrarlo para dejar en el almacén</a>' : ''}</small>` : ''}
                 ${l.leido && l.leido.pe > 1 ? (l.empaque ? `<small>Empaque: ${esc(l.conversion)} · <a href="#" onclick="event.preventDefault(); cmpEmpaque(${i}, false)">la cantidad ya está en unidades</a></small>`
                     : `<small>Tal como la factura: ${fmt(l.leido.cantidad)} ${esc(String(l.leido.unidad || 'und').toLowerCase())} · <a href="#" onclick="event.preventDefault(); cmpEmpaque(${i}, true)">es por bulto de ${l.leido.pe}</a></small>`)
+                  : l.leido ? `<small>Por unidad · <a href="#" onclick="event.preventDefault(); cmpEmpaquePedir(${i})">¿es por bulto?</a></small>`
                   : l.conversion ? `<small>Empaque: ${esc(l.conversion)}</small>` : ''}
                 ${l.descripcionFactura ? `<small>Factura: ${esc(l.descripcionFactura)}${l.unidad ? ' (' + esc(l.unidad) + ')' : ''}${l.origenCodigo === 'recordado' ? ' · ✓ recordado' : l.origenCodigo === 'barras' ? ' · ✓ por código de barras' : l.origenCodigo === 'parecido' ? ' · <b>parecido: revíselo</b>' : l.origenCodigo === 'sugerido' ? ' · sugerido' : ''}</small>` : ''}
                 <small class="cmp-regla">${esc(l.regla || '')}</small></td>
