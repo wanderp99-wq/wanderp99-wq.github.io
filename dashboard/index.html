@@ -12392,9 +12392,28 @@
     const cmpTasaCompra = () => cmp.tasaManual > 0 ? cmp.tasaManual : cmpTasaBcvFecha();
     // Cambió la tasa (otra fecha o escrita a mano): los precios en Bs se ven con la nueva; si la factura vino en Bs,
     // sus costos se vuelven a pasar a $ (desde el costo en Bs de cada renglón) y se recalculan los precios
-    function cmpTasaAplicar() {
+    // Cada renglón leído guarda lo que decía la factura (cantidad y costo con IVA, en su moneda y su unidad, y las unidades por empaque):
+    // con eso se rehacen la cantidad y el costo en $ si cambia la tasa, la moneda o si es (o no) por bulto
+    const cmpMonedaFactura = () => cmp.leido && cmp.leido.moneda === 'BS' ? 'BS' : 'USD';
+    function cmpLineaRecalc(l, sinPrecios) {
+        const x = l.leido; if (!x) return false;
+        const tasa = cmpMonedaFactura() === 'BS' ? cmpTasaCompra() : 0, pe = l.empaque && x.pe > 1 ? x.pe : 1, costo = x.costo / pe;
+        l.cantidad = Math.round(x.cantidad * pe * 1000) / 1000;
+        l.costoBs = tasa > 0 ? costo : 0;
+        l.costo = cmpR3(tasa > 0 ? costo / tasa : costo);
+        l.conversion = pe > 1 ? `${fmt(x.cantidad)} ${String(x.unidad || 'bulto').toLowerCase()} × ${pe} = ${fmt(l.cantidad)} unidades a ${tasa > 0 ? 'Bs ' : '$ '}${fmt3(costo)}` : '';
+        const p = cmpProd(l);
+        // Los márgenes elegidos se conservan (si se recalcula varias veces no se van corriendo con el redondeo del precio)
+        if (p && !sinPrecios) { const pr = cmpPrecios(p, l.costo, l, l.libre); Object.assign(l, { detal: pr.detal, mayor: pr.mayor }, l.margenDetal ? {} : { margenDetal: pr.margenDetal }, l.margenMayor ? {} : { margenMayor: pr.margenMayor }); }
+        return true;
+    }
+    function cmpEmpaque(i, si) { const l = cmp.lineas[i]; if (!l) return; l.empaque = si; cmpLineaRecalc(l); cmpPintarCompra(document.getElementById('almContenido'), true); cmpAvanceProgramar(); }
+    function cmpEmpaqueTodos(si) { cmp.lineas.forEach(l => { if (l.leido && l.leido.pe > 1) { l.empaque = si; cmpLineaRecalc(l); } }); cmpPintarCompra(document.getElementById('almContenido'), true); cmpAvanceProgramar(); }
+    function cmpCambiarMoneda(v) { if (!cmp.leido) cmp.leido = {}; cmp.leido.moneda = v; cmpTasaAplicar(true); }
+    function cmpTasaAplicar(moneda) {
         const tasa = cmpTasaCompra();
         if (tasa > 0) cmp.lineas.forEach(l => {
+            if (l.leido) { if (moneda || cmpMonedaFactura() === 'BS') cmpLineaRecalc(l); return; }   // factura en $: la tasa no cambia sus costos
             if (!(l.costoBs > 0)) return;
             l.costo = cmpR3(l.costoBs / tasa);
             const p = cmpProd(l); if (!p) return;
@@ -12666,21 +12685,25 @@ Reglas:
         // Tasa: la impresa en la factura (si vino en Bs y la trae); si no, la del BCV del día de la factura (se puede cambiar)
         cmp.fechaFactura = r.fechaFactura || '';
         cmp.tasaManual = r.moneda === 'BS' && r.tasa > 0 && Math.abs(r.tasa - cmpTasaBcvFecha()) > 1e-9 ? r.tasa : 0;
-        const tasa = r.moneda === 'BS' ? cmpTasaCompra() : 0;
+        cmp.leido = r;   // cmpLineaRecalc usa su moneda
         const lineas = (r.lineas || []).map(l => {
-            // Costo en $ con el IVA incluido (es lo que se paga); si la factura está en Bs, se pasa a $ con la tasa (y se guarda en Bs, por si cambia la tasa)
-            let costo = l.costoUnitario * (1 + (l.iva || 0) / 100), cantidad = l.cantidad, conversion = '';
+            const iva = 1 + (l.iva || 0) / 100;
+            let q = Number(l.cantidad) || 0, cu = Number(l.costoUnitario) || 0;
             // Caja, bulto o paquete: se pasa a unidades (se ingresa y se reparte por unidad). "12X800ML" = 12 unidades por caja
-            const porEmpaque = l.porEmpaque > 1 ? l.porEmpaque : Number((/(\d+)\s*[Xx]\s*\d/.exec(l.descripcionFactura || '') || [])[1]) || 0;
-            if (/CAJA|BULTO|FARDO|PAQ|BOLSA|DOCENA|\bCJ\b|\bBL\b/i.test(l.unidad || '') && porEmpaque > 1) {
-                cantidad = cantidad * porEmpaque; costo = costo / porEmpaque;
-                conversion = `${fmt(l.cantidad)} ${String(l.unidad).toLowerCase()} × ${porEmpaque} = ${fmt(cantidad)} unidades a ${tasa > 0 ? 'Bs ' + fmt3(costo) : '$ ' + fmt3(costo)}`;
+            const pe = l.porEmpaque > 1 ? l.porEmpaque : Number((/(\d+)\s*[Xx]\s*\d/.exec(l.descripcionFactura || '') || [])[1]) || 0;
+            let empaque = /CAJA|BULTO|BUL|FARDO|PAQ|BOLSA|DOCENA|\bCJ\b|\bBL\b/i.test(l.unidad || '') && pe > 1;
+            // Se compara con el total del renglón (con o sin IVA): si la IA puso el costo por unidad y la cantidad en bultos (o al revés), se corrige
+            const cerca = (a, b) => b > 0 && Math.abs(a - b) <= Math.max(0.02, b * 0.015);
+            const cuadra = c => cerca(q * c, l.total) || cerca(q * c * iva, l.total);
+            if (l.total > 0 && q > 0 && !cuadra(cu) && pe > 1) {
+                if (empaque && cuadra(cu * pe)) cu = cu * pe;          // cantidad en bultos y costo por unidad: el costo del bulto
+                else if (empaque && cuadra(cu / pe)) { empaque = false; cu = cu / pe; }   // la cantidad ya venía en unidades: el costo de una unidad
             }
-            const costoBs = tasa > 0 ? costo : 0;
-            if (tasa > 0) costo = costo / tasa;
             const x = cmpLineaNueva({ codigo: l.codigo, descripcion: String(l.descripcionFactura || '').trim().toUpperCase(), claveProveedor: l.claveProveedor,
-                                      descripcionFactura: [l.codigoProveedor, l.descripcionFactura].filter(Boolean).join(' · '), iva: l.iva || 0, conversion,
-                                      unidad: l.unidad, cantidad: Math.round(cantidad * 1000) / 1000, costo: cmpR3(costo), costoBs, origenCodigo: l.origenCodigo });
+                                      descripcionFactura: [l.codigoProveedor, l.descripcionFactura].filter(Boolean).join(' · '), iva: l.iva || 0,
+                                      unidad: l.unidad, origenCodigo: l.origenCodigo, empaque,
+                                      leido: { cantidad: q, costo: cu * iva, pe: pe > 1 ? pe : 0, unidad: l.unidad || '' } });
+            cmpLineaRecalc(x, true);
             cmpAplicarSugerencia(x);
             return x;
         });
@@ -12690,7 +12713,7 @@ Reglas:
         cmpAvanceEstado = '';
         cmpPintarCompra(document.getElementById('almContenido'), true);
         cmpAvanceProgramar();   // lo leído queda guardado en "Compras en curso" (no se pierde si se cierra la página)
-        if (tasa > 0) mostrarBanner(`La factura está en bolívares: los costos se pasaron a $ con la tasa ${fmt(tasa)}. Revíselos.`, 'warn');
+        if (r.moneda === 'BS' && cmpTasaCompra() > 0) mostrarBanner(`La factura está en bolívares: los costos se pasaron a $ con la tasa ${fmt(cmpTasaCompra())}. Revíselos.`, 'warn');
     }
     function cmpSinFoto() {
         Object.assign(cmp, { paso: 'revisar', leido: null, proveedorId: '', proveedorLeido: null, factura: '', fechaFactura: fechaLocalHoy(), tasaManual: 0, enlaces: [], lineas: [cmpLineaNueva()], borradorId: null, borradorVer: '' });
@@ -12726,7 +12749,9 @@ Reglas:
                 ${p && !p.libre ? `<b>${esc(p.descripcion)}</b>` : `<input type="text" class="cmp-desc" value="${esc(l.descripcion)}" placeholder="Descripción del producto" autocomplete="off" oninput="cmp.lineas[${i}].descripcion=this.value" onchange="cmpDescripcion(${i})">`}</div>
                 ${mal ? '<small style="color:var(--danger)">No existe ese código: bórrelo para trabajar con la descripción</small>' : ''}
                 ${p && p.libre ? `<small>Sin código: se reparte completo a las tiendas${queda > 0 ? ' · <a href="#" onclick="event.preventDefault(); almEditarProducto(\'\', \'\')">registrarlo para dejar en el almacén</a>' : ''}</small>` : ''}
-                ${l.conversion ? `<small>Empaque: ${esc(l.conversion)}</small>` : ''}
+                ${l.leido && l.leido.pe > 1 ? (l.empaque ? `<small>Empaque: ${esc(l.conversion)} · <a href="#" onclick="event.preventDefault(); cmpEmpaque(${i}, false)">la cantidad ya está en unidades</a></small>`
+                    : `<small>Tal como la factura: ${fmt(l.leido.cantidad)} ${esc(String(l.leido.unidad || 'und').toLowerCase())} · <a href="#" onclick="event.preventDefault(); cmpEmpaque(${i}, true)">es por bulto de ${l.leido.pe}</a></small>`)
+                  : l.conversion ? `<small>Empaque: ${esc(l.conversion)}</small>` : ''}
                 ${l.descripcionFactura ? `<small>Factura: ${esc(l.descripcionFactura)}${l.unidad ? ' (' + esc(l.unidad) + ')' : ''}${l.origenCodigo === 'recordado' ? ' · ✓ recordado' : l.origenCodigo === 'barras' ? ' · ✓ por código de barras' : l.origenCodigo === 'parecido' ? ' · <b>parecido: revíselo</b>' : l.origenCodigo === 'sugerido' ? ' · sugerido' : ''}</small>` : ''}
                 <small class="cmp-regla">${esc(l.regla || '')}</small></td>
             <td>${n('cantidad', l.cantidad, 'cmp-n')}<small>${p ? almUnidad(p.tipo) : ''}</small></td>
@@ -12782,13 +12807,17 @@ Reglas:
                     <div><label for="cmpTasa">Tasa (Bs por $)</label><input type="number" id="cmpTasa" min="0" step="0.0001" value="${cmpTasaCompra() || ''}" onchange="cmpCambiarTasaCompra(this.value)">
                         <small class="nota" style="margin:.25rem 0 0">${cmp.tasaManual > 0 ? `Escrita a mano · <a href="#" onclick="event.preventDefault(); cmp.tasaManual=0; cmpTasaAplicar()">usar la del BCV (${fmt(cmpTasaBcvFecha())})</a>`
                             : (() => { const t = tasaBCVdel(cmp.fechaFactura || fechaLocalHoy()); return t ? `BCV del ${fechaBonita(t[0])}` : 'Sin tasa del BCV: escríbala'; })()}</small></div>
+                    ${cmp.lineas.some(l => l.leido) ? `<div><label for="cmpMoneda">Costos de la factura en</label><select id="cmpMoneda" onchange="cmpCambiarMoneda(this.value)">
+                        <option value="USD"${cmpMonedaFactura() === 'USD' ? ' selected' : ''}>Dólares ($)</option><option value="BS"${cmpMonedaFactura() === 'BS' ? ' selected' : ''}>Bolívares (Bs): se pasan a $ con la tasa</option></select></div>` : ''}
                 </div>
                 <div class="nota">Escriba el <b>%</b> y el precio de venta sale solo (costo ÷ (1 − %)); también puede escribir el precio y el % se calcula. El % sale sugerido según el manual (o el de la última vez). Los productos <b>sin código</b> se trabajan con su descripción y se reparten completos; solo lo que queda en el almacén necesita estar registrado. Las cajas y bultos se pasan a unidades.</div>
                 ${cmpVerHTML()}
                 <div class="tabla-wrap"><table class="${cmpClaseVer()}" id="cmpTabla" data-sin-paginar><thead><tr><th>#</th><th class="izq">Producto</th><th>Cant.</th><th class="g-c">Costo $</th><th class="g-m">% detal</th><th class="g-u">Detal $</th><th class="g-b">Detal Bs</th><th class="g-m">% mayor</th><th class="g-u">Mayor $</th><th class="g-b">Mayor Bs</th>
                     ${CMP_TIENDAS.map(t => `<th class="cmp-t g-d g-t g-t-${CMP_SIGLA[t]}" title="${esc(t)}">${CMP_SIGLA[t]}</th>`).join('')}<th class="g-d">Queda</th><th></th></tr></thead>
                     <tbody>${cmp.lineas.map(cmpFilaHTML).join('')}</tbody></table></div>
-                <div class="req-acciones"><button type="button" class="btn-ghost" onclick="cmp.lineas.push(cmpLineaNueva());cmpPintarCompra(document.getElementById('almContenido'), true);cmpAvanceProgramar()">＋ Agregar renglón</button></div>
+                <div class="req-acciones"><button type="button" class="btn-ghost" onclick="cmp.lineas.push(cmpLineaNueva());cmpPintarCompra(document.getElementById('almContenido'), true);cmpAvanceProgramar()">＋ Agregar renglón</button>
+                    ${cmp.lineas.some(l => l.leido && l.leido.pe > 1) ? `<button type="button" class="btn-ghost" onclick="cmpEmpaqueTodos(false)" title="Las cantidades y costos quedan tal como los trae la factura">Todos tal como la factura</button>
+                        <button type="button" class="btn-ghost" onclick="cmpEmpaqueTodos(true)" title="Los bultos, cajas y paquetes se pasan a unidades">Todos los bultos a unidades</button>` : ''}</div>
                 <div class="cmp-pie" id="cmpPie">${cmpPieHTML()}</div>
                 <div class="login-error" id="cmpError"></div>
                 <div class="req-acciones" style="justify-content:flex-end;align-items:center;margin-bottom:0"><small class="nota" id="cmpAvance" style="margin:0 auto 0 0" title="El avance se guarda solo en Google: se puede seguir después o en otro equipo (Compras en curso)">${esc(cmpAvanceEstado || 'El avance se guarda solo mientras trabaja')}</small>
@@ -12816,7 +12845,7 @@ Reglas:
         const total = cmp.lineas.reduce((s, l) => s + (l.cantidad || 0) * (l.costo || 0), 0);
         let leido = cmp.leido && cmp.leido.total, enBs = '';
         // Total de la factura en bolívares (los costos ya están en $): se compara pasándolo a $
-        if (leido && total > 0 && leido > total * 20) { const ts = cmpTasaCompra(); if (ts) { enBs = ` (Bs ${fmt(leido)} a ${fmt(ts)})`; leido = leido / ts; } }
+        if (leido && total > 0 && (cmpMonedaFactura() === 'BS' || leido > total * 20)) { const ts = cmpTasaCompra(); if (ts) { enBs = ` (Bs ${fmt(leido)} a ${fmt(ts)})`; leido = leido / ts; } }
         const porTienda = CMP_TIENDAS.map(t => { const v = cmp.lineas.reduce((s, l) => s + (Number(l.dist[t]) || 0) * (l.costo || 0), 0); return v > 0 ? `${CMP_SIGLA[t]} $ ${fmt(v)}` : ''; }).filter(Boolean);
         return `<span>Costo de la compra: <b>$ ${fmt(total)}</b></span>${leido ? `<span>Total de la factura (leído): $ ${fmt(leido)}${enBs}${Math.abs(leido - total) > 0.02 * leido ? ' <b style="color:var(--danger)">no coincide: revise cantidades y costos</b>' : ' ✓'}</span>` : ''}
             <span>${cmp.lineas.length} renglón(es)</span>${porTienda.length ? `<span>A tiendas (al costo): ${porTienda.join(' · ')}</span>` : '<span>Todo queda en el almacén</span>'}`;
@@ -12835,6 +12864,10 @@ Reglas:
         if (!l) return;
         if (c.startsWith('dist:')) l.dist[c.slice(5)] = v; else l[c] = v;
         if (c === 'costo' && l.costoBs > 0) l.costoBs = v * (cmpTasaCompra() || 0);   // el costo escrito manda si después cambia la tasa
+        if (l.leido && (c === 'costo' || c === 'cantidad')) {   // y queda como lo leído (en la moneda y la unidad de la factura)
+            const pe = l.empaque && l.leido.pe > 1 ? l.leido.pe : 1, t = cmpMonedaFactura() === 'BS' ? cmpTasaCompra() || 1 : 1;
+            if (c === 'costo') l.leido.costo = v * t * pe; else l.leido.cantidad = v / pe;
+        }
         const p = cmpProd(l);
         if (p && ['costo', 'merma', 'margenDetal', 'margenMayor'].includes(c)) {
             if (c !== 'costo') l.libre = true;   // la persona decide el margen: la regla especial ya no manda
