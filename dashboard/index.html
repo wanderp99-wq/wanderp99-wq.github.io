@@ -808,7 +808,7 @@
             color: var(--text-muted); border: 1px dashed var(--border); background: var(--list-bg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .hor-afuera b { color: var(--text-main); font-weight: 600; margin-right: .25rem; }
         .req-dlg.hor-img-dlg { width: min(860px, 100%); } .hor-img-dlg img { width: 100%; border-radius: 12px; border: 1px solid var(--border); display: block; }
-        .hor-ficha.no-puede { border-color: var(--bad); box-shadow: 0 0 0 1px var(--bad); } .hor-ficha.no-puede::before { content: '⚠'; color: var(--bad); margin-right: .25rem; }
+        .hor-ficha.no-puede { border-color: var(--bad); box-shadow: 0 0 0 1px var(--bad); } .hor-ficha.no-puede::before { content: '!'; font-weight: 800; color: var(--bad); margin-right: .25rem; }
         /* En Corrido y Libre el nombre va como texto gris (sigue siendo arrastrable) */
         .hor-ficha.texto { background: none; border-color: transparent; color: var(--text-muted); font-weight: 500; padding: .12rem .3rem; border-radius: 6px; }
         .hor-ficha.texto:hover { box-shadow: none; color: var(--text-main); }
@@ -1147,7 +1147,10 @@
         .cmp-foto { position: relative; width: 96px; height: 120px; border-radius: 10px; overflow: hidden; border: 1px solid var(--border); background: var(--list-bg); }
         .cmp-foto img { width: 100%; height: 100%; object-fit: cover; }
         .cmp-foto button { position: absolute; top: 4px; right: 4px; border: 0; border-radius: 50%; width: 24px; height: 24px; background: rgba(0,0,0,.6); color: #fff; cursor: pointer; }
-        .cmp-agregar { width: 96px; height: 120px; border: 2px dashed var(--border); border-radius: 10px; display: flex; align-items: center; justify-content: center; text-align: center; cursor: pointer; color: var(--text-muted); font-size: .85rem; padding: .4rem; }
+        .cmp-agregar { width: 96px; height: 120px; border: 2px dashed var(--border); border-radius: 10px; display: flex; flex-direction: column; gap: .45rem; align-items: center; justify-content: center; text-align: center; cursor: pointer; color: var(--text-muted); font-size: .85rem; padding: .4rem; }
+        .cmp-agregar:hover { border-color: var(--primary); color: var(--primary); }
+        svg.ico { width: 16px; height: 16px; vertical-align: -3px; margin-right: .4rem; flex: none; }
+        .cmp-agregar svg.ico { margin: 0; }
         .cmp-tabla { min-width: 0; }
         .cmp-tabla.x-c .g-c, .cmp-tabla.x-m .g-m, .cmp-tabla.x-u .g-u, .cmp-tabla.x-b .g-b, .cmp-tabla.x-d .g-d { display: none; }
         .cmp-tabla.solo-SR .g-t:not(.g-t-SR), .cmp-tabla.solo-RU .g-t:not(.g-t-RU), .cmp-tabla.solo-IS .g-t:not(.g-t-IS), .cmp-tabla.solo-PA .g-t:not(.g-t-PA) { display: none; }
@@ -1904,12 +1907,12 @@
                 <div><label>Tipo</label><div class="ms" id="pagDTipo" data-todos="Todos"></div></div>
             </div>
             <div class="semana-nav pagd-sem">
-                <button type="button" class="btn-ghost btn-flecha" onclick="pagMoverSemana(-1)" title="Semana anterior">◀</button>
+                <button type="button" class="btn-ghost btn-flecha" onclick="pagMoverSemana(-1)" title="Semana anterior">‹</button>
                 <div class="semana-label">
                     <div class="semana-titulo" id="pagDSemTitulo"></div>
                     <div class="semana-sub">Semana administrativa: sábado a viernes</div>
                 </div>
-                <button type="button" class="btn-ghost btn-flecha" id="pagDSemSig" onclick="pagMoverSemana(1)" title="Semana siguiente">▶</button>
+                <button type="button" class="btn-ghost btn-flecha" id="pagDSemSig" onclick="pagMoverSemana(1)" title="Semana siguiente">›</button>
                 <button type="button" class="btn-ghost" onclick="pagSemanaActual()">Semana actual</button>
                 <button type="button" class="btn-ghost act-modulo" id="pagDBtnAct" onclick="pagActualizar()" title="Volver a leer de la hoja (solo se redibuja si hay cambios)">Actualizar</button>
             </div>
@@ -1941,12 +1944,12 @@
         <!-- ===== CONCILIACIÓN ===== -->
         <div id="pagConc" class="hidden">
             <div class="semana-nav">
-                <button type="button" class="btn-ghost btn-flecha" onclick="pagMoverSemana(-1)" title="Semana anterior">◀</button>
+                <button type="button" class="btn-ghost btn-flecha" onclick="pagMoverSemana(-1)" title="Semana anterior">‹</button>
                 <div class="semana-label">
                     <div class="semana-titulo" id="pagCSemTitulo"></div>
                     <div class="semana-sub">Pagos móviles y lotes reportados en las fichas · semana sábado a viernes</div>
                 </div>
-                <button type="button" class="btn-ghost btn-flecha" id="pagCSemSig" onclick="pagMoverSemana(1)" title="Semana siguiente">▶</button>
+                <button type="button" class="btn-ghost btn-flecha" id="pagCSemSig" onclick="pagMoverSemana(1)" title="Semana siguiente">›</button>
                 <button type="button" class="btn-ghost" onclick="pagSemanaActual()">Semana actual</button>
                 <button type="button" class="btn-ghost act-modulo" id="pagCBtnAct" onclick="pagActualizar()" title="Volver a cruzar con la hoja (solo se redibuja si hay cambios)">Actualizar</button>
             </div>
@@ -1998,12 +2001,12 @@
         <!-- ===== LISTA ===== -->
         <div id="pagLista" class="hidden">
             <div class="semana-nav">
-                <button type="button" class="btn-ghost btn-flecha" onclick="pagMoverSemana(-1)" title="Semana anterior">◀</button>
+                <button type="button" class="btn-ghost btn-flecha" onclick="pagMoverSemana(-1)" title="Semana anterior">‹</button>
                 <div class="semana-label">
                     <div class="semana-titulo" id="pagSemTitulo"></div>
                     <div class="semana-sub">Semana administrativa: sábado a viernes</div>
                 </div>
-                <button type="button" class="btn-ghost btn-flecha" id="pagSemSig" onclick="pagMoverSemana(1)" title="Semana siguiente">▶</button>
+                <button type="button" class="btn-ghost btn-flecha" id="pagSemSig" onclick="pagMoverSemana(1)" title="Semana siguiente">›</button>
                 <button type="button" class="btn-ghost" onclick="pagSemanaActual()">Semana actual</button>
             </div>
             <div class="filters">
@@ -2521,12 +2524,12 @@
         <!-- ===== SEMANA ===== -->
         <div id="ventasSemanaBox">
         <div class="semana-nav">
-            <button type="button" class="btn-ghost btn-flecha" id="vSemAnt" onclick="moverSemanaVentas(-1)" title="Semana anterior">◀</button>
+            <button type="button" class="btn-ghost btn-flecha" id="vSemAnt" onclick="moverSemanaVentas(-1)" title="Semana anterior">‹</button>
             <div class="semana-label">
                 <div class="semana-titulo" id="vSemTitulo"></div>
                 <div class="semana-sub">Semana administrativa: sábado a viernes</div>
             </div>
-            <button type="button" class="btn-ghost btn-flecha" id="vSemSig" onclick="moverSemanaVentas(1)" title="Semana siguiente">▶</button>
+            <button type="button" class="btn-ghost btn-flecha" id="vSemSig" onclick="moverSemanaVentas(1)" title="Semana siguiente">›</button>
             <button type="button" class="btn-ghost" id="vSemHoy" onclick="semanaVentasActual()">Semana actual</button>
             <button type="button" class="btn-primary" id="vBtnPdf" onclick="descargarPDFVentas()">Descargar PDF</button>
         </div>
@@ -2631,12 +2634,12 @@
     <!-- ===== MODO GRÁFICOS ===== -->
     <div id="modoGraficos" class="hidden">
         <div class="semana-nav">
-            <button type="button" class="btn-ghost btn-flecha" id="btnSemAnt" onclick="moverSemana(-1)" title="Semana anterior">◀</button>
+            <button type="button" class="btn-ghost btn-flecha" id="btnSemAnt" onclick="moverSemana(-1)" title="Semana anterior">‹</button>
             <div class="semana-label">
                 <div class="semana-titulo" id="semanaTitulo"></div>
                 <div class="semana-sub">Semana administrativa: sábado a viernes</div>
             </div>
-            <button type="button" class="btn-ghost btn-flecha" id="btnSemSig" onclick="moverSemana(1)" title="Semana siguiente">▶</button>
+            <button type="button" class="btn-ghost btn-flecha" id="btnSemSig" onclick="moverSemana(1)" title="Semana siguiente">›</button>
             <button type="button" class="btn-ghost" id="btnSemHoy" onclick="irASemanaActual()">Semana actual</button>
         </div>
 
@@ -2678,12 +2681,12 @@
     <!-- ===== MODO TOTAL EXTERNO (pagos externos de TDD) ===== -->
     <div id="modoExterno" class="hidden">
         <div class="semana-nav">
-            <button type="button" class="btn-ghost btn-flecha" onclick="extMover(-1)" title="Período anterior">◀</button>
+            <button type="button" class="btn-ghost btn-flecha" onclick="extMover(-1)" title="Período anterior">‹</button>
             <div class="semana-label">
                 <div class="semana-titulo" id="extTitulo"></div>
                 <div class="semana-sub" id="extSub">Pagos externos de TDD (se descuentan del total TDD de cada ficha)</div>
             </div>
-            <button type="button" class="btn-ghost btn-flecha" id="extSig" onclick="extMover(1)" title="Período siguiente">▶</button>
+            <button type="button" class="btn-ghost btn-flecha" id="extSig" onclick="extMover(1)" title="Período siguiente">›</button>
             <div class="segmentado">
                 <button type="button" id="extP-semana" class="activo" onclick="extPeriodoCambiar('semana')">Semana</button>
                 <button type="button" id="extP-mes" onclick="extPeriodoCambiar('mes')">Mes</button>
@@ -3115,8 +3118,20 @@
     // ==========================================
     // SESIÓN Y NAVEGACIÓN ENTRE MÓDULOS
     // ==========================================
+    // Íconos de acción: de línea y de un solo color (el del texto), como los de los módulos. Nunca emoji de colores.
+    // ico('imprimir') va delante del texto de un botón; class "ico" les da el tamaño.
+    const ICO_ACCION = {
+        imprimir: '<path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/>',
+        compartir: '<circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="m8.2 10.8 7.6-4.4M8.2 13.2l7.6 4.4"/>',
+        imagen: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.8"/><path d="m21 16-5-5-9 9"/>',
+        descargar: '<path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 19h16"/>',
+        camara: '<path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/>',
+        avisar: '<path d="M3 11v2a1 1 0 0 0 1 1h3l6 4V6L7 10H4a1 1 0 0 0-1 1z"/><path d="M17 9a4 4 0 0 1 0 6"/>',
+        campana: '<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/>'
+    };
+    const ico = (n, tam) => `<svg class="ico" ${tam ? `style="width:${tam}px;height:${tam}px"` : ''} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO_ACCION[n]}</svg>`;
     const ICONOS = {
-        cuadre: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="10" width="18" height="11" rx="2"/><path d="M7 10V5h10v5"/><path d="M9 7.5h6"/><path d="M7 14h2M11 14h2M15 14h2M7 17.5h2M11 17.5h2M15 17.5h2"/></svg>',
+        cuadre:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="10" width="18" height="11" rx="2"/><path d="M7 10V5h10v5"/><path d="M9 7.5h6"/><path d="M7 14h2M11 14h2M15 14h2M7 17.5h2M11 17.5h2M15 17.5h2"/></svg>',
         pagos:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 4l9 5.5"/><path d="M5 10v7M9.5 10v7M14.5 10v7M19 10v7"/><path d="M3 20h18"/><circle cx="18.5" cy="17.5" r="4" fill="var(--list-bg)"/><path d="m16.8 17.5 1.2 1.2 2.2-2.4"/></svg>',
         gastos: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>',
         ventas: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/><path d="M15 8h4v4"/></svg>',
@@ -3137,6 +3152,7 @@
         reqcharcu: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 3v2h6V3"/><path d="M8.5 10h7M8.5 13.5h7M8.5 17h4"/></svg>',
         precios: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z"/><circle cx="8" cy="8" r="1.5"/><path d="m12 16 1.5 1.5 3-3"/></svg>',
         movalmacen: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h13l-3-3M20 16H7l3 3"/></svg>',
+        facturar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>',
         talento: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="8" r="3.5"/><path d="M3.5 20c0-3.6 2.9-6.5 6.5-6.5 1.3 0 2.5.4 3.5 1"/><path d="m17.5 13 1.2 2.4 2.6.4-1.9 1.8.5 2.6-2.4-1.3-2.4 1.3.5-2.6-1.9-1.8 2.6-.4z"/></svg>',
         horarios: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/><circle cx="15.5" cy="15.5" r="3.5"/><path d="M15.5 14v1.5l1 1"/></svg>'
     });
@@ -3164,7 +3180,8 @@
         { id: 'horarios',   area: 'rrhh',    titulo: 'Horarios de trabajo',   desc: 'Horario semanal de cada tienda: generarlo, ajustarlo y enviarlo por Telegram.', listo: true },
         { id: 'reqcharcu',  area: 'almacen', titulo: 'Requerimientos de charcutería', desc: 'Cuánto enviar a cada local según ventas, exhibición y la existencia de la cava.', listo: true },
         { id: 'inventario', area: 'almacen', titulo: 'Productos e inventario', desc: 'Catálogo de productos, existencia del almacén y movimientos.', listo: true },
-        { id: 'movalmacen', area: 'almacen', titulo: 'Entradas y salidas',    desc: 'Facturar notas de entrega, compras con foto de la factura y operaciones de inventario.', listo: true },
+        { id: 'facturar',   area: 'almacen', titulo: 'Facturar',              desc: 'Notas de entrega a clientes y tiendas, y las notas emitidas. Sin acceso al inventario ni a las entradas.', listo: true },
+        { id: 'movalmacen', area: 'almacen', titulo: 'Entradas y salidas',    desc: 'Compras con foto de la factura, operaciones de inventario, notas emitidas e inversión por tienda.', listo: true },
         { id: 'precios',    area: 'almacen', titulo: 'Precios en tiendas',    desc: 'Lo que entró al almacén: costo y precios nuevos, y qué falta ingresar o cambiar en cada tienda.', listo: true }
     ];
     MODULOS.forEach(m => { if (!m.area) m.area = 'admin'; });
@@ -3181,7 +3198,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-10-29.5';
+    const VERSION_SERVIDOR = '2026-10-29.8';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -3367,7 +3384,7 @@
         claveAdminAuto(document.body);
         // login, menu, cuadre, ventas y admin tienen su propia sección; el resto usa la genérica "en construcción"
         // Caja chica usa la misma sección de Control de efectivo, mostrando solo la caja chica
-        const seccion = vista === 'cajachica' ? 'efectivo' : vista === 'reqcharcu' ? 'req' : vista === 'asistencia' ? 'asis' : vista === 'asisgestion' ? 'asisg' : (vista === 'nomina' || vista === 'talento' || vista === 'cxc' || vista === 'horarios') ? 'per' : (vista === 'inventario' || vista === 'movalmacen' || vista === 'precios') ? 'alm' : vista === 'pagonomina' ? 'pnom' : vista === 'marcaje' ? 'marca' : ['login', 'menu', 'cuadre', 'ventas', 'admin', 'pagos', 'efectivo'].includes(vista) ? vista : 'modulo';
+        const seccion = vista === 'cajachica' ? 'efectivo' : vista === 'reqcharcu' ? 'req' : vista === 'asistencia' ? 'asis' : vista === 'asisgestion' ? 'asisg' : (vista === 'nomina' || vista === 'talento' || vista === 'cxc' || vista === 'horarios') ? 'per' : (vista === 'inventario' || vista === 'movalmacen' || vista === 'precios' || vista === 'facturar') ? 'alm' : vista === 'pagonomina' ? 'pnom' : vista === 'marcaje' ? 'marca' : ['login', 'menu', 'cuadre', 'ventas', 'admin', 'pagos', 'efectivo'].includes(vista) ? vista : 'modulo';
         ['login', 'menu', 'cuadre', 'ventas', 'admin', 'pagos', 'efectivo', 'req', 'asis', 'asisg', 'per', 'alm', 'pnom', 'marca', 'modulo'].forEach(v => {
             const el = document.getElementById('vista' + v[0].toUpperCase() + v.slice(1));
             el.dataset.pantalla = '';   // al aparecer entra deslizándose (ANIM)
@@ -3400,7 +3417,7 @@
         if (vista === 'asisgestion') asisgIniciar();
         if (vista === 'nomina' || vista === 'talento' || vista === 'cxc' || vista === 'horarios') perIniciar(vista);
         if (vista === 'marcaje') marcaIniciar();
-        if (vista === 'inventario' || vista === 'movalmacen' || vista === 'precios') almIniciar(vista);
+        if (vista === 'inventario' || vista === 'movalmacen' || vista === 'precios' || vista === 'facturar') almIniciar(vista);
         if (vista === 'pagonomina') pnomIniciar();
         if (vista !== 'login' && vista !== 'marcaje') setTimeout(() => avisarEnLinea(true), 500);
         if (vista === 'efectivo' || vista === 'cajachica') efeIniciar(vista === 'cajachica');
@@ -3429,13 +3446,13 @@
         efectivo: () => efeActualizar(), cajachica: () => efeActualizar(), reqcharcu: () => reqCargar(),
         asistencia: () => asisCargarHist(true), asisgestion: () => asisgCargar(true),
         nomina: () => perCargar(), talento: () => perCargar(), cxc: () => perCargar(), horarios: () => perCargar(),
-        inventario: () => almCargar(), movalmacen: () => { cmpCompras = null; return almCargar(); }, precios: () => { cmpOrd = null; return almCargar(); }, pagonomina: () => pnomCargar()
+        inventario: () => almCargar(), facturar: () => almCargar(), movalmacen: () => { cmpCompras = null; return almCargar(); }, precios: () => { cmpOrd = null; return almCargar(); }, pagonomina: () => pnomCargar()
     };
     // ---------- Cambios en vivo: cada 30 s se pregunta a Google qué áreas cambiaron (respuesta mínima).
     // Si cambió la del módulo abierto, se vuelve a leer solo, sin molestar: no mientras se escribe, hay una ventana abierta o algo se guarda.
     const VISTA_AREAS = { cuadre: ['cuadre'], ventas: ['cuadre'], pagos: ['cuadre'], efectivo: ['efe', 'cuadre'], cajachica: ['efe'], reqcharcu: ['req'],
         asistencia: ['asis'], asisgestion: ['asis', 'per'], nomina: ['per', 'asis'], talento: ['per'], cxc: ['per', 'alm', 'cuadre'], horarios: ['per'],
-        inventario: ['alm'], movalmacen: ['alm'], precios: ['alm'], pagonomina: ['per'] };
+        inventario: ['alm'], facturar: ['alm'], movalmacen: ['alm'], precios: ['alm'], pagonomina: ['per'] };
     const VIVO_CADA = 30000;
     let verConocida = {}, vivoOcupado = false, vivoTecleo = 0;
     function vivoUsar(v) { Object.keys(v).forEach(k => { if (!verConocida[k] || v[k] > verConocida[k]) verConocida[k] = v[k]; }); }
@@ -3738,8 +3755,9 @@
             document.getElementById('asisgNombres').innerHTML = nombres.map(n => `<option value="${esc(n)}">`).join('');
         }]);
         // Almacén: productos, clientes y proveedores (así Facturar abre al instante)
-        if (tiene('inventario') || tiene('movalmacen')) tareas.push([['inventario', 'movalmacen'], async () => {
+        if (tiene('inventario') || tiene('movalmacen') || tiene('facturar')) tareas.push([['inventario', 'movalmacen', 'facturar'], async () => {
             if (!almDatos) almUsar(await llamarApi({ action: 'alm_datos' }));
+            if (tiene('facturar') && !tiene('movalmacen') && !almNotas) almNotas = (await llamarApi({ action: 'alm_notas', ultimas: true })).notas || [];
             if (tiene('movalmacen')) {
                 const [n, o] = await Promise.all([almNotas ? null : llamarApi({ action: 'alm_notas', ultimas: true }), almIngresos ? null : llamarApi({ action: 'alm_ingresos', ultimas: true })]);
                 if (n && !almNotas) almNotas = n.notas || [];
@@ -3856,7 +3874,7 @@
                     ${x.items.map(i => `<button type="button" class="pend-item" onclick="pendIr('${esc(x.modulo)}')">${esc(i.texto)}</button>`).join('')}</details>`; }).join('');
         return `<div class="pend-cab"><b>Pendientes</b><button type="button" class="btn-ghost btn-mini" onclick="pendRevisar(true)" ${pendCargando ? 'disabled' : ''}>⟳</button></div>${cuerpo}
             <div class="pend-pie">${pendDatos && pendDatos.hora ? `Revisado ${esc(pendDatos.hora.slice(11))} · cada 5 min` : ''}
-                ${permiso === 'default' ? '<button type="button" class="btn-ghost btn-mini" onclick="pendActivarAvisos()">🔔 Activar avisos en este equipo</button>'
+                ${permiso === 'default' ? '<button type="button" class="btn-ghost btn-mini" onclick="pendActivarAvisos()">' + ico('campana') + 'Activar avisos en este equipo</button>'
                   : permiso === 'granted' ? '<span>Avisos activados</span>' : permiso === 'denied' ? '<span title="Permítalos en la configuración del navegador">Avisos bloqueados</span>' : ''}</div>`;
     }
     function pendAbrir() {
@@ -8521,10 +8539,10 @@
     function nomCabecera() {
         const actual = inicioSemana(fechaLocalHoy());
         return `<div class="nom-cab">
-                <div class="nom-semana"><button type="button" class="btn-ghost" title="Semana anterior" onclick="nomMoverSemana(-7)">◀</button>
+                <div class="nom-semana"><button type="button" class="btn-ghost" title="Semana anterior" onclick="nomMoverSemana(-7)">‹</button>
                     <div><b>Semana ${diaSemana(nomSemana)} ${fechaBonita(nomSemana)} – ${diaSemana(sumarDias(nomSemana, 6))} ${fechaBonita(sumarDias(nomSemana, 6))}</b>
                         <small>${nomSemana === actual ? 'semana en curso (todavía no termina)' : nomSemana > actual ? 'semana futura' : 'sábado a viernes'}</small></div>
-                    <button type="button" class="btn-ghost" title="Semana siguiente" onclick="nomMoverSemana(7)" ${nomSemana >= actual ? 'disabled' : ''}>▶</button></div>
+                    <button type="button" class="btn-ghost" title="Semana siguiente" onclick="nomMoverSemana(7)" ${nomSemana >= actual ? 'disabled' : ''}>›</button></div>
                 <label>Departamento o local <select onchange="nomElegirLugar(this.value)"><option value="">Todos</option>${perOpciones(perLugares(), nomLugar)}</select></label>
                 <label class="nom-tasa">Tasa (Bs por $) <span><input type="number" id="nomTasa" step="0.0001" min="0" value="${nomTasa() || ''}" onchange="nomCambiarTasa(this.value)">
                     ${nomTasaManual ? `<button type="button" class="btn-ghost btn-mini" onclick="nomTasaManual=0;perPintar()" title="Volver a la tasa BCV de hoy">BCV ${fmt(nomTasaBcv())}</button>` : '<small>BCV de hoy</small>'}</span></label>
@@ -9498,9 +9516,9 @@
         const actual = inicioSemana(fechaLocalHoy());
         const cual = horSemana === actual ? 'semana en curso' : horSemana === sumarDias(actual, 7) ? 'próxima semana' : horSemana < actual ? 'semana pasada' : 'semana futura';
         return `<div class="nom-cab">
-                ${conSemana ? `<div class="nom-semana"><button type="button" class="btn-ghost" title="Semana anterior" onclick="horMoverSemana(-7)">◀</button>
+                ${conSemana ? `<div class="nom-semana"><button type="button" class="btn-ghost" title="Semana anterior" onclick="horMoverSemana(-7)">‹</button>
                     <div><b>Semana ${diaSemana(horSemana)} ${fechaBonita(horSemana)} – ${diaSemana(sumarDias(horSemana, 6))} ${fechaBonita(sumarDias(horSemana, 6))}</b><small>${cual}</small></div>
-                    <button type="button" class="btn-ghost" title="Semana siguiente" onclick="horMoverSemana(7)">▶</button></div>` : '<div></div>'}
+                    <button type="button" class="btn-ghost" title="Semana siguiente" onclick="horMoverSemana(7)">›</button></div>` : '<div></div>'}
                 <div class="segmentado">${(perDatos.locales || []).map(l => `<button type="button" class="${l === horLocal ? 'activo' : ''}" onclick="horElegirLocal('${esc(l)}')">${esc(l)}</button>`).join('')}</div>
             </div>`;
     }
@@ -9686,7 +9704,7 @@
         libresAuto.forEach(i => { d[i] = 'L'; });
         if (libresAuto.length) mostrarBanner(`${w.nombre} completó sus ${n} turnos: ${libresAuto.map(i => diaSemana(sumarDias(horSemana, i))).join(', ')} queda${libresAuto.length > 1 ? 'n' : ''} como día libre.`, 'ok');
         if (cod === 'L' && d.filter(x => x === 'L').length > 1) mostrarBanner(`${w.nombre} queda con ${d.filter(x => x === 'L').length} días libres.`, 'warn');
-        // Se permite, pero se advierte: su ficha dice que ese día no puede en ese turno (queda marcado con ⚠ y en la revisión)
+        // Se permite, pero se advierte: su ficha dice que ese día no puede en ese turno (queda marcado con ! en rojo y en la revisión)
         if (no) mostrarBanner(`Atención: según su ficha, ${w.nombre} no puede trabajar el ${diaSemana(sumarDias(horSemana, dia))} en la ${HOR_COD[no].toLowerCase()}. Quedó asignado con advertencia.`, 'warn');
         plan[id] = d; perPintar();
     }
@@ -10276,7 +10294,7 @@
                 ${perDeudasHist ? `<label class="per-fecha">Desde <input type="date" id="perDDesde" value="${perDeudasDesde}" onchange="perDeudasFechas()"></label>
                                    <label class="per-fecha">Hasta <input type="date" id="perDHasta" value="${perDeudasHasta}" onchange="perDeudasFechas()"></label>` : ''}
             </div>`;
-        const cargandoPag = perDeudasHist && !histListo ? `<div class="per-filtro-activo">⏳ Cargando lo pagado del ${fechaBonita(perDeudasDesde)} al ${fechaBonita(perDeudasHasta)}... (mientras, se ve lo pendiente)</div>` : '';
+        const cargandoPag = perDeudasHist && !histListo ? `<div class="per-filtro-activo">Cargando lo pagado del ${fechaBonita(perDeudasDesde)} al ${fechaBonita(perDeudasHasta)}... (mientras, se ve lo pendiente)</div>` : '';
         const elegido = exacto ? (lista[0] ? lista[0].nombre : document.getElementById('perBuscar').value) : '';
         const filtro = cargandoPag + (exacto ? `<div class="per-filtro-activo">Mostrando solo a <b>${esc(elegido)}</b> · <a href="#" data-n="${esc(elegido)}" onclick="perHistAbrir(this.dataset.n); return false;"><b>ver historial completo</b></a> · <a href="#" onclick="perLiberarFiltro(); return false;">ver a todos</a></div>` : '');
         const resumen = gastos ? perGastosResumen(lista, perDeudasDatos) : perDeudasResumen(lista, perDeudasDatos.hoy);
@@ -10591,7 +10609,7 @@
         const tipos = [['DEUDA', 'azul', 'Deuda', 'Alguien quedó debiendo'], ['ABONO', 'verde', 'Abono', 'Alguien pagó'], ['GASTO', 'blanca', 'Gasto de tienda', 'Compra de una tienda']];
         const paso = (n, titulo, cuerpo, ayuda) => `<div class="prg-paso"><div class="prg-tit">${titulo}${ayuda ? `<small>${ayuda}</small>` : ''}</div>${cuerpo}</div>`;
         const abonos = (perDeudasPend && perDeudasPend.abonos) || [];
-        const vacioFoto = abono ? '📷 Toque para adjuntar la captura del pago' : '📷 Toque para adjuntar la foto de la factura';
+        const vacioFoto = abono ? 'Toque para adjuntar la captura del pago' : 'Toque para adjuntar la foto de la factura';
         let n = 0;
         return `<div class="prg-head"><h3>Nuevo registro</h3><button type="button" class="prg-x" title="Cerrar (Esc)" onclick="perRegCerrar()">✕</button></div>
             <div class="prg-tipos">${tipos.map(([k, ic, nom, sub]) => `<button type="button" class="luz-${ic} ${t === k ? 'activo' : ''}" title="${sub}" onclick="perRegModo('tipo', '${k}')"><i class="prg-luz" aria-hidden="true"></i><b>${nom}</b></button>`).join('')}</div>
@@ -10765,7 +10783,7 @@
         const total = perRegCola.reduce((s, c) => s + c.usd, 0);
         return `<div class="prg-cola"><div class="prg-tit">Abonos en la lista (${perRegCola.length}) · ${perUsd(total)}<small> se registran todos al guardar</small></div>
             ${perRegCola.map((c, i) => `<div class="prg-cola-fila"><span>${i + 1}. ${fechaBonita(c.fecha)} · <b>${perUsd(c.usd)}</b>${c.moneda === 'Bs' ? ` <small>(Bs ${fmt(c.monto)})</small>` : ''}${c.desc ? ' · ' + esc(c.desc) : ''}
-                · <small>${c.archivo ? '📎 ' + esc(c.archivo.name) : 'sin comprobante (clave de administrador)'}</small></span>
+                · <small>${c.archivo ? 'Adjunto: ' + esc(c.archivo.name) : 'sin comprobante (clave de administrador)'}</small></span>
                 <button type="button" class="btn-ghost btn-mini" onclick="perRegQuitarDeCola(${i})">Quitar</button></div>`).join('')}</div>`;
     }
     // El abono escrito en la ventana, listo para la lista (null si falta algo: avisa qué)
@@ -11157,7 +11175,7 @@
     let almDatos = null, almVista = '', almTab = '', almNotas = null, almIngresos = null;
     let almVenta = { items: [], sel: -1, descuento: 0, claveDesc: '', claveStock: '', ultimo: '' };
     let almIng = { operacion: '', proveedorId: '', documento: '', clienteId: '', nota: '', items: [], sel: -1, listo: false, ultimo: '' };
-    const ALM_TABS = { precios: [['ordenes', 'Por actualizar'], ['completas', 'Historial']], inventario: [['productos', 'Productos']], movalmacen: [['facturar', 'Facturar'], ['compra', 'Compra con foto'], ['ingresar', 'Operaciones de inventario'], ['notas', 'Notas emitidas'], ['ingresos', 'Historial de operaciones'], ['tiendas', 'Inversión por tienda']] };
+    const ALM_TABS = { precios: [['ordenes', 'Por actualizar'], ['completas', 'Historial']], inventario: [['productos', 'Productos']], facturar: [['facturar', 'Facturar'], ['notas', 'Notas emitidas']], movalmacen: [['compra', 'Compra con foto'], ['ingresar', 'Operaciones de inventario'], ['notas', 'Notas emitidas'], ['ingresos', 'Historial de operaciones'], ['tiendas', 'Inversión por tienda']] };
     const ALM_OPS = [['COMPRA', 'Compra a proveedor'], ['SIN_FACTURA', 'Ingreso sin factura'], ['DEVOLUCION', 'Devolución de cliente'], ['AJUSTE', 'Ajuste de inventario'], ['DESCUENTO', 'Descuento de inventario']];
     const ALM_EMPRESA = { nombre: 'DISTRIBUIDORA PLAZA VALENCIA 20, C.A.', rif: 'J-50076678-5', direccion: 'Av. Carabobo C/C Rocío e Infante, Casa Nro 84-15, Zona Candelaria, Valencia, Carabobo', telefono: '0414-9403766' };
     const almCant = (n, tipo) => new Intl.NumberFormat('es-VE', { minimumFractionDigits: tipo === 'Pesado' ? 3 : 0, maximumFractionDigits: 3 }).format(Number(n) || 0);
@@ -11201,7 +11219,7 @@
         almEnfocar();
     }
     function almPintar() {
-        if (!almDatos || (vistaActual !== 'inventario' && vistaActual !== 'movalmacen' && vistaActual !== 'precios')) return;
+        if (!almDatos || (vistaActual !== 'inventario' && vistaActual !== 'movalmacen' && vistaActual !== 'precios' && vistaActual !== 'facturar')) return;
         const out = document.getElementById('almContenido');
         if (almTab === 'compra') { cmpPintarCompra(out); return; }   // la compra se dibuja aparte: sus campos se actualizan uno a uno
         if (almTab === 'ordenes' || almTab === 'completas') { pintarConservando(out, cmpOrdenesVista()); if (!cmpOrd || (cmpOrd.ver !== (almTab === 'completas' ? 'completas' : 'pendientes') && !cmpOrd.cargando)) cmpCargarOrdenes(); return; }
@@ -11278,7 +11296,7 @@
 
     // ---------- Teclas del punto de venta (antes que las del panel: Esc no sale del módulo con una venta a medias) ----------
     window.addEventListener('keydown', e => {
-        if (vistaActual !== 'inventario' && vistaActual !== 'movalmacen') return;
+        if (vistaActual !== 'inventario' && vistaActual !== 'movalmacen' && vistaActual !== 'facturar') return;
         if (almDlgAbierta()) {
             if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); almCerrar(); }
             return;
@@ -12090,14 +12108,14 @@
                 <div class="alm-ver-info"><div class="alm-ver-num">Nota de entrega N° ${esc(n.numero)} ${anulada ? '<span class="chip st-sobra">Anulada</span>' : ''}${n.modificaciones ? '<span class="chip st-info">Modificada</span>' : ''}</div>
                     <div class="alm-ver-cli">${esc(n.cliente)}</div>
                     <small>${tienda ? 'Despacho a tienda' : esc(n.condicion)}${n.vence ? ' · vence ' + fechaBonita(n.vence) : ''} · ${fechaBonita(n.fecha)} ${esc(n.hora)} · ${esc(n.usuario)}${n.cedula ? ' · RIF ' + esc(n.cedula) : ''}</small>
-                    ${n.comentario ? `<div class="alm-ver-com">💬 ${esc(n.comentario)}</div>` : ''}</div>
+                    ${n.comentario ? `<div class="alm-ver-com"><b>Comentario:</b> ${esc(n.comentario)}</div>` : ''}</div>
                 <div class="alm-total"><small>${anulada ? 'Total (anulada)' : 'Total'}</small><b>$ ${fmt(n.total)}</b><small>${n.totalBs ? 'Bs ' + fmt(n.totalBs) + (n.tasa ? ' · tasa ' + fmt(n.tasa) : '') : ''}${n.descuento ? ' · desc. $ ' + fmt(n.descuento) : ''}</small></div>
             </div>
             <div class="tabla-wrap alm-carrito alm-ver-tabla"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Código</th><th class="izq">Descripción</th><th>Cantidad</th><th>Precio $</th><th>Subtotal $</th></tr></thead><tbody>
                 ${n.detalle.map(x => `<tr><td class="izq"><b>${esc(x.codigo)}</b></td><td class="izq">${esc(x.descripcion)}</td><td>${almCant(x.cantidad, x.tipo)} <small>${almUnidad(x.tipo)}</small></td><td>${fmt(x.precio)}</td><td><b>${fmt(x.total)}</b></td></tr>`).join('')}</tbody></table></div>
             <div class="alm-pie"><span>${n.detalle.length} renglón(es) · ${und} und · ${almCant(kg, 'Pesado')} kg</span>
                 ${n.modificaciones ? `<span class="alm-ver-mod" title="${esc(n.modificaciones)}">Modificaciones: ${esc(n.modificaciones.split(' | ').pop())}</span>` : ''}</div>
-            ${anulada ? `<div class="banner error" style="display:block;margin-top:.6rem">${esc(n.anulacion)}</div>` : `<div class="alm-marcas-fila">
+            ${anulada ? `<div class="banner error" style="display:block;margin-top:.6rem">${esc(n.anulacion)}</div>` : !permisos.includes('movalmacen') ? '' : `<div class="alm-marcas-fila">
                 ${tienda ? marca('ingresada', n.ingresada, 'Ingresada en tienda', 'Por ingresar en tienda', 'amar') : ''}${marca('verificada', n.verificada, 'Recepción verificada', 'Sin verificar')}</div>`}
             <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0;flex-wrap:wrap">
                 ${anulada ? '' : `<button type="button" class="btn-eliminar" onclick="almAnular('${esc(n.numero)}')">Anular</button><button type="button" class="btn-ghost" onclick="almModificarNota('${esc(n.numero)}')">Modificar (clave)</button>`}
@@ -12479,8 +12497,8 @@ Reglas:
                 <h3 style="margin-top:0">Compra con foto de la factura</h3>
                 <div class="nota" style="margin-top:0">Tome la foto derecha, completa y con buena luz. Si la factura tiene varias páginas, una foto por página (hasta 4). Gemini lee proveedor, productos, cantidades y costos; usted revisa todo antes de guardar.</div>
                 <div class="cmp-fotos">${cmp.fotos.map((f, i) => `<div class="cmp-foto"><img src="${f}" alt="Página ${i + 1}"><button type="button" title="Quitar" onclick="cmp.fotos.splice(${i},1);almPintar()">✕</button></div>`).join('')}
-                    ${cmp.fotos.length < 4 ? `<label class="cmp-agregar">📷 ${cmp.fotos.length ? 'Tomar otra página' : 'Tomar foto'}<input type="file" accept="image/*" capture="environment" hidden onchange="cmpAgregarFotos(this.files); this.value=''"></label>
-                        <label class="cmp-agregar">🖼 ${cmp.fotos.length ? 'Elegir otra foto' : 'Elegir foto ya tomada'}<input type="file" accept="image/*" multiple hidden onchange="cmpAgregarFotos(this.files); this.value=''"></label>` : ''}</div>
+                    ${cmp.fotos.length < 4 ? `<label class="cmp-agregar">${ico('camara', 28)}<span>${cmp.fotos.length ? 'Tomar otra página' : 'Tomar foto'}</span><input type="file" accept="image/*" capture="environment" hidden onchange="cmpAgregarFotos(this.files); this.value=''"></label>
+                        <label class="cmp-agregar">${ico('imagen', 28)}<span>${cmp.fotos.length ? 'Elegir otra foto' : 'Elegir foto ya tomada'}</span><input type="file" accept="image/*" multiple hidden onchange="cmpAgregarFotos(this.files); this.value=''"></label>` : ''}</div>
                 <div class="login-error" id="cmpError"></div>
                 <div class="req-acciones" style="margin-bottom:0"><button type="button" class="btn-ghost" onclick="cmpSinFoto()">Escribir sin foto</button>
                     <button type="button" class="btn-ghost" onclick="cmp.modoTexto=true;cmpPintarCompra(document.getElementById('almContenido'), true)">Pegar texto de otra IA</button>
@@ -12493,7 +12511,7 @@ Reglas:
                     ${ultimas.map(c => `<tr><td class="izq"><b>${esc(c.numero)}</b></td><td class="izq">${fechaBonita(c.fecha)} <small>${esc(c.hora)}</small></td><td class="izq">${esc(c.proveedor)}<small>Factura ${esc(c.factura || 's/n')} · ${esc(c.usuario)}</small></td>
                         <td>${c.renglones}</td><td>${fmt(c.total)}</td><td class="izq"><small>${Object.keys(c.notas).map(k => esc(CMP_SIGLA[k] || k) + ' ' + esc(c.notas[k])).join(' · ') || '—'}</small></td>
                         <td class="izq"><small>${Object.keys(c.queda).map(k => { const p = almProducto(k); return esc(p ? p.descripcion : k) + ': ' + almCant(c.queda[k], p && p.tipo) + ' ' + almUnidad(p && p.tipo); }).join('<br>') || 'Nada'}</small></td>
-                        <td style="white-space:nowrap">${(c.detalle || []).length ? `<button type="button" class="btn-ghost btn-mini" title="Imprimir cuánto va a cada tienda" onclick="cmpImprimirDistribucion('${esc(c.numero)}')">🖨 Distribución</button> ` : ''}${c.fotos.map((u, i) => `<a class="btn-ghost btn-mini" href="${esc(u)}" target="_blank" rel="noopener">Foto${c.fotos.length > 1 ? ' ' + (i + 1) : ''}</a>`).join(' ')}</td></tr>`).join('')}</tbody></table></div>`}</div>`;
+                        <td style="white-space:nowrap">${(c.detalle || []).length ? `<button type="button" class="btn-ghost btn-mini" title="Imprimir cuánto va a cada tienda" onclick="cmpImprimirDistribucion('${esc(c.numero)}')">${ico('imprimir')}Distribución</button> ` : ''}${c.fotos.map((u, i) => `<a class="btn-ghost btn-mini" href="${esc(u)}" target="_blank" rel="noopener">Foto${c.fotos.length > 1 ? ' ' + (i + 1) : ''}</a>`).join(' ')}</td></tr>`).join('')}</tbody></table></div>`}</div>`;
     }
     async function cmpCargarCompras() {
         cmpCompras = [];   // mientras carga no se vuelve a pedir
@@ -12682,7 +12700,7 @@ Reglas:
                 ${p && !p.libre ? `<b>${esc(p.descripcion)}</b>` : `<input type="text" class="cmp-desc" value="${esc(l.descripcion)}" placeholder="Descripción del producto" autocomplete="off" oninput="cmp.lineas[${i}].descripcion=this.value" onchange="cmpDescripcion(${i})">`}</div>
                 ${mal ? '<small style="color:var(--danger)">No existe ese código: bórrelo para trabajar con la descripción</small>' : ''}
                 ${p && p.libre ? `<small>Sin código: se reparte completo a las tiendas${queda > 0 ? ' · <a href="#" onclick="event.preventDefault(); almEditarProducto(\'\', \'\')">registrarlo para dejar en el almacén</a>' : ''}</small>` : ''}
-                ${l.conversion ? `<small>📦 ${esc(l.conversion)}</small>` : ''}
+                ${l.conversion ? `<small>Empaque: ${esc(l.conversion)}</small>` : ''}
                 ${l.descripcionFactura ? `<small>Factura: ${esc(l.descripcionFactura)}${l.unidad ? ' (' + esc(l.unidad) + ')' : ''}${l.origenCodigo === 'recordado' ? ' · ✓ recordado' : l.origenCodigo === 'barras' ? ' · ✓ por código de barras' : l.origenCodigo === 'parecido' ? ' · <b>parecido: revíselo</b>' : l.origenCodigo === 'sugerido' ? ' · sugerido' : ''}</small>` : ''}
                 <small class="cmp-regla">${esc(l.regla || '')}</small></td>
             <td>${n('cantidad', l.cantidad, 'cmp-n')}<small>${p ? almUnidad(p.tipo) : ''}</small></td>
@@ -12929,7 +12947,7 @@ Reglas:
             </div>
             ${completas ? '' : `<div class="cmp-resumen"><span>Por definir precio: <b style="color:var(--amar-txt)">${cmpOrd.porDefinir || 0}</b></span><span>Por actualizar: <b>${cmpOrd.porActualizar || 0}</b></span>${f.tienda ? `<span>Pendientes en ${esc(f.tienda)}: <b>${l.length}</b></span>` : ''}
                 ${permisos.some(x => x === 'precios' || x === 'inventario') ? `<button type="button" class="btn-primary btn-mini cmp-imp" onclick="cmpNuevaOrdenDlg()" title="Cargar un precio nuevo aunque no haya llegado mercancía">＋ Cambio de precio sin compra</button>` : ''}
-                ${l.length ? `<button type="button" class="btn-ghost btn-mini cmp-imp" onclick="cmpImprimirPendientes()">🖨 Imprimir ${f.tienda ? 'lo de ' + esc(f.tienda) : 'la lista'}</button>` : ''}</div>`}
+                ${l.length ? `<button type="button" class="btn-ghost btn-mini cmp-imp" onclick="cmpImprimirPendientes()">${ico('imprimir')}Imprimir ${f.tienda ? 'lo de ' + esc(f.tienda) : 'la lista'}</button>` : ''}</div>`}
             ${!l.length ? `<div class="empty">${completas ? 'Todavía no hay órdenes completas.' : 'No hay nada pendiente con estos filtros.'}</div>` : `<div class="tabla-wrap"><table class="req-tabla cmp-otabla" data-sin-paginar><thead><tr>
                 <th class="izq">Producto</th><th>Costo ${etiqueta}</th><th>Detal ${etiqueta}</th>${conMayor ? `<th>Mayor ${etiqueta}</th>` : ''}
                 ${tiendas.map(t => `<th class="cmp-oth">${esc(CMP_SIGLA[t])}<small>${esc(t)}</small>${completas ? '' : `<button type="button" class="cmp-todo" title="Marcar con precio actualizado todo lo pendiente de ${esc(t)} en esta lista" onclick="cmpMarcarTienda('${esc(t)}')">✓ todo</button>`}</th>`).join('')}
@@ -13003,9 +13021,155 @@ Reglas:
     }
     // Distribución de una compra guardada (Compras recientes): cuánto de cada producto va a cada tienda y cuánto queda en el almacén,
     // con el N° de la nota de cada tienda y espacio para firmar el despacho
-    function cmpImprimirDistribucion(numero) {
+    // Se abre una vista previa (la hoja como foto) con: Descargar PDF (sin impresora: sirve en el teléfono), Descargar foto,
+    // Compartir (WhatsApp, Telegram... en el teléfono) e Imprimir (solo si hay impresora)
+    let cmpDistArchivo = null;   // { numero, compra, lienzo, png }
+    async function cmpImprimirDistribucion(numero) {
         const c = (cmpCompras || []).find(x => x.numero === numero);
         if (!c || !(c.detalle || []).length) { mostrarBanner('Esa compra no tiene el detalle guardado.', 'warn'); return; }
+        cmpDistArchivo = null;
+        const comparte = !!(navigator.canShare && navigator.share);
+        almVentana(`<div class="req-dlg alm-dlg-ancho" style="width:min(900px,100%)"><h3>Distribución · compra ${esc(c.numero)}</h3>
+            <div class="req-sub">${esc(c.proveedor)} · factura ${esc(c.factura || 's/n')}</div>
+            <div id="cmpDistVista" style="margin:.75rem 0;max-height:60vh;overflow:auto;border:1px solid var(--border);border-radius:10px;background:#fff;text-align:center">${cargandoHTML('Preparando la hoja...')}</div>
+            <div class="login-error" id="cmpDistError"></div>
+            <div class="req-acciones" style="justify-content:flex-end;flex-wrap:wrap;margin-bottom:0">
+                <button type="button" class="btn-ghost" onclick="almCerrar()">Cerrar</button>
+                <button type="button" class="btn-ghost" onclick="cmpDistImprimir('${esc(c.numero)}')" title="Necesita una impresora (o la opción Guardar como PDF de la computadora)">${ico('imprimir')}Imprimir</button>
+                ${comparte ? `<button type="button" class="btn-ghost cmp-dist-b" disabled onclick="cmpDistCompartir()">${ico('compartir')}Compartir foto</button>` : ''}
+                <button type="button" class="btn-ghost cmp-dist-b" disabled onclick="cmpDistDescargarFoto()">${ico('imagen')}Descargar foto</button>
+                <button type="button" class="btn-primary cmp-dist-b" disabled onclick="cmpDistDescargarPDF()">${ico('descargar')}Descargar PDF</button></div></div>`);
+        try {
+            const lienzo = cmpDistLienzo(c);
+            cmpDistArchivo = { numero: c.numero, compra: c, lienzo, png: lienzo.toDataURL('image/png') };
+            const v = document.getElementById('cmpDistVista'); if (!v) return;
+            v.innerHTML = `<img src="${cmpDistArchivo.png}" alt="Distribución de la compra ${esc(c.numero)}" style="width:100%;max-width:860px;display:block;margin:auto">`;
+            document.querySelectorAll('.cmp-dist-b').forEach(b => { b.disabled = false; });
+        } catch (e) {
+            const v = document.getElementById('cmpDistVista'); if (v) v.innerHTML = '';
+            const er = document.getElementById('cmpDistError'); if (er) er.textContent = 'No se pudo preparar la foto: ' + e.message + '. Puede usar Imprimir.';
+        }
+    }
+    // Los datos de la hoja (los mismos para la foto y el PDF)
+    function cmpDistDatos(c) {
+        const tipo = l => (almProducto(l.codigo) || {}).tipo, cant = (v, l) => v > 0 ? almCant(v, tipo(l)) : '—';
+        const filas = c.detalle.map((l, i) => {
+            const queda = cmpR2(l.cantidad - CMP_TIENDAS.reduce((s, t) => s + (Number((l.dist || {})[t]) || 0), 0));
+            return { n: String(i + 1), cod: l.codigo || '—', desc: String(l.descripcion || ''), llego: almCant(l.cantidad, tipo(l)) + ' ' + almUnidad(tipo(l)),
+                     tiendas: CMP_TIENDAS.map(t => cant((l.dist || {})[t], l)), queda: queda > 0 ? cant(queda, l) : '—' };
+        });
+        return { titulo: 'Distribución · compra ' + c.numero, filas, renglones: CMP_TIENDAS.map(t => c.detalle.filter(l => (Number((l.dist || {})[t]) || 0) > 0).length),
+                 sub: `${c.proveedor} · factura ${c.factura || 's/n'}${c.fechaFactura ? ' del ' + fechaBonita(c.fechaFactura) : ''} · registrada ${fechaBonita(c.fecha)} ${c.hora || ''} por ${c.usuario} · ${c.detalle.length} renglón(es)` };
+    }
+    // La hoja como foto, dibujada directamente en el lienzo (antes se "fotografiaba" la página con html2canvas y salía en blanco)
+    function cmpDistLienzo(c) {
+        const D = cmpDistDatos(c), E = 2, W = 1100, M = 32, nT = CMP_TIENDAS.length;
+        const F = (peso, tam) => `${peso} ${tam}px Arial, Helvetica, sans-serif`;
+        const cols = [{ w: 34 }, { w: 96 }, { w: 0 }, { w: 96, c: 1 }].concat(CMP_TIENDAS.map(() => ({ w: 92, c: 1 })), [{ w: 92, c: 1 }]);
+        cols[2].w = W - 2 * M - cols.reduce((s, x) => s + x.w, 0);
+        const xs = []; cols.reduce((x, cl) => { xs.push(x); return x + cl.w; }, M);
+        const med = document.createElement('canvas').getContext('2d');
+        const partir = (txt, ancho, font) => {
+            med.font = font; const l = []; let a = '';
+            String(txt).split(/\s+/).filter(Boolean).forEach(p => { const b = a ? a + ' ' + p : p; if (med.measureText(b).width > ancho && a) { l.push(a); a = p; } else a = b; });
+            if (a) l.push(a); return l.length ? l : [''];
+        };
+        const subL = partir(D.sub, W - 2 * M, F(400, 13));
+        const filas = D.filas.map(f => ({ f, desc: partir(f.desc, cols[2].w - 12, F(400, 13)) }));
+        const altoFila = r => Math.max(30, 13 + r.desc.length * 17), cabAlto = 46;
+        const H = M + 30 + subL.length * 18 + 16 + cabAlto + filas.reduce((s, r) => s + altoFila(r), 0) + 30 + 64 + M;
+        const cv = document.createElement('canvas'); cv.width = W * E; cv.height = Math.ceil(H * E);
+        const g = cv.getContext('2d'); g.scale(E, E);
+        g.fillStyle = '#ffffff'; g.fillRect(0, 0, W, H); g.textBaseline = 'middle';
+        const txt = (t, i, yy, font, color) => {
+            g.font = font; g.fillStyle = color;
+            if (cols[i].c) { g.textAlign = 'center'; g.fillText(t, xs[i] + cols[i].w / 2, yy); } else { g.textAlign = 'left'; g.fillText(t, xs[i] + 6, yy); }
+            g.textAlign = 'left';
+        };
+        const linea = (yy, alto, color) => { g.fillStyle = color; g.fillRect(M, yy, W - 2 * M, alto); };
+        let y = M;
+        g.font = F(700, 22); g.fillStyle = '#0f172a'; g.fillText(D.titulo, M, y + 12); y += 30;
+        g.font = F(400, 13); g.fillStyle = '#475569'; subL.forEach(l => { g.fillText(l, M, y + 8); y += 18; });
+        y += 6; linea(y, 2, '#44AC00'); y += 10;
+        ['#', 'CÓDIGO', 'PRODUCTO', 'LLEGÓ'].concat(CMP_TIENDAS.map(t => CMP_SIGLA[t]), ['QUEDA']).forEach((t, i) => txt(t, i, y + 12, F(700, 11), '#475569'));
+        CMP_TIENDAS.forEach((t, j) => txt(c.notas[t] ? 'Nota ' + c.notas[t] : t, 4 + j, y + 29, F(400, 10), '#64748b'));
+        txt('almacén', 4 + nT, y + 29, F(400, 10), '#64748b');
+        y += cabAlto - 6; linea(y, 1.5, '#0f172a'); y += 2;
+        filas.forEach((r, ri) => {
+            const h = altoFila(r), mid = y + h / 2;
+            if (ri % 2) { g.fillStyle = '#f8fafc'; g.fillRect(M, y, W - 2 * M, h); }
+            txt(r.f.n, 0, mid, F(400, 12), '#64748b'); txt(r.f.cod, 1, mid, F(400, 12), '#475569');
+            r.desc.forEach((l, k) => txt(l, 2, mid - (r.desc.length - 1) * 8.5 + k * 17, F(400, 13), '#0f172a'));
+            txt(r.f.llego, 3, mid, F(700, 13), '#0f172a');
+            r.f.tiendas.forEach((v, j) => txt(v, 4 + j, mid, v === '—' ? F(400, 13) : F(700, 14), v === '—' ? '#cbd5e1' : '#2f7a00'));
+            txt(r.f.queda, 4 + nT, mid, F(700, 13), r.f.queda === '—' ? '#cbd5e1' : '#0f172a');
+            y += h; linea(y - 1, 1, '#e2e8f0');
+        });
+        linea(y, 1.5, '#0f172a');
+        D.renglones.forEach((n, j) => txt(n + ' renglón(es)', 4 + j, y + 15, F(400, 10), '#475569'));
+        y += 30 + 36;
+        const nF = nT + 1, sep = 24, wF = (W - 2 * M - sep * (nF - 1)) / nF;
+        ['Despachado por'].concat(CMP_TIENDAS.map(t => 'Recibido ' + CMP_SIGLA[t])).forEach((t, i) => {
+            const fx = M + i * (wF + sep); g.fillStyle = '#0f172a'; g.fillRect(fx, y, wF, 1);
+            g.font = F(400, 11); g.fillStyle = '#475569'; g.textAlign = 'center'; g.fillText(t, fx + wF / 2, y + 14); g.textAlign = 'left';
+        });
+        return cv;
+    }
+    const cmpDistNombre = () => 'Distribucion compra ' + cmpDistArchivo.numero;
+    function cmpDistDescargarFoto() {
+        if (!cmpDistArchivo) return;
+        const a = document.createElement('a'); a.href = cmpDistArchivo.png; a.download = cmpDistNombre() + '.png';
+        document.body.appendChild(a); a.click(); a.remove();
+    }
+    async function cmpDistCompartir() {
+        if (!cmpDistArchivo) return;
+        try {
+            const blob = await (await fetch(cmpDistArchivo.png)).blob(), f = new File([blob], cmpDistNombre() + '.png', { type: 'image/png' });
+            if (navigator.canShare && !navigator.canShare({ files: [f] })) { cmpDistDescargarFoto(); return; }
+            await navigator.share({ files: [f], title: cmpDistNombre() });
+        } catch (e) { if (e.name !== 'AbortError') mostrarBanner('No se pudo compartir: ' + e.message + '. Use "Descargar foto".', 'warn'); }
+    }
+    // PDF tamaño carta sin pasar por la impresora: texto y tabla de verdad (jsPDF + autoTable), nítido y con varias páginas si hace falta
+    function cmpDistDescargarPDF() {
+        const c = cmpDistArchivo && cmpDistArchivo.compra; if (!c) return;
+        try {
+            const D = cmpDistDatos(c), { jsPDF } = window.jspdf, doc = new jsPDF({ unit: 'mm', format: 'letter' }), M = 12, A = 215.9, nT = CMP_TIENDAS.length;
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.setTextColor(15, 23, 42); doc.text(D.titulo, M, M + 4);
+            doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(71, 85, 105);
+            const subL = doc.splitTextToSize(D.sub, A - 2 * M); doc.text(subL, M, M + 10);
+            const y = M + 10 + subL.length * 4; doc.setDrawColor(68, 172, 0); doc.setLineWidth(0.6); doc.line(M, y, A - M, y);
+            const colSt = { 0: { cellWidth: 7, textColor: [100, 116, 139] }, 1: { cellWidth: 20, textColor: [71, 85, 105] }, 3: { cellWidth: 18, halign: 'center', fontStyle: 'bold' },
+                            [4 + nT]: { cellWidth: 16, halign: 'center', fontStyle: 'bold' } };
+            for (let j = 0; j < nT; j++) colSt[4 + j] = { cellWidth: 17, halign: 'center', fontStyle: 'bold', textColor: [47, 122, 0] };
+            doc.autoTable({
+                head: [['#', 'Código', 'Producto', 'Llegó'].concat(CMP_TIENDAS.map(t => CMP_SIGLA[t] + (c.notas[t] ? '\nNota ' + c.notas[t] : '')), ['Queda\nalmacén'])],
+                body: D.filas.map(f => [f.n, f.cod, f.desc, f.llego].concat(f.tiendas, [f.queda])),
+                foot: [['', '', '', ''].concat(D.renglones.map(n => n + ' reng.'), [''])],
+                startY: y + 3, margin: { left: M, right: M }, theme: 'plain', columnStyles: colSt, showFoot: 'lastPage',
+                styles: { fontSize: 8.5, cellPadding: 1.6, textColor: [15, 23, 42], lineColor: [226, 232, 240], lineWidth: 0.1, valign: 'middle' },
+                headStyles: { textColor: [71, 85, 105], fontStyle: 'bold', fontSize: 7.5, halign: 'center', lineColor: [15, 23, 42] },
+                footStyles: { textColor: [71, 85, 105], fontSize: 7, halign: 'center' },
+                alternateRowStyles: { fillColor: [248, 250, 252] },
+                didParseCell: d => { if (d.section === 'body' && d.cell.raw === '—') { d.cell.styles.textColor = [203, 213, 225]; d.cell.styles.fontStyle = 'normal'; } }
+            });
+            let fy = doc.lastAutoTable.finalY + 18; if (fy > 279.4 - 15) { doc.addPage(); fy = 30; }
+            const nF = nT + 1, sep = 5, wF = (A - 2 * M - sep * (nF - 1)) / nF;
+            doc.setDrawColor(15, 23, 42); doc.setLineWidth(0.3); doc.setFontSize(7.5); doc.setTextColor(71, 85, 105);
+            ['Despachado por'].concat(CMP_TIENDAS.map(t => 'Recibido ' + CMP_SIGLA[t])).forEach((t, i) => { const fx = M + i * (wF + sep); doc.line(fx, fy, fx + wF, fy); doc.text(t, fx + wF / 2, fy + 4, { align: 'center' }); });
+            doc.save(cmpDistNombre() + '.pdf');
+        } catch (e) { mostrarBanner('No se pudo hacer el PDF: ' + e.message, 'error'); }
+    }    function cmpDistImprimir(numero) {
+        const c = (cmpCompras || []).find(x => x.numero === numero); if (!c) return;
+        const html = cmpDistribucionHTML(c, false);
+        let fr = document.getElementById('almImprimeMarco'); if (fr) fr.remove();
+        fr = document.createElement('iframe'); fr.id = 'almImprimeMarco'; fr.setAttribute('aria-hidden', 'true');
+        fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+        document.body.appendChild(fr);
+        const w = fr.contentWindow; w.document.open(); w.document.write(html); w.document.close();
+        setTimeout(() => { try { w.focus(); w.print(); } catch (e) { mostrarBanner('No se pudo abrir la impresión (' + e.message + '). Use "Descargar PDF".', 'warn'); } }, 200);
+    }
+    // La hoja de distribución. comoFoto: con márgenes propios (la imagen no tiene los de la impresora)
+    function cmpDistribucionHTML(c, comoFoto) {
         const tipo = l => (almProducto(l.codigo) || {}).tipo, cant = (v, l) => v > 0 ? almCant(v, tipo(l)) : '';
         const reparte = l => CMP_TIENDAS.reduce((s, t) => s + (Number((l.dist || {})[t]) || 0), 0);
         const filas = c.detalle.map((l, i) => {
@@ -13016,9 +13180,9 @@ Reglas:
                 <td class="c q">${queda > 0 ? cant(queda, l) : '<span class="nada">—</span>'}</td></tr>`;
         }).join('');
         const renglonesDe = t => c.detalle.filter(l => (Number((l.dist || {})[t]) || 0) > 0).length;
-        const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Distribución compra ${esc(c.numero)}</title><style>
+        return `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Distribución compra ${esc(c.numero)}</title><style>
             @page{size:letter;margin:10mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-            body{margin:0;font-family:Arial,Helvetica,sans-serif;color:#0f172a;font-size:9.5pt}
+            html,body{background:#fff}body{margin:0;font-family:Arial,Helvetica,sans-serif;color:#0f172a;font-size:9.5pt${comoFoto ? ';padding:8mm 8mm 4mm' : ''}}
             h1{font-size:13pt;margin:0}.sub{color:#475569;font-size:8.5pt;margin:1mm 0 3mm;border-bottom:.5mm solid #44AC00;padding-bottom:2mm}
             table{width:100%;border-collapse:collapse}th{font-size:7.5pt;text-transform:uppercase;color:#475569;text-align:left;border-bottom:.3mm solid #0f172a;padding:1.2mm 1mm}
             th small{display:block;text-transform:none;font-weight:400}
@@ -13036,12 +13200,6 @@ Reglas:
                 <tbody>${filas}</tbody>
                 <tfoot><tr><td colspan="4"></td>${CMP_TIENDAS.map(t => `<td>${renglonesDe(t)} renglón(es)</td>`).join('')}<td></td></tr></tfoot></table>
             <div class="firma"><div>Despachado por</div>${CMP_TIENDAS.map(t => `<div>Recibido ${esc(CMP_SIGLA[t])}</div>`).join('')}</div></body></html>`;
-        let fr = document.getElementById('almImprimeMarco'); if (fr) fr.remove();
-        fr = document.createElement('iframe'); fr.id = 'almImprimeMarco'; fr.setAttribute('aria-hidden', 'true');
-        fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
-        document.body.appendChild(fr);
-        const w = fr.contentWindow; w.document.open(); w.document.write(html); w.document.close();
-        setTimeout(() => { try { w.focus(); w.print(); } catch (e) { mostrarBanner('No se pudo abrir la impresión: ' + e.message, 'error'); } }, 200);
     }
     // ---------- Marcas al instante: los clics se juntan y se guardan juntos en segundo plano ----------
     // Cada clic se ve marcado de inmediato. Los clics seguidos (700 ms) van en un solo pedido "cmp_marcar_lote" (ligero: Google devuelve
@@ -13164,7 +13322,7 @@ Reglas:
             </div>
             <div class="nota">Precio = costo ÷ (1 − margen), redondeado al centavo (o terminado en 7 / ,99 con la terminación psicológica). Al mayor (solo charcutería) sobre el costo de la factura, sin merma. Si cambia el precio y alguna tienda ya lo había actualizado, se le quita la marca para que lo cambie de nuevo.</div>
             <div class="login-error" id="cmpKError"></div>
-            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0">${o.detal > 0 || o.mayor > 0 ? `<button type="button" class="btn-ghost" style="margin-right:auto" onclick="cmpAvisarOrden('${esc(o.id)}', this)" title="Envía el precio de esta orden al grupo de Telegram &quot;Control de depósito&quot;">📣 Avisar por Telegram</button>` : ''}<button type="button" class="btn-ghost" onclick="almCerrar()">Cancelar</button><button type="submit" class="btn-primary" id="cmpBtnK">Guardar precio</button></div></form>`);
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0">${o.detal > 0 || o.mayor > 0 ? `<button type="button" class="btn-ghost" style="margin-right:auto" onclick="cmpAvisarOrden('${esc(o.id)}', this)" title="Envía el precio de esta orden al grupo de Telegram &quot;Control de depósito&quot;">${ico('avisar')}Avisar por Telegram</button>` : ''}<button type="button" class="btn-ghost" onclick="almCerrar()">Cancelar</button><button type="submit" class="btn-primary" id="cmpBtnK">Guardar precio</button></div></form>`);
     }
     async function cmpAvisarOrden(id, btn) {
         if (!confirm('¿Enviar el precio de esta orden al grupo "Control de depósito"?')) return;
@@ -13174,7 +13332,7 @@ Reglas:
             if (r.telegram && r.telegram.ok) mostrarBanner('Aviso enviado al grupo "Control de depósito".', 'ok');
             else mostrarBanner('Telegram no aceptó el aviso: ' + ((r.telegram || {}).error || 'sin respuesta'), 'error');
         } catch (e) { mostrarBanner(e.message, 'error'); }
-        btn.disabled = false; btn.textContent = '📣 Avisar por Telegram';
+        btn.disabled = false; btn.innerHTML = ico('avisar') + 'Avisar por Telegram';
     }
     // Cambio de precio sin compra: se elige el producto del catálogo, se calcula igual que en una orden y queda "Por actualizar" en las tiendas
     function cmpNuevaOrdenDlg() {
@@ -13556,6 +13714,11 @@ Reglas:
             // Solo lo que ocupa la nota (sin hoja en blanco debajo)
             const alto = Math.ceil(Math.max(...[...w.document.body.children].map(el => el.getBoundingClientRect().bottom)) + w.scrollY) + 18;
             const lienzo = await w.html2canvas(w.document.body, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false, height: alto, windowHeight: alto });
+            // En algunos equipos html2canvas devuelve el dibujo vacío (transparente o todo blanco): no se manda una imagen en blanco
+            // (quien llama la manda vacía y Google envía la nota con su formato)
+            const px = lienzo.getContext('2d').getImageData(0, 0, lienzo.width, lienzo.height).data;
+            let tinta = 0; for (let i = 0; i < px.length && tinta < 50; i += 4 * 7) if (px[i + 3] > 0 && px[i] < 160) tinta++;
+            if (tinta < 50) throw new Error('la imagen de la nota salió vacía');
             return lienzo.toDataURL('image/png');
         } finally { fr.remove(); }
     }
@@ -15161,7 +15324,7 @@ Reglas:
                 <td class="efe-c">${f.bs > 0 || efeSinEnvio(f) ? efeSwRecibido(f, 'bs') : ''}</td>
                 <td>${f.usd ? fmtUsd(f.usd) : '—'}</td>
                 <td class="efe-c">${f.usd > 0 ? efeSwRecibido(f, 'usd') : ''}</td>
-                <td class="efe-c"><button type="button" class="efe-ico" title="Modificar el monto (pide clave de administrador)" onclick="efeAbrirModificar(${f.fila})">✏️</button></td></tr>`).join('') +
+                <td class="efe-c"><button type="button" class="efe-ico" title="Modificar el monto (pide clave de administrador)" onclick="efeAbrirModificar(${f.fila})"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:middle"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button></td></tr>`).join('') +
             '</tbody></table>' : '<div class="empty">No hay envíos pendientes por llegar.</div>';
 
         // Por tienda
@@ -15235,7 +15398,7 @@ Reglas:
         };
         const turnoCorto = t => /^ma/i.test(t || '') ? 'M' : /^ta/i.test(t || '') ? 'T' : esc(t || '');
         document.getElementById('efeHTabla').innerHTML = lista.length ? `<table data-sin-paginar><thead><tr><th class="izq">Fecha</th><th class="izq">Concepto</th>
-            <th class="izq">Responsable</th><th class="izq">Turno</th><th>Bs</th><th>$</th><th class="efe-c" title="Foto">📎</th><th class="efe-c" title="Verificación (solo gastos de oficina)">Verif.</th><th></th></tr></thead><tbody>` +
+            <th class="izq">Responsable</th><th class="izq">Turno</th><th>Bs</th><th>$</th><th class="efe-c" title="Foto">Foto</th><th class="efe-c" title="Verificación (solo gastos de oficina)">Verif.</th><th></th></tr></thead><tbody>` +
             lista.slice(0, efeHLimite).map(f => `<tr class="${f.tipo === 'EGRESO' ? 'fila-egreso' : f.tipo === 'TRASPASO' ? 'fila-traspaso' : f.tipo === 'EXTERNO' ? 'fila-externo' : ''}"><td class="izq">${efeFecha(f.fecha)}</td>
                 <td class="izq efe-gris">${f.tipo === 'TRASPASO' ? esc(f.turno || 'Traspaso a caja chica') : f.tipo === 'EGRESO' ? esc(f.turno || (f.etiqueta && f.etiqueta !== 'EGRESO' ? f.etiqueta : 'Egreso manual')) : f.tipo === 'EXTERNO' ? esc(f.turno) : esc(f.tienda || 'Ingreso manual')}</td><td class="izq efe-gris">${efeCorto(f.cajero)}</td>
                 <td class="izq efe-gris"><span title="${esc(f.tipo === 'INGRESO' ? f.turno : '')}">${f.tipo !== 'INGRESO' ? '' : turnoCorto(f.turno)}</span></td>
@@ -15518,7 +15681,7 @@ Reglas:
             .filter(m => !fm || m.moneda === fm).reverse();
         const borrable = m => m.tipo === 'GASTO' || (m.tipo === 'RECARGA' && m.origen === 'externo');
         document.getElementById('efeCTabla').innerHTML = lista.length ? `<table><thead><tr><th class="izq">Fecha</th><th class="izq">Tipo</th><th class="izq">Concepto</th>
-            <th class="izq">Responsable</th><th>Monto</th><th>Saldo</th><th class="efe-c" title="Comprobante">📎</th><th class="efe-c" title="Verificado">Verif.</th><th></th></tr></thead><tbody>` +
+            <th class="izq">Responsable</th><th>Monto</th><th>Saldo</th><th class="efe-c" title="Comprobante">Comp.</th><th class="efe-c" title="Verificado">Verif.</th><th></th></tr></thead><tbody>` +
             lista.map(m => `<tr class="${m.tipo === 'GASTO' && !m.verificado ? 'cc-sinverificar' : ''}"><td class="izq">${efeFecha(m.fecha)}</td>
                 <td class="izq"><span class="chip ${m.tipo === 'RECARGA' ? (m.origen === 'externo' ? 'st-info' : 'st-ok') : 'st-falta'}" title="${m.tipo === 'RECARGA' ? (m.origen === 'externo' ? 'Recarga externa (no afecta el flujo general)' : 'Recarga desde el flujo general') : 'Gasto'}">${m.tipo === 'RECARGA' ? 'Recarga' : 'Gasto'}</span></td>
                 <td class="izq efe-gris">${esc(m.concepto)}</td><td class="izq efe-gris">${efeCorto(m.responsable)}</td>
@@ -15613,8 +15776,8 @@ Reglas:
     }
     // Listas más fáciles de leer: fecha corta (completa al pasar el cursor), íconos en vez de palabras y los detalles en el cursor
     const efeFecha = f => !f ? '—' : `<span class="efe-fecha" title="${diaSemana(f)} ${fechaBonita(f)}">${f.slice(8, 10)}/${f.slice(5, 7)}/${f.slice(2, 4)}</span>`;   // año abreviado, letra pequeña
-    const efeFoto = url => url ? `<a class="efe-ico" href="${esc(url)}" target="_blank" rel="noopener" title="Ver foto">📎</a>` : '';
-    const efeBorrar = (accion, titulo) => `<button type="button" class="efe-ico" title="${esc(titulo)}" onclick="${accion}">🗑</button>`;
+    const efeFoto = url => url ? `<a class="efe-ico" href="${esc(url)}" target="_blank" rel="noopener" title="Ver foto"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:middle"><path d="M21.4 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></a>` : '';
+    const efeBorrar = (accion, titulo) => `<button type="button" class="efe-ico" title="${esc(titulo)}" onclick="${accion}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:middle"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg></button>`;
     const efeCorto = n => { const s = String(n || '').trim(); return `<span title="${esc(s)}">${esc(s.split(/\s+/).slice(0, 2).join(' '))}</span>`; };
     function efeAprox(bs, fecha) { const t = tasaBCVdel(fecha || fechaLocalHoy()); return t && bs ? ' · ≈ ' + fmtUsd(Math.abs(bs) / t[1]) : ''; }
     const efeMonto = (moneda, v, fecha) => `<span title="${moneda === 'BsE' ? 'Bs electrónicos' : moneda === '$' ? '$ efectivo' : 'Bs efectivo'}${moneda !== '$' ? efeAprox(v, fecha) : ''}">${moneda === '$' ? fmtUsd(v) : fmtBs(v)}${moneda === 'BsE' ? '<span class="efe-e">e</span>' : ''}</span>`;
