@@ -3600,15 +3600,18 @@
     // Botón atrás del teléfono (Android) o del navegador = "← Atrás" del panel (igual que Esc: si hay una ventana abierta, solo la cierra).
     // Se deja una entrada "de guardia" en el historial del navegador; al pulsar atrás se consume, se hace el Atrás del panel y se vuelve a poner.
     // En Inicio, sin nada abierto, la primera vez avisa y la segunda sale de la aplicación.
-    // Chrome (sobre todo en Android) SALTA las entradas del historial que la página puso sin que la persona tocara la pantalla.
-    // La guardia se ponía así: al abrir la app (se retoma la sesión sola), al terminar de entrar (después de esperar a Google) y justo
-    // después de cada atrás. Como ya había una guardia, nunca se ponía otra "con toque": el atrás se la saltaba y la app se recargaba
-    // (se veía Inicio y luego cargaba) o, sin nada antes, se cerraba. Ahora se sabe si la guardia actual se puso con un toque; si no,
-    // el siguiente toque o tecla real pone una nueva. "click" y "touchend" sí cuentan como toque (pointerdown en pantalla táctil no).
-    let atrasConGesto = false, atrasAvisoEn = 0;
+    // Chrome (sobre todo en Android) marca como "saltable" la entrada del historial en la que se está cuando la página pone otra sin que
+    // la persona haya tocado la pantalla, y el botón atrás se la salta. Antes la guardia se ponía así (al abrir la app con la sesión
+    // retomada, al terminar de entrar y justo después de cada atrás): el atrás se saltaba la entrada de la página y la app se recargaba
+    // (se veía Inicio y luego cargaba) o, sin nada antes, se cerraba (por ejemplo, de un área a Inicio con dos atrás seguidos).
+    // Ahora:
+    //  - si la guardia se puso sin toque, el siguiente toque o tecla real pone otra ("click"/"touchend" sí cuentan; pointerdown táctil no)
+    //  - después de cada atrás NO se crea una entrada nueva: se vuelve con "adelante" a la misma guardia (recorrer no marca nada)
+    //  - en Inicio no se vuelve: se avisa y se baja hasta la entrada de la página, y el siguiente atrás sale
+    let atrasConGesto = false, atrasAvisoEn = 0, atrasIgnorar = 0, atrasEnCurso = false;
     const atrasHayGesto = () => !navigator.userActivation || navigator.userActivation.isActive;
     function atrasArmar() {
-        if (!clave || vistaActual === 'login' || vistaActual === 'marcaje') return;
+        if (!clave || atrasEnCurso || vistaActual === 'login' || vistaActual === 'marcaje') return;
         const gesto = atrasHayGesto();
         try {
             if (!(history.state && history.state.panelAtras)) { history.pushState({ panelAtras: 1 }, ''); atrasConGesto = gesto; }
@@ -3617,19 +3620,22 @@
     }
     ['click', 'touchend', 'keydown'].forEach(tipo => document.addEventListener(tipo, e => { if (e.isTrusted) atrasArmar(); }, true));
     window.addEventListener('popstate', () => {
+        if (atrasIgnorar && Date.now() < atrasIgnorar) { atrasIgnorar = 0; return; }   // el "adelante" / "atrás" que hizo el propio panel (si no llegó en 800 ms, no se espera más)
         if (!clave || vistaActual === 'login' || vistaActual === 'marcaje') return;
-        atrasConGesto = false;   // la entrada a la que se volvió puede ser una saltable: el siguiente toque pone una guardia nueva
         const visible = el => el && !el.classList.contains('hidden') && el.getClientRects().length > 0;
         const abierto = [...document.querySelectorAll('.req-dlg-fondo, .efe-modal, #perDlg, [role="dialog"]')].some(visible) || document.querySelector('.ms.abierto');
         if (!abierto && vistaActual === 'menu' && !areaActual && !historialVistas.length) {
             if (Date.now() - atrasAvisoEn > 1500) mostrarBanner('Pulse atrás otra vez para salir.', 'ok');
             atrasAvisoEn = Date.now();
+            atrasConGesto = false;   // si después abre algo, el siguiente toque vuelve a poner la guardia
             // Si debajo quedó otra guardia, se baja hasta la entrada de la página: el siguiente atrás sí sale
-            if (history.state && history.state.panelAtras) history.back();
+            if (history.state && history.state.panelAtras) { atrasIgnorar = Date.now() + 800; history.back(); }
             return;
         }
-        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
-        atrasArmar();
+        atrasEnCurso = true;   // mientras se hace el Atrás del panel no se crean entradas nuevas (quedarían saltables)
+        try { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); }
+        finally { atrasEnCurso = false; }
+        atrasIgnorar = Date.now() + 800; history.forward();   // de vuelta a la misma guardia
     });
     document.addEventListener('visibilitychange', () => { if (!document.hidden) avisarEnLinea(true); });
 
