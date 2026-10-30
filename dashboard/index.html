@@ -3207,7 +3207,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-10-30.1';
+    const VERSION_SERVIDOR = '2026-10-30.2';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -7938,6 +7938,7 @@
             ${t ? `<div class="asisg-datos"><span><small>Cargo</small>${esc(t.cargo) || '—'}</span><span><small>Perfil</small>${esc(t.perfil) || '—'}</span><span><small>${depto ? 'Departamento' : 'Local'}</small>${esc(t.local) || '—'}</span>
                 <span><small>Turno</small>${esc(t.turno) || '—'}</span><span><small>No puede trabajar</small>${t.restricciones.length ? esc(t.restricciones.join(', ')) : '—'}</span></div>` : ''}
             <div class="nota" style="margin-top:.5rem">Se mide con: ${mide}</div>
+            ${!propio && depto && dias.some(d => d.lugar !== depto) ? `<div class="banner warn" style="display:block;margin:.5rem 0">En las tiendas se le mide con el horario de la tienda y en ${esc(depto)} con el del departamento${(() => { const h = dias.find(d => d.lugar === depto && d.h); return h ? ` (${rango(h.h)})` : ''; })()}. Si su horario es el mismo en todas partes, escríbalo abajo como <b>horario propio</b>: ese manda en la tienda y en el departamento.</div>` : ''}
             ${editar}
             ${dias.length ? `<div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">Día</th><th class="izq">Dónde</th><th>Turno</th><th>Se esperaba</th><th>Entrada</th><th>Salida</th><th class="izq">Resultado</th></tr></thead><tbody>
                 ${dias.map(d => `<tr><td class="izq">${diaSemana(d.fecha)} ${fechaBonita(d.fecha)}</td><td class="izq">${esc(d.lugar)}</td><td>${esc(d.turno)}</td><td>${d.h ? rango(d.h) : 'Día libre'}</td>

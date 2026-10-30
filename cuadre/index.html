@@ -2292,22 +2292,32 @@
 
             // Se lee la respuesta del script para confirmar que la hoja guardó la ficha
             // (antes se enviaba "a ciegas" y siempre decía "éxito", aunque fallara)
-            payload.idem = COLA.nuevoIdem();   // si Google la guardó pero no respondió, al reenviarla con el mismo idem no se duplica
+            // El MISMO idem mientras sea esta ficha (si dio error y se vuelve a pulsar "Finalizar", va con el mismo): si Google ya la
+            // había guardado, no se repite. Se cambia al guardarse bien (o al quedar en la cola) y no se pierde si se recarga la página.
+            let idemFicha = ''; try { idemFicha = localStorage.getItem('caja_idem') || ''; } catch (e) {}
+            if (!idemFicha) { idemFicha = COLA.nuevoIdem(); try { localStorage.setItem('caja_idem', idemFicha); } catch (e) {} }
+            payload.idem = idemFicha;
             payload.equipo = fichaEquipo();    // seguridad: equipo autorizado (lo exige el script si el administrador lo activó)
             let respuesta;
             try {
-                const resp = await fetch(WEB_APP_URL, {
-                    method: "POST",
-                    headers: { "Content-Type": "text/plain;charset=utf-8" },
-                    body: JSON.stringify(payload)
-                });
-                respuesta = JSON.parse(await resp.text());
+                // "Todavía se está guardando" (el primer envío sigue en Google): se espera y se pregunta otra vez, con el mismo idem
+                for (let intento = 0; intento < 8; intento++) {
+                    const resp = await fetch(WEB_APP_URL, {
+                        method: "POST",
+                        headers: { "Content-Type": "text/plain;charset=utf-8" },
+                        body: JSON.stringify(payload)
+                    });
+                    respuesta = JSON.parse(await resp.text());
+                    if (!(respuesta && respuesta.resultado === 'error' && /todav[ií]a se est[aá] guardando/i.test(respuesta.detalle || respuesta.error || ''))) break;
+                    botonSubmit.textContent = "Guardando... (esperando a la hoja)";
+                    await new Promise(ok => setTimeout(ok, 5000));
+                }
             } catch (errRed) {
                 // Sin respuesta (sin internet o Google no contestó): la ficha queda guardada en este equipo y se envía sola
                 const sinRed = await COLA.sinInternet();
                 await COLA.agregar({ tipo: 'ficha', desc: `Ficha ${payload.tienda} · ${payload.fecha} · ${payload.turno} · ${payload.cajero}`, cuerpo: payload, idem: payload.idem,
                                      extra: { tienda: payload.tienda, fecha: payload.fecha } });
-                localStorage.removeItem('caja_borrador');
+                localStorage.removeItem('caja_borrador'); localStorage.removeItem('caja_idem');   // la cola la envía con su idem
                 alert((sinRed ? "No hay internet." : "La hoja no respondió.") + " La ficha quedó guardada en este equipo y se enviará sola cuando haya conexión, sin duplicarse. No la vuelva a llenar." +
                       "\n\nEl número de ficha y el PDF se generan al enviarse: verá el aviso en esta pantalla. Mientras tanto aparece abajo como pendiente.");
                 document.getElementById('mainForm').reset();
@@ -2321,8 +2331,8 @@
                 throw new Error("La hoja NO guardó la ficha: " + detalle);
             }
 
-            // Limpiar borrador temporal solo cuando la hoja confirmó
-            localStorage.removeItem('caja_borrador');
+            // Limpiar borrador temporal solo cuando la hoja confirmó (y el idem: la próxima ficha lleva uno nuevo)
+            localStorage.removeItem('caja_borrador'); localStorage.removeItem('caja_idem');
 
             // La hoja asignó el número de ficha (anterior + 1): se muestra y va en el PDF
             const nro = respuesta.nroFicha;
@@ -2336,7 +2346,8 @@
                 avisoPdf = "\n\nOJO: la ficha se guardó, pero no se pudo crear el PDF (" + errPdf.message + ").";
             }
 
-            alert("Ficha Nº " + nro + " guardada en la hoja (fila " + respuesta.rowCuadre + ")." +
+            alert((respuesta.yaRegistrado ? "Esta ficha YA estaba guardada (no se volvió a guardar): Ficha Nº " + nro + " (fila " + respuesta.rowCuadre + ")."
+                                          : "Ficha Nº " + nro + " guardada en la hoja (fila " + respuesta.rowCuadre + ").") +
                   (avisoPdf || "\nEl PDF se descargó en la PC."));
             document.getElementById('mainForm').reset();
             window.location.reload();
