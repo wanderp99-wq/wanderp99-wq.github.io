@@ -1025,6 +1025,15 @@
         .asis-nota input { width: 100%; box-sizing: border-box; }
         /* Gestión de asistencia: gráficas */
         .asisg-graf svg { width: 100%; height: auto; display: block; }
+        /* Horario del trabajador elegido */
+        .asisg-ficha { margin-top: 1rem; }
+        .asisg-datos { display: flex; flex-wrap: wrap; gap: .5rem 1.6rem; font-weight: 600; }
+        .asisg-datos small { display: block; font-size: .7rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
+        .asisg-hprop { margin: .7rem 0; padding: .7rem .8rem; border: 1px solid var(--border); border-radius: 12px; background: var(--list-bg); }
+        .asisg-hprop label { display: block; margin-bottom: .35rem; }
+        .asisg-hprop-c { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+        .asisg-hprop-c input[type=time] { width: auto; }
+        .asisg-hprop .nota { display: block; margin: .4rem 0 0; }
         @media (max-width: 640px) { .asisg-graf .grafico-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; } .asisg-graf svg { min-width: 600px; } }
         .asisg-graf .eje { stroke: var(--border); stroke-width: 1; }
         .asisg-graf .eje.base { stroke: var(--text-muted); stroke-opacity: .6; }
@@ -3198,7 +3207,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-10-29.11';
+    const VERSION_SERVIDOR = '2026-10-30.1';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -3747,7 +3756,7 @@
             const desde = document.getElementById('asisgDesde').value, hasta = document.getElementById('asisgHasta').value;
             if (asisgDatos && asisgDatos.desde === desde && asisgDatos.hasta === hasta) return;
             const r = await llamarApi({ action: 'asisg_listar', desde, hasta });
-            asisgDatos = { desde, hasta, oficina: r.oficina || [], locales: r.locales || [], faltantes: r.faltantes || [], departamentos: r.departamentos || [], deptoDe: r.deptoDe || {} };
+            asisgDatos = { desde, hasta, oficina: r.oficina || [], locales: r.locales || [], faltantes: r.faltantes || [], departamentos: r.departamentos || [], deptoDe: r.deptoDe || {}, fichas: r.fichas || [] };
             if (Array.isArray(r.horarios) && r.horarios.length) PUNT_HORARIOS = r.horarios;
             if (r.propios) PUNT_PROPIOS = r.propios;
             if (r.toleranciaMin) PUNT_TOLERANCIA = Number(r.toleranciaMin) || 5;
@@ -7773,7 +7782,7 @@
         try {
             const r = await llamarApi({ action: 'asisg_listar', desde, hasta });
             if (pedido !== asisgPedido) return;   // llegó tarde: ya se pidió otro período
-            asisgDatos = { desde, hasta, oficina: r.oficina || [], locales: r.locales || [], faltantes: r.faltantes || [], departamentos: r.departamentos || [], deptoDe: r.deptoDe || {} };
+            asisgDatos = { desde, hasta, oficina: r.oficina || [], locales: r.locales || [], faltantes: r.faltantes || [], departamentos: r.departamentos || [], deptoDe: r.deptoDe || {}, fichas: r.fichas || [] };
             if (Array.isArray(r.horarios) && r.horarios.length) PUNT_HORARIOS = r.horarios;
             if (r.propios) PUNT_PROPIOS = r.propios;
             if (r.toleranciaMin) PUNT_TOLERANCIA = Number(r.toleranciaMin) || 5;
@@ -7795,7 +7804,7 @@
         if (!asisgDatos) return;
         // Un trabajador elegido (nombre exacto, o el único que queda con el filtro): primero su gráfica de horas por día
         const sel = asisgNombreSel();
-        const graf = sel ? asisgGrafica(sel) : '';
+        const graf = sel ? asisgGrafica(sel) + asisgFichaHorario(sel) : '';
         if (asisgTab === 'resumen') out.innerHTML = graf + asisgResumen();
         else if (asisgTab === 'oficina') out.innerHTML = graf + asisgOficina();
         else if (asisgTab === 'horarios') out.innerHTML = asisgHorarios();
@@ -7821,6 +7830,7 @@
     // Oficina: horario del departamento de la persona ese día (null = día libre)
     const asisgDepDe = persona => { const deps = asisgDatos.departamentos || [], n = (asisgDatos.deptoDe || {})[asisgClave(persona)]; return deps.find(d => d.nombre === n) || deps[0] || null; };
     function asisgHorarioOficina(persona, fecha) {
+        const propio = PUNT_PROPIOS[asisgClave(persona)]; if (propio && fecha) return propio;   // horario propio del perfil (PCP...): manda también en la oficina
         const dep = asisgDepDe(persona); if (!dep || !fecha) return null;
         const h = dep.dias[['DOM', 'LUN', 'MAR', 'MIE', 'JUE', 'VIE', 'SAB'][new Date(fecha + 'T12:00:00').getDay()]];
         return h ? { entrada: h.entrada, salida: h.salida, salidaPermitida: h.salida } : null;
@@ -7901,6 +7911,57 @@
             <div class="grafico-wrap"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Horas por día de ${esc(nombre)}">${svg}</svg></div>
             <div class="nota">Pase el mouse (o toque) una barra para ver el detalle del día. <a href="#" onclick="document.getElementById('asisgBuscar').value=''; asisgPintar(); return false;">Ver todos</a></div></div>`;
     }
+
+    // ---------- Horario del trabajador elegido: con qué se mide, cada día (esperado vs. marcado) y su horario propio editable ----------
+    function asisgFichaHorario(nombre) {
+        const k = asisgClave(nombre), t = (asisgDatos.fichas || []).find(x => asisgClave(x.nombre) === k) || null;
+        const propio = PUNT_PROPIOS[k], depto = (asisgDatos.deptoDe || {})[k];
+        const rango = h => h ? `${horaAmPm(h.entrada)} a ${horaAmPm(h.salida)}` : '—';
+        const mide = propio ? `Horario propio de su perfil <b>${esc(propio.perfil || (t && t.perfil) || '')}</b>: <b>${rango(propio)}</b>, en la tienda y en la oficina. Llega tarde si marca más de ${PUNT_TOLERANCIA} min después de las ${horaAmPm(propio.entrada)}.`
+            : depto ? `Horario del departamento <b>${esc(depto)}</b> (pestaña "Horario por departamento") y, si cubre una tienda, el de ese turno.`
+            : `El horario de la tienda y el turno donde marca (mañana o tarde), con ${PUNT_TOLERANCIA} min de tolerancia.`;
+        // Cada día: dónde, con qué hora se le esperaba, cuándo marcó y cómo le fue
+        const dias = asisgDatos.locales.filter(f => asisgClave(f.trabajador) === k).map(f => ({ fecha: f.fecha, lugar: f.tienda, turno: f.turno, h: puntHorario(f.tienda, f.turno, f.fecha, f.trabajador), entrada: f.entrada, salida: f.salida, chips: asisgPuntChips(f) }))
+            .concat(asisgDatos.oficina.filter(f => asisgClave(f.persona) === k).map(f => ({ fecha: f.fecha, lugar: depto || 'Oficina', turno: 'Jornada', h: asisgHorarioOficina(f.persona, f.fecha), entrada: f.entrada, salida: f.salida, chips: asisgPuntChipsOficina(f) })))
+            .sort((a, b) => a.fecha.localeCompare(b.fecha) || String(a.entrada).localeCompare(String(b.entrada)));
+        const puedeEditar = permisos.includes('talento') || permisos.includes('nomina');
+        const mismos = t && t.perfil ? (asisgDatos.fichas || []).filter(x => asisgClave(x.perfil) === asisgClave(t.perfil)).length : 0;
+        const editar = !puedeEditar ? '' : !t ? '<div class="nota">No encontré a esta persona en Talento humano (puede estar escrita distinto en la ficha).</div>'
+            : !t.perfil ? `<div class="nota">No tiene perfil asignado: asígnelo en Talento humano para darle un horario propio.</div>`
+            : `<form class="asisg-hprop" onsubmit="asisgGuardarPropio(event, this)" data-perfil="${esc(t.perfil)}">
+                <label>Horario propio del perfil <b>${esc(t.perfil)}</b></label>
+                <div class="asisg-hprop-c"><input type="time" name="e" value="${esc(propio ? propio.entrada : '')}" aria-label="Hora de entrada"><span>a</span><input type="time" name="s" value="${esc(propio ? propio.salida : '')}" aria-label="Hora de salida">
+                    <button type="submit" class="btn-primary btn-mini">Guardar horario</button>${propio ? `<button type="button" class="btn-ghost btn-mini" onclick="asisgGuardarPropio(event, this.form, true)">Quitar horario propio</button>` : ''}</div>
+                <small class="nota">${mismos > 1 ? `Cambia el horario de los ${mismos} trabajadores con el perfil ${esc(t.perfil)}.` : `Solo ${esc(nombre)} tiene este perfil.`} Sin horario propio se mide con el de la tienda o el departamento.</small></form>`;
+        return `<div class="grafico-card asisg-ficha">
+            <div class="grafico-head"><h3>Horario de ${esc(nombre)}</h3>${t && permisos.includes('talento') ? `<button type="button" class="btn-ghost btn-mini" onclick="asisgAbrirTalento('${esc(t.id)}')">Ver en Talento humano</button>` : ''}</div>
+            ${t ? `<div class="asisg-datos"><span><small>Cargo</small>${esc(t.cargo) || '—'}</span><span><small>Perfil</small>${esc(t.perfil) || '—'}</span><span><small>${depto ? 'Departamento' : 'Local'}</small>${esc(t.local) || '—'}</span>
+                <span><small>Turno</small>${esc(t.turno) || '—'}</span><span><small>No puede trabajar</small>${t.restricciones.length ? esc(t.restricciones.join(', ')) : '—'}</span></div>` : ''}
+            <div class="nota" style="margin-top:.5rem">Se mide con: ${mide}</div>
+            ${editar}
+            ${dias.length ? `<div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">Día</th><th class="izq">Dónde</th><th>Turno</th><th>Se esperaba</th><th>Entrada</th><th>Salida</th><th class="izq">Resultado</th></tr></thead><tbody>
+                ${dias.map(d => `<tr><td class="izq">${diaSemana(d.fecha)} ${fechaBonita(d.fecha)}</td><td class="izq">${esc(d.lugar)}</td><td>${esc(d.turno)}</td><td>${d.h ? rango(d.h) : 'Día libre'}</td>
+                    <td>${d.entrada ? horaAmPm(d.entrada) : '—'}</td><td>${d.salida ? horaAmPm(d.salida) : '<span class="chip st-sobra">Sin salida</span>'}</td><td class="izq">${d.chips}</td></tr>`).join('')}
+            </tbody></table></div>` : '<div class="empty">No marcó en estas fechas.</div>'}</div>`;
+    }
+    // Guardar (o quitar) el horario propio del perfil: se modifica el perfil completo con lo que ya tenía (Talento humano › Perfiles)
+    async function asisgGuardarPropio(ev, form, quitar) {
+        ev.preventDefault();
+        const e = quitar ? '' : form.e.value, s = quitar ? '' : form.s.value, nombre = form.dataset.perfil;
+        if (!quitar && (!e || !s)) { mostrarBanner('Escriba la hora de entrada y la de salida.', 'warn'); return; }
+        if (quitar && !confirm(`¿Quitar el horario propio del perfil ${nombre}? Se medirá con el horario de la tienda o del departamento.`)) return;
+        const btns = [...form.querySelectorAll('button')]; btns.forEach(b => { b.disabled = true; });
+        try {
+            const p = ((await llamarApi({ action: 'per_listar' })).perfiles || []).find(x => asisgClave(x.nombre) === asisgClave(nombre));
+            if (!p) throw new Error('No encontré el perfil ' + nombre + ' en Talento humano.');
+            await llamarApi({ action: 'per_perfil_guardar', original: p.nombre, nombre: p.nombre, cargo: p.cargo, local: p.local, turno: p.turno, formaPago: p.formaPago, pago: p.pago,
+                              turnosMinimos: p.turnosMinimos, bonoPuntualidad: p.bonoPuntualidad, bonoProductividad: p.bonoProductividad, horaExtra: p.horaExtra, notas: p.notas, horaEntrada: e, horaSalida: s });
+            perDatos = null; nomDatos = null;   // Talento humano y Nómina vuelven a leer los perfiles
+            mostrarBanner(quitar ? `Perfil ${p.nombre}: sin horario propio.` : `Perfil ${p.nombre}: horario de ${horaAmPm(e)} a ${horaAmPm(s)}.`, 'ok');
+            await asisgCargar(true);
+        } catch (err) { mostrarBanner(err.message, 'error'); btns.forEach(b => { b.disabled = false; }); }
+    }
+    function asisgAbrirTalento(id) { irA('talento'); setTimeout(() => { if (typeof perEditarTrabajador === 'function' && perDatos) perEditarTrabajador(id); }, 900); }
 
     // Mini barra debajo del nombre: un trazo por día del período (alto según las horas; gris si no trabajó)
     function asisgMini(nombre) {
@@ -8434,6 +8495,7 @@
     }
     // Horario de oficina (o de otro departamento) de esa persona ese día; null = su día libre
     function nomHorarioOficina(d, persona, fecha) {
+        const propio = PUNT_PROPIOS[asisgClave(persona)]; if (propio && fecha) return propio;   // horario propio del perfil: también en la oficina
         const n = d.deptoDe[asisgClave(persona)], dep = d.departamentos.find(x => x.nombre === n) || d.departamentos[0];
         if (!dep || !fecha) return null;
         const h = dep.dias[['DOM', 'LUN', 'MAR', 'MIE', 'JUE', 'VIE', 'SAB'][new Date(fecha + 'T12:00:00').getDay()]];
