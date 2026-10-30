@@ -3309,6 +3309,17 @@
             [padre, lab, caja, inp].forEach(el => { if (el) { el.dataset.claveOculta = '1'; el.style.display = 'none'; } });
         });
     }
+    // Un campo de clave escondido que alguien vació (p. ej. una ventana que limpia sus campos al abrirse) se vuelve a llenar.
+    // Si no, queda vacío, escondido y "obligatorio": el navegador no deja guardar y no muestra nada ("no me permite guardar").
+    function claveAdminRellenar(raiz) {
+        if (!esPrincipal || !clave) return;
+        (raiz && raiz.querySelectorAll ? raiz : document).querySelectorAll('input[data-clave-auto]').forEach(inp => { if (!inp.value) inp.value = clave; });
+    }
+    // Antes de que el navegador revise el formulario: al pulsar un botón o Enter dentro de un formulario
+    ['click', 'keydown'].forEach(t => document.addEventListener(t, e => {
+        if (t === 'keydown' && e.key !== 'Enter') return;
+        const f = e.target && e.target.closest && e.target.closest('form'); if (f) claveAdminRellenar(f);
+    }, true));
     function claveAdminRestaurar() {
         document.querySelectorAll('[data-clave-oculta]').forEach(el => { el.style.display = ''; delete el.dataset.claveOculta; });
         document.querySelectorAll('input[data-clave-auto]').forEach(inp => { inp.value = ''; delete inp.dataset.claveAuto; });
@@ -15586,6 +15597,7 @@ Reglas:
         document.getElementById('efeMDetalle').textContent = detalle;
         document.getElementById('efeMMontos').classList.toggle('hidden', !conMontos);
         ['efeMMotivo', 'efeMClave'].forEach(id => document.getElementById(id).value = '');
+        claveAdminRellenar(document.getElementById('efeModal'));   // administrador: su clave va sola (el campo está escondido)
         document.getElementById('efeMError').textContent = '';
         const borrar = /^eliminar/.test(accion.tipo);
         document.getElementById('efeMBtn').textContent = borrar ? 'Eliminar' : 'Guardar cambio';
