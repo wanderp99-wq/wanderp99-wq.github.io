@@ -3328,7 +3328,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-10-30.3';
+    const VERSION_SERVIDOR = '2026-10-31.2';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -7951,14 +7951,17 @@
     // Día corrido: trabajó la mañana y vuelve en la tarde. Tiene 1 hora para comer desde que salió: la primera vuelta del día
     // no es retraso si llega dentro de esa hora más la tolerancia (las mismas reglas que el equipo de marcaje, Personal.gs)
     const PUNT_COMIDA_CORRIDO = 60;
+    // Cualquier regreso del mismo día (almuerzo o mandado, mañana o tarde) tiene esa hora desde su salida anterior (como el carnet).
+    // Y la salida de la mañana seguida de un regreso ese mismo día es su almuerzo, no "salió antes" ni "trabajó menos".
     function puntCorrido(ev, f, filas) {
-        if (!ev || !/^tar/i.test(f.turno || '')) return ev;
-        const mismo = x => asisgClave(x.trabajador) === asisgClave(f.trabajador) && x.fecha === f.fecha;
-        const man = filas.find(x => mismo(x) && /^ma/i.test(x.turno || '') && x.salida);
-        const primera = filas.filter(x => mismo(x) && /^tar/i.test(x.turno || '')).sort((a, b) => String(a.entrada).localeCompare(String(b.entrada)))[0];
-        if (!man || primera !== f) return ev;
+        if (!ev) return ev;
+        const mismo = x => asisgClave(x.trabajador) === asisgClave(f.trabajador) && x.fecha === f.fecha && x !== f;
+        const vuelve = f.salida && filas.some(x => mismo(x) && x.entrada && String(x.entrada) >= String(f.salida));
+        if (vuelve) ev = Object.assign({}, ev, { salioAntes: 0, menos: 0, almuerzo: true });
+        const prev = filas.filter(x => mismo(x) && x.salida && String(x.salida) <= String(f.entrada)).sort((a, b) => String(b.salida).localeCompare(String(a.salida)))[0];
+        if (!prev) return ev;
         const h = puntHorario(f.tienda, f.turno, f.fecha, f.trabajador);
-        const r = puntMin(f.entrada) - Math.max(h ? puntMin(h.entrada) : 0, puntMin(man.salida) + PUNT_COMIDA_CORRIDO);
+        const r = puntMin(f.entrada) - Math.max(h ? puntMin(h.entrada) : 0, puntMin(prev.salida) + PUNT_COMIDA_CORRIDO);
         return Object.assign({}, ev, { tarde: r > PUNT_TOLERANCIA ? r : 0, pierdeBono: r > PUNT_TOLERANCIA, corrido: true });
     }
     const asisgPunt = f => puntCorrido(puntEvaluar(puntHorario(f.tienda, f.turno, f.fecha, f.trabajador), f.entrada, f.salida), f, asisgDatos.locales);
@@ -8638,6 +8641,36 @@
         return h ? { entrada: h.entrada, salida: h.salida, salidaPermitida: h.salida } : null;
     }
     // Todo lo de un trabajador en la semana
+    // Turnos de tienda de una persona, como se pagan:
+    //  1) Varias marcas con carnet del MISMO turno y día (salió a almorzar o a un mandado y volvió) son UN turno:
+    //     de la primera entrada a la última salida, con las horas sumadas (sin el rato que estuvo fuera).
+    //  2) Día corrido sin marcar el almuerzo: un turno de la mañana que sigue hasta el cierre de la tarde (sale a la hora permitida
+    //     de la tarde o hasta 1 h antes) son DOS turnos: mañana hasta el cambio de turno y tarde desde ahí. Quien tiene horario
+    //     propio en su perfil (p. ej. PCP) no se parte. Quedarse 1 o 2 horas de más después de la mañana sigue siendo horas extra.
+    function nomTurnosDelDia(lista, k) {
+        const letra = t => /^ma/i.test(t) ? 'M' : /^tar/i.test(t) ? 'T' : asisgClave(t);
+        const unidos = [], grupos = new Map();
+        lista.slice().sort((a, b) => a.fecha.localeCompare(b.fecha) || String(a.entrada).localeCompare(String(b.entrada))).forEach(f => {
+            if (!/^carnet/i.test(f.responsable || '')) { unidos.push(f); return; }
+            const g = f.fecha + '|' + letra(f.turno) + '|' + asisgClave(f.tienda), x = grupos.get(g);
+            if (!x) { const c = Object.assign({}, f); grupos.set(g, c); unidos.push(c); return; }
+            if (!f.salida) x.salida = '';                                   // la última vuelta todavía no marcó salida
+            else if (x.salida !== '' && String(f.salida) > String(x.salida)) x.salida = f.salida;
+            x.horas = Math.round(((Number(x.horas) || 0) + (Number(f.horas) || 0)) * 100) / 100;
+            x.vueltas = (x.vueltas || 1) + 1;
+        });
+        const out = [];
+        unidos.forEach(f => {
+            const hM = /^ma/i.test(f.turno) && f.salida && !PUNT_PROPIOS[k] ? puntHorario(f.tienda, 'Mañana', f.fecha) : null;
+            const hT = hM ? puntHorario(f.tienda, 'Tarde', f.fecha) : null;
+            const e = puntMin(f.entrada), s = puntMin(f.salida), corte = hM ? puntMin(hM.salida) : null;
+            if (!hM || !hT || e === null || s === null || s <= corte || s < puntMin(hT.salidaPermitida) - 60 || e >= corte) { out.push(f); return; }
+            const hMan = Math.round((corte - e) / 60 * 100) / 100, total = Number(f.horas) || Math.round((s - e) / 60 * 100) / 100;
+            out.push(Object.assign({}, f, { salida: hM.salida, horas: Math.min(hMan, total), corrido: true }),
+                     Object.assign({}, f, { turno: 'Tarde', entrada: hT.entrada, horas: Math.max(0, Math.round((total - hMan) * 100) / 100), corrido: true, clave: 'L' + f.fila + 'T' }));
+        });
+        return out;
+    }
     function nomCalcular(t) {
         const d = nomDatos, k = asisgClave(t.nombre), aj = nomAjDe(t.id), extraAj = aj.extra || {};
         const p = perDatos.perfiles.find(x => x.nombre === t.perfil) || null;
@@ -8652,15 +8685,16 @@
         // queda el del carnet, si no el que tiene salida, si no el de más horas. Los repetidos se avisan para quitarlos.
         const turnoDe = f => f.fecha + '|' + (/^ma/i.test(f.turno) ? 'M' : /^tar/i.test(f.turno) ? 'T' : asisgClave(f.turno));
         const puntaje = f => (/^carnet/i.test(f.responsable || '') ? 4 : 0) + (f.salida ? 2 : 0) + (Number(f.horas) || 0) / 100;
-        const unicos = new Map(), todosLoc = d.locales.filter(f => asisgClave(f.trabajador) === k);
+        const unicos = new Map(), todosLoc = nomTurnosDelDia(d.locales.filter(f => asisgClave(f.trabajador) === k), k);
         todosLoc.forEach(f => { const p = unicos.get(turnoDe(f)); if (!p || puntaje(f) > puntaje(p)) unicos.set(turnoDe(f), f); });
         const repetidos = todosLoc.filter(f => unicos.get(turnoDe(f)) !== f);
         [...unicos.values()].forEach(f => {
-            const ev = puntCorrido(puntEvaluar(puntHorario(f.tienda, f.turno, f.fecha, f.trabajador), f.entrada, f.salida), f, d.locales);
+            const ev = f.corrido ? puntEvaluar(puntHorario(f.tienda, f.turno, f.fecha), f.entrada, f.salida)   // día corrido: cada mitad con el horario de su turno
+                                 : puntCorrido(puntEvaluar(puntHorario(f.tienda, f.turno, f.fecha, f.trabajador), f.entrada, f.salida), f, d.locales);
             const cod = hor ? hor.dias[Math.round((aFecha(f.fecha) - aFecha(nomSemana)) / 864e5)] || '' : null;
             const fuera = cod !== null ? !(cod === 'C' || (cod === 'M' && /^ma/i.test(f.turno)) || (cod === 'T' && /^tar/i.test(f.turno)))
                                        : (turnoPerfil.startsWith('man') && /^tar/i.test(f.turno)) || (turnoPerfil.startsWith('tar') && /^ma/i.test(f.turno));
-            const clave = 'L' + f.fila;
+            const clave = f.clave || ('L' + f.fila);
             filas.push({ clave, fecha: f.fecha, lugar: f.tienda, turno: f.turno, entrada: f.entrada, salida: f.salida, horas: Number(f.horas) || 0, ev,
                          extra: clave in extraAj ? !!extraAj[clave] : fuera, sinSalida: !f.salida });
         });
