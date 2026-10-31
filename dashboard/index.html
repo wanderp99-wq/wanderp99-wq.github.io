@@ -3027,9 +3027,130 @@
     // para no competir con lo que está cargando el módulo que la persona abrió.
     let apiEnCurso = 0, precargaPrioridad = '';   // precargaPrioridad: el último módulo abierto (se precarga primero)
     async function llamarApi(payload) {
+        // Lectura con copia en este equipo: se responde al instante con lo guardado y Google se consulta por detrás (DATOS, abajo)
+        const local = DATOS.leer(payload);
+        if (local) return local;
         apiEnCurso++;
-        try { return await llamarApiPedido(payload); } finally { apiEnCurso--; }
+        try {
+            const r = await llamarApiPedido(payload);
+            if (DATOS.guardable(payload)) DATOS.guardar(payload, r);
+            else if (!SOLO_LECTURA.test(payload.action)) DATOS.olvidarAreas(payload.action);   // se guardó algo: esa área se vuelve a leer de Google
+            return r;
+        } catch (e) {
+            // Otra persona cambió lo mismo mientras se editaba: Google no guardó (no se pisa). Se avisa claro y el módulo se pone al día solo.
+            if (/cambi[oó] (mientras tanto|en la hoja)/i.test(e.message || '')) {
+                e.message = 'Otra persona modificó esto mientras usted lo editaba, así que no se guardó (para no borrar lo suyo). La pantalla se actualizó con lo nuevo: revise y vuelva a guardar.';
+                DATOS.olvidarAreas(payload.action);
+                const vista = vistaActual;
+                setTimeout(() => { if (vista === vistaActual && ACTUALIZAR[vista]) DATOS.aGoogle(ACTUALIZAR[vista]).catch(() => {}); }, 300);
+            }
+            throw e;
+        } finally { apiEnCurso--; }
     }
+
+    // ==========================================
+    // COPIA LOCAL DE LOS DATOS (para que todo abra al instante, como un programa instalado)
+    // Cada lectura (productos, notas, efectivo, asistencia, nómina...) queda guardada en este equipo (IndexedDB), por usuario.
+    // Al volver a pedirla se muestra AL INSTANTE lo guardado y Google se consulta por detrás; si trajo algo distinto, el módulo
+    // abierto se vuelve a dibujar solo. Google sigue siendo el que manda: todo lo que se guarda va a Google (con su bloqueo).
+    //  - Guardar algo borra la copia de su área (lo siguiente se lee de Google: nunca se ve lo de antes de guardar).
+    //  - Un cambio de otra persona (aviso de cambios cada 30 s) hace que su área se lea de Google.
+    //  - "Actualizar" siempre va a Google.
+    // ==========================================
+    const DATOS = (() => {
+        // Lecturas que no se copian: entrar, avisos, lo que cambia a cada momento o es de una sola vez
+        const NO_COPIAR = /^(login|ping|cambios|pendientes|enlinea|marca_estado|cmp_enlazar|cmp_borrador|nom_autorizar|alm_kardex)$/;
+        const VIGENCIA = 3 * 24 * 3600 * 1000;   // lo guardado hace más de 3 días no se muestra
+        const RECIENTE = 20000;                   // leído de Google hace menos de 20 s: no se vuelve a preguntar
+        const memoria = new Map();                // llave -> { s (texto), t (cuándo), ver (versiones de sus áreas) }
+        let bd = null, usuario = '', forzar = 0;
+        const enCurso = new Set();
+        // Áreas de cada acción (las mismas de Google: areasDeAccion en CuadreSistema.gs)
+        function areas(a) {
+            a = String(a);
+            if (/^(alm|cmp)_/.test(a)) return ['alm', 'per'];
+            if (/^(per_|cxc_|nom_|pnom_|hor_)/.test(a)) return ['per'];
+            if (/^(efe_|cc_)/.test(a)) return ['efe'];
+            if (/^(list$|save$|cuadre_|conc_|mov_|cuentas_)/.test(a)) return ['cuadre', 'efe'];
+            if (/^req_/.test(a)) return ['req'];
+            if (/^asis/.test(a)) return ['asis', 'per'];
+            return ['otros'];
+        }
+        const guardable = p => !!(usuario && p && SOLO_LECTURA.test(p.action) && !NO_COPIAR.test(p.action));
+        function llave(p) {
+            const x = Object.assign({}, p); ['clave', 'idem', 'eq', 'disp', 'vista'].forEach(k => delete x[k]);
+            return usuario + '|' + JSON.stringify(Object.keys(x).sort().reduce((o, k) => { o[k] = x[k]; return o; }, {}));
+        }
+        // Lo que no cuenta para saber si cambió algo (cuánto tardó Google, versiones, hora de la respuesta)
+        const texto = r => JSON.stringify(r, (k, v) => (k === 'ms' || k === '_ver' || k === 'yaRegistrado') ? undefined : v);
+        function abrir() {
+            if (!bd) bd = new Promise(ok => {
+                try { const r = indexedDB.open('pv-datos', 1); r.onupgradeneeded = () => r.result.createObjectStore('r', { keyPath: 'k' }); r.onsuccess = () => ok(r.result); r.onerror = () => ok(null); }
+                catch (e) { ok(null); }
+            });
+            return bd;
+        }
+        async function tienda(modo) { const db = await abrir(); try { return db ? db.transaction('r', modo).objectStore('r') : null; } catch (e) { return null; } }
+        const pedir = r => new Promise(ok => { r.onsuccess = () => ok(r.result); r.onerror = () => ok(null); });
+        // Al entrar: se carga a memoria lo guardado de este usuario (lo vencido se borra)
+        async function iniciar(nombre) {
+            usuario = String(nombre || ''); memoria.clear();
+            const s = await tienda('readwrite'); if (!s) return;
+            const todos = await pedir(s.getAll()) || [], ahora = Date.now();
+            todos.forEach(x => { if (ahora - x.t > VIGENCIA) s.delete(x.k); else if (x.k.startsWith(usuario + '|')) memoria.set(x.k, { s: x.s, t: x.t, ver: x.ver || {} }); });
+        }
+        function salir() { usuario = ''; memoria.clear(); }
+        async function guardar(p, r) {
+            if (!guardable(p) || !r) return;
+            const k = llave(p), x = { s: texto(r), t: Date.now(), ver: Object.assign({}, verConocida) };
+            memoria.set(k, x);
+            const s = await tienda('readwrite'); if (s) s.put(Object.assign({ k }, x));
+        }
+        // Se guardó algo: la copia de esas áreas ya no sirve (en memoria y en el equipo)
+        async function olvidarAreas(accion) {
+            const a = areas(accion), quitar = [];
+            memoria.forEach((x, k) => { const acc = (/"action":"([^"]+)"/.exec(k) || [])[1]; if (acc && areas(acc).some(z => a.includes(z))) quitar.push(k); });
+            quitar.forEach(k => memoria.delete(k));
+            const s = await tienda('readwrite'); if (s) quitar.forEach(k => s.delete(k));
+        }
+        // ¿Otra persona cambió algo de sus áreas después de leerlo? (versiones del aviso de cambios)
+        const viejo = (p, x) => areas(p.action).some(a => verConocida[a] && verConocida[a] > (x.ver[a] || '0'));
+        // Lectura: lo guardado al instante (copia nueva, para que el módulo no cambie lo guardado) y Google por detrás
+        function leer(p) {
+            if (!guardable(p) || forzar) return null;
+            const x = memoria.get(llave(p));
+            if (!x || Date.now() - x.t > VIGENCIA) return null;
+            const r = JSON.parse(x.s);
+            anotarTiempo(p.action + ' · copia local', 0, null, true);
+            if (Date.now() - x.t > RECIENTE || viejo(p, x)) revisar(p, x.s);
+            return r;
+        }
+        // Pregunta a Google por detrás; si trajo algo distinto, se guarda y el módulo abierto se vuelve a dibujar
+        async function revisar(p, antes) {
+            const k = llave(p); if (enCurso.has(k)) return; enCurso.add(k);
+            try {
+                apiEnCurso++;
+                let r; try { r = await llamarApiPedido(p); } finally { apiEnCurso--; }
+                await guardar(p, r);
+                if (texto(r) !== antes) redibujar(p.action);
+            } catch (e) {} finally { enCurso.delete(k); }
+        }
+        // Redibuja el módulo abierto con lo nuevo (sin molestar: no mientras se escribe ni con una ventana abierta)
+        let espera = 0;
+        function redibujar(accion, intento = 0) {
+            const vista = vistaActual, fn = ACTUALIZAR[vista];
+            if (!fn || !(VISTA_AREAS[vista] || []).some(a => areas(accion).includes(a))) return;
+            clearTimeout(espera);
+            espera = setTimeout(() => {
+                if (vista !== vistaActual) return;
+                if (!vivoPuede()) { if (intento < 20) redibujar(accion, intento + 1); return; }
+                Promise.resolve(fn()).catch(() => {});   // lee de la copia recién guardada (sin volver a Google)
+            }, intento ? 3000 : 150);
+        }
+        // "Actualizar" y los cambios de otros: directo a Google (y se guarda lo nuevo)
+        async function aGoogle(fn) { forzar++; try { return await fn(); } finally { forzar--; } }
+        return { iniciar, salir, leer, guardar, guardable, olvidarAreas, aGoogle };
+    })();
     async function llamarApiPedido(payload) {
         const t0 = performance.now();
         let llaveIdem = '';
@@ -3207,7 +3328,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-10-30.2';
+    const VERSION_SERVIDOR = '2026-10-30.3';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -3220,6 +3341,8 @@
             'y espere a que diga LISTO; luego Salir y entrar de nuevo. Este panel espera la versión ' + VERSION_SERVIDOR + '.', 'warn');
     }
     // Talento humano salió de Nómina: quien tiene Nómina también lo ve (el servidor le permite lo mismo)
+    // Dueño de la copia local de los datos: el nombre y sus permisos (otra clave, u otros permisos, no ve lo de esta)
+    const llaveUsuario = () => nombreUsuario + '#' + (permisos || []).slice().sort().join(',');
     const normalizarPermisos = p => { p = (p || []).slice(); if (p.includes('nomina') && !p.includes('talento')) p.push('talento'); return p; };
     // Al retomar la sesión (recargar la página) se vuelven a pedir los permisos y la versión del script, por detrás
     async function refrescarSesion() {
@@ -3265,6 +3388,7 @@
             }
             input.value = '';
             guardarSesion(); sesionActividad();
+            await DATOS.iniciar(llaveUsuario());   // lo guardado en este equipo de este usuario: los módulos abren al instante
             irA('menu');
             if (avisosSeguridad.principalDeFabrica) mostrarBanner('La clave principal es la de fábrica. Cámbiela ya en Claves y permisos › Clave principal (mínimo 6 caracteres).', 'error');
             else if (avisosSeguridad.claveCorta) mostrarBanner('Su clave tiene menos de 6 caracteres y es fácil de adivinar. ' + (esPrincipal ? 'Cámbiela en Claves y permisos.' : 'Pida a un administrador que le asigne una más larga.'), 'warn');
@@ -3331,7 +3455,7 @@
         if (clave && WEB_APP_URL && typeof mensaje !== 'string') llamarApiReal({ action: 'ping', salir: true, vista: '', disp: DISPOSITIVO }, performance.now()).catch(() => {});   // deja de figurar como conectado
         clave = null;
         permisos = [];
-        nombreUsuario = ''; esPrincipal = false; olvidarClavesAdmin();
+        nombreUsuario = ''; esPrincipal = false; olvidarClavesAdmin(); DATOS.salir();
         filas = []; borradores = {}; seleccion = null; cargadoDesde = null; cuadreIniciado = false;
         // Al salir se borra todo lo guardado en memoria (otra persona puede entrar con menos permisos)
         efeDatos = { filas: [], cajaChica: [] }; efeCargado = null; efeCargadoEn = 0; precargadoDesde = null; Object.keys(pagMemoria).forEach(k => delete pagMemoria[k]);
@@ -3494,7 +3618,7 @@
             // Las áreas que no son de este módulo solo se anotan si nunca se habían visto (se leerán al abrir su módulo)
             Object.keys(r.ver).forEach(k => { if (!verConocida[k]) verConocida[k] = r.ver[k]; });
             if (!nuevas.length || vista !== vistaActual || !vivoPuede()) return;
-            await ACTUALIZAR[vista]();
+            await DATOS.aGoogle(ACTUALIZAR[vista]);   // otra persona cambió algo: se lee de Google (y se guarda lo nuevo)
             nuevas.forEach(k => { if (r.ver[k] > (verConocida[k] || '0')) verConocida[k] = r.ver[k]; });
         } catch (e) {}
         finally { vivoOcupado = false; }
@@ -3509,7 +3633,7 @@
         const fn = ACTUALIZAR[vistaActual] || (() => irA(vistaActual, { sinHistorial: true })), btn = document.getElementById('btnActualizar');
         if (!fn || btn.disabled) return;
         btn.disabled = true; btnCargando(btn, 'Actualizando...');
-        try { await fn(); } catch (e) { mostrarBanner('No se pudo actualizar: ' + e.message, 'error'); }
+        try { await DATOS.aGoogle(fn); } catch (e) { mostrarBanner('No se pudo actualizar: ' + e.message, 'error'); }   // "Actualizar": siempre a Google
         finally { btn.disabled = false; btn.textContent = '⟳ Actualizar'; }
     }
     function abrirArea(id) {
@@ -12217,7 +12341,7 @@
     let almMod = null;
     function almModificarNota(numero) {
         const n = almNotaDe(numero); if (!n) return;
-        almMod = { numero, items: n.detalle.map(x => ({ codigo: x.codigo, descripcion: x.descripcion, tipo: x.tipo, cantidad: x.cantidad, precio: x.precio })) };
+        almMod = { numero, totalAnt: n.total, modsAnt: n.modificaciones || '', items: n.detalle.map(x => ({ codigo: x.codigo, descripcion: x.descripcion, tipo: x.tipo, cantidad: x.cantidad, precio: x.precio })) };
         almModPintar();
     }
     function almModPintar() {
@@ -12252,6 +12376,7 @@
         btnCargando(btn, 'Guardando...');
         try {
             const r = await llamarApi({ action: 'alm_nota_modificar', numero: almMod.numero, motivo: document.getElementById('almModMot').value.trim(), claveAdmin: document.getElementById('almModClave').value,
+                                        totalAnt: almMod.totalAnt, modsAnt: almMod.modsAnt,   // si otra persona la modificó mientras tanto, Google no la pisa
                                         items: items.map(x => ({ codigo: x.codigo, cantidad: x.cantidad, precio: x.precio })) });
             almReemplazarNota(r.nota); almAplicarCambios(r.cambios); if (r.pendientes) almDatos.pendientes = r.pendientes; almTiendas = null;
             mostrarBanner(`Nota ${r.nota.numero} modificada: total $ ${fmt(r.nota.total)}.`, 'ok');
@@ -13757,7 +13882,7 @@ Reglas:
         const act = document.getElementById('almFAct');
         if (!v('almFDes')) { err.textContent = 'Escriba la descripción'; document.getElementById('almFDes').focus(); return; }
         // Se ve al instante en la lista y Google lo guarda en segundo plano
-        const pedido = { action: 'alm_producto_guardar', original, codigo: (original || v('almFCod')).toUpperCase(), descripcion: v('almFDes'), categoria: v('almFCat'), tipo: v('almFTipo'),
+        const pedido = { action: 'alm_producto_guardar', original, modificadoAnt: original && almProducto(original) ? almProducto(original).modificado || '' : undefined, codigo: (original || v('almFCod')).toUpperCase(), descripcion: v('almFDes'), categoria: v('almFCat'), tipo: v('almFTipo'),
                          costo: v('almFCos'), precio: v('almFPre'), bulto: v('almFBul'), minimo: v('almFMin'), proveedor: v('almFProv'), iva: v('almFIva'), activo: act ? act.checked : undefined };
         const cat = almBuscarCategoria(pedido.categoria), previo = original ? almProducto(original) : null;
         const local = Object.assign({}, previo || { existencia: 0, activo: true }, { codigo: pedido.codigo, descripcion: pedido.descripcion.toUpperCase(), categoria: cat ? cat.nombre : '', tipo: pedido.tipo,
@@ -16138,7 +16263,9 @@ Reglas:
             if (s && s.clave) {
                 sesionActividad();
                 clave = s.clave; permisos = normalizarPermisos(s.permisos); nombreUsuario = s.nombre || ''; esPrincipal = !!s.principal;
-                irA('menu'); setTimeout(precargarModulos, 300); setTimeout(refrescarSesion, 200); return;
+                irA('menu'); setTimeout(refrescarSesion, 200);
+                DATOS.iniciar(llaveUsuario()).then(() => setTimeout(precargarModulos, 100));   // primero lo guardado en el equipo
+                return;
             }
         } catch (e) {}
         irA(marcaEquipo() ? 'marcaje' : 'login');   // equipo de marcaje ya autorizado: abre directo en marcar asistencia
