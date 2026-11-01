@@ -1287,6 +1287,15 @@
         .nom-barra-pie { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-top: .45rem; font-size: .85rem; color: var(--text-muted); } .nom-barra-pie b { color: var(--text-main); }
         .alm-guardando { display: none; } .alm-guardando.activo { display: inline-flex; margin-right: .6rem; padding: .1rem .55rem; border-radius: 999px; background: var(--warn-bg); color: var(--warn); font-weight: 600; }
         .alm-falta, .alm-falta b { color: var(--bad); } .alm-sobra, .alm-sobra b { color: var(--ok); }
+        /* Seguimiento de producto: la historia del producto paso a paso, con lo que quedó después de cada uno */
+        .seg-lista { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+        .seg-paso { display: grid; grid-template-columns: 82px 1fr 110px 110px; gap: 10px; align-items: center; padding: 10px 14px; border-top: 1px solid var(--border); border-left: 4px solid transparent; }
+        .seg-paso:first-child { border-top: 0; }
+        .seg-paso.entra { border-left-color: var(--ok); } .seg-paso.sale { border-left-color: var(--bad); } .seg-paso.precio { border-left-color: var(--border); opacity: .85; }
+        .seg-paso small { display: block; color: var(--text-muted); font-size: 12px; }
+        .seg-cant, .seg-queda { text-align: right; font-variant-numeric: tabular-nums; }
+        .seg-fin { background: var(--none-bg); font-weight: 600; }
+        @media (max-width: 640px) { .seg-paso { grid-template-columns: 1fr auto; } .seg-paso .seg-fecha { grid-column: 1 / -1; } }
         .alm-total-falta { background: linear-gradient(135deg, #f87171, #dc2626 45%, #b91c1c); box-shadow: 0 6px 18px rgba(185, 28, 28, .25); }
         .alm-conteo { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; margin: .7rem 0 .4rem; }
         .alm-conteo > div { background: var(--list-bg); border: 1px solid var(--border); border-radius: 10px; padding: .5rem .7rem; }
@@ -3328,7 +3337,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-10-31.6';
+    const VERSION_SERVIDOR = '2026-10-31.7';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -11429,7 +11438,7 @@
     let almDatos = null, almVista = '', almTab = '', almNotas = null, almIngresos = null;
     let almVenta = { items: [], sel: -1, descuento: 0, claveDesc: '', claveStock: '', ultimo: '' };
     let almIng = { operacion: '', proveedorId: '', documento: '', clienteId: '', nota: '', items: [], sel: -1, listo: false, ultimo: '' };
-    const ALM_TABS = { precios: [['ordenes', 'Por actualizar'], ['completas', 'Historial']], inventario: [['productos', 'Productos']], facturar: [['facturar', 'Facturar'], ['notas', 'Notas emitidas']], movalmacen: [['compra', 'Compra con foto'], ['ingresar', 'Operaciones de inventario'], ['notas', 'Notas emitidas'], ['ingresos', 'Historial de operaciones'], ['tiendas', 'Inversión por tienda']] };
+    const ALM_TABS = { precios: [['ordenes', 'Por actualizar'], ['completas', 'Historial']], inventario: [['productos', 'Productos'], ['seguimiento', 'Seguimiento de producto']], facturar: [['facturar', 'Facturar'], ['notas', 'Notas emitidas']], movalmacen: [['compra', 'Compra con foto'], ['ingresar', 'Operaciones de inventario'], ['notas', 'Notas emitidas'], ['ingresos', 'Historial de operaciones'], ['tiendas', 'Inversión por tienda']] };
     const ALM_OPS = [['COMPRA', 'Compra a proveedor'], ['SIN_FACTURA', 'Ingreso sin factura'], ['DEVOLUCION', 'Devolución de cliente'], ['AJUSTE', 'Ajuste de inventario'], ['DESCUENTO', 'Descuento de inventario'],
                      ['DEV_PROVEEDOR', 'Devolución a proveedor']];   // sale mercancía de vuelta al proveedor (p. ej. devolver un préstamo)
     const almOpSale = op => op === 'DESCUENTO' || op === 'DEV_PROVEEDOR';   // operaciones que restan del almacén
@@ -11480,7 +11489,7 @@
         if (almTab === 'compra') { cmpPintarCompra(out); return; }   // la compra se dibuja aparte: sus campos se actualizan uno a uno
         if (almTab === 'ordenes' || almTab === 'completas') { pintarConservando(out, cmpOrdenesVista()); if (!cmpOrd || (cmpOrd.ver !== (almTab === 'completas' ? 'historial' : 'pendientes') && !cmpOrd.cargando)) cmpCargarOrdenes(); return; }
         pintarConservando(out, (almVista === 'movalmacen' ? almPendientesHTML() : '') + (almTab === 'productos' ? almProductosVista() : almTab === 'facturar' ? almFacturarVista() : almTab === 'ingresar' ? almIngresarVista()
-                              : almTab === 'notas' ? almNotasVista() : almTab === 'tiendas' ? almTiendasVista() : almIngresosVista()));
+                              : almTab === 'seguimiento' ? almSeguimientoVista() : almTab === 'notas' ? almNotasVista() : almTab === 'tiendas' ? almTiendasVista() : almIngresosVista()));
         if (almTab === 'notas' && !almNotas) almCargarNotas();
         if (almTab === 'tiendas' && !almTiendas) almCargarTiendas();
         if (almTab === 'ingresos' && !almIngresos) almCargarIngresos();
@@ -13919,7 +13928,7 @@ Reglas:
             ${l.map(p => `<tr class="${p.activo ? '' : 'alm-anulada'}"><td class="izq"><b>${esc(p.codigo)}</b></td><td class="izq">${esc(p.descripcion)}<small>${p.tipo === 'Pesado' ? 'Pesado (kg)' : 'Por unidad'}${p.proveedor ? ' · ' + esc(p.proveedor) : ''}${p.iva !== 'Exento' ? ' · ' + esc(p.iva) : ''}</small></td>
                 <td class="izq">${esc(p.categoria) || '—'}</td><td>${fmt(p.costo)}</td><td><b>${fmt(p.precio)}</b></td><td>${p.costo > 0 && p.precio > 0 ? fmt((p.precio / p.costo - 1) * 100) + ' %' : '—'}</td>
                 <td><b style="${p.existencia < 0 ? 'color:var(--bad)' : ''}">${almCant(p.existencia, p.tipo)}</b> <small>${almUnidad(p.tipo)}</small>${bajo(p) ? '<span class="chip st-sobra">bajo mínimo</span>' : ''}</td>
-                <td class="alm-acc"><button type="button" class="btn-ghost btn-mini" onclick="almEditarProducto('${esc(p.codigo).replace(/'/g, '&#39;')}')">Modificar</button><button type="button" class="btn-ghost btn-mini" onclick="almKardex('${esc(p.codigo).replace(/'/g, '&#39;')}')" title="Todo lo que pasó con este producto, en orden">Seguimiento</button></td></tr>`).join('')}
+                <td class="alm-acc"><button type="button" class="btn-ghost btn-mini" onclick="almEditarProducto('${esc(p.codigo).replace(/'/g, '&#39;')}')">Modificar</button><button type="button" class="btn-ghost btn-mini" onclick="almIrSeguimiento('${esc(p.codigo).replace(/'/g, '&#39;')}')" title="Todo lo que pasó con este producto, en orden">Seguimiento</button></td></tr>`).join('')}
             </tbody></table></div>` : `<div class="empty">${ps.length ? 'Ningún producto con estos filtros.' : 'Todavía no hay productos. Cárguelos con "Importar Excel" (el catálogo corregido) o uno por uno con "+ Nuevo producto".'}</div>`}
             <div class="nota">El código se guarda tal cual, como texto: 051 y 0051 son productos distintos y ningún código se puede repetir. La existencia cambia sola con cada nota de entrega u operación de inventario.</div>`;
     }
@@ -14030,7 +14039,7 @@ Reglas:
     let almSeg = null;
     async function almKardex(codigo) {
         const p = almProducto(codigo);
-        almSeg = { codigo, datos: null, orden: 'nuevo', tipo: '', desde: '', hasta: '' };
+        almSeg = { codigo, datos: null, orden: 'viejo', tipo: '', desde: '', hasta: '' };
         almVentana(`<div class="req-dlg alm-dlg-grande"><h3>Seguimiento · ${esc(p.descripcion)}</h3><div class="req-sub">${esc(p.codigo)} · existencia ${almCant(p.existencia, p.tipo)} ${almUnidad(p.tipo)} · costo $ ${fmt(p.costo)}</div>
             <div id="almKx">${cargandoHTML('Buscando todo lo que pasó con este producto...')}</div>
             <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-ghost" onclick="almCerrar()">Cerrar</button></div></div>`);
@@ -14044,32 +14053,168 @@ Reglas:
     }
     function almSegPintar() {
         const el = document.getElementById('almKx'); if (!el || !almSeg || !almSeg.datos) return;
-        const p = almProducto(almSeg.codigo) || {}, d = almSeg.datos, f = almSeg;
-        // Un solo listado: movimientos de existencia y órdenes de precio, por fecha
+        el.innerHTML = almSegHTML();
+    }
+    // Cliente o tienda de un movimiento (para buscar lo que se le despachó a uno en especial)
+    const almSegCliente = (m, docs) => { const x = docs[m.documento] || {}; return x.condicion === 'Tienda' && x.local ? 'TIENDA ' + x.local.toUpperCase() : (x.cliente || (x.tercero || '').split(' · ')[0] || '').toUpperCase(); };
+    function almSegHTML() {
+        const p = almProducto(almSeg.codigo) || {}, d = almSeg.datos, f = almSeg, docs = d.docs || {};
+        const enPeriodo = x => (!f.desde || x.slice(0, 10) >= f.desde) && (!f.hasta || x.slice(0, 10) <= f.hasta);
+        // Un solo listado: movimientos de existencia y órdenes de precio, por fecha (con cliente: solo lo de ese cliente)
         const eventos = (d.movimientos || []).map(m => ({ fecha: m.fecha, tipo: m.cantidad < 0 ? 'sale' : 'entra', m }))
-            .concat((d.precios || []).map(o => ({ fecha: o.fecha, tipo: 'precio', o })))
-            .filter(e => (!f.tipo || e.tipo === f.tipo) && (!f.desde || e.fecha.slice(0, 10) >= f.desde) && (!f.hasta || e.fecha.slice(0, 10) <= f.hasta))
+            .concat(f.cliente ? [] : (d.precios || []).map(o => ({ fecha: o.fecha, tipo: 'precio', o })))
+            .filter(e => (!f.tipo || e.tipo === f.tipo) && enPeriodo(e.fecha) && (!f.cliente || almSegCliente(e.m, docs) === f.cliente))
             .sort((a, b) => f.orden === 'nuevo' ? b.fecha.localeCompare(a.fecha) : a.fecha.localeCompare(b.fecha));
-        const entra = (d.movimientos || []).filter(m => m.cantidad > 0).reduce((s, m) => s + m.cantidad, 0), sale = (d.movimientos || []).filter(m => m.cantidad < 0).reduce((s, m) => s - m.cantidad, 0);
+        const movs = d.movimientos || [], u = almUnidad(p.tipo);
+        // En cuántas partes se fue: tiendas, clientes (crédito o contado), ajustes...
+        const grupos = {};
+        movs.forEach(m => { const q = almSegQue(m, d.docs || {}); grupos[q.grupo] = (grupos[q.grupo] || 0) + m.cantidad; });
+        const entra = movs.filter(m => m.cantidad > 0).reduce((s, m) => s + m.cantidad, 0), sale = movs.filter(m => m.cantidad < 0).reduce((s, m) => s - m.cantidad, 0);
+        const ultimo = movs.length ? movs[movs.length - 1].existencia : 0;
+        const cuadra = !movs.length || Math.abs(ultimo - (Number(p.existencia) || 0)) < 0.0005;
         const fecha = x => `${esc(x.slice(8, 10) + '/' + x.slice(5, 7) + '/' + x.slice(2, 4))}<small>${esc(x.slice(11, 16))}</small>`;
-        const fila = e => e.tipo === 'precio'
-            ? `<tr><td class="izq">${fecha(e.fecha)}</td><td class="izq"><span class="chip st-info">Precio</span> ${esc(e.o.origen || 'Cambio de precio')}<small>${[e.o.proveedor, e.o.definidoPor ? 'definido por ' + e.o.definidoPor : '', e.o.estado].filter(Boolean).map(esc).join(' · ')}</small></td>
-                <td colspan="2" class="izq">costo $ ${fmt(e.o.costo)}${e.o.costoAnt && Math.abs(e.o.costoAnt - e.o.costo) > 0.0005 ? ` <small>antes $ ${fmt(e.o.costoAnt)}</small>` : ''}</td>
-                <td class="izq">detal $ ${e.o.detal ? fmt(e.o.detal) : '—'}${e.o.mayor ? ` · mayor $ ${fmt(e.o.mayor)}` : ''}${e.o.detalAnt ? `<small>antes detal $ ${fmt(e.o.detalAnt)}${e.o.mayorAnt ? ' · mayor $ ' + fmt(e.o.mayorAnt) : ''}</small>` : ''}</td></tr>`
-            : `<tr><td class="izq">${fecha(e.fecha)}</td><td class="izq"><b>${esc(e.m.operacion)}</b> · ${esc(e.m.documento)}<small>${[e.m.nota, e.m.usuario].filter(Boolean).map(esc).join(' · ')}</small></td>
-                <td class="${e.m.cantidad < 0 ? 'alm-falta' : 'alm-sobra'}"><b>${e.m.cantidad > 0 ? '+' : '−'}${almCant(Math.abs(e.m.cantidad), p.tipo)}</b> <small>${almUnidad(p.tipo)}</small></td>
-                <td><b>${almCant(e.m.existencia, p.tipo)}</b><small>quedó</small></td><td class="izq">${e.m.costo ? 'costo $ ' + fmt(e.m.costo) : ''}${e.m.precio ? `<small>precio $ ${fmt(e.m.precio)}</small>` : ''}</td></tr>`;
-        el.innerHTML = `<div class="kpis"><div class="kpi"><div class="k-label">Movimientos</div><div class="k-value">${(d.movimientos || []).length}</div></div>
-                <div class="kpi ok"><div class="k-label">Entró en total</div><div class="k-value">${almCant(entra, p.tipo)}</div></div>
+        const paso = e => {
+            if (e.tipo === 'precio') {
+                const o = e.o, antes = o.detalAnt ? ` (antes $ ${fmt(o.detalAnt)})` : '';
+                const titulo = o.detal ? `Precio nuevo en tiendas: detal $ ${fmt(o.detal)}${antes}${o.mayor ? ` · mayor $ ${fmt(o.mayor)}` : ''}` : `Costo nuevo $ ${fmt(o.costo)} · precio por definir`;
+                return `<div class="seg-paso precio"><div class="seg-fecha">${fecha(e.fecha)}</div>
+                    <div><b>${esc(titulo)}</b>
+                    <small>${[o.origen, o.detal ? 'costo $ ' + fmt(o.costo) : '', o.definidoPor ? 'definido por ' + o.definidoPor : '', o.estado].filter(Boolean).map(esc).join(' · ')}</small></div>
+                    <div class="seg-cant"></div><div class="seg-queda"></div></div>`;
+            }
+            const m = e.m, q = almSegQue(m, d.docs || {});
+            return `<div class="seg-paso ${m.cantidad < 0 ? 'sale' : 'entra'}"><div class="seg-fecha">${fecha(e.fecha)}</div>
+                <div><b>${esc(q.titulo)}</b><small>${[q.detalle, m.documento, m.usuario ? 'por ' + m.usuario : ''].filter(Boolean).map(esc).join(' · ')}</small></div>
+                <div class="seg-cant ${m.cantidad < 0 ? 'alm-falta' : 'alm-sobra'}"><b>${m.cantidad > 0 ? '+' : '−'}${almCant(Math.abs(m.cantidad), p.tipo)}</b> <small style="display:inline">${esc(u)}</small></div>
+                <div class="seg-queda">quedan <b>${almCant(m.existencia, p.tipo)}</b></div></div>`;
+        };
+        // Al final (o al principio si va de lo más nuevo a lo más viejo): lo que debe haber hoy
+        const fin = `<div class="seg-paso seg-fin"><div class="seg-fecha">Hoy</div><div>Debe quedar en existencia
+                ${cuadra ? '' : `<small style="color:var(--bad)">El sistema dice ${esc(almCant(p.existencia, p.tipo))} ${esc(u)}: hubo un cambio que no pasó por Entradas y salidas (por ejemplo, editado en la hoja).</small>`}</div>
+                <div class="seg-cant"></div><div class="seg-queda"><b>${almCant(movs.length ? ultimo : p.existencia, p.tipo)}</b> ${esc(u)}</div></div>`;
+        // Solo fechas (sin cliente ni tipo): con cuánto empezó y con cuánto terminó el período
+        let inicio = '', cierre = '';
+        const delPeriodo = movs.filter(m => enPeriodo(m.fecha));
+        if ((f.desde || f.hasta) && !f.cliente && !f.tipo) {
+            const antes = movs.filter(m => f.desde && m.fecha.slice(0, 10) < f.desde);
+            const tenia = antes.length ? antes[antes.length - 1].existencia : (delPeriodo.length ? delPeriodo[0].existencia - delPeriodo[0].cantidad : 0);
+            const quedo = delPeriodo.length ? delPeriodo[delPeriodo.length - 1].existencia : tenia;
+            const fila = (que, cuando, v) => `<div class="seg-paso seg-fin"><div class="seg-fecha">${esc(cuando)}</div><div>${que}</div><div class="seg-cant"></div><div class="seg-queda"><b>${almCant(v, p.tipo)}</b> ${esc(u)}</div></div>`;
+            const dmy = x => x ? x.slice(8, 10) + '/' + x.slice(5, 7) + '/' + x.slice(2, 4) : '';
+            inicio = fila('Tenía al empezar', f.desde ? dmy(f.desde) : 'Inicio', tenia);
+            cierre = fila('Quedó al terminar', f.hasta ? dmy(f.hasta) : 'Hoy', quedo);
+            if (f.orden === 'nuevo') [inicio, cierre] = [cierre, inicio];
+        }
+        const filtrado = f.tipo || f.desde || f.hasta || f.cliente;
+        // Con cliente: cuánto se le despachó en total
+        const alCliente = f.cliente ? eventos.reduce((s, e) => s - (e.m ? e.m.cantidad : 0), 0) : 0;
+        return `<div class="kpis"><div class="kpi ok"><div class="k-label">Entró en total</div><div class="k-value">${almCant(entra, p.tipo)}</div></div>
                 <div class="kpi bad"><div class="k-label">Salió en total</div><div class="k-value">${almCant(sale, p.tipo)}</div></div>
+                <div class="kpi${cuadra ? '' : ' bad'}"><div class="k-label">Existencia hoy</div><div class="k-value">${almCant(p.existencia, p.tipo)}</div></div>
                 <div class="kpi"><div class="k-label">Cambios de precio</div><div class="k-value">${(d.precios || []).length}</div></div></div>
+            ${Object.keys(grupos).length ? `<div class="req-sub" style="margin:4px 0 10px">${Object.entries(grupos).map(([g, v]) => `${esc(g)}: <b class="${v < 0 ? 'alm-falta' : 'alm-sobra'}">${v > 0 ? '+' : v < 0 ? '−' : ''}${almCant(Math.abs(v), p.tipo)}</b>`).join(' &nbsp;·&nbsp; ')}</div>` : ''}
+            ${f.cliente ? `<div class="req-sub" style="margin:4px 0 10px">A ${esc(f.cliente)}${f.desde || f.hasta ? ' en esas fechas' : ''}: <b class="alm-falta">${almCant(alCliente, p.tipo)} ${esc(u)}</b> en ${eventos.length} movimiento(s)</div>` : ''}
             <div class="filters alm-filtros">
                 <div><label for="almSgT">Ver</label><select id="almSgT" onchange="almSeg.tipo=this.value;almSegPintar()">${[['', 'Todo'], ['entra', 'Solo entradas'], ['sale', 'Solo salidas'], ['precio', 'Solo cambios de precio']].map(([v, x]) => `<option value="${v}"${v === f.tipo ? ' selected' : ''}>${x}</option>`).join('')}</select></div>
-                <div><label for="almSgD">Desde</label><input type="date" id="almSgD" value="${esc(f.desde)}" onchange="almSeg.desde=this.value;almSegPintar()"></div>
-                <div><label for="almSgH">Hasta</label><input type="date" id="almSgH" value="${esc(f.hasta)}" onchange="almSeg.hasta=this.value;almSegPintar()"></div>
+                ${f.enPestana ? '' : `<div><label for="almSgD">Desde</label><input type="date" id="almSgD" value="${esc(f.desde)}" onchange="almSeg.desde=this.value;almSegPintar()"></div>
+                <div><label for="almSgH">Hasta</label><input type="date" id="almSgH" value="${esc(f.hasta)}" onchange="almSeg.hasta=this.value;almSegPintar()"></div>`}
                 <div><label for="almSgO">Orden</label><select id="almSgO" onchange="almSeg.orden=this.value;almSegPintar()"><option value="nuevo"${f.orden === 'nuevo' ? ' selected' : ''}>Lo más reciente primero</option><option value="viejo"${f.orden === 'viejo' ? ' selected' : ''}>Lo más viejo primero</option></select></div></div>
-            ${eventos.length ? `<div class="tabla-wrap" style="max-height:55vh;overflow:auto"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Fecha</th><th class="izq">Qué pasó</th><th>Cantidad</th><th>Existencia</th><th class="izq">Costo / precio</th></tr></thead><tbody>
-                ${eventos.map(fila).join('')}</tbody></table></div>` : '<div class="empty">Nada con estos filtros.</div>'}`;
+            ${eventos.length || !filtrado || inicio ? `<div style="${f.enPestana ? '' : 'max-height:58vh;overflow:auto'}"><div class="seg-lista">
+                ${f.orden === 'nuevo' && !filtrado ? fin : inicio}${eventos.map(paso).join('')}${f.orden !== 'nuevo' && !filtrado ? fin : cierre}</div></div>` : `<div class="empty">Nada con estos filtros.</div>`}`;
+    }
+
+    // ---------- Pestaña "Seguimiento de producto": buscar el producto (código o descripción, se autocompleta), fechas y cliente ----------
+    let almSgBus = { q: '', desde: '', hasta: '', cliente: '', sug: [], idx: 0 };
+    function almSeguimientoVista() {
+        const b = almSgBus, d = almDatos || { productos: [], clientes: [] };
+        const clientes = [...new Set((d.clientes || []).map(c => (c.tipo === 'Tienda' && c.local ? 'TIENDA ' + c.local : c.nombre || '').toUpperCase()).filter(Boolean))].sort((a, c) => a.localeCompare(c, 'es'));
+        const p = almSeg && almSeg.enPestana ? almProducto(almSeg.codigo) : null;
+        return `<div class="filters alm-filtros">
+                <div style="flex:2;min-width:260px;position:relative"><label for="almSgProd">Producto (código o descripción)</label>
+                    <input id="almSgProd" autocomplete="off" role="combobox" aria-expanded="false" placeholder="Ej.: 051 o queso duro" value="${esc(b.q)}" data-enter-propio
+                        oninput="almSgEscribir(this.value)" onkeydown="almSgTecla(event)" onblur="setTimeout(() => { almSgBus.sug = []; almSgSugPintar(); }, 150)"><div id="almSgSug"></div></div>
+                <div><label for="almSgDesde">Desde</label><input type="date" id="almSgDesde" value="${esc(b.desde)}" onchange="almSgFiltro('desde', this.value)"></div>
+                <div><label for="almSgHasta">Hasta</label><input type="date" id="almSgHasta" value="${esc(b.hasta)}" onchange="almSgFiltro('hasta', this.value)"></div>
+                <div><label for="almSgCli">Cliente o tienda</label><select id="almSgCli" onchange="almSgFiltro('cliente', this.value)"><option value="">Todos</option>${clientes.map(c => `<option${c === b.cliente ? ' selected' : ''}>${esc(c)}</option>`).join('')}</select></div></div>
+            ${p ? `<div class="req-sub" style="margin:0 0 10px"><b>${esc(p.codigo)} · ${esc(p.descripcion)}</b> · existencia ${almCant(p.existencia, p.tipo)} ${almUnidad(p.tipo)} · costo $ ${fmt(p.costo)}</div>` : ''}
+            <div id="almKx">${!p ? '<div class="empty">Escriba el código o la descripción del producto y elíjalo de la lista.</div>' : almSeg.datos ? almSegHTML() : cargandoHTML('Buscando todo lo que pasó con este producto...')}</div>`;
+    }
+    function almSgEscribir(v) {
+        almSgBus.q = v;
+        const s = v.trim().toUpperCase(), n = asisgClave(v);
+        if (s.length < 2 || !almDatos) { almSgBus.sug = []; almSgSugPintar(); return; }
+        const exacto = [], prefijo = [], nombre = [];
+        almDatos.productos.forEach(p => {
+            const c = p.codigo.toUpperCase();
+            if (c === s) exacto.push(p);
+            else if (c.startsWith(s)) prefijo.push(p);
+            else if (n.length >= 2 && n.split(' ').every(w => asisgClave(p.descripcion).includes(w))) nombre.push(p);   // todas las palabras, en cualquier orden
+        });
+        nombre.sort((a, b) => a.descripcion.localeCompare(b.descripcion, 'es'));
+        almSgBus.sug = exacto.concat(prefijo, nombre).slice(0, 10); almSgBus.idx = 0;
+        almSgSugPintar();
+    }
+    function almSgSugPintar() {
+        const el = document.getElementById('almSgSug'), inp = document.getElementById('almSgProd'); if (!el) return;
+        const b = almSgBus;
+        el.innerHTML = b.sug.length ? `<div class="alm-sug" role="listbox">${b.sug.map((p, i) => `<button type="button" role="option" class="alm-op${i === b.idx ? ' sel' : ''}" onmousedown="event.preventDefault()" onclick="almSgElegir(${i})">
+            <b>${esc(p.codigo)}</b><span>${esc(p.descripcion)}</span><small>${almCant(p.existencia, p.tipo)} ${almUnidad(p.tipo)}</small></button>`).join('')}</div>` : '';
+        if (inp) inp.setAttribute('aria-expanded', b.sug.length ? 'true' : 'false');
+    }
+    function almSgTecla(e) {
+        const b = almSgBus;
+        if (e.key === 'ArrowDown' && b.sug.length) { e.preventDefault(); b.idx = (b.idx + 1) % b.sug.length; almSgSugPintar(); }
+        else if (e.key === 'ArrowUp' && b.sug.length) { e.preventDefault(); b.idx = (b.idx - 1 + b.sug.length) % b.sug.length; almSgSugPintar(); }
+        else if (e.key === 'Escape' && b.sug.length) { e.preventDefault(); e.stopPropagation(); b.sug = []; almSgSugPintar(); }
+        else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (b.sug.length) { almSgElegir(b.idx); return; }
+            const q = asisgClave(b.q), p = almDatos && almDatos.productos.find(x => asisgClave(x.codigo) === q);   // código exacto sin lista
+            if (p) almSgAbrir(p.codigo);
+        }
+    }
+    // Desde la lista de productos: pasa a la pestaña Seguimiento con ese producto
+    function almIrSeguimiento(codigo) { almModo('seguimiento'); almSgAbrir(codigo); }
+    function almSgElegir(i) { const p = almSgBus.sug[i]; if (p) almSgAbrir(p.codigo); }
+    async function almSgAbrir(codigo) {
+        const p = almProducto(codigo); if (!p) return;
+        almSgBus.q = p.codigo + ' · ' + p.descripcion; almSgBus.sug = [];
+        almSeg = { codigo, datos: null, orden: 'viejo', tipo: '', desde: almSgBus.desde, hasta: almSgBus.hasta, cliente: almSgBus.cliente, enPestana: true };
+        almPintar();
+        const yo = almSeg;
+        try { yo.datos = await llamarApi({ action: 'alm_seguimiento', codigo }); }
+        catch (e) {
+            try { yo.datos = { movimientos: ((await llamarApi({ action: 'alm_kardex', codigo })).movimientos || []).reverse(), precios: [] }; }
+            catch (e2) { yo.datos = null; const el = document.getElementById('almKx'); if (el && almSeg === yo) el.innerHTML = `<div class="banner error">${esc(e2.message)}</div>`; return; }
+        }
+        if (almSeg === yo && almTab === 'seguimiento') almSegPintar();
+    }
+    function almSgFiltro(k, v) {
+        almSgBus[k] = v;
+        if (almSeg && almSeg.enPestana) { almSeg[k] = v; almSegPintar(); }
+    }
+    // Qué pasó con un movimiento, dicho como se cuenta: "Llegó de Lácteos X", "Salida a la tienda Santa Rosa", "Salida a cliente Juan (CxC)"...
+    // grupo: para el resumen de en qué se fue la mercancía
+    function almSegQue(m, docs) {
+        const x = docs[m.documento] || {}, op = m.operacion || '';
+        const cli = x.cliente || (m.nota || '').replace(/^Cliente\s+/, '').split(' · ')[0];
+        if (/nota de entrega/i.test(op)) {
+            if (x.condicion === 'Tienda') return { titulo: `Salida a la tienda ${x.local || cli}`, detalle: x.estado === 'Anulada' ? 'nota anulada después' : '', grupo: 'A tiendas' };
+            if (x.condicion === 'Crédito') return { titulo: `Salida a cliente ${cli} (CxC, crédito)`, detalle: x.estado === 'Anulada' ? 'nota anulada después' : '', grupo: 'A clientes' };
+            return { titulo: `Salida a cliente ${cli}${x.condicion ? ' (' + x.condicion.toLowerCase() + ')' : ''}`, detalle: x.estado === 'Anulada' ? 'nota anulada después' : '', grupo: 'A clientes' };
+        }
+        if (/anulaci/i.test(op)) return { titulo: 'Regresó: se anuló la nota', detalle: m.nota, grupo: 'Anulaciones y cambios' };
+        if (/modificaci/i.test(op)) return { titulo: m.cantidad < 0 ? 'Se modificó la nota: salió más' : 'Se modificó la nota: regresó', detalle: m.nota, grupo: 'Anulaciones y cambios' };
+        const ter = (x.tercero || m.nota || '').split(' · ')[0];   // sin el RIF
+        const fac = x.factura ? `factura ${x.factura}${x.fiscal ? ' (fiscal)' : ''}` : '';
+        if (/compra/i.test(op)) return { titulo: `Llegó de ${ter || 'proveedor'}`, detalle: ['compra', fac].filter(Boolean).join(' · '), grupo: 'Compras' };
+        if (/sin factura/i.test(op)) return { titulo: `Entró sin factura${ter ? ' de ' + ter : ''}`, detalle: x.nota || '', grupo: 'Compras' };
+        if (/devoluci.n de cliente/i.test(op)) return { titulo: `Devolvió el cliente ${ter}`, detalle: fac, grupo: 'Devoluciones' };
+        if (/devoluci.n a proveedor/i.test(op)) return { titulo: `Se devolvió a ${ter || 'proveedor'}`, detalle: x.nota || '', grupo: 'Devoluciones' };
+        if (/ajuste/i.test(op)) return { titulo: m.cantidad < 0 ? 'Ajuste de inventario: faltaba' : 'Ajuste de inventario: sobraba', detalle: x.nota || m.nota, grupo: 'Ajustes' };
+        if (/descuento/i.test(op)) return { titulo: 'Descuento de inventario', detalle: x.nota || m.nota, grupo: 'Ajustes' };
+        if (/inicial/i.test(op)) return { titulo: 'Inventario inicial', detalle: m.nota, grupo: 'Inicial' };
+        return { titulo: op || 'Movimiento', detalle: m.nota, grupo: 'Otros' };
     }
     // Importar el catálogo corregido: CÓDIGO NUEVO (si lo tiene) o CÓDIGO, descripción, existencia, categoría, tipo, costo, precio...
     async function almImportarExcel(file) {
