@@ -556,7 +556,7 @@
         #efeHTabla th:nth-child(7) { width: 48px; } #efeHTabla th:nth-child(8) { width: 60px; } #efeHTabla th:nth-child(9) { width: 44px; }   /* Foto, verificado, eliminar */
         /* Estado de cada monto con una bolita de color (leyenda arriba): verde recibido · amarillo por llegar · azul a caja chica · rojo egreso */
         .efe-punto { display: inline-block; width: .62rem; height: .62rem; border-radius: 50%; margin-left: .45rem; vertical-align: middle; flex: none; }   /* a la derecha de la cifra: los montos quedan alineados */
-        .efe-cifra { white-space: nowrap; } .cmp-marca-q.efe-firma { display: flex; width: max-content; margin: .3rem 0 0 auto; } .efe-firma .cmp-bt { cursor: default; padding: .2rem .5rem; font-size: .75rem; } .efe-usd { display: block; font-size: .72rem; color: var(--text-muted); white-space: nowrap; margin-top: .05rem; } .efe-usd.con-punto { padding-right: 1.07rem; }
+        .efe-cifra { white-space: nowrap; } .cmp-marca-q.efe-firma { display: flex; width: max-content; margin: .15rem 0 0 auto; align-items: flex-end; } .cmp-marca-q.efe-firma small { text-align: right; } .efe-usd { display: block; font-size: .72rem; color: var(--text-muted); white-space: nowrap; margin-top: .05rem; } .efe-usd.con-punto { padding-right: 1.07rem; }
         .efe-punto.ok { background: var(--ok); } .efe-punto.pend { background: #f59e0b; } .efe-punto.caja { background: #3b82f6; } .efe-punto.egr { background: var(--bad); }
         .efe-leyenda span { display: inline-flex; align-items: center; font-size: .8rem; color: var(--text-muted); } .efe-leyenda .efe-punto { margin-right: .3rem; }
         .btn-eliminar { background: none; border: 1px solid transparent; color: var(--danger, #dc2626); font-size: .78rem; font-weight: 600;
@@ -3337,7 +3337,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-10-31.7';
+    const VERSION_SERVIDOR = '2026-11-01.1';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -16004,21 +16004,21 @@ Reglas:
             return `<i class="efe-punto ${cls}" title="${txt}"></i>`;
         };
         const turnoCorto = t => /^ma/i.test(t || '') ? 'M' : /^ta/i.test(t || '') ? 'T' : esc(t || '');
-        // Firma de quien lo recibió ("Bs: Ana · 2026-10-31 14:05 | $: ..."), debajo del monto: igual que la de Precios en tiendas
-        // (botón verde "✓ Recibido", nombre corto y día · hora)
-        const firma = (f, mon) => { if (f.tipo !== 'INGRESO' || !f.recibidoPor) return ''; const et = mon === 'usd' ? '$' : 'Bs';
+        // Firma debajo del monto ("Bs: Ana · 2026-10-31 14:05 | $: ..."), discreta: nombre corto y día · hora.
+        // Envíos de las cajas: quien lo recibió. Gastos, traspasos y dinero externo: quien lo registró.
+        const firma = (f, mon) => { if (!f.recibidoPor) return ''; const et = mon === 'usd' ? '$' : 'Bs';
             const p = f.recibidoPor.split(' | ').find(x => x.indexOf(et + ':') === 0); if (!p) return '';
             const m = /^[^:]+:\s*(.*?)\s*·\s*(\d{4}-\d{2}-\d{2}(?:\s+\d{2}:\d{2})?)/.exec(p);
             const quien = m ? m[1] : p.slice(et.length + 1).trim();
-            return `<span class="cmp-marca-q efe-firma" title="${esc(p.slice(et.length + 1).trim())}"><span class="cmp-bt hecho">✓ Recibido</span>
+            return `<span class="cmp-marca-q efe-firma" title="${f.tipo === 'INGRESO' ? 'Recibió' : 'Registró'}: ${esc(p.slice(et.length + 1).trim())}">
                 <small><b>${esc(cmpNombreCorto(quien))}</b>${m ? esc(cmpCuandoCorto(m[2])) : ''}</small></span>`; };
         document.getElementById('efeHTabla').innerHTML = lista.length ? `<table data-sin-paginar><thead><tr><th class="izq">Fecha</th><th class="izq">Concepto</th>
             <th class="izq">Responsable</th><th class="izq">Turno</th><th>Bs</th><th>$</th><th class="efe-c" title="Foto">Foto</th><th class="efe-c" title="Verificación (solo gastos de oficina)">Verif.</th><th></th></tr></thead><tbody>` +
             lista.slice(0, efeHLimite).map(f => `<tr class="${f.tipo === 'EGRESO' ? 'fila-egreso' : f.tipo === 'TRASPASO' ? 'fila-traspaso' : f.tipo === 'EXTERNO' ? 'fila-externo' : ''}"><td class="izq">${efeFecha(f.fecha)}</td>
                 <td class="izq efe-gris">${f.tipo === 'TRASPASO' ? esc(f.turno || 'Traspaso a caja chica') : f.tipo === 'EGRESO' ? esc(f.turno || (f.etiqueta && f.etiqueta !== 'EGRESO' ? f.etiqueta : 'Egreso manual')) : f.tipo === 'EXTERNO' ? esc(f.turno) : esc(f.tienda || 'Ingreso manual')}</td><td class="izq efe-gris">${efeCorto(f.cajero)}</td>
                 <td class="izq efe-gris"><span title="${esc(f.tipo === 'INGRESO' ? f.turno : '')}">${f.tipo !== 'INGRESO' ? '' : turnoCorto(f.turno)}</span></td>
-                <td class="${f.bs < 0 ? 'monto-neg' : ''}">${f.bs ? efeMontoUsd('Bs', f.bs, f.fecha, punto(f, 'bs')) : efeSinEnvio(f) ? `<span class="efe-cifra"><span title="Caja sin envío">Bs 0</span>${punto(f, 'bs')}</span>` : ''}${f.bsOk ? firma(f, 'bs') : ''}</td>
-                <td class="${f.usd < 0 ? 'monto-neg' : ''}">${f.usd ? `<span class="efe-cifra">${fmtUsd(f.usd)}${punto(f, 'usd')}</span>` : ''}${f.usdOk ? firma(f, 'usd') : ''}</td>
+                <td class="${f.bs < 0 ? 'monto-neg' : ''}">${f.bs ? efeMontoUsd('Bs', f.bs, f.fecha, punto(f, 'bs')) : efeSinEnvio(f) ? `<span class="efe-cifra"><span title="Caja sin envío">Bs 0</span>${punto(f, 'bs')}</span>` : ''}${f.bsOk || f.tipo !== 'INGRESO' ? firma(f, 'bs') : ''}</td>
+                <td class="${f.usd < 0 ? 'monto-neg' : ''}">${f.usd ? `<span class="efe-cifra">${fmtUsd(f.usd)}${punto(f, 'usd')}</span>` : ''}${f.usdOk || f.tipo !== 'INGRESO' ? firma(f, 'usd') : ''}</td>
                 <td class="efe-c">${efeFoto(f.foto)}</td>
                 <td class="efe-c">${efeEstadoVerif(f)}</td>
                 <td class="efe-c">${f.tipo !== 'INGRESO' ? efeBorrar(`efeEliminar(${f.fila})`, f.tipo === 'TRASPASO' ? 'Eliminar este traspaso (también se quita de la caja chica)' : f.tipo === 'EXTERNO' ? 'Eliminar este dinero externo' : 'Eliminar este gasto') : ''}</td></tr>`).join('') +
