@@ -556,7 +556,7 @@
         #efeHTabla th:nth-child(7) { width: 48px; } #efeHTabla th:nth-child(8) { width: 60px; } #efeHTabla th:nth-child(9) { width: 44px; }   /* Foto, verificado, eliminar */
         /* Estado de cada monto con una bolita de color (leyenda arriba): verde recibido · amarillo por llegar · azul a caja chica · rojo egreso */
         .efe-punto { display: inline-block; width: .62rem; height: .62rem; border-radius: 50%; margin-left: .45rem; vertical-align: middle; flex: none; }   /* a la derecha de la cifra: los montos quedan alineados */
-        .efe-cifra { white-space: nowrap; } .efe-firma { display: block; font-size: .7rem; color: var(--ok); white-space: nowrap; margin-top: .05rem; } .efe-usd { display: block; font-size: .72rem; color: var(--text-muted); white-space: nowrap; margin-top: .05rem; } .efe-usd.con-punto { padding-right: 1.07rem; }
+        .efe-cifra { white-space: nowrap; } .cmp-marca-q.efe-firma { display: flex; width: max-content; margin: .3rem 0 0 auto; } .efe-firma .cmp-bt { cursor: default; padding: .2rem .5rem; font-size: .75rem; } .efe-usd { display: block; font-size: .72rem; color: var(--text-muted); white-space: nowrap; margin-top: .05rem; } .efe-usd.con-punto { padding-right: 1.07rem; }
         .efe-punto.ok { background: var(--ok); } .efe-punto.pend { background: #f59e0b; } .efe-punto.caja { background: #3b82f6; } .efe-punto.egr { background: var(--bad); }
         .efe-leyenda span { display: inline-flex; align-items: center; font-size: .8rem; color: var(--text-muted); } .efe-leyenda .efe-punto { margin-right: .3rem; }
         .btn-eliminar { background: none; border: 1px solid transparent; color: var(--danger, #dc2626); font-size: .78rem; font-weight: 600;
@@ -16004,11 +16004,14 @@ Reglas:
             return `<i class="efe-punto ${cls}" title="${txt}"></i>`;
         };
         const turnoCorto = t => /^ma/i.test(t || '') ? 'M' : /^ta/i.test(t || '') ? 'T' : esc(t || '');
-        // Firma de quien lo recibió ("Bs: Ana · 2026-10-31 14:05 | $: ..."), debajo del monto
+        // Firma de quien lo recibió ("Bs: Ana · 2026-10-31 14:05 | $: ..."), debajo del monto: igual que la de Precios en tiendas
+        // (botón verde "✓ Recibido", nombre corto y día · hora)
         const firma = (f, mon) => { if (f.tipo !== 'INGRESO' || !f.recibidoPor) return ''; const et = mon === 'usd' ? '$' : 'Bs';
             const p = f.recibidoPor.split(' | ').find(x => x.indexOf(et + ':') === 0); if (!p) return '';
-            const m = /^[^:]+:\s*(.*?)\s*·\s*(\d{4})-(\d{2})-(\d{2})\s+(\d{2}:\d{2})/.exec(p);
-            return `<small class="efe-firma" title="${esc(p)}">recibió ${esc(m ? efeCorto(m[1]) + ' · ' + m[4] + '/' + m[3] + ' ' + m[5] : p.slice(et.length + 1))}</small>`; };
+            const m = /^[^:]+:\s*(.*?)\s*·\s*(\d{4}-\d{2}-\d{2}(?:\s+\d{2}:\d{2})?)/.exec(p);
+            const quien = m ? m[1] : p.slice(et.length + 1).trim();
+            return `<span class="cmp-marca-q efe-firma" title="${esc(p.slice(et.length + 1).trim())}"><span class="cmp-bt hecho">✓ Recibido</span>
+                <small><b>${esc(cmpNombreCorto(quien))}</b>${m ? esc(cmpCuandoCorto(m[2])) : ''}</small></span>`; };
         document.getElementById('efeHTabla').innerHTML = lista.length ? `<table data-sin-paginar><thead><tr><th class="izq">Fecha</th><th class="izq">Concepto</th>
             <th class="izq">Responsable</th><th class="izq">Turno</th><th>Bs</th><th>$</th><th class="efe-c" title="Foto">Foto</th><th class="efe-c" title="Verificación (solo gastos de oficina)">Verif.</th><th></th></tr></thead><tbody>` +
             lista.slice(0, efeHLimite).map(f => `<tr class="${f.tipo === 'EGRESO' ? 'fila-egreso' : f.tipo === 'TRASPASO' ? 'fila-traspaso' : f.tipo === 'EXTERNO' ? 'fila-externo' : ''}"><td class="izq">${efeFecha(f.fecha)}</td>
