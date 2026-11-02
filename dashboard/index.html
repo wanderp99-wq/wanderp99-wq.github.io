@@ -3337,7 +3337,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-01.1';
+    const VERSION_SERVIDOR = '2026-11-01.3';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -10249,7 +10249,7 @@
                 <div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">Local</th><th>Mañana</th><th>Tarde (lunes a sábado)</th><th>Tarde (domingo)</th></tr></thead><tbody>${hor}</tbody></table></div>
                 <h4 class="per-sub">Oficina y otros departamentos (por día)</h4>
                 <div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">Departamento</th>${PER_DIAS_H.map(([, n]) => `<th>${n}</th>`).join('')}<th>Personas</th></tr></thead><tbody>
-                ${(perDatos.departamentos || []).map(d => `<tr><td class="izq"><b>${esc(d.nombre)}</b>${d.enTiendas ? '<small>marca en cualquier tienda con este horario</small>' : ''}</td>${PER_DIAS_H.map(([k]) => `<td>${d.dias[k] ? `${perHora(d.dias[k].entrada)}<small>a ${perHora(d.dias[k].salida)}</small>` : '<span class="nota">libre</span>'}</td>`).join('')}
+                ${(perDatos.departamentos || []).map(d => `<tr><td class="izq"><b>${esc(d.nombre)}</b>${d.enTiendas ? '<small>siempre con su horario</small>' : ''}</td>${PER_DIAS_H.map(([k]) => `<td>${d.dias[k] ? `${perHora(d.dias[k].entrada)}<small>a ${perHora(d.dias[k].salida)}</small>` : '<span class="nota">libre</span>'}</td>`).join('')}
                     <td>${perDatos.trabajadores.filter(t => t.activo && t.local === d.nombre).length}</td></tr>`).join('')}</tbody></table></div>
                 <div class="nota">Tolerancia de llegada: ${perTol()} minutos. Si llega más tarde a cualquier turno, pierde el bono de puntualidad de toda la semana. En la oficina, lo que pase de su hora de salida son horas extra. Para que alguien use el horario de un departamento, elija ese departamento en su ficha de trabajador (Local o departamento). En los locales, "sale" = desde qué hora puede irse; quedarse hasta el cierre es su horario normal y lo que pase del cierre son horas extra. Solo un administrador puede modificar los horarios.</div></div>
             ${perCarnetConfig()}`;
@@ -10337,8 +10337,8 @@
             <div class="per-dep-cab"><input type="text" class="per-dep-nombre" maxlength="40" required placeholder="Nombre del departamento" value="${esc(dep.nombre)}">
                 <button type="button" class="btn-ghost btn-mini" onclick="perDepCopiar(this)" title="Copiar el horario del lunes a los demás días que trabajan">Igual que el lunes</button>
                 <button type="button" class="btn-eliminar" onclick="this.closest('.per-dep').remove()">Quitar</button></div>
-            <label class="per-check interruptor per-dep-tiendas" title="Su personal pasa el carnet en el equipo de cualquier tienda y siempre cuenta como este departamento, con este horario (nunca como un turno de la tienda). Sin almuerzo: el segundo pase es la salida.">
-                <input type="checkbox" ${dep.enTiendas ? 'checked' : ''}><span class="sw-pista"></span> Marca en cualquier tienda con este horario (p. ej. PCP)</label>
+            <label class="per-check interruptor per-dep-tiendas" title="Su personal marca en cualquier equipo y siempre cuenta con el horario de este departamento (o el de su perfil), aunque aparezca en el horario de una tienda. Sin almuerzo: el segundo pase del carnet es la salida.">
+                <input type="checkbox" ${dep.enTiendas ? 'checked' : ''}><span class="sw-pista"></span> Siempre con su horario, aunque esté en el horario de una tienda (p. ej. PCP)</label>
             <div class="per-dep-dias">${PER_DIAS_H.map(([k, n]) => { const h = dep.dias[k];
                 return `<div class="per-dep-dia${h ? '' : ' libre'}" data-k="${k}"><label class="per-check interruptor"><input type="checkbox" ${h ? 'checked' : ''} onchange="this.closest('.per-dep-dia').classList.toggle('libre', !this.checked)"><span class="sw-pista"></span> ${n}</label>
                     <input type="time" class="de" value="${h ? h.entrada : '08:00'}"><input type="time" class="ds" value="${h ? h.salida : '17:00'}"></div>`; }).join('')}</div></div>`;
