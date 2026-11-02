@@ -1,6 +1,6 @@
 {
-  "name": "Dashboard general",
-  "short_name": "Dashboard",
+  "name": "Plaza Software",
+  "short_name": "Plaza Software",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
