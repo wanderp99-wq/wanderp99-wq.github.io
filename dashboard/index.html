@@ -14129,6 +14129,9 @@ Reglas:
         const b = almSgBus, d = almDatos || { productos: [], clientes: [] };
         const clientes = [...new Set((d.clientes || []).map(c => (c.tipo === 'Tienda' && c.local ? 'TIENDA ' + c.local : c.nombre || '').toUpperCase()).filter(Boolean))].sort((a, c) => a.localeCompare(c, 'es'));
         const p = almSeg && almSeg.enPestana ? almProducto(almSeg.codigo) : null;
+        // Volver a la pestaña después de un rato (o de modificar o anular una nota en otro módulo): la historia se vuelve a leer,
+        // si no, se mostraba la vieja junto a la existencia nueva y parecía un cambio sin registrar (NE-000122, 01/11)
+        if (p && almSeg.datos && !almSeg.refrescando && Date.now() - (almSeg.leido || 0) > 15000) setTimeout(almSgRefrescar, 0);
         return `<div class="filters alm-filtros">
                 <div style="flex:2;min-width:260px;position:relative"><label for="almSgProd">Producto (código o descripción)</label>
                     <input id="almSgProd" autocomplete="off" role="combobox" aria-expanded="false" placeholder="Ej.: 051 o queso duro" value="${esc(b.q)}" data-enter-propio
@@ -14187,6 +14190,15 @@ Reglas:
             try { yo.datos = { movimientos: ((await llamarApi({ action: 'alm_kardex', codigo })).movimientos || []).reverse(), precios: [] }; }
             catch (e2) { yo.datos = null; const el = document.getElementById('almKx'); if (el && almSeg === yo) el.innerHTML = `<div class="banner error">${esc(e2.message)}</div>`; return; }
         }
+        yo.leido = Date.now();
+        if (almSeg === yo && almTab === 'seguimiento') almSegPintar();
+    }
+    // Lee otra vez la historia del producto abierto, sin perder los filtros ni el orden
+    async function almSgRefrescar() {
+        const yo = almSeg; if (!yo || !yo.enPestana || yo.refrescando) return;
+        yo.refrescando = true;
+        try { yo.datos = await llamarApi({ action: 'alm_seguimiento', codigo: yo.codigo }); yo.leido = Date.now(); } catch (e) { yo.leido = Date.now(); }
+        yo.refrescando = false;
         if (almSeg === yo && almTab === 'seguimiento') almSegPintar();
     }
     function almSgFiltro(k, v) {
