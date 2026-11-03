@@ -3385,7 +3385,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-01.3';
+    const VERSION_SERVIDOR = '2026-11-02.1';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -12419,8 +12419,6 @@
     function almVerNota(numero) {
         const n = almNotaDe(numero); if (!n) return;
         const anulada = n.estado === 'Anulada', tienda = n.condicion === 'Tienda', und = n.detalle.reduce((s, x) => s + (x.tipo === 'Unidad' ? x.cantidad : 0), 0), kg = n.detalle.reduce((s, x) => s + (x.tipo === 'Pesado' ? x.cantidad : 0), 0);
-        const marca = (campo, v, si, no, cls) => `<button type="button" class="alm-marca ${v ? 'si' : cls || ''}" onclick="almMarcarNota('${esc(n.numero)}','${campo}',${!v})" title="${v ? esc(v) + ' · toque para desmarcar (clave)' : 'Marcar (clave de administrador)'}">
-            <span class="alm-marca-ico">${v ? '✓' : '○'}</span><span><b>${v ? si : no}</b><small>${v ? esc(v) : 'clave de administrador'}</small></span></button>`;
         almVentana(`<div class="req-dlg alm-dlg-grande">
             <div class="alm-ver-top">
                 <div class="alm-ver-info"><div class="alm-ver-num">Nota de entrega N° ${esc(n.numero)} ${anulada ? '<span class="chip st-sobra">Anulada</span>' : ''}${n.modificaciones ? '<span class="chip st-info">Modificada</span>' : ''}</div>
@@ -12433,8 +12431,7 @@
                 ${n.detalle.map(x => `<tr><td class="izq"><b>${esc(x.codigo)}</b></td><td class="izq">${esc(x.descripcion)}</td><td>${almCant(x.cantidad, x.tipo)} <small>${almUnidad(x.tipo)}</small></td><td>${fmt(x.precio)}</td><td><b>${fmt(x.total)}</b></td></tr>`).join('')}</tbody></table></div>
             <div class="alm-pie"><span>${n.detalle.length} renglón(es) · ${und} und · ${almCant(kg, 'Pesado')} kg</span>
                 ${n.modificaciones ? `<span class="alm-ver-mod" title="${esc(n.modificaciones)}">Modificaciones: ${esc(n.modificaciones.split(' | ').pop())}</span>` : ''}</div>
-            ${anulada ? `<div class="banner error" style="display:block;margin-top:.6rem">${esc(n.anulacion)}</div>` : !permisos.includes('movalmacen') ? '' : `<div class="alm-marcas-fila">
-                ${tienda ? marca('ingresada', n.ingresada, 'Ingresada en tienda', 'Por ingresar en tienda', 'amar') : ''}${marca('verificada', n.verificada, 'Recepción verificada', 'Sin verificar')}</div>`}
+            ${anulada ? `<div class="banner error" style="display:block;margin-top:.6rem">${esc(n.anulacion)}</div>` : !permisos.includes('movalmacen') ? '' : `<div class="alm-marcas-fila" id="almMarcasNota" data-num="${esc(n.numero)}">${almMarcasHTML(n)}</div>`}
             <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0;flex-wrap:wrap">
                 ${anulada ? '' : `<button type="button" class="btn-eliminar" onclick="almAnular('${esc(n.numero)}')">Anular</button><button type="button" class="btn-ghost" onclick="almModificarNota('${esc(n.numero)}')">Modificar (clave)</button>`}
                 ${esPrincipal ? `<button type="button" class="btn-ghost" onclick="almEnviarTelegram(almNotaDe('${esc(n.numero)}'))" title="Las notas se envían solas al guardarlas">Reenviar a Telegram</button>` : ''}
@@ -12444,12 +12441,19 @@
         if (!almNotas) return; const i = almNotas.findIndex(x => x.numero === n.numero);
         if (i >= 0) almNotas[i] = n; else almNotas.unshift(n);
     }
+    // Botones "Ingresada en tienda" y "Verificada" de la nota (se repintan solos, sin volver a abrir la ventana)
+    function almMarcasHTML(n) {
+        const marca = (campo, v, si, no, cls) => `<button type="button" class="alm-marca ${v ? 'si' : cls || ''}" onclick="almMarcarNota('${esc(n.numero)}','${campo}',${!v})" title="${v ? esc(v) + ' · toque para desmarcar (clave)' : 'Marcar (clave de administrador)'}">
+            <span class="alm-marca-ico">${v ? '✓' : '○'}</span><span><b>${v ? si : no}</b><small>${v ? esc(v) : 'clave de administrador'}</small></span></button>`;
+        return (n.condicion === 'Tienda' ? marca('ingresada', n.ingresada, 'Ingresada en tienda', 'Por ingresar en tienda', 'amar') : '') + marca('verificada', n.verificada, 'Recepción verificada', 'Sin verificar');
+    }
     async function almMarcarNota(numero, campo, valor) {
         const titulo = campo === 'verificada' ? (valor ? 'Verificar la recepción' : 'Quitar la verificación') : (valor ? 'Marcar ingresada en tienda' : 'Quitar "ingresada en tienda"');
         const claveAdmin = await efePedirClave(titulo, 'Nota N° ' + numero + ': un administrador debe autorizarlo.'); if (!claveAdmin) return;
         // Al instante en pantalla; se guarda en segundo plano (si falla, se deshace y avisa)
         const n = almNotaDe(numero), antes = n ? n[campo] : '';
-        const pintar = () => { almPintar(); const d = document.getElementById('almDlg'); if (d && !d.classList.contains('hidden')) almVerNota(numero); };
+        // La lista de atrás se repinta; en la ventana de la nota solo cambian los botones de las marcas (la ventana no se vuelve a abrir)
+        const pintar = () => { almPintar(); const m = document.getElementById('almMarcasNota'), x = almNotaDe(numero); if (m && x && m.dataset.num === numero && m.closest('#almDlg:not(.hidden)')) m.innerHTML = almMarcasHTML(x); };
         if (n) { n[campo] = valor ? nombreUsuario + ' · guardando...' : ''; pintar(); }
         try {
             const r = await llamarApi({ action: 'alm_nota_marcar', numero, campo, valor, claveAdmin });
@@ -12905,10 +12909,11 @@ Reglas:
             ${cmpBorradoresHTML()}
             <div class="grafico-card"><div class="grafico-head"><h3>Compras recientes</h3></div>
                 ${!ultimas ? cargandoHTML('Cargando compras...') : !ultimas.length ? '<div class="empty">Todavía no hay compras registradas con foto.</div>'
-                : `<div class="tabla-wrap"><table class="req-tabla cmp-lista"><thead><tr><th class="izq">N°</th><th class="izq">Fecha</th><th class="izq">Proveedor · factura</th><th>Renglones</th><th>Costo $</th><th class="izq">Notas a tiendas</th><th class="izq">Quedó en almacén</th><th></th></tr></thead><tbody>
+                : `<div class="tabla-wrap"><table class="req-tabla cmp-lista"><thead><tr><th class="izq">N°</th><th class="izq">Fecha</th><th class="izq">Proveedor · factura</th><th>Renglones</th><th>Costo $</th><th class="izq">Notas a tiendas</th><th class="izq">Quedó en almacén</th><th class="izq">Libro de compras</th><th></th></tr></thead><tbody>
                     ${ultimas.map(c => `<tr><td class="izq"><b>${esc(c.numero)}</b></td><td class="izq">${fechaBonita(c.fecha)} <small>${esc(c.hora)}</small></td><td class="izq">${esc(c.proveedor)}<small>Factura ${esc(c.factura || 's/n')} · ${esc(c.usuario)}</small></td>
                         <td data-l="Renglones">${c.renglones}</td><td data-l="Costo $">${fmt(c.total)}</td><td class="izq" data-l="Notas a tiendas"><small>${Object.keys(c.notas).map(k => esc(CMP_SIGLA[k] || k) + ' ' + esc(c.notas[k])).join(' · ') || '—'}</small></td>
                         <td class="izq" data-l="Quedó en almacén"><small>${Object.keys(c.queda).map(k => { const p = almProducto(k); return esc(p ? p.descripcion : k) + ': ' + almCant(c.queda[k], p && p.tipo) + ' ' + almUnidad(p && p.tipo); }).join('<br>') || 'Nada'}</small></td>
+                        <td class="izq" data-l="Libro de compras"><small${/^No se pudo/.test(c.libro || '') ? ' style="color:var(--danger)"' : ''}>${esc(c.libro || '—')}</small></td>
                         <td class="cmp-lista-bt" style="white-space:nowrap">${(c.detalle || []).length ? `<button type="button" class="btn-ghost btn-mini" title="Imprimir cuánto va a cada tienda" onclick="cmpImprimirDistribucion('${esc(c.numero)}')">${ico('imprimir')}Distribución</button> ` : ''}${c.fotos.map((u, i) => `<a class="btn-ghost btn-mini" href="${esc(u)}" target="_blank" rel="noopener">Foto${c.fotos.length > 1 ? ' ' + (i + 1) : ''}</a>`).join(' ')}</td></tr>`).join('')}</tbody></table></div>`}</div>`;
     }
     async function cmpCargarCompras() {
@@ -13344,7 +13349,9 @@ Reglas:
         const r = cmp.resultado || {};
         return `<div class="grafico-card">
             <h3 style="margin-top:0;color:#3a9400">✓ Compra ${esc(r.compra || '')} guardada</h3>
-            <div class="nota" style="margin-top:0">${r.ingreso ? `Entró al almacén con la operación de inventario N° ${esc(r.ingreso.numero)}. ` : ''}${(r.ordenes || []).length} orden(es) de actualización en "Precios en tiendas".${r.libro ? ` Anotada en el Libro de compras (pestaña ${esc(r.libro.hoja)}, NRO ${esc(r.libro.nro)}, ${r.libro.renglones} renglón(es)).` : ''}</div>
+            <div class="nota" style="margin-top:0">${r.ingreso ? `Entró al almacén con la operación de inventario N° ${esc(r.ingreso.numero)}. ` : ''}${(r.ordenes || []).length} orden(es) de actualización en "Precios en tiendas".</div>
+            ${r.libro ? `<div class="banner ok" style="display:block">✓ Anotada en el Libro de compras 2026: pestaña <b>${esc(r.libro.hoja)}</b>, NRO <b>${esc(r.libro.nro)}</b>, ${r.libro.desde ? `filas <b>${r.libro.desde}${r.libro.hasta > r.libro.desde ? ' a ' + r.libro.hasta : ''}</b> ` : ''}(${r.libro.renglones} renglón(es)).</div>`
+              : r.avisoLibro ? `<div class="banner error" style="display:block">La compra quedó guardada, pero ${esc(r.avisoLibro.replace(/^No se pudo/, 'no se pudo'))}. Anótela a mano en el Libro de compras.</div>` : ''}
             ${(() => { const ns = r.notas || [], ok = ns.filter(n => n._tg === 'ok').length;
                 return ns.length && ok === ns.length ? `<div class="banner ok" style="display:block">✓ Las ${ns.length} nota(s) se enviaron al grupo "Control de depósito".</div>` : ''; })()}
             ${(r.notas || []).length ? `<h4 class="per-sub">Notas de entrega a las tiendas (se envían solas al grupo "Control de depósito"; imprimir es opcional)</h4>
@@ -13857,19 +13864,23 @@ Reglas:
     }
     async function cmpGuardarNuevaOrden(ev) {
         ev.preventDefault();
-        const k = cmpCalc, btn = document.getElementById('cmpBtnK'), err = document.getElementById('cmpKError');
+        const k = cmpCalc, err = document.getElementById('cmpKError');
         if (!k) { err.textContent = 'Elija el producto de la lista'; return; }
         if (!(k.detal > 0) && !(k.mayor > 0)) { err.textContent = 'Escriba el precio al detal o al mayor'; return; }
-        const avisar = document.getElementById('cmpNAvisar').checked;
-        btnCargando(btn, 'Guardando...');
-        try {
-            const r = await llamarApi({ action: 'cmp_orden_nueva', codigo: k.codigo, costo: k.costo, merma: k.merma, detal: k.detal, mayor: k.mayor,
-                                        motivo: document.getElementById('cmpNMotivo').value.trim(), avisar, ver: cmpOrd.ver });
-            almCerrar(); cmpUsarOrdenes(r);
-            if (avisar && r.telegram && !r.telegram.ok) mostrarBanner(`Precio guardado (${r.orden}), pero Telegram no aceptó el aviso: ${r.telegram.error}. Puede reenviarlo desde la orden.`, 'warn');
-            else mostrarBanner(`Precio guardado (${r.orden})${avisar ? ' y avisado al grupo "Control de depósito"' : ''}. Queda por actualizar en las tiendas.`, 'ok');
-            almCargar();   // los márgenes nuevos quedan para la próxima sugerencia
-        } catch (e) { err.textContent = e.message; btn.disabled = false; btn.textContent = 'Guardar precio'; }
+        const avisar = document.getElementById('cmpNAvisar').checked, motivo = document.getElementById('cmpNMotivo').value.trim(), nombre = k.prod ? k.prod.descripcion : k.codigo;
+        // La ventana se cierra al instante; Google lo guarda en segundo plano (si falla, avisa con el precio para volver a cargarlo)
+        almCerrar();
+        almEnSegundoPlano(async () => {
+            try {
+                const r = await llamarApi({ action: 'cmp_orden_nueva', codigo: k.codigo, costo: k.costo, merma: k.merma, detal: k.detal, mayor: k.mayor, motivo, avisar, ver: cmpOrd.ver });
+                cmpUsarOrdenes(r);
+                if (avisar && r.telegram && !r.telegram.ok) mostrarBanner(`Precio de ${nombre} guardado (${r.orden}), pero Telegram no aceptó el aviso: ${r.telegram.error}. Puede reenviarlo desde la orden.`, 'warn');
+                else mostrarBanner(`Precio de ${nombre} guardado (${r.orden})${avisar ? ' y avisado al grupo "Control de depósito"' : ''}. Queda por actualizar en las tiendas.`, 'ok');
+                almCargar();   // los márgenes nuevos quedan para la próxima sugerencia
+            } catch (e) {
+                mostrarBanner(`El precio de ${nombre} NO se guardó: ${e.message}. Vuelva a cargarlo (detal $ ${fmt(k.detal)}${k.mayor > 0 ? ', mayor $ ' + fmt(k.mayor) : ''}).`, 'error');
+            }
+        });
     }
     function cmpCalcEntrada(c, valor) {
         const k = cmpCalc, p = k.prod || almProducto(k.codigo), v = valor === '' ? 0 : Number(valor);
