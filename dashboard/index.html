@@ -1183,6 +1183,7 @@
         .cmp-tabla small.cmp-ant { white-space: nowrap; text-align: right; margin-top: 2px; }
         .cmp-tabla .cmp-ant .sube { color: var(--danger); font-weight: 600; } .cmp-tabla .cmp-ant .baja { color: #16a34a; font-weight: 600; }
         .cmp-regla { color: #3a9400; }
+        .cmp-aviso-costo { color: #b45309 !important; font-weight: 600; }
         .cmp-tabla .cmp-mal input.cmp-cod { border-color: var(--danger); }
         .cmp-tabla th.cmp-t, .cmp-tabla td.cmp-t { background: var(--list-bg); }
         .cmp-pie { display: flex; flex-wrap: wrap; gap: .4rem 1.4rem; align-items: baseline; margin: .7rem 0; font-size: .92rem; }
@@ -13067,8 +13068,10 @@ Reglas:
         Object.assign(cmp, { paso: 'revisar', leido: r, fiscal: false, proveedorId: r.proveedorId || '', proveedorLeido: r.proveedorLeido || null, factura: r.factura || '', fechaFactura: r.fechaFactura || '', enlaces: r.fotos || [], lineas,
                              borradorId: null, borradorVer: '' });
         if (!cmp.lineas.length) cmp.lineas.push(cmpLineaNueva());
+        const ivaAuto = cmpIvaDetectar(lineas, r);
         cmpAvanceEstado = '';
         cmpPintarCompra(document.getElementById('almContenido'), true);
+        if (ivaAuto) mostrarBanner(ivaAuto, 'warn');
         cmpAvanceProgramar();   // lo leído queda guardado en "Compras en curso" (no se pierde si se cierra la página)
         if (r.moneda === 'BS' && cmpTasaCompra() > 0) mostrarBanner(`La factura está en bolívares: los costos se pasaron a $ con la tasa ${fmt(cmpTasaCompra())}. Revíselos.`, 'warn');
     }
@@ -13091,6 +13094,45 @@ Reglas:
                            detalAnt: s.ant ? s.ant.detal : 0, mayorAnt: s.ant ? s.ant.mayor : 0 });
     }
     const cmpRepartido = l => CMP_TIENDAS.reduce((s, t) => s + (Number(l.dist[t]) || 0), 0);
+    // IVA de un renglón (0 o 16): el costo pasa a llevarlo (o deja de llevarlo) y los precios se recalculan con los mismos márgenes
+    function cmpIvaPoner(l, iva) {
+        const antes = 1 + (Number(l.iva) || 0) / 100, ahora = 1 + iva / 100;
+        if (Math.abs(antes - ahora) < 1e-9) return;
+        l.iva = iva;
+        if (l.leido) { l.leido.costo = l.leido.costo / antes * ahora; cmpLineaRecalc(l, true); }
+        else { l.costo = cmpR3(l.costo / antes * ahora); if (l.costoBs > 0) l.costoBs = l.costoBs / antes * ahora; }
+        const p = cmpProd(l); if (!p) return;
+        const pr = cmpPrecios(p, l.costo, l, l.libre);
+        Object.assign(l, { detal: pr.detal, margenDetal: pr.margenDetal, mayor: pr.mayor, margenMayor: pr.margenMayor });
+    }
+    function cmpIvaCambiar(i) {
+        const l = cmp.lineas[i]; if (!l) return;
+        cmpIvaPoner(l, l.iva ? 0 : 16);
+        const tr = document.getElementById('cmpF' + i); if (tr) tr.outerHTML = cmpFilaHTML(l, i);
+        document.getElementById('cmpPie').innerHTML = cmpPieHTML();
+        cmpAvanceProgramar();
+    }
+    function cmpIvaTodos(iva) { cmp.lineas.forEach(l => cmpIvaPoner(l, iva)); cmpPintarCompra(document.getElementById('almContenido'), true); cmpAvanceProgramar(); }
+    // Al leer la factura: si ningún renglón trae IVA pero el total de la factura sí lo incluye, se le suma
+    // (a los marcados (G) o 16 % en la descripción; si no hay marcas, a todos). Devuelve el aviso, o '' si no tocó nada.
+    function cmpIvaDetectar(lineas, r) {
+        const tot = Number(r && r.total) || 0;
+        if (!(tot > 0) || !lineas.length || lineas.some(l => l.iva > 0) || lineas.some(l => !l.leido)) return '';
+        const valor = ls => ls.reduce((s, l) => s + l.leido.cantidad * l.leido.costo, 0), cerca = (a, b) => Math.abs(a - b) <= Math.max(0.05, b * 0.015);
+        const sin = valor(lineas); if (cerca(sin, tot)) return '';
+        const marcados = lineas.filter(l => /\(G\)|\bG\s*$|16[,.]?0*\s*%/i.test(l.descripcionFactura || ''));
+        const cuales = marcados.length && cerca(sin + valor(marcados) * 0.16, tot) ? marcados : cerca(sin * 1.16, tot) ? lineas : null;
+        if (!cuales) return '';
+        cuales.forEach(l => { cmpIvaPoner(l, 16); cmpAplicarSugerencia(l); });
+        return `La factura trae IVA pero los renglones venían sin él: se sumó el 16 % al costo de ${cuales.length === lineas.length ? 'todos los productos' : cuales.length + ' producto(s) marcados (G)'}. Revíselo (en cada renglón: "quitar").`;
+    }
+    // Aviso informativo: precio de venta igual o muy cerca del costo (gana menos de 5 %)
+    function cmpAvisoCosto(l, conMayor) {
+        const c = Number(l.costo) || 0; if (!(c > 0)) return '';
+        const r = [['detal', Number(l.detal) || 0], ['mayor', conMayor ? Number(l.mayor) || 0 : 0]].filter(([, v]) => v > 0 && v < c / 0.95)
+            .map(([n, v]) => v <= c + 0.0005 ? `al ${n} es igual o menor que el costo` : `al ${n} está muy cerca del costo (gana ${fmt((1 - c / v) * 100)} %)`);
+        return r.length ? `<small class="cmp-aviso-costo">Precio ${r.join(' · ')}</small>` : '';
+    }
     function cmpFilaHTML(l, i) {
         const p = cmpProd(l), mal = l.codigo && !p, tasa = cmpTasaCompra(), mayor = cmpVendeMayor(p);
         const n = (c, v, cls, extra) => `<input type="number" class="${cls}" step="${c === 'cantidad' ? 'any' : c === 'costo' ? '0.001' : '0.01'}" min="0" value="${v ? v : ''}" data-i="${i}" data-c="${c}" oninput="cmpEntrada(this)" ${extra || ''}>`;
@@ -13111,9 +13153,9 @@ Reglas:
                   : l.leido ? `<small>Por unidad · <a href="#" onclick="event.preventDefault(); cmpEmpaquePedir(${i})">¿es por bulto?</a></small>`
                   : l.conversion ? `<small>Empaque: ${esc(l.conversion)}</small>` : ''}
                 ${l.descripcionFactura ? `<small>Factura: ${esc(l.descripcionFactura)}${l.unidad ? ' (' + esc(l.unidad) + ')' : ''}${l.origenCodigo === 'recordado' ? ' · ✓ recordado' : l.origenCodigo === 'barras' ? ' · ✓ por código de barras' : l.origenCodigo === 'parecido' ? ' · <b>parecido: revíselo</b>' : l.origenCodigo === 'sugerido' ? ' · sugerido' : ''}</small>` : ''}
-                <small class="cmp-regla">${esc(l.regla || '')}</small></td>
+                <small class="cmp-regla">${esc(l.regla || '')}</small><span id="cmpAv${i}">${cmpAvisoCosto(l, mayor)}</span></td>
             <td data-l="Cantidad">${n('cantidad', l.cantidad, 'cmp-n')}<small>${p ? almUnidad(p.tipo) : ''}</small></td>
-            <td class="g-c" data-l="Costo $">${n('costo', cmpR3(l.costo), 'cmp-n')}${l.iva ? `<small>con IVA ${l.iva} %</small>` : ''}${l.costoBs > 0 ? `<small>Bs ${fmt(l.costoBs)}</small>` : ''}<span id="cmpAc${i}">${antes(costoAnt, '$ ' + fmt3(costoAnt) + varia(costoAnt, l.costo))}</span>${p && !costoAnt && !(ant && ant.detal) ? '<small class="cmp-ant">Sin compra anterior</small>' : ''}</td>
+            <td class="g-c" data-l="Costo $">${n('costo', cmpR3(l.costo), 'cmp-n')}<small>${l.iva ? `con IVA ${l.iva} % · <a href="#" onclick="event.preventDefault(); cmpIvaCambiar(${i})">quitar</a>` : `sin IVA · <a href="#" onclick="event.preventDefault(); cmpIvaCambiar(${i})">sumar IVA 16 %</a>`}</small>${l.costoBs > 0 ? `<small>Bs ${fmt(l.costoBs)}</small>` : ''}<span id="cmpAc${i}">${antes(costoAnt, '$ ' + fmt3(costoAnt) + varia(costoAnt, l.costo))}</span>${p && !costoAnt && !(ant && ant.detal) ? '<small class="cmp-ant">Sin compra anterior</small>' : ''}</td>
             <td class="g-m" data-l="% detal">${n('margenDetal', l.margenDetal, 'cmp-p')}${antes(ant && ant.margenDetal, fmt(ant && ant.margenDetal) + ' %')}</td>
             <td class="g-u" data-l="Detal $">${n('detal', l.detal, 'cmp-n')}${antes(ant && ant.detal, '$ ' + fmt(ant && ant.detal))}</td>
             <td class="g-b" data-l="Detal Bs"><span id="cmpDb${i}">${bs(l.detal)}</span>${antes(ant && ant.detal && tasa, 'Bs ' + bs(ant && ant.detal))}</td>
@@ -13207,6 +13249,8 @@ Reglas:
         if (leido && total > 0 && (cmpMonedaFactura() === 'BS' || leido > total * 20)) { const ts = cmpTasaCompra(); if (ts) { enBs = ` (Bs ${fmt(leido)} a ${fmt(ts)})`; leido = leido / ts; } }
         const porTienda = CMP_TIENDAS.map(t => { const v = cmp.lineas.reduce((s, l) => s + (Number(l.dist[t]) || 0) * (l.costo || 0), 0); return v > 0 ? `${CMP_SIGLA[t]} $ ${fmt(v)}` : ''; }).filter(Boolean);
         return `<span>Costo de la compra: <b>$ ${fmt(total)}</b></span>${leido ? `<span>Total de la factura (leído): $ ${fmt(leido)}${enBs}${Math.abs(leido - total) > 0.02 * leido ? ' <b style="color:var(--danger)">no coincide: revise cantidades y costos</b>' : ' ✓'}</span>` : ''}
+            ${leido && Math.abs(leido - total) > 0.02 * leido ? `<span><button type="button" class="btn-ghost btn-mini" onclick="cmpIvaTodos(16)">Sumar IVA 16 % a todos</button> <button type="button" class="btn-ghost btn-mini" onclick="cmpIvaTodos(0)">Quitar el IVA a todos</button></span>` : ''}
+            ${(() => { const n = cmp.lineas.filter(l => cmpAvisoCosto(l, cmpVendeMayor(cmpProd(l)))).length; return n ? `<span class="cmp-aviso-costo">${n} producto(s) con precio de venta igual o muy cerca del costo</span>` : ''; })()}
             <span>${cmp.lineas.length} renglón(es)</span>${porTienda.length ? `<span>A tiendas (al costo): ${porTienda.join(' · ')}</span>` : '<span>Todo queda en el almacén</span>'}`;
     }
     function cmpCodigo(i, v) {
@@ -13244,6 +13288,7 @@ Reglas:
         if (mb) mb.textContent = l.mayor > 0 && tasa ? fmt(l.mayor * tasa) : '—';
         const ac = document.getElementById('cmpAc' + i);   // "Antes $ X ▲ %" del costo, con el costo que se está escribiendo
         if (ac && c === 'costo') { const t = document.createElement('tbody'); t.innerHTML = cmpFilaHTML(l, i); const nuevo = t.querySelector('#cmpAc' + i); if (nuevo) ac.innerHTML = nuevo.innerHTML; }
+        const av = document.getElementById('cmpAv' + i); if (av) av.innerHTML = cmpAvisoCosto(l, cmpVendeMayor(p));
         const q = cmpR2(l.cantidad - cmpRepartido(l)), qe = document.getElementById('cmpQ' + i);
         qe.textContent = almCant(q, p && p.tipo); qe.style.color = q < 0 || (p && p.libre && q > 0) ? 'var(--danger)' : '';
         document.getElementById('cmpPie').innerHTML = cmpPieHTML();
