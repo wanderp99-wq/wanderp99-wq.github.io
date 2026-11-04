@@ -1152,6 +1152,18 @@
         .alm-lista-acc { margin-top: -.3rem; align-items: center; gap: .8rem; flex-wrap: wrap; }
         .alm-marcas { display: flex; flex-direction: column; gap: .4rem; margin-top: .7rem; } .alm-marcas div { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; } .alm-marcas small { color: var(--text-muted); }
         .alm-mod-in { width: 92px; text-align: right; }
+        /* Notas por confirmar (Facturar y Notas emitidas) */
+        .alm-pc { border: 1px solid var(--border); border-radius: 12px; padding: .6rem .75rem; margin-bottom: .9rem; background: var(--list-bg); }
+        .alm-pc-tit { font-weight: 700; font-size: .9rem; margin-bottom: .4rem; } .alm-pc-tit small { font-weight: 400; color: var(--text-muted); margin-left: .4rem; }
+        .alm-pc-fila { display: grid; grid-template-columns: 9.5rem 1fr auto; gap: .6rem; align-items: center; padding: .45rem .5rem; border-radius: 8px; border-left: 4px solid var(--border); background: var(--card-bg); margin-top: .35rem; }
+        .alm-pc-fila small { display: block; color: var(--text-muted); font-size: .76rem; }
+        .alm-pc-est { font-weight: 700; font-size: .82rem; }
+        .alm-pc-acc { display: flex; gap: .35rem; flex-wrap: wrap; justify-content: flex-end; }
+        .alm-pc-curso { border-left-color: var(--primary); } .alm-pc-curso .alm-pc-est { color: var(--primary); }
+        .alm-pc-ok { border-left-color: #44AC00; } .alm-pc-ok .alm-pc-est { color: #2f8f00; }
+        .alm-pc-duda { border-left-color: #d97706; } .alm-pc-duda .alm-pc-est { color: #b45309; }
+        .alm-pc-mal { border-left-color: var(--danger); background: color-mix(in srgb, var(--danger) 7%, var(--card-bg)); } .alm-pc-mal .alm-pc-est { color: var(--danger); }
+        @media (max-width: 640px) { .alm-pc-fila { grid-template-columns: 1fr; } .alm-pc-acc { justify-content: flex-start; } }
         /* Compra con foto y precios en tiendas */
         .cmp-fotos { display: flex; flex-wrap: wrap; gap: .6rem; margin: .8rem 0; }
         .cmp-foto { position: relative; width: 96px; height: 120px; border-radius: 10px; overflow: hidden; border: 1px solid var(--border); background: var(--list-bg); }
@@ -3074,7 +3086,7 @@
         if (TIEMPOS.length > 60) TIEMPOS.pop();
     }
     // Solo lectura: si la respuesta de Google no llega, se reintenta una vez sola (no cambia nada en la hoja)
-    const SOLO_LECTURA = /^(login|list|cuadre_detalle|cuadre_detalle_lote|mov_listar|cuentas_listar|conc_listar|efe_listar|cc_listar|req_datos|req_ventas|req_historial|asis_hoy|asis_listar|asisg_listar|per_listar|cxc_deudas|nom_historial|nom_autorizar|nom_ajustes|hor_datos|alm_datos|alm_notas|alm_ingresos|alm_kardex|alm_seguimiento|alm_tiendas|alm_existencias|cmp_compras|cmp_ordenes|cmp_enlazar|cmp_borradores|cmp_borrador|pnom_listar|ping|cambios|pendientes|enlinea|marca_estado)$/;
+    const SOLO_LECTURA = /^(login|list|cuadre_detalle|cuadre_detalle_lote|mov_listar|cuentas_listar|conc_listar|efe_listar|cc_listar|req_datos|req_ventas|req_historial|asis_hoy|asis_listar|asisg_listar|per_listar|cxc_deudas|nom_historial|nom_autorizar|nom_ajustes|hor_datos|alm_datos|alm_notas|alm_ingresos|alm_kardex|alm_seguimiento|alm_tiendas|alm_existencias|alm_espera_listar|cmp_compras|cmp_ordenes|cmp_enlazar|cmp_borradores|cmp_borrador|pnom_listar|ping|cambios|pendientes|enlinea|marca_estado)$/;
     // Guardados sin repetir: cada cambio lleva un "idem". Si no llegó la respuesta y se vuelve a pulsar el MISMO cambio,
     // se manda el mismo idem y Google responde "ya estaba registrado" en vez de guardarlo otra vez.
     const idemPendientes = new Map();   // contenido del cambio -> idem del intento sin respuesta
@@ -3215,7 +3227,7 @@
         // La imagen de una nota para Telegram tampoco: Google la acepta una sola vez por nota.
         if (!SOLO_LECTURA.test(payload.action) && !/^(cmp_leer|alm_tg_imagen)$/.test(payload.action)) {
             llaveIdem = JSON.stringify(payload);
-            payload = Object.assign({}, payload, { idem: idemPendientes.get(llaveIdem) || nuevoIdem() });
+            payload = Object.assign({}, payload, { idem: payload.idem || idemPendientes.get(llaveIdem) || nuevoIdem() });   // quien trae su idem (una nota) lo conserva en cada reenvío
         }
         try {
             const r = await llamarApiReal(payload, t0);
@@ -3385,7 +3397,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-02.1';
+    const VERSION_SERVIDOR = '2026-11-04.1';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -7423,7 +7435,7 @@
         if (sel.has(3)) partes.push(`<h2>3. Variedad (${avisos.length})</h2><ul>${avisos.map(a => `<li><b>${esc(a.titulo || '')}</b> ${esc(a.texto)}</li>`).join('') || '<li>Sin avisos</li>'}</ul>`);
         const w = window.open('', '_blank');
         if (!w) { alert('El navegador bloqueó la ventana para imprimir. Permita las ventanas emergentes.'); return; }
-        w.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Requerimiento ${esc(local)} ${fechaBonita(semana)}</title>
+        w.document.write(mediaCarta(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Requerimiento ${esc(local)} ${fechaBonita(semana)}</title>
             <style>@page{size:letter;margin:9mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:10.5px;margin:0;color:#111}
             h1{font-size:14px;margin:0 0 2px}h2{font-size:12px;margin:10px 0 3px;padding-bottom:2px;border-bottom:1.5px solid #111}p{margin:0 0 4px;color:#444;font-size:10px}
             table{width:100%;border-collapse:collapse}thead{display:table-header-group}tr{page-break-inside:avoid}
@@ -7437,7 +7449,7 @@
             <p>Semana del ${fechaBonita(semana)} al ${fechaBonita(sumarDias(semana, 6))} · ${dias} días de venta · impreso ${new Date().toLocaleString('es-VE')}</p>
             ${partes.join('')}
             ${sel.has(1) ? '<div class="firmas"><span>Despachado por</span><span>Recibido por</span></div>' : ''}
-            <script>window.onload=function(){window.print()}<\/script></body></html>`);
+            <script>window.onload=function(){window.print()}<\/script></body></html>`));
         w.document.close();
     }
 
@@ -8329,9 +8341,9 @@
             .chip.st-pend{background:#eef1f5;color:#475569}.chip.st-sobra{background:#f6ebe1;color:#b45309}
             .chip.st-ok{background:#e3f1ec;color:#047857}.hor-doble{font-style:normal;font-weight:700;color:#047857;font-size:8.5px;margin-left:3px}.hor-vacio{color:#94a3b8}.hor-tarde{font-style:normal;font-weight:700;color:#b91c1c;font-size:8.5px;margin-left:3px}
             .req-acciones,body>.nota,.hor-card>.nota{display:none}`;
-        w.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Horarios por local</title><style>${estilos}</style></head><body>
+        w.document.write(mediaCarta(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Horarios por local</title><style>${estilos}</style></head><body>
             <h1>Horario por departamento · ${fechaBonita(asisgDatos.desde)} al ${fechaBonita(asisgDatos.hasta)}</h1>${asisgHorarios()}
-            <script>window.onload=function(){window.print()}<\/script></body></html>`);
+            <script>window.onload=function(){window.print()}<\/script></body></html>`, 0.77));
         w.document.close();
     }
     // Repinta un bloque sin que la pantalla salte: conserva el desplazamiento (vertical y horizontal) de la página, del bloque y de cada
@@ -9508,7 +9520,7 @@
             .sort((a, b) => a.trabajador.localeCompare(b.trabajador, 'es'));
         if (!ps.length) { mostrarBanner('No encontré la nómina ' + id + '.', 'warn'); return; }
         const s = k => r2(ps.reduce((a, p) => a + (p[k] || 0), 0)), logo = (document.querySelector('link[rel="icon"]') || {}).href || '';
-        const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Nómina ${esc(id)}</title><style>
+        let html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Nómina ${esc(id)}</title><style>
             @page{size:letter landscape;margin:9mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
             body{margin:0;font-family:Arial,Helvetica,sans-serif;color:#0f172a;font-size:8.6pt}
             .cab{display:flex;align-items:center;gap:3mm;border-bottom:.6mm solid #44AC00;padding-bottom:2mm;margin-bottom:2mm}.cab img{width:11mm;height:11mm}
@@ -9525,6 +9537,7 @@
                 <td class="i">${p.pagado ? `Pagado ${fechaBonita(p.fechaPago)}${p.referencia ? '<small>ref. ' + esc(p.referencia) + '</small>' : ''}` : 'Por pagar'}</td><td class="i"><div class="firma">&nbsp;</div></td></tr>`).join('')}
             </tbody><tfoot><tr><td class="i" colspan="4">Total · ${ps.length} trabajador(es)</td><td>${fmt(s('generado'))}</td><td>${fmt(s('descontado'))}</td><td>${fmt(s('neto'))}</td><td></td><td>${s('netoBs') ? fmt(s('netoBs')) : '—'}</td><td class="i" colspan="2">${ps.filter(p => p.pagado).length} de ${ps.length} pagados</td></tr></tfoot></table>
             <div class="pie">Impreso el ${new Date().toLocaleString('es-VE')} · ${esc(nombreUsuario || '')}</div></body></html>`;
+        html = mediaCarta(html, 0.77);
         let fr = document.getElementById('nomImprimeMarco'); if (fr) fr.remove();
         fr = document.createElement('iframe'); fr.id = 'nomImprimeMarco'; fr.setAttribute('aria-hidden', 'true'); fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
         document.body.appendChild(fr);
@@ -11508,6 +11521,11 @@
         cargarTasasBCV().then(() => { if (vistaActual === almVista) almPintar(); });
         if (almDatos) almPintar(); else document.getElementById('almContenido').innerHTML = cargandoHTML('Cargando productos...');
         if (!almDatos || Date.now() - almDatosEn > 120000) await almCargar(!almDatos);
+        if (almDatos && (vista === 'facturar' || vista === 'movalmacen')) {
+            almPCReanudar();                                      // notas que quedaron sin confirmar: se reenvían solas
+            if (vista === 'facturar') { almVentaRecuperar(); almEsperaLeerNube().then(() => { if (almTab === 'facturar') almPintar(); }); }
+            almPintar();
+        }
         almEnfocar();
     }
     async function almCargar(primera) {
@@ -11542,6 +11560,7 @@
         if (almTab === 'tiendas' && !almTiendas) almCargarTiendas();
         if (almTab === 'ingresos' && !almIngresos) almCargarIngresos();
         const sel = out.querySelector('.alm-carrito tr.sel'); if (sel) sel.scrollIntoView({ block: 'nearest' });
+        if (almTab === 'facturar') almVentaGuardarLocal();   // la venta en pantalla no se pierde si se recarga la página
     }
     // El cursor vuelve al campo del código (facturar / ingresar)
     // Al instante (un lector de códigos escribe muy rápido) y otra vez al terminar de dibujar
@@ -11647,7 +11666,7 @@
         const tasa = almTasa();
         const sub = almR(doc.items.reduce((s, x) => s + x.cantidad * (ingreso ? x.costo : x.precio), 0));
         const desc = ingreso ? 0 : Math.min(doc.descuento || 0, sub), total = almR(sub - desc);
-        const espera = ingreso ? almOpsEspera().length : almEspera().length, ajuste = ingreso && almIng.operacion === 'AJUSTE', descuentoInv = ingreso && almOpSale(almIng.operacion);
+        const espera = ingreso ? almOpsEspera().length : almEsperaTodas().length, ajuste = ingreso && almIng.operacion === 'AJUSTE', descuentoInv = ingreso && almOpSale(almIng.operacion);
         const falta = ajuste ? almR(doc.items.filter(x => x.cantidad < 0).reduce((s, x) => s + x.cantidad * x.costo, 0)) : 0, sobra = ajuste ? almR(sub - falta) : 0;
         const dinero = v => (v < 0 ? '−' : '') + fmt(Math.abs(v));
         const teclas = ingreso
@@ -11861,34 +11880,90 @@
         almPintar(); almEnfocar();
     }
 
-    // ---------- F6 / F7: ventas en espera (en este equipo) ----------
-    const almEspera = () => { try { return JSON.parse(localStorage.getItem('alm_espera') || '[]') || []; } catch (e) { return []; } };
+    // ---------- F6 / F7: ventas en espera ----------
+    // Se guardan en este equipo al instante y también en Google (hoja ALM ESPERA): no se pierden si se borra el navegador
+    // y se pueden traer desde cualquier equipo. Si Google no responde, queda en este equipo y se vuelve a enviar al abrir F7.
+    const almEspera = () => {
+        try {
+            const l = JSON.parse(localStorage.getItem('alm_espera') || '[]') || [];
+            if (l.some(v => !v.id)) { l.forEach(v => { if (!v.id) v.id = 'E' + nuevoIdem().replace(/-/g, '').slice(0, 14); }); almEsperaGuardar(l); }   // las de antes no tenían identificador
+            return l;
+        } catch (e) { return []; }
+    };
     const almEsperaGuardar = l => { try { localStorage.setItem('alm_espera', JSON.stringify(l)); } catch (e) {} };
+    let almEsperaNube = [];   // las que están en Google (de cualquier equipo), leídas al abrir F7 o al entrar
+    const almEsperaTodas = () => { const l = almEspera(), ids = new Set(l.map(v => v.id)); return l.concat(almEsperaNube.filter(v => !ids.has(v.id))); };
+    const almEsperaItems = items => items.map(x => ({ codigo: x.codigo, descripcion: x.descripcion, tipo: x.tipo, cantidad: x.cantidad, precio: x.precio }));
+    function almEsperaNueva(items, hora) {
+        return { id: 'E' + nuevoIdem().replace(/-/g, '').slice(0, 14), hora: hora || new Date().toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' }), fecha: fechaLocalHoy(), usuario: nombreUsuario,
+                 items: almEsperaItems(items), descuento: 0, total: almR(items.reduce((s, x) => s + x.cantidad * x.precio, 0)), enGoogle: false };
+    }
+    // A Google en segundo plano; si falla queda marcada "solo en este equipo" y se reintenta al abrir F7
+    async function almEsperaSubir(v) {
+        try {
+            await llamarApi({ action: 'alm_espera_guardar', id: v.id, items: v.items, total: v.total });
+            const l = almEspera(), x = l.find(y => y.id === v.id); if (x) { x.enGoogle = true; almEsperaGuardar(l); }
+            return true;
+        } catch (e) { return false; }
+    }
+    async function almEsperaLeerNube() {
+        try {
+            const r = await llamarApi({ action: 'alm_espera_listar' });
+            almEsperaNube = (r.esperas || []).map(v => ({ id: v.id, hora: String(v.guardada).slice(11), fecha: String(v.guardada).slice(0, 10), usuario: v.usuario, items: v.items, descuento: 0, total: v.total, enGoogle: true, deNube: true }));
+            // Las de este equipo que Google ya no tiene en espera (otro equipo las trajo): se quitan de aquí
+            const nube = new Set(almEsperaNube.map(v => v.id)), l = almEspera(), quedan = l.filter(v => !v.enGoogle || nube.has(v.id));
+            if (quedan.length !== l.length) almEsperaGuardar(quedan);
+            quedan.filter(v => !v.enGoogle).forEach(almEsperaSubir);
+        } catch (e) { /* sin Google (o script anterior): solo las de este equipo */ }
+    }
     function almGuardarEspera() {
         if (!almVenta.items.length) { mostrarBanner('No hay venta para guardar.', 'warn'); return; }
-        const l = almEspera();
-        l.push({ hora: new Date().toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' }), items: almVenta.items.map(x => Object.assign({}, x, { sinExistencia: false })), descuento: 0,
-                 total: almR(almVenta.items.reduce((s, x) => s + x.cantidad * x.precio, 0)) });
-        almEsperaGuardar(l);
+        const v = almEsperaNueva(almVenta.items), l = almEspera();
+        l.push(v); almEsperaGuardar(l);
         almVenta = { items: [], sel: -1, descuento: 0, claveDesc: '', claveStock: '', ultimo: 'Venta guardada en espera (F7 para traerla)' };
         almPintar(); almEnfocar();
+        almEsperaSubir(v).then(ok => { if (!ok) mostrarBanner('La venta quedó en espera solo en este equipo (Google no respondió). Se vuelve a enviar sola al abrir F7.', 'warn'); });
     }
-    function almTraerEspera() {
-        const l = almEspera();
-        if (!l.length) { mostrarBanner('No hay ventas en espera.', 'warn'); return; }
-        almVentana(`<div class="req-dlg alm-dlg-ancho"><h3>Ventas en espera</h3><div class="alm-lista">
-            ${l.map((v, i) => `<button type="button" class="alm-op" ${i === l.length - 1 ? 'autofocus' : ''} onclick="almTraer(${i})"><b>${esc(v.hora)}</b><span>${v.items.length} renglón(es): ${esc(v.items.slice(0, 3).map(x => x.descripcion).join(', '))}${v.items.length > 3 ? '…' : ''}</span><small>$ ${fmt(v.total)}</small></button>`).join('')}</div>
-            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-ghost" onclick="almCerrar()">Cerrar (Esc)</button></div></div>`);
+    function almEsperaDlgHTML() {
+        const l = almEsperaTodas();
+        return `<div class="req-dlg alm-dlg-ancho"><h3>Ventas en espera</h3><div class="req-sub">Guardadas con F6, en este equipo o en otro.</div>${!l.length ? '<div class="empty">No hay ventas en espera.</div>' : `<div class="alm-lista">
+            ${l.map((v, i) => `<button type="button" class="alm-op" ${i === l.length - 1 ? 'autofocus' : ''} onclick="almTraer('${esc(v.id)}')"><b>${esc(v.hora)}</b><span>${v.items.length} renglón(es): ${esc(v.items.slice(0, 3).map(x => x.descripcion).join(', '))}${v.items.length > 3 ? '…' : ''}<small>${esc([v.fecha && v.fecha !== fechaLocalHoy() ? fechaBonita(v.fecha) : '', v.usuario, v.deNube ? 'guardada en otro equipo' : v.enGoogle ? '' : 'solo en este equipo'].filter(Boolean).join(' · '))}</small></span><small>$ ${fmt(v.total)}</small></button>`).join('')}</div>`}
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-ghost" onclick="almCerrar()">Cerrar (Esc)</button></div></div>`;
     }
-    function almTraer(i) {
-        const l = almEspera(), v = l[i];
+    async function almTraerEspera() {
+        almVentana(almEsperaDlgHTML());
+        await almEsperaLeerNube();
+        const d = document.querySelector('#almDlg:not(.hidden) .req-dlg h3');
+        if (d && d.textContent === 'Ventas en espera') almVentana(almEsperaDlgHTML());
+    }
+    function almTraer(id) {
+        const l = almEspera(), v = almEsperaTodas().find(x => x.id === id);
         if (!v) return;
         if (almVenta.items.length && !confirm('La venta actual se guardará en espera para traer esta. ¿Seguir?')) return;
-        if (almVenta.items.length) l.push({ hora: new Date().toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' }), items: almVenta.items, descuento: 0, total: almR(almVenta.items.reduce((s, x) => s + x.cantidad * x.precio, 0)) });
-        l.splice(i, 1); almEsperaGuardar(l);
+        const quedan = l.filter(x => x.id !== id);
+        if (almVenta.items.length) { const actual = almEsperaNueva(almVenta.items); quedan.push(actual); almEsperaSubir(actual); }
+        almEsperaGuardar(quedan); almEsperaNube = almEsperaNube.filter(x => x.id !== id);
+        if (v.enGoogle) llamarApi({ action: 'alm_espera_retomar', id }).catch(() => {});   // deja de estar en espera en todos los equipos
         // Precios al día: los del catálogo de ahora
         almVenta = { items: v.items.filter(x => almProducto(x.codigo)).map(x => Object.assign({}, x, { precio: almProducto(x.codigo).precio, sinExistencia: false })), sel: -1, descuento: 0, claveDesc: '', claveStock: '', ultimo: 'Venta de las ' + v.hora + ' recuperada' };
+        const sinCatalogo = v.items.filter(x => !almProducto(x.codigo));
+        if (sinCatalogo.length) mostrarBanner(`No se trajeron ${sinCatalogo.length} renglón(es) porque ya no están en el catálogo: ${sinCatalogo.map(x => x.descripcion).join(', ')}.`, 'warn');
         almCerrar(); almPintar();
+    }
+
+    // ---------- La venta que está en pantalla se guarda en este equipo a cada cambio (si se recarga la página no se pierde) ----------
+    function almVentaGuardarLocal() {
+        if (!almVentaRecuperada) return;   // antes de recuperar la de la última vez no se escribe (se borraría con la pantalla vacía)
+        try { if (almVenta.items.length) localStorage.setItem('alm_venta_actual', JSON.stringify({ items: almEsperaItems(almVenta.items), en: Date.now() })); else localStorage.removeItem('alm_venta_actual'); } catch (e) {}
+    }
+    let almVentaRecuperada = false;
+    function almVentaRecuperar() {
+        if (almVentaRecuperada) return; almVentaRecuperada = true;
+        try {
+            const v = JSON.parse(localStorage.getItem('alm_venta_actual') || 'null');
+            if (!v || !v.items || !v.items.length || almVenta.items.length) return;
+            almVenta = { items: v.items.filter(x => almProducto(x.codigo)).map(x => Object.assign({}, x, { sinExistencia: false })), sel: -1, descuento: 0, claveDesc: '', claveStock: '', ultimo: 'Se recuperó la venta que estaba en pantalla' };
+        } catch (e) {}
     }
 
     // ---------- Espacio: totalizar (cliente, contado o crédito) y emitir la nota ----------
@@ -11990,39 +12065,110 @@
         const nota = { numero: almDatos.proximaNota || '—', fecha: fechaLocalHoy(), hora: ahora.toTimeString().slice(0, 5), clienteId: cli.id, cliente: cli.nombre, cedula: cli.cedula, telefono: cli.telefono, direccion: cli.direccion,
                        condicion, vence: credito && !tienda ? sumarDias(fechaLocalHoy(), dias) : '', subtotal, descuento, total, tasa, totalBs: tasa ? almR(total * tasa) : 0, estado: 'Emitida',
                        usuario: nombreUsuario, renglones: detalle.length, detalle, comentario: (document.getElementById('almComentario') || {}).value ? document.getElementById('almComentario').value.trim() : '', ingresada: '', verificada: '', modificaciones: '' };
-        const pedido = { action: 'alm_facturar', clienteId: cli.id, condicion, diasCredito: dias, tasa, descuento: venta.descuento || 0, claveAdmin: venta.claveDesc || venta.claveStock || '', comentario: nota.comentario, tgEquipo: true,
+        // Identificador fijo de esta nota: si hay que reenviarla (Google no respondió, se recargó la página), Google la reconoce y no la repite
+        const idem = nuevoIdem();
+        const pedido = { action: 'alm_facturar', idem, clienteId: cli.id, condicion, diasCredito: dias, tasa, descuento: venta.descuento || 0, claveAdmin: venta.claveDesc || venta.claveStock || '', comentario: nota.comentario, tgEquipo: true,
                          items: venta.items.map(x => ({ codigo: x.codigo, cantidad: x.cantidad })) };
+        // Antes de limpiar la pantalla, la nota queda anotada en este equipo ("Notas por confirmar") hasta que Google confirme que la guardó
+        const x = { idem, creado: Date.now(), estado: 'guardando', error: '', intentos: 0, nota, pedido, items: almEsperaItems(venta.items) };
+        almPC.unshift(x); almPCGuardar();
         // La pantalla queda lista para la siguiente venta
         almMoverLocal(venta.items, -1);
         almDatos.proximaNota = almNumeroTxt((Number(nota.numero) || 0) + 1);
-        almVenta = { items: [], sel: -1, descuento: 0, claveDesc: '', claveStock: '', ultimo: `Nota ${nota.numero} · ${nota.cliente} · $ ${fmt(total)}` };
+        almVenta = { items: [], sel: -1, descuento: 0, claveDesc: '', claveStock: '', ultimo: `Nota ${nota.numero} · ${nota.cliente} · $ ${fmt(total)} · guardando...` };
         almCliSel = '';
         almPintar();
         almPreguntarImprimir('nota', nota);
-        almEnSegundoPlano(async () => {
-            try {
-                const r = await llamarApi(pedido);
-                almTiendas = null;
-                if (!r.nota) { almNotas = null; await almCargar(); return; }   // ya estaba guardada (reintento): se vuelve a leer
-                if (r.telegram && r.telegram.espera) almTgImagenAuto(r.nota);
-                if (almNotas && almNotasF.modo === 'ultimas') almReemplazarNota(r.nota);
-                if (almDatos.pendientes) { almDatos.pendientes.notasPorVerificar++; if (r.nota.condicion === 'Tienda') { almDatos.pendientes.porIngresar++; almDatos.pendientes.porIngresarUsd = almR(almDatos.pendientes.porIngresarUsd + r.nota.total); } }
-                almAplicarCambios(r.cambios);
-                if (r.proximaNota && Number(r.proximaNota) > Number(almDatos.proximaNota)) almDatos.proximaNota = r.proximaNota;
-                nota._guardada = r.nota;
-                if (almUltimaNota === nota) almUltimaNota = r.nota;
-                if (r.nota.numero !== nota.numero) mostrarBanner(`La nota de ${nota.cliente} quedó guardada con el N° ${r.nota.numero} (no ${nota.numero}). Si ya la imprimió, reimprímala desde Notas emitidas.`, 'warn');
-                else if (r.telegram && !r.telegram.ok) mostrarBanner(`Nota ${r.nota.numero} guardada. Telegram no la aceptó todavía (${r.telegram.error}); Google la reintenta solo.`, 'warn');
-                almPintar();
-            } catch (e) {
-                // No se guardó: la venta vuelve a "ventas en espera" (F7) y se vuelve a leer la existencia
-                nota._fallo = true;
-                const l = almEspera(); l.push({ hora: 'NO GUARDADA ' + nota.hora, items: venta.items.map(x => Object.assign({}, x, { sinExistencia: false })), descuento: 0, total: subtotal }); almEsperaGuardar(l);
-                mostrarBanner(`La nota N° ${nota.numero} de ${nota.cliente} NO se guardó: ${e.message}. La venta quedó en espera (F7) para emitirla otra vez; si la imprimió, ese papel no vale.`, 'error');
-                await almCargar();
-            }
-        });
+        almEnSegundoPlano(() => almEnviarNota(x));
         // El envío al grupo de Telegram lo hace Google al guardar la nota (almFacturar): no depende de este equipo
+    }
+
+    // ---------- Notas por confirmar ----------
+    // Cada nota emitida queda en este equipo hasta que Google confirma que la guardó: se ve arriba en Facturar y en Notas emitidas
+    // (guardando / guardada / sin respuesta / no guardada). Si Google no responde se reenvía sola con el MISMO identificador
+    // (Google no la repite), también después de recargar la página. Si Google la rechaza (sin existencia, clave...) queda a la vista
+    // con Reintentar, Corregir en la venta o Descartar: nunca desaparece sin avisar.
+    const ALM_PC_LLAVE = 'alm_por_confirmar';
+    let almPC = (() => { try { return JSON.parse(localStorage.getItem(ALM_PC_LLAVE) || '[]') || []; } catch (e) { return []; } })();
+    // La clave de administrador (descuento o sin existencia) no se guarda en el navegador
+    function almPCGuardar() {
+        try { localStorage.setItem(ALM_PC_LLAVE, JSON.stringify(almPC.filter(x => x.estado !== 'guardada').map(x => Object.assign({}, x, { enviando: false, pedido: Object.assign({}, x.pedido, { claveAdmin: '' }) })))); } catch (e) {}
+    }
+    const almPCDe = idem => almPC.find(x => x.idem === idem);
+    function almPCRepintar() { if (almTab === 'facturar' || almTab === 'notas') almPintar(); }
+    async function almEnviarNota(x) {
+        if (x.enviando || x.estado === 'guardada') return;
+        x.enviando = true; x.intentos++; if (x.estado === 'error') x.estado = 'guardando';
+        almPCRepintar();
+        try {
+            const r = await llamarApi(x.pedido);
+            const nota = x.nota;
+            almTiendas = null;
+            x.estado = 'guardada'; x.hecho = Date.now(); x.error = '';
+            if (!r.nota) { x.numero = nota.numero; x.yaEstaba = true; almNotas = null; await almCargar(); return; }   // ya estaba guardada (reenvío): se vuelve a leer
+            x.numero = r.nota.numero;
+            if (r.telegram && r.telegram.espera) almTgImagenAuto(r.nota);
+            if (almNotas && almNotasF.modo === 'ultimas') almReemplazarNota(r.nota);
+            if (almDatos.pendientes) { almDatos.pendientes.notasPorVerificar++; if (r.nota.condicion === 'Tienda') { almDatos.pendientes.porIngresar++; almDatos.pendientes.porIngresarUsd = almR(almDatos.pendientes.porIngresarUsd + r.nota.total); } }
+            almAplicarCambios(r.cambios);
+            if (r.proximaNota && Number(r.proximaNota) > Number(almDatos.proximaNota)) almDatos.proximaNota = r.proximaNota;
+            nota._guardada = r.nota;
+            if (almUltimaNota === nota) almUltimaNota = r.nota;
+            if (r.nota.numero !== nota.numero) mostrarBanner(`La nota de ${nota.cliente} quedó guardada con el N° ${r.nota.numero} (no ${nota.numero}). Si ya la imprimió, reimprímala desde Notas emitidas.`, 'warn');
+            else if (r.telegram && !r.telegram.ok) mostrarBanner(`Nota ${r.nota.numero} guardada. Telegram no la aceptó todavía (${r.telegram.error}); Google la reintenta solo.`, 'warn');
+            if (/guardando\.\.\.$/.test(almVenta.ultimo || '')) almVenta.ultimo = almVenta.ultimo.replace(/ · guardando\.\.\.$/, ' · ✓ guardada');
+        } catch (e) {
+            // Sin respuesta (o Google todavía la está guardando): puede que SÍ se haya guardado. Se reenvía sola con el mismo identificador
+            // durante 5 horas (Google recuerda el identificador 6 horas): nunca se duplica.
+            const dudosa = e.sinRespuesta || /todavía se está guardando/.test(e.message || '');
+            x.estado = dudosa ? 'dudosa' : 'error'; x.error = e.message || String(e);
+            if (dudosa && x.intentos < 6 && Date.now() - x.creado < 5 * 3600000) setTimeout(() => almEnSegundoPlano(() => almEnviarNota(x)), Math.min(60000, 10000 * x.intentos));
+            if (!dudosa) { mostrarBanner(`La nota N° ${x.nota.numero} de ${x.nota.cliente} NO se guardó: ${x.error}. Está arriba en "Notas por confirmar": corríjala o reintente. Si la imprimió, ese papel no vale todavía.`, 'error'); await almCargar(); }
+        } finally {
+            x.enviando = false; almPCGuardar(); almPCRepintar();
+            // Las ya confirmadas se quitan de la lista a los 3 minutos
+            if (x.estado === 'guardada') setTimeout(() => { almPC = almPC.filter(y => y !== x); almPCRepintar(); }, 180000);
+        }
+    }
+    function almPCReintentar(idem) { const x = almPCDe(idem); if (!x) return; x.intentos = 0; almEnSegundoPlano(() => almEnviarNota(x)); }
+    // Volver a la venta para corregirla (solo si Google la rechazó o no hay forma de saber si la guardó)
+    function almPCCorregir(idem) {
+        const x = almPCDe(idem); if (!x) return;
+        const aviso = x.estado === 'dudosa' ? `Google no confirmó la nota N° ${x.nota.numero}: puede que SÍ esté guardada. Revise primero en Notas emitidas (Actualizar).\n\n` : '';
+        if (!confirm(`${aviso}¿Pasar la nota N° ${x.nota.numero} de ${x.nota.cliente} a la venta para corregirla y emitirla otra vez?`)) return;
+        if (almVenta.items.length) { const l = almEspera(), v = almEsperaNueva(almVenta.items); l.push(v); almEsperaGuardar(l); almEsperaSubir(v); mostrarBanner('La venta que estaba en pantalla quedó en espera (F7).', 'ok'); }
+        almVenta = { items: x.items.filter(y => almProducto(y.codigo)).map(y => Object.assign({}, y, { precio: almProducto(y.codigo).precio, sinExistencia: false })), sel: -1, descuento: 0, claveDesc: '', claveStock: '', ultimo: `Nota ${x.nota.numero} para corregir (${x.nota.cliente})` };
+        almPC = almPC.filter(y => y !== x); almPCGuardar();
+        if (almVista === 'facturar') almModo('facturar'); else almPintar();
+    }
+    function almPCDescartar(idem) {
+        const x = almPCDe(idem); if (!x) return;
+        if (x.estado !== 'guardada' && !confirm(`¿Quitar la nota N° ${x.nota.numero} de ${x.nota.cliente} de esta lista?\n\n${x.estado === 'dudosa' ? 'Google no confirmó si la guardó: revise en Notas emitidas antes de descartarla.' : 'NO quedó guardada: si la mercancía ya se despachó, use "Corregir en la venta" y emítala.'}`)) return;
+        almPC = almPC.filter(y => y !== x); almPCGuardar(); almPCRepintar();
+    }
+    // Al entrar al almacén: las que quedaron sin confirmar (se cerró o recargó la página) se reenvían solas
+    let almPCReanudado = false;
+    function almPCReanudar() {
+        if (almPCReanudado) return; almPCReanudado = true;
+        almPC.filter(x => x.estado === 'guardando' || x.estado === 'dudosa').forEach(x => {
+            x.estado = 'dudosa'; x.intentos = 0;
+            if (Date.now() - x.creado < 5 * 3600000) almEnSegundoPlano(() => almEnviarNota(x));
+            else x.error = 'Pasaron más de 5 horas sin confirmar: revise en Notas emitidas si quedó guardada.';
+        });
+    }
+    function almPCHTML() {
+        if (!almPC.length) return '';
+        const est = { guardando: ['Guardando en Google...', 'alm-pc-curso'], guardada: ['✓ Guardada', 'alm-pc-ok'], dudosa: ['Sin confirmar', 'alm-pc-duda'], error: ['NO se guardó', 'alm-pc-mal'] };
+        return `<div class="alm-pc"><div class="alm-pc-tit">Notas por confirmar <small>Quedan aquí hasta que Google confirma que las guardó</small></div>
+            ${almPC.map(x => { const [txt, cls] = est[x.estado] || est.guardando, n = x.nota, enviando = x.enviando;
+                return `<div class="alm-pc-fila ${cls}"><span class="alm-pc-est">${enviando && x.estado !== 'guardada' ? 'Enviando...' : txt}</span>
+                <span class="alm-pc-nota"><b>N° ${esc(x.numero || n.numero)}</b> · ${esc(n.cliente)} · $ ${fmt(n.total)} · ${n.detalle.length} renglón(es) <small>${esc(n.fecha === fechaLocalHoy() ? n.hora : fechaBonita(n.fecha) + ' ' + n.hora)}${x.yaEstaba ? ' · ya estaba guardada' : ''}</small>
+                    ${x.estado === 'dudosa' ? `<small>${esc(x.error && /5 horas/.test(x.error) ? x.error : 'Google no respondió: puede que sí se guardó. Se reintenta sola sin duplicarla.')}</small>` : x.estado === 'error' ? `<small>${esc(x.error)}</small>` : ''}</span>
+                <span class="alm-pc-acc">${x.estado === 'guardada' ? `<button type="button" class="btn-ghost btn-mini" onclick="almPCDescartar('${x.idem}')" title="Quitar de la lista">✕</button>`
+                    : `${enviando ? '' : `<button type="button" class="btn-primary btn-mini" onclick="almPCReintentar('${x.idem}')">${x.estado === 'error' ? 'Reintentar' : 'Reintentar ya'}</button>`}
+                       ${x.estado === 'error' || (x.estado === 'dudosa' && !enviando) ? `<button type="button" class="btn-ghost btn-mini" onclick="almPCCorregir('${x.idem}')">Corregir en la venta</button>` : ''}
+                       <button type="button" class="btn-ghost btn-mini" onclick="almImprimir('nota', almPCDe('${x.idem}').nota)">Imprimir</button>
+                       ${x.estado === 'error' ? `<button type="button" class="btn-eliminar btn-mini" onclick="almPCDescartar('${x.idem}')">Descartar</button>` : ''}`}</span></div>`; }).join('')}</div>`;
     }
     function almPreguntarImprimir(tipo, doc) {
         // La nota se imprime con la versión que guardó Google (si ya llegó)
@@ -12325,7 +12471,7 @@
             }
         });
     }
-    function almFacturarVista() { return almPosVista(almVenta, false); }
+    function almFacturarVista() { return almPCHTML() + almPosVista(almVenta, false); }
 
     // ---------- Guardado en segundo plano: se imprime y se sigue trabajando mientras Google guarda (en orden, sin repetir) ----------
     let almCola = Promise.resolve(), almGuardando = 0;
@@ -12399,9 +12545,9 @@
         const filtros = almFiltrosHTML(f, 'almNotas=null;almPintar()', extra, 'almNotasF');
         const acciones = `<div class="req-acciones alm-lista-acc"><button type="button" class="btn-ghost" onclick="almExportarNotas()">Exportar a Excel</button>
 </div>`;
-        if (!almNotas) return filtros + acciones + cargandoHTML('Cargando notas...');
+        if (!almNotas) return almPCHTML() + filtros + acciones + cargandoHTML('Cargando notas...');
         const l = almNotasFiltradas(), vig = l.filter(n => n.estado !== 'Anulada');
-        return filtros + acciones + `<div class="kpis"><div class="kpi"><div class="k-label">Notas</div><div class="k-value">${vig.length}</div><div class="k-label">${l.length - vig.length} anulada(s)</div></div>
+        return almPCHTML() + filtros + acciones + `<div class="kpis"><div class="kpi"><div class="k-label">Notas</div><div class="k-value">${vig.length}</div><div class="k-label">${l.length - vig.length} anulada(s)</div></div>
                 <div class="kpi"><div class="k-label">Total $</div><div class="k-value">${fmt(vig.reduce((s, n) => s + n.total, 0))}</div></div>
                 <div class="kpi amar"><div class="k-label">Por ingresar en tienda</div><div class="k-value">${vig.filter(n => n.condicion === 'Tienda' && !n.ingresada).length}</div></div>
                 <div class="kpi"><div class="k-label">Por verificar</div><div class="k-value">${vig.filter(n => !n.verificada).length}</div></div></div>
@@ -13483,7 +13629,7 @@ Reglas:
             <td class="prod"><b>${esc(o.descripcion)}</b><small>${o.codigo ? esc(o.codigo) : 'sin código'}${o.estado === 'Por definir precio' ? ' · POR DEFINIR PRECIO' : ''}</small></td>
             <td class="m">${cmpMon(o.costo)}</td><td class="m"><b>${cmpMon(o.detal)}</b></td>${conMayor ? `<td class="m">${o.mayor ? cmpMon(o.mayor) : '—'}</td>` : ''}
             ${tiendas.map(t => `<td class="c">${(o.dist[t] || {}).cant > 0 ? (f.tienda ? '' : `<small>${almCant(o.dist[t].cant, o.tipo)}</small>`) + caja(o, t, 'ingresado') + ' ' : ''}${caja(o, t, 'actualizado')}</td>`).join('')}</tr>`).join('');
-        const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Pendientes por actualizar${f.tienda ? ' · ' + esc(f.tienda) : ''}</title><style>
+        let html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Pendientes por actualizar${f.tienda ? ' · ' + esc(f.tienda) : ''}</title><style>
             @page{size:letter;margin:10mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
             body{margin:0;font-family:Arial,Helvetica,sans-serif;color:#0f172a;font-size:9.5pt}
             h1{font-size:13pt;margin:0}.sub{color:#475569;font-size:8.5pt;margin:1mm 0 3mm;border-bottom:.5mm solid #44AC00;padding-bottom:2mm}
@@ -13501,6 +13647,7 @@ Reglas:
                 ${tiendas.map(t => `<th class="c">${f.tienda ? 'Ingresó · Precio' : esc(CMP_SIGLA[t])}</th>`).join('')}</tr></thead><tbody>${filas}</tbody></table>
             <div class="pie">${f.tienda ? 'Tilde cada casilla al ingresar la mercancía y al cambiar el precio en el sistema de la tienda.' : 'En cada tienda: la primera casilla es "ingresó" (solo si recibe mercancía) y la segunda "precio actualizado".'} ✓ = ya marcado en el sistema.</div>
             <div class="firma"><div>Actualizado por</div><div>Revisado por</div></div></body></html>`;
+        html = mediaCarta(html);
         let fr = document.getElementById('almImprimeMarco'); if (fr) fr.remove();
         fr = document.createElement('iframe'); fr.id = 'almImprimeMarco'; fr.setAttribute('aria-hidden', 'true');
         fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
@@ -13649,7 +13796,7 @@ Reglas:
         } catch (e) { mostrarBanner('No se pudo hacer el PDF: ' + e.message, 'error'); }
     }    function cmpDistImprimir(numero) {
         const c = (cmpCompras || []).find(x => x.numero === numero); if (!c) return;
-        const html = cmpDistribucionHTML(c, false);
+        const html = mediaCarta(cmpDistribucionHTML(c, false));
         let fr = document.getElementById('almImprimeMarco'); if (fr) fr.remove();
         fr = document.createElement('iframe'); fr.id = 'almImprimeMarco'; fr.setAttribute('aria-hidden', 'true');
         fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
@@ -14383,6 +14530,14 @@ Reglas:
 
     // ---------- Impresión a media carta (nota de entrega y comprobante de ingreso) ----------
     // copia: en la misma impresión sale una segunda hoja igual, marcada "COPIA"
+    // Impresiones en MEDIA CARTA (8,5 × 5,5 pulgadas, horizontal): el contenido es el mismo de siempre, solo cambia la hoja.
+    // Lo que no cabe sigue en otra media carta (los títulos de la tabla se repiten y ningún renglón se parte), con "Hoja X de Y" abajo.
+    // escala: lo que antes salía en carta horizontal (11 pulgadas de ancho) se reduce para que entre igual en 8,5.
+    function mediaCarta(html, escala) {
+        const hoja = '@page{size:8.5in 5.5in;margin:7mm 8mm 9mm;@bottom-right{content:"Hoja " counter(page) " de " counter(pages);font:7pt Arial,sans-serif;color:#64748b}}'
+            + 'thead{display:table-header-group}tr{break-inside:avoid;page-break-inside:avoid}h1,h2,h3{break-after:avoid}' + (escala ? `@media print{body{zoom:${escala}}}` : '');
+        return /@page\s*\{[^}]*\}/.test(html) ? html.replace(/@page\s*\{[^}]*\}/, hoja) : html.replace('</style>', hoja + '</style>');
+    }
     function almImprimir(tipo, d, copia) {
         if (!d) return;
         let html = almDocumentoHTML(tipo, d);
