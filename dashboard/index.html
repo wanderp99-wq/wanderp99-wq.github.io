@@ -515,6 +515,13 @@
         @keyframes carga-gira { to { transform: rotate(360deg); } }
         @media (prefers-reduced-motion: reduce) { .cuadros, .carga-anillo::after { animation-duration: 2.5s; } }
         .btn-cargando { display: inline-flex; align-items: center; gap: .5rem; }
+        /* Aviso flotante: abajo a la derecha (en el teléfono, arriba: abajo están las barras de guardar). No recibe clics. */
+        .carga-flotante { position: fixed; right: 16px; bottom: 16px; z-index: 1003; pointer-events: none; opacity: 0; visibility: hidden; transform: translateY(10px);
+                          transition: opacity .2s, transform .2s, visibility .2s; }
+        .carga-flotante.ver { opacity: 1; visibility: visible; transform: none; }
+        .carga-flotante .carga-tarjeta { box-shadow: 0 10px 30px rgba(15, 23, 42, .18); }
+        .carga-flotante .carga-texto b { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        @media (max-width: 640px) { .carga-flotante { left: 16px; right: 16px; top: 12px; bottom: auto; transform: translateY(-10px); } .carga-flotante .carga-tarjeta { display: flex; } }
         .ocupado { display: inline-flex; align-items: center; gap: .4rem; font-size: .78rem; color: var(--text-muted); white-space: nowrap; }
         #pagCTabla tr.reciente td { background: var(--ok-bg); transition: background 1.5s; }
         .chip.st-posible { color: #7c3aed; background: rgba(124, 58, 237, .13); }
@@ -2960,6 +2967,40 @@
         btn.disabled = true;
         btn.innerHTML = `<span class="btn-cargando">${iconoCargando()}<span>${esc(texto)}</span></span>`;
     }
+
+    // ---------- Aviso flotante "Cargando" con el logo (como en las Utilidades de BigSoft) ----------
+    // Sale solo, sin tocar ningún módulo: mientras en pantalla haya algo trabajando (el anillo pequeño de un botón, aviso o
+    // "Guardando", o un botón desactivado que dice "Guardando...", "Leyendo..."). Sale a los 0,4 s (lo rápido no parpadea),
+    // no tapa clics ni bloquea: se puede seguir usando el panel. Se va solo cuando ya nada está trabajando.
+    (function () {
+        const PALABRAS = /^(guardando|cargando|leyendo|enviando|buscando|procesando|actualizando|subiendo|generando|calculando|registrando|borrando|eliminando|anulando|verificando|consultando|preparando|descargando|importando|exportando|aplicando|creando|marcando|pagando|cerrando)\b/i;
+        let caja = null, desde = 0, programado = false;
+        const visible = el => el.offsetParent !== null || getComputedStyle(el).position === 'fixed';
+        function trabajando() {
+            for (const el of document.querySelectorAll('.cuadros')) {
+                if (!visible(el)) continue;
+                const t = (el.closest('.btn-cargando, .ocupado, button, .banner') || el.parentElement).textContent;
+                return t.replace(/\s+/g, ' ').trim() || 'Cargando...';
+            }
+            for (const b of document.querySelectorAll('button:disabled')) { const t = b.textContent.replace(/\s+/g, ' ').trim(); if (PALABRAS.test(t) && visible(b)) return t; }
+            return null;
+        }
+        function revisar() {
+            programado = false;
+            const t = trabajando();
+            if (t == null) { desde = 0; if (caja && caja.classList.contains('ver')) caja.classList.remove('ver'); return; }
+            if (!caja) {
+                caja = document.createElement('div'); caja.className = 'carga-flotante'; caja.setAttribute('role', 'status'); caja.setAttribute('aria-live', 'polite');
+                caja.innerHTML = `<div class="carga-tarjeta">${iconoCargando(true)}<span class="carga-texto"><b></b><small>Un momento, por favor</small></span></div>`;
+                document.body.appendChild(caja);
+            }
+            const b = caja.querySelector('b'), texto = t.length > 70 ? t.slice(0, 69) + '…' : t;
+            if (b.textContent !== texto) b.textContent = texto;   // solo si cambió (si no, se observaría a sí mismo sin parar)
+            if (!desde) { desde = Date.now(); setTimeout(() => { if (desde && trabajando() != null) caja.classList.add('ver'); }, 400); }
+        }
+        const programar = () => { if (!programado) { programado = true; setTimeout(revisar, 60); } };
+        new MutationObserver(programar).observe(document.documentElement, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['disabled', 'class', 'style'] });
+    })();
 
     // ---------- Filtros de selección múltiple ----------
     // <div class="ms" id="..." data-todos="Todas"></div>. Sin nada marcado = todos.
