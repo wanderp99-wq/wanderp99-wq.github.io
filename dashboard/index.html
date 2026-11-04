@@ -499,19 +499,22 @@
         .pag-cands label { display: flex; gap: 0.5rem; align-items: flex-start; margin: 0; color: var(--text-main); font-size: 0.88rem; cursor: pointer; }
         .pag-cands input { width: auto; margin-top: 0.2rem; }
         .input-admin { max-width: 200px; }
-        /* Icono "pensando": cuadritos que se encogen y vuelven en cadena */
-        .cuadros { display: inline-grid; grid-template-columns: repeat(3, 5px); gap: 2px; vertical-align: middle; }
-        .cuadros i { width: 5px; height: 5px; background: var(--accent, #2563eb); border-radius: 1px; animation: cuadro 1.3s infinite ease-in-out; }
-        .cuadros.grande { grid-template-columns: repeat(3, 10px); gap: 3px; }
-        .cuadros.grande i { width: 10px; height: 10px; border-radius: 2px; }
-        .cuadros i:nth-child(1) { animation-delay: .2s; } .cuadros i:nth-child(2) { animation-delay: .3s; } .cuadros i:nth-child(3) { animation-delay: .4s; }
-        .cuadros i:nth-child(4) { animation-delay: .1s; } .cuadros i:nth-child(5) { animation-delay: .2s; } .cuadros i:nth-child(6) { animation-delay: .3s; }
-        .cuadros i:nth-child(7) { animation-delay: 0s; }  .cuadros i:nth-child(8) { animation-delay: .1s; } .cuadros i:nth-child(9) { animation-delay: .2s; }
-        @keyframes cuadro { 0%, 70%, 100% { transform: scale(1); opacity: 1; } 35% { transform: scale(0); opacity: .25; } }
-        @media (prefers-reduced-motion: reduce) { .cuadros i { animation-duration: 3s; } }
-        .cargando { display: flex; flex-direction: column; align-items: center; gap: .75rem; }
+        /* Icono de carga (igual al de las Utilidades de BigSoft): anillo naranja que gira; en tablas y secciones, tarjeta con el logo */
+        .cuadros { display: inline-block; width: 14px; height: 14px; box-sizing: border-box; border-radius: 50%; border: 2px solid color-mix(in srgb, currentColor 20%, transparent);
+                   border-top-color: var(--carga, #ff4000); border-right-color: var(--carga, #ff4000); animation: carga-gira .8s linear infinite; vertical-align: middle; flex: 0 0 auto; }
+        button .cuadros, .banner .cuadros { --carga: currentColor; }
+        .cargando { display: flex; justify-content: center; border: 0; padding: 1.25rem .5rem; }
+        .carga-tarjeta { display: inline-flex; align-items: center; gap: 1rem; padding: .9rem 1.5rem .9rem .9rem; text-align: left; max-width: 100%;
+                         background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 1px 3px rgba(15, 23, 42, .06); }
+        .carga-anillo { position: relative; width: 58px; height: 58px; flex: 0 0 auto; }
+        .carga-anillo::before, .carga-anillo::after { content: ''; position: absolute; inset: 0; border-radius: 50%; border: 4px solid var(--border); opacity: .55; }
+        .carga-anillo::after { opacity: 1; border-color: transparent; border-top-color: #ff4000; border-right-color: #ff4000; animation: carga-gira 1s linear infinite; }
+        .carga-anillo img { position: absolute; left: 13px; top: 13px; width: 32px; height: 32px; }
+        .carga-texto b { display: block; font-size: 1rem; font-weight: 600; color: var(--text-main); }
+        .carga-texto small { display: block; font-size: .8rem; color: var(--text-muted); margin-top: .15rem; }
+        @keyframes carga-gira { to { transform: rotate(360deg); } }
+        @media (prefers-reduced-motion: reduce) { .cuadros, .carga-anillo::after { animation-duration: 2.5s; } }
         .btn-cargando { display: inline-flex; align-items: center; gap: .5rem; }
-        button .cuadros i, .banner .cuadros i { background: currentColor; }
         .ocupado { display: inline-flex; align-items: center; gap: .4rem; font-size: .78rem; color: var(--text-muted); white-space: nowrap; }
         #pagCTabla tr.reciente td { background: var(--ok-bg); transition: background 1.5s; }
         .chip.st-posible { color: #7c3aed; background: rgba(124, 58, 237, .13); }
@@ -2947,9 +2950,10 @@
     });
 
     // ---------- Icono de carga (cuadritos "pensando"), igual en todos los módulos ----------
-    const iconoCargando = grande => `<span class="cuadros${grande ? ' grande' : ''}" aria-hidden="true">${'<i></i>'.repeat(9)}</span>`;
-    // Recuadro "cargando" para una tabla o sección
-    const cargandoHTML = texto => `<div class="empty cargando">${iconoCargando(true)}<span>${esc(texto)}</span></div>`;
+    const logoCarga = () => (document.querySelector('link[rel="icon"]') || {}).href || '';
+    const iconoCargando = grande => grande ? `<span class="carga-anillo" aria-hidden="true"><img src="${esc(logoCarga())}" alt=""></span>` : '<span class="cuadros" aria-hidden="true"></span>';
+    // Recuadro "cargando" para una tabla o sección: tarjeta con el logo girando, el texto de cada módulo y "Un momento, por favor"
+    const cargandoHTML = texto => `<div class="empty cargando" role="status"><div class="carga-tarjeta">${iconoCargando(true)}<span class="carga-texto"><b>${esc(texto)}</b><small>Un momento, por favor</small></span></div></div>`;
     // Botón ocupado: icono + texto (al terminar, cada función le devuelve su texto normal)
     function btnCargando(btn, texto) {
         if (!btn) return;
