@@ -515,6 +515,9 @@
         @keyframes carga-gira { to { transform: rotate(360deg); } }
         @media (prefers-reduced-motion: reduce) { .cuadros, .carga-anillo::after { animation-duration: 2.5s; } }
         .btn-cargando { display: inline-flex; align-items: center; gap: .5rem; }
+        /* Almacén: se ve en mayúsculas mientras el teclado de la tablet compone la palabra (el texto se pasa a mayúsculas al terminarla) */
+        #almContenido input[type=text]:not([inputmode=decimal]), #almContenido input[type=search], #almDlg input[type=text]:not([inputmode=decimal]), #almDlg input[type=search] { text-transform: uppercase; }
+        #almContenido input::placeholder, #almDlg input::placeholder { text-transform: none; }
         /* Aviso flotante: abajo a la derecha (en el teléfono, arriba: abajo están las barras de guardar). No recibe clics. */
         .carga-flotante { position: fixed; right: 16px; bottom: 16px; z-index: 1003; pointer-events: none; opacity: 0; visibility: hidden; transform: translateY(10px);
                           transition: opacity .2s, transform .2s, visibility .2s; }
@@ -3442,7 +3445,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-04.1';
+    const VERSION_SERVIDOR = '2026-11-05.1';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -11640,15 +11643,28 @@
         if (!almDlgAbierta()) almEnfocar();
     }
     // En el Almacén todo se escribe en mayúsculas (códigos, descripciones, proveedores, clientes, notas). El cursor no se mueve.
-    document.addEventListener('input', e => {
-        const el = e.target;
-        if (!el || el.tagName !== 'INPUT' || el._num || !/^(text|search|tel)$/.test(el.type) || !el.closest('#almContenido, #almDlg')) return;
+    // En la tablet / teléfono (también con teclado externo) el teclado va "componiendo" la palabra: si se cambia el texto mientras
+    // compone, repite letras ("jamon" salía "JAJAMJAMO"). Entonces: mientras compone solo se VE en mayúsculas (CSS) y el texto se
+    // pasa a mayúsculas al terminar la palabra (compositionend). Con teclado de PC no hay composición y se hace al instante.
+    const almMayus = el => !!el && el.tagName === 'INPUT' && !el._num && /^(text|search|tel)$/.test(el.type) && !!el.closest('#almContenido, #almDlg');
+    function almAMayusculas(el) {
         const v = el.value, m = v.toUpperCase();
         if (v === m) return;
         const a = el.selectionStart, b = el.selectionEnd;
         el.value = m;
         try { el.setSelectionRange(a, b); } catch (x) {}
         if (el.id === 'almCod') almCodTexto = m;
+    }
+    document.addEventListener('input', e => {
+        const el = e.target;
+        if (!almMayus(el) || e.isComposing || e.inputType === 'insertCompositionText') return;
+        almAMayusculas(el);
+    }, true);
+    document.addEventListener('compositionend', e => {
+        const el = e.target;
+        if (!almMayus(el)) return;
+        // después de que el teclado entregue la palabra (y después de los oninput de cada campo)
+        setTimeout(() => { almAMayusculas(el); el.dispatchEvent(new Event('input', { bubbles: true })); }, 0);
     }, true);
     // Enter en un campo de un formulario con data-enter: pasa al siguiente; en el último, guarda
     document.addEventListener('keydown', e => {
@@ -13101,11 +13117,51 @@ Reglas:
             <div class="grafico-card"><div class="grafico-head"><h3>Compras recientes</h3></div>
                 ${!ultimas ? cargandoHTML('Cargando compras...') : !ultimas.length ? '<div class="empty">Todavía no hay compras registradas con foto.</div>'
                 : `<div class="tabla-wrap"><table class="req-tabla cmp-lista"><thead><tr><th class="izq">N°</th><th class="izq">Fecha</th><th class="izq">Proveedor · factura</th><th>Renglones</th><th>Costo $</th><th class="izq">Notas a tiendas</th><th class="izq">Quedó en almacén</th><th class="izq">Libro de compras</th><th></th></tr></thead><tbody>
-                    ${ultimas.map(c => `<tr><td class="izq"><b>${esc(c.numero)}</b></td><td class="izq">${fechaBonita(c.fecha)} <small>${esc(c.hora)}</small></td><td class="izq">${esc(c.proveedor)}<small>Factura ${esc(c.factura || 's/n')} · ${esc(c.usuario)}</small></td>
+                    ${ultimas.map(c => `<tr${c.anulada ? ' style="opacity:.55"' : ''}><td class="izq"><b>${esc(c.numero)}</b>${c.anulada ? `<small><span class="chip st-falta" title="${esc(c.anulada)}">ANULADA</span></small>` : ''}</td><td class="izq">${fechaBonita(c.fecha)} <small>${esc(c.hora)}</small></td><td class="izq">${esc(c.proveedor)}<small>Factura ${esc(c.factura || 's/n')} · ${esc(c.usuario)}</small></td>
                         <td data-l="Renglones">${c.renglones}</td><td data-l="Costo $">${fmt(c.total)}</td><td class="izq" data-l="Notas a tiendas"><small>${Object.keys(c.notas).map(k => esc(CMP_SIGLA[k] || k) + ' ' + esc(c.notas[k])).join(' · ') || '—'}</small></td>
                         <td class="izq" data-l="Quedó en almacén"><small>${Object.keys(c.queda).map(k => { const p = almProducto(k); return esc(p ? p.descripcion : k) + ': ' + almCant(c.queda[k], p && p.tipo) + ' ' + almUnidad(p && p.tipo); }).join('<br>') || 'Nada'}</small></td>
-                        <td class="izq" data-l="Libro de compras"><small${/^No se pudo/.test(c.libro || '') ? ' style="color:var(--danger)"' : ''}>${esc(c.libro || '—')}</small></td>
-                        <td class="cmp-lista-bt" style="white-space:nowrap">${(c.detalle || []).length ? `<button type="button" class="btn-ghost btn-mini" title="Imprimir cuánto va a cada tienda" onclick="cmpImprimirDistribucion('${esc(c.numero)}')">${ico('imprimir')}Distribución</button> ` : ''}${c.fotos.map((u, i) => `<a class="btn-ghost btn-mini" href="${esc(u)}" target="_blank" rel="noopener">Foto${c.fotos.length > 1 ? ' ' + (i + 1) : ''}</a>`).join(' ')}</td></tr>`).join('')}</tbody></table></div>`}</div>`;
+                        <td class="izq" data-l="Libro de compras">${/^Anotándose/.test(c.libro || '') && !c.anulada
+                            ? `<small>Falta anotarla</small> <button type="button" class="btn-ghost btn-mini" title="Se cerró el panel antes de terminar de anotarla" onclick="cmpAnotarLibro('${esc(c.numero)}', this)">Anotar en el libro</button>`
+                            : `<small${/^No se pudo/.test(c.libro || '') ? ' style="color:var(--danger)"' : ''}>${esc(c.libro || '—')}</small>`}</td>
+                        <td class="cmp-lista-bt" style="white-space:nowrap">${(c.detalle || []).length ? `<button type="button" class="btn-ghost btn-mini" title="Imprimir cuánto va a cada tienda" onclick="cmpImprimirDistribucion('${esc(c.numero)}')">${ico('imprimir')}Distribución</button> ` : ''}${c.fotos.map((u, i) => `<a class="btn-ghost btn-mini" href="${esc(u)}" target="_blank" rel="noopener">Foto${c.fotos.length > 1 ? ' ' + (i + 1) : ''}</a>`).join(' ')}${c.anulada ? '' : ` <button type="button" class="btn-ghost btn-mini" style="color:var(--danger)" title="Anular esta compra (registrada dos veces o por error)" onclick="cmpAnularCompra('${esc(c.numero)}')">Anular</button>`}</td></tr>`).join('')}</tbody></table></div>`}</div>`;
+    }
+    // Compra guardada cuyo Libro de compras quedó sin anotar (se cerró el panel antes): se anota con la tasa BCV de hoy
+    async function cmpAnotarLibro(numero, btn) {
+        btnCargando(btn, 'Anotando...');
+        try {
+            const t = cmpTasa() || 0;
+            const x = await llamarApi({ action: 'cmp_libro', compra: numero, tasa: t, tasaFactura: t });
+            mostrarBanner(x.libro ? `Compra ${numero} anotada en el Libro de compras: pestaña ${x.libro.hoja}, NRO ${x.libro.nro}.` : x.yaAnotada ? `Ya estaba anotada: ${x.yaAnotada}.` : (x.avisoLibro || 'No se pudo anotar.'), x.libro || x.yaAnotada ? 'ok' : 'error');
+        } catch (e) { mostrarBanner('No se pudo anotar en el Libro de compras: ' + e.message, 'error'); }
+        cmpCompras = null; almPintar();
+    }
+    // ---------- Anular una compra (registrada dos veces o por error), con la clave de administrador ----------
+    function cmpAnularCompra(numero) {
+        const c = (cmpCompras || []).find(x => x.numero === numero); if (!c) return;
+        const notas = Object.keys(c.notas || {}).map(k => (CMP_SIGLA[k] || k) + ' ' + c.notas[k]);
+        almVentana(`<form class="req-dlg" data-enter onsubmit="cmpAnularCompraListo(event, '${esc(numero)}')"><h3>Anular compra N° ${esc(numero)}</h3>
+            <div class="req-sub">${esc(c.proveedor)} · factura ${esc(c.factura || 's/n')} · ${c.renglones} renglón(es) · $ ${fmt(c.total)}</div>
+            <div class="nota" style="margin-top:0">Al anularla:<br>· ${notas.length ? 'Se anulan sus notas a las tiendas (' + esc(notas.join(', ')) + '): la mercancía vuelve al almacén y se rebaja el gasto de cada tienda.' : 'No tiene notas a tiendas.'}
+                <br>· ${c.operacion ? 'Sale del almacén lo que entró con la operación ' + esc(c.operacion) + ' (y el costo vuelve al anterior si nadie lo cambió después).' : 'No entró nada al almacén.'}
+                <br>· Sus órdenes de precio dejan de estar pendientes en las tiendas.
+                ${/^Pestaña /.test(c.libro || '') ? `<br>· El Libro de compras NO se toca: borre a mano ${esc(c.libro)}.` : ''}</div>
+            <label for="cmpAnMot">Motivo</label><input type="text" id="cmpAnMot" autocomplete="off" maxlength="150" required autofocus placeholder="Ej.: se registró dos veces (es la misma que la compra ...)">
+            <label for="cmpAnClave">Clave de administrador</label><input type="password" id="cmpAnClave" autocomplete="off" required>
+            <div class="login-error" id="cmpAnError"></div>
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-ghost" onclick="almCerrar()">Cancelar</button><button type="submit" class="btn-eliminar" id="cmpAnBtn">Anular compra</button></div></form>`);
+    }
+    async function cmpAnularCompraListo(ev, numero) {
+        ev.preventDefault();
+        const btn = document.getElementById('cmpAnBtn');
+        btnCargando(btn, 'Anulando...');
+        try {
+            const r = await llamarApi({ action: 'cmp_anular', numero, motivo: document.getElementById('cmpAnMot').value.trim(), claveAdmin: document.getElementById('cmpAnClave').value });
+            almCerrar();
+            cmpCompras = r.compras || null; almNotas = null; almIngresos = null; almTiendas = null; cmpOrd = null;
+            almCargar();
+            mostrarBanner(`Compra ${numero} anulada.` + (r.notas.length ? ` Notas anuladas: ${r.notas.join(', ')}.` : '') + (r.ingreso ? ` La operación ${r.ingreso} salió del almacén.` : '') + (r.ordenes ? ` ${r.ordenes} orden(es) de precio quitadas.` : '')
+                + (r.avisos.length ? '\nRevise: ' + r.avisos.join(' ') : ''), r.avisos.length ? 'warn' : 'ok');
+        } catch (e) { document.getElementById('cmpAnError').textContent = e.message; btn.disabled = false; btn.textContent = 'Anular compra'; }
     }
     async function cmpCargarCompras() {
         cmpCompras = [];   // mientras carga no se vuelve a pedir
@@ -13510,11 +13566,28 @@ Reglas:
         clearTimeout(cmpAvanceEspera);
         if (cmpFotosPromesa) { btn.textContent = 'Guardando las fotos...'; await cmpFotosPromesa; btn.textContent = 'Guardando...'; }   // que la compra lleve sus fotos
         while (cmpAvanceEnviando) await new Promise(r => setTimeout(r, 200));   // que termine el guardado del avance (si no, podría volver a crearla en curso)
-        try {
-            const r = await llamarApi({ action: 'cmp_guardar', tgEquipo: true, fiscal: !!cmp.fiscal, borradorId: cmp.borradorId || '', proveedorId: cmp.proveedorId, factura: cmp.factura.trim(), fechaFactura: cmp.fechaFactura, tasa: cmpTasaCompra(), fotos: cmp.enlaces,
+        // Un mismo identificador para esta compra en cada intento: si Google tardó y dio error pero sí la guardó, el reintento NO la
+        // repite (05/11: una factura entró dos veces). Además Google no acepta la misma factura del mismo proveedor dos veces.
+        cmp.idemGuardar = cmp.idemGuardar || nuevoIdem();
+        const pedido = { action: 'cmp_guardar', idem: cmp.idemGuardar, libroAparte: true, tgEquipo: true, fiscal: !!cmp.fiscal, borradorId: cmp.borradorId || '', proveedorId: cmp.proveedorId, factura: cmp.factura.trim(), fechaFactura: cmp.fechaFactura, tasa: cmpTasaCompra(), fotos: cmp.enlaces,
                 tasaFactura: cmpTasaCompra(),
                 lineas: lineas.map(l => ({ codigo: l.codigo, descripcion: cmpProd(l).descripcion, categoria: cmpProd(l).categoria, claveProveedor: l.claveProveedor, cantidad: l.cantidad, costo: l.costo, merma: l.merma, margenDetal: l.margenDetal, detal: l.detal,
-                                           margenMayor: l.margenMayor, mayor: l.mayor, dist: l.dist })) });
+                                           margenMayor: l.margenMayor, mayor: l.mayor, dist: l.dist })) };
+        try {
+            let r;
+            try { r = await llamarApi(pedido); }
+            catch (e) {
+                // La misma factura de este proveedor ya está registrada: solo se guarda otra vez si es OTRA factura con el mismo número
+                if (!/^FACTURA_REPETIDA/.test(e.message || '')) throw e;
+                const txt = e.message.replace(/^FACTURA_REPETIDA:\s*/, '');
+                if (!confirm(txt + '\n\nSi es la MISMA factura, pulse Cancelar (ya está guardada; véala en Compras recientes).\nSi es OTRA factura distinta con el mismo número, pulse Aceptar para registrarla.')) {
+                    err.textContent = txt; btn.disabled = false; btn.textContent = 'Guardar compra y emitir notas'; cmpCompras = null; return;
+                }
+                cmp.idemGuardar = nuevoIdem();
+                r = await llamarApi(Object.assign({}, pedido, { idem: cmp.idemGuardar, repetidaOk: true }));
+            }
+            // Google ya la había guardado con este mismo intento (no respondió a tiempo la primera vez): no se repitió
+            if (r.yaRegistrado) r = { compra: '', yaRegistrado: true, notas: [], ordenes: [], queda: {} };
             almAplicarCambios(r.cambios);
             if (r.proximoIngreso) almDatos.proximoIngreso = r.proximoIngreso;
             // Cada nota va al grupo "Control de depósito": este equipo manda su imagen enseguida (o Google la envía; si Telegram falla, la reintenta solo)
@@ -13526,11 +13599,22 @@ Reglas:
                 });
             });
             almNotas = null; almIngresos = null; almTiendas = null; cmpCompras = null; cmpOrd = null;
-            Object.assign(cmp, { paso: 'listo', resultado: r, fotos: [], borradorId: null, borradorVer: '' });
+            Object.assign(cmp, { paso: 'listo', resultado: r, fotos: [], borradorId: null, borradorVer: '', idemGuardar: null });
             cmpAvanceEstado = '';   // "Compras en curso" se vuelve a leer con las compras (cmpCompras = null)
             cmpPintarCompra(document.getElementById('almContenido'), true);
             almCargar();
-        } catch (e) { err.textContent = e.message; btn.disabled = false; btn.textContent = 'Guardar compra y emitir notas'; }
+            // El Libro de compras, aparte y en segundo plano: la compra ya está guardada y se puede seguir trabajando
+            if (r.libroPendiente && r.compra) {
+                const repintar = () => { if (almTab === 'compra' && cmp.paso === 'listo' && cmp.resultado === r) cmpPintarCompra(document.getElementById('almContenido'), true); };
+                llamarApi({ action: 'cmp_libro', compra: r.compra, tasa: pedido.tasa, tasaFactura: pedido.tasaFactura })
+                    .then(x => { r.libro = x.libro || null; r.avisoLibro = x.libro ? '' : (x.avisoLibro || (x.yaAnotada ? '' : 'No se pudo anotar en el Libro de compras')); if (x.yaAnotada) r.libroYa = x.yaAnotada; })
+                    .catch(e => { r.avisoLibro = 'No se pudo anotar en el Libro de compras: ' + e.message; })
+                    .finally(() => { r.libroPendiente = false; cmpCompras = null; repintar(); });
+            }
+        } catch (e) {
+            err.textContent = e.message + (e.sinRespuesta ? ' Puede pulsar Guardar otra vez: si ya se había guardado, NO se repite.' : '');
+            btn.disabled = false; btn.textContent = 'Guardar compra y emitir notas';
+        }
     }
     // Estado del envío que hizo Google al guardar cada nota
     const cmpTelegramEstado = n => n._tg === 'ok' ? '<span class="chip st-ok">✓ Enviada a Telegram</span>'
@@ -13540,8 +13624,11 @@ Reglas:
         const r = cmp.resultado || {};
         return `<div class="grafico-card">
             <h3 style="margin-top:0;color:#3a9400">✓ Compra ${esc(r.compra || '')} guardada</h3>
+            ${r.yaRegistrado ? `<div class="banner ok" style="display:block">Esta compra ya se había guardado: Google la registró aunque no respondió a tiempo la primera vez. No se repitió. Véala en "Compras recientes".</div>` : ''}
             <div class="nota" style="margin-top:0">${r.ingreso ? `Entró al almacén con la operación de inventario N° ${esc(r.ingreso.numero)}. ` : ''}${(r.ordenes || []).length} orden(es) de actualización en "Precios en tiendas".</div>
-            ${r.libro ? `<div class="banner ok" style="display:block">✓ Anotada en el Libro de compras 2026: pestaña <b>${esc(r.libro.hoja)}</b>, NRO <b>${esc(r.libro.nro)}</b>, ${r.libro.desde ? `filas <b>${r.libro.desde}${r.libro.hasta > r.libro.desde ? ' a ' + r.libro.hasta : ''}</b> ` : ''}(${r.libro.renglones} renglón(es)).</div>`
+            ${r.libroPendiente ? `<div class="banner" style="display:flex"><span class="btn-cargando">${iconoCargando()}<span>Anotándola en el Libro de compras... (puede seguir trabajando)</span></span></div>`
+              : r.libroYa ? `<div class="banner ok" style="display:block">✓ Ya estaba anotada en el Libro de compras: ${esc(r.libroYa)}.</div>`
+              : r.libro ? `<div class="banner ok" style="display:block">✓ Anotada en el Libro de compras 2026: pestaña <b>${esc(r.libro.hoja)}</b>, NRO <b>${esc(r.libro.nro)}</b>, ${r.libro.desde ? `filas <b>${r.libro.desde}${r.libro.hasta > r.libro.desde ? ' a ' + r.libro.hasta : ''}</b> ` : ''}(${r.libro.renglones} renglón(es)).</div>`
               : r.avisoLibro ? `<div class="banner error" style="display:block">La compra quedó guardada, pero ${esc(r.avisoLibro.replace(/^No se pudo/, 'no se pudo'))}. Anótela a mano en el Libro de compras.</div>` : ''}
             ${(() => { const ns = r.notas || [], ok = ns.filter(n => n._tg === 'ok').length;
                 return ns.length && ok === ns.length ? `<div class="banner ok" style="display:block">✓ Las ${ns.length} nota(s) se enviaron al grupo "Control de depósito".</div>` : ''; })()}
@@ -14575,12 +14662,16 @@ Reglas:
 
     // ---------- Impresión a media carta (nota de entrega y comprobante de ingreso) ----------
     // copia: en la misma impresión sale una segunda hoja igual, marcada "COPIA"
-    // Impresiones en MEDIA CARTA (8,5 × 5,5 pulgadas, horizontal): el contenido es el mismo de siempre, solo cambia la hoja.
+    // Impresiones en MEDIA CARTA VERTICAL (5,5 × 8,5 pulgadas, como las notas de entrega): la impresora de la oficina toma la media
+    // carta parada; en horizontal cortaba el lado izquierdo (05/11: la distribución salía sin #, código ni producto).
+    // El contenido es el mismo de siempre, reducido para que quepa a lo ancho (los nombres largos bajan a otra línea).
     // Lo que no cabe sigue en otra media carta (los títulos de la tabla se repiten y ningún renglón se parte), con "Hoja X de Y" abajo.
-    // escala: lo que antes salía en carta horizontal (11 pulgadas de ancho) se reduce para que entre igual en 8,5.
+    // escala: lo que antes salía en carta horizontal (11 pulgadas de ancho) va más reducido (nómina, horarios).
     function mediaCarta(html, escala) {
-        const hoja = '@page{size:8.5in 5.5in;margin:7mm 8mm 9mm;@bottom-right{content:"Hoja " counter(page) " de " counter(pages);font:7pt Arial,sans-serif;color:#64748b}}'
-            + 'thead{display:table-header-group}tr{break-inside:avoid;page-break-inside:avoid}h1,h2,h3{break-after:avoid}' + (escala ? `@media print{body{zoom:${escala}}}` : '');
+        const zoom = escala ? Math.round(escala * 0.78 * 100) / 100 : 0.8;
+        const hoja = '@page{size:5.5in 8.5in;margin:7mm 6mm 9mm;@bottom-right{content:"Hoja " counter(page) " de " counter(pages);font:7pt Arial,sans-serif;color:#64748b}}'
+            + 'thead{display:table-header-group}tr{break-inside:avoid;page-break-inside:avoid}h1,h2,h3{break-after:avoid}'
+            + `@media print{body{zoom:${zoom}}td,th{overflow-wrap:anywhere}}`;
         return /@page\s*\{[^}]*\}/.test(html) ? html.replace(/@page\s*\{[^}]*\}/, hoja) : html.replace('</style>', hoja + '</style>');
     }
     function almImprimir(tipo, d, copia) {
