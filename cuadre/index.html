@@ -12,9 +12,10 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%22400%20380%201130%201175%22%3E%3Cpath%20fill%3D%22%23F2EEE8%22%20stroke%3D%22%239c958a%22%20stroke-width%3D%2228%22%20d%3D%22M423%20398%20H950%20C1230%20398%201400%20560%201450%20788%20L1115%20952%20C1110%20790%201075%20655%20870%20655%20H773%20V1193%20L423%201365%20Z%22%2F%3E%3Cpath%20fill%3D%22%2344AC00%22%20d%3D%22M423%201365%20L1508%20834%20V865%20L658%201533%20H423%20Z%22%2F%3E%3Cpath%20fill%3D%22%23FF3D00%22%20d%3D%22M820%201533%20L1465%201026%20C1460%201140%201448%201225%201420%201295%20C1360%201440%201250%201490%201160%201505%20C1090%201522%201020%201533%20950%201533%20Z%22%2F%3E%3C%2Fsvg%3E">
-    <!-- Librerías para generar el PDF de la ficha (texto nítido, legible en el teléfono) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <!-- Librerías para generar el PDF de la ficha (texto nítido, legible en el teléfono). "defer": se bajan al abrir (así sirven
+         aunque después se vaya el internet) pero ya no detienen la pantalla mientras bajan -->
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
     <style>
         :root {
             --bg-color: #1e293b; /* Fondo general en gris oscuro */
@@ -207,6 +208,12 @@
             font-weight: 500;
             font-size: 0.875rem;
         }
+        /* Respuesta al tocar: el botón se hunde un poco; sin destello azul ni zoom por doble toque; foco visible con teclado */
+        button, a, select, label.interruptor { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+        button { transition: transform .08s ease, filter .15s ease, background-color .15s ease, border-color .15s ease; }
+        button:not(:disabled):active { transform: scale(.97); filter: brightness(.93); }
+        button:focus-visible, a:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+        @media (prefers-reduced-motion: reduce) { button { transition: none; } button:not(:disabled):active { transform: none; } }
         .btn-add { background: var(--primary); color: white; margin-top: 0.5rem; }
         .btn-remove { background: var(--danger); color: white; flex: 0 0 auto !important; min-width: 40px !important; padding: 0.6rem; }
         .btn-submit { background: #10b981; color: white; width: 100%; padding: 1rem; font-size: 1rem; margin-top: 2rem; }
@@ -452,12 +459,23 @@
         const pedir = r => new Promise((ok, mal) => { r.onsuccess = () => ok(r.result); r.onerror = () => mal(r.error); });
         function abrir() {
             if (!bd) bd = new Promise(ok => {
-                try { const r = indexedDB.open(BD, 1); r.onupgradeneeded = () => r.result.createObjectStore(ALM, { keyPath: 'idem' }); r.onsuccess = () => ok(r.result); r.onerror = () => ok(null); }
-                catch (e) { ok(null); }
+                try {
+                    const r = indexedDB.open(BD, 1);
+                    r.onupgradeneeded = () => r.result.createObjectStore(ALM, { keyPath: 'idem' });
+                    // Si el navegador cierra la base (al salir, falta de espacio, otra pestaña), la próxima vez se abre de nuevo
+                    r.onsuccess = () => { const db = r.result; db.onclose = () => { bd = null; }; db.onversionchange = () => { try { db.close(); } catch (e) {} bd = null; }; ok(db); };
+                    r.onerror = () => ok(null);
+                } catch (e) { ok(null); }
             });
             return bd;
         }
-        const almacen = async modo => { const db = await abrir(); return db ? db.transaction(ALM, modo).objectStore(ALM) : null; };
+        // La base pudo cerrarse justo ahora ("connection is closing"): se reabre una vez y se sigue
+        const almacen = async modo => {
+            for (let i = 0; ; i++) {
+                const db = await abrir(); if (!db) return null;
+                try { return db.transaction(ALM, modo).objectStore(ALM); } catch (e) { bd = null; if (i) throw e; }
+            }
+        };
         async function lista() { const s = await almacen('readonly'); const l = s ? await pedir(s.getAll()) : [...memoria.values()]; return l.sort((a, b) => a.creado - b.creado); }
         async function poner(x) { const s = await almacen('readwrite'); if (s) await pedir(s.put(x)); else memoria.set(x.idem, x); }
         async function quitar(idem) { const s = await almacen('readwrite'); if (s) await pedir(s.delete(idem)); else memoria.delete(idem); }
@@ -808,11 +826,11 @@
                 <input type="text" id="nroFicha" readonly placeholder="Se asigna al enviar">
             </div>
             <div class="form-group">
-                <label>Fecha Automática</label>
+                <label for="fecha">Fecha Automática</label>
                 <input type="date" id="fecha" readonly required>
             </div>
             <div class="form-group">
-                <label>Tasa BCV (automática)</label>
+                <label for="tasaBCV">Tasa BCV (automática)</label>
                 <input type="number" step="0.01" min="0" id="tasaBCV" value="" readonly tabindex="-1" title="La tasa se toma automáticamente del BCV y no se puede modificar">
                 <button type="button" class="btn-reintentar hidden" id="btnReintentarTasa" onclick="cargarTasaBCV()">Reintentar</button>
                 <small class="tasa-nota" id="tasaNota"></small>
@@ -847,15 +865,15 @@
         <h3>1. Efectivo Bolívares</h3>
         <div class="grid-3">
             <div class="form-group">
-                <label>Recibí para Caja (Bs)</label>
+                <label for="bsRecibi">Recibí para Caja (Bs)</label>
                 <input type="number" step="0.01" min="0" id="bsRecibi" value="0" oninput="calcularEfectivoBs()" required>
             </div>
             <div class="form-group">
-                <label>Dejé para Caja (Bs)</label>
+                <label for="bsDeje">Dejé para Caja (Bs)</label>
                 <input type="number" step="0.01" min="0" id="bsDeje" value="0" oninput="calcularEfectivoBs()" required>
             </div>
             <div class="form-group">
-                <label>Envié a Oficina (Bs)</label>
+                <label for="bsEnvie">Envié a Oficina (Bs)</label>
                 <input type="number" step="0.01" min="0" id="bsEnvie" value="0" oninput="calcularEfectivoBs()" required>
             </div>
         </div>
@@ -876,11 +894,11 @@
         
         <div class="grid-3" style="margin-top: 1rem;">
             <div class="form-group">
-                <label>Sub Total Lotes (Bs)</label>
+                <label for="tddSubtotal">Sub Total Lotes (Bs)</label>
                 <input type="text" id="tddSubtotal" value="0,00" readonly>
             </div>
             <div class="form-group">
-                <label>Pagos Externos (Bs)</label>
+                <label for="tddPagosExternos">Pagos Externos (Bs)</label>
                 <input type="number" step="0.01" min="0" id="tddPagosExternos" value="0" oninput="calcularTDD()" required>
             </div>
             <div class="form-group">
@@ -900,11 +918,11 @@
 
         <div class="grid-2">
             <div class="form-group">
-                <label>Monto de la Mañana</label>
+                <label for="bioManana">Monto de la Mañana</label>
                 <input type="number" step="0.01" min="0" id="bioManana" value="0" oninput="calcularBiopago()" required>
             </div>
             <div class="form-group">
-                <label>Monto total</label>
+                <label for="bioTarde">Monto total</label>
                 <input type="number" step="0.01" min="0" id="bioTarde" value="0" oninput="calcularBiopago()" required>
             </div>
         </div>
@@ -926,15 +944,15 @@
         <h3>5. Divisas ($)</h3>
         <div class="grid-3">
             <div class="form-group">
-                <label>Recibí para Caja ($)</label>
+                <label for="divRecibi">Recibí para Caja ($)</label>
                 <input type="number" step="0.01" min="0" id="divRecibi" value="0" oninput="calcularDivisas()" required>
             </div>
             <div class="form-group">
-                <label>Dejé para Caja ($)</label>
+                <label for="divDeje">Dejé para Caja ($)</label>
                 <input type="number" step="0.01" min="0" id="divDeje" value="0" oninput="calcularDivisas()" required>
             </div>
             <div class="form-group">
-                <label>Envié a Oficina ($)</label>
+                <label for="divEnvie">Envié a Oficina ($)</label>
                 <input type="number" step="0.01" min="0" id="divEnvie" value="0" oninput="calcularDivisas()" required>
             </div>
         </div>

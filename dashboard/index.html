@@ -12,9 +12,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%22400%20380%201130%201175%22%3E%3Cpath%20fill%3D%22%23FF4000%22%20d%3D%22M423%20398%20H950%20C1230%20398%201400%20560%201450%20788%20L1115%20952%20C1110%20790%201075%20655%20870%20655%20H773%20V1193%20L423%201365%20Z%22%2F%3E%3Cpath%20fill%3D%22%2344AC00%22%20d%3D%22M423%201365%20L1508%20834%20V865%20L658%201533%20H423%20Z%22%2F%3E%3Cpath%20fill%3D%22%23F7931E%22%20d%3D%22M820%201533%20L1465%201026%20C1460%201140%201448%201225%201420%201295%20C1360%201440%201250%201490%201160%201505%20C1090%201522%201020%201533%20950%201533%20Z%22%2F%3E%3C%2Fsvg%3E">
-    <!-- Librerías para descargar el Visor de ventas en PDF -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <!-- Las librerías de PDF y Excel se bajan al usarlas (libJsPDF, libXLSX): la entrada al panel no las espera -->
     <style>
         :root {
             --bg-color: #1e293b;
@@ -40,10 +38,12 @@
             --shadow: rgba(0, 0, 0, 0.3);
             --radius: 8px;
             --amar: #facc15; --amar-txt: #facc15; --amar-bg: rgba(250, 204, 21, 0.14);   /* "por pagar" */
+            --verde-txt: #6fd13a;   /* verde del logo para TEXTO (compras, precios que bajan): legible sobre fondo oscuro */
             color-scheme: dark;
         }
         :root[data-theme="light"] {
             --amar: #eab308; --amar-txt: #a16207; --amar-bg: rgba(234, 179, 8, 0.14);
+            --verde-txt: #2b7a00;
             --bg-color: #e2e8f0;
             --card-bg: #ffffff;
             --border: #cbd5e1;
@@ -107,6 +107,15 @@
         .btn-primary { background: var(--primary); color: white; }
         .btn-save { background: #10b981; color: white; }
         .btn-danger { background: var(--danger); color: white; }
+        /* Respuesta al tocar (como en iPhone): el botón se hunde un poco al presionarlo; en el teléfono sin el destello azul ni el
+           zoom por doble toque; con el teclado, un anillo muestra dónde está el foco */
+        button, a, select, label.interruptor, .menu-btn { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+        button { transition: transform .08s ease, filter .15s ease, border-color .15s ease, background-color .15s ease, box-shadow .15s ease; }
+        button:not(:disabled):not(.btn-limpiar):active { transform: scale(.97); filter: brightness(.93); }
+        .menu-btn:not(:disabled):active { transform: translateY(0) scale(.98); }
+        .btn-primary:not(:disabled):hover, .btn-danger:not(:disabled):hover, .btn-save:not(:disabled):hover { filter: brightness(1.08); }
+        button:focus-visible, a:focus-visible, .menu-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+        @media (prefers-reduced-motion: reduce) { button { transition: none; } button:not(:disabled):active, .menu-btn:not(:disabled):active { transform: none; } }
         .efe-actualizar { float: right; }
         .paginador { display: flex; align-items: center; justify-content: center; gap: .75rem; flex-wrap: wrap; padding: .75rem 0 .25rem; font-size: .85rem; color: var(--text-muted); }
         .paginador:empty { display: none; }
@@ -547,6 +556,7 @@
         .rpt-esp small b { min-width: 0; }
         .rpt-vista { display: flex; flex-wrap: wrap; gap: .5rem; align-items: end; margin: .8rem 0 .4rem; }
         .rpt-vista > div { min-width: 11rem; }
+        .rpt-vista > .rpt-buscar { flex: 1 1 16rem; }
         tr.bsr-activa td { background: color-mix(in srgb, var(--primary) 9%, transparent); }
         /* Entrar con huella */
         .huella-entrar { display: flex; flex-direction: column; align-items: stretch; gap: .45rem; margin: .25rem 0 .5rem; }
@@ -928,7 +938,7 @@
         .nom-dias tr.nom-libre th, .nom-dias tr.nom-libre td { color: var(--text-muted); } .nom-lugar { font-size: .78rem; color: var(--text-muted); text-align: left !important; }
         .nom-chk { display: inline-grid; place-items: center; width: 1.25rem; height: 1.25rem; border: 1.5px solid var(--border); border-radius: 5px; font-size: .8rem; line-height: 1; vertical-align: middle; }
         .nom-chk.si { background: var(--ok); border-color: var(--ok); color: #fff; } .nom-chk.ex { background: #d97706; border-color: #d97706; }
-        .nom-ex { display: block; font-style: normal; font-size: .7rem; font-weight: 700; color: #d97706; }
+        .nom-ex { display: block; font-style: normal; font-size: .7rem; font-weight: 700; color: var(--warn); }
         .nom-dia { background: none; border: 0; padding: .1rem .3rem; cursor: pointer; color: inherit; font: inherit; border-radius: 6px; } .nom-dia:hover { background: var(--card-bg); }
         .nom-gas { width: 100%; border-collapse: collapse; font-size: .9rem; } .nom-gas th { text-align: right; padding: .45rem .6rem; border-bottom: 2px solid var(--ok); }
         .nom-gas td { padding: .4rem .6rem; border-bottom: 1px solid var(--border); text-align: right; } .nom-gas td:nth-child(2) { text-align: center; } .nom-gas th:nth-child(2), .nom-gas th:nth-child(4), .nom-gas td:nth-child(4) { text-align: center; }
@@ -976,7 +986,7 @@
         /* ===== Pendientes sin conexión (el mismo bloque en el Dashboard y en la ficha) ===== */
         .cola-aviso { position: fixed; left: 12px; bottom: 12px; z-index: 900; display: inline-flex; align-items: center; gap: .45rem; padding: .5rem .85rem; border-radius: 999px;
             border: 1px solid var(--border); background: var(--card-bg); color: var(--text-main); font: inherit; font-size: .85rem; font-weight: 600; cursor: pointer; box-shadow: 0 6px 18px rgba(0, 0, 0, .18); }
-        .cola-aviso.error { border-color: #ef4444; color: #ef4444; }
+        .cola-aviso.error { border-color: var(--bad); color: var(--bad); }
         .cola-aviso .cola-punto { width: .55rem; height: .55rem; border-radius: 50%; background: #f59e0b; flex: none; }
         .cola-aviso.enviando .cola-punto { background: #3b82f6; animation: cola-latido 1s ease-in-out infinite; } .cola-aviso.error .cola-punto { background: #ef4444; }
         @keyframes cola-latido { 50% { opacity: .3; transform: scale(.7); } }
@@ -985,7 +995,7 @@
         .cola-caja h3 { margin: 0 0 .25rem; font-size: 1.05rem; border: 0; padding: 0; } .cola-caja > p { margin: 0 0 .8rem; color: var(--text-muted); font-size: .85rem; }
         .cola-item { border: 1px solid var(--border); border-radius: 10px; padding: .6rem .75rem; margin-bottom: .5rem; }
         .cola-item b { display: block; font-size: .9rem; } .cola-item small { display: block; color: var(--text-muted); font-size: .78rem; margin-top: .1rem; }
-        .cola-item .cola-err { color: #ef4444; } .cola-item .cola-acc { display: flex; gap: .4rem; flex-wrap: wrap; margin-top: .45rem; }
+        .cola-item .cola-err { color: var(--bad); } .cola-item .cola-acc { display: flex; gap: .4rem; flex-wrap: wrap; margin-top: .45rem; }
         .cola-item button, .cola-pie button { font: inherit; font-size: .8rem; padding: .3rem .7rem; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--text-main); cursor: pointer; }
         .cola-pie { display: flex; justify-content: flex-end; gap: .5rem; margin-top: .6rem; }
         .cola-toast { position: fixed; left: 50%; bottom: 64px; transform: translateX(-50%); z-index: 1002; max-width: min(92vw, 520px); padding: .7rem 1rem; border-radius: 12px;
@@ -1216,8 +1226,8 @@
         .alm-pc-est { font-weight: 700; font-size: .82rem; }
         .alm-pc-acc { display: flex; gap: .35rem; flex-wrap: wrap; justify-content: flex-end; }
         .alm-pc-curso { border-left-color: var(--primary); } .alm-pc-curso .alm-pc-est { color: var(--primary); }
-        .alm-pc-ok { border-left-color: #44AC00; } .alm-pc-ok .alm-pc-est { color: #2f8f00; }
-        .alm-pc-duda { border-left-color: #d97706; } .alm-pc-duda .alm-pc-est { color: #b45309; }
+        .alm-pc-ok { border-left-color: #44AC00; } .alm-pc-ok .alm-pc-est { color: var(--verde-txt); }
+        .alm-pc-duda { border-left-color: #d97706; } .alm-pc-duda .alm-pc-est { color: var(--warn); }
         .alm-pc-mal { border-left-color: var(--danger); background: color-mix(in srgb, var(--danger) 7%, var(--card-bg)); } .alm-pc-mal .alm-pc-est { color: var(--danger); }
         @media (max-width: 640px) { .alm-pc-fila { grid-template-columns: 1fr; } .alm-pc-acc { justify-content: flex-start; } }
         /* Compra con foto y precios en tiendas */
@@ -1249,9 +1259,9 @@
         .cmp-tabla .cmp-cod { width: 92px; } .cmp-tabla .cmp-n { width: 74px; text-align: right; } .cmp-tabla .cmp-p { width: 58px; text-align: right; } .cmp-tabla .cmp-d { width: 58px; text-align: right; }
         .cmp-tabla small { display: block; color: var(--text-muted); font-size: .74rem; line-height: 1.25; max-width: 230px; text-align: left; }
         .cmp-tabla small.cmp-ant { white-space: nowrap; text-align: right; margin-top: 2px; }
-        .cmp-tabla .cmp-ant .sube { color: var(--danger); font-weight: 600; } .cmp-tabla .cmp-ant .baja { color: #16a34a; font-weight: 600; }
-        .cmp-regla { color: #3a9400; }
-        .cmp-aviso-costo { color: #b45309 !important; font-weight: 600; }
+        .cmp-tabla .cmp-ant .sube { color: var(--danger); font-weight: 600; } .cmp-tabla .cmp-ant .baja { color: var(--verde-txt); font-weight: 600; }
+        .cmp-regla { color: var(--verde-txt); }
+        .cmp-aviso-costo { color: var(--warn) !important; font-weight: 600; }
         .cmp-tabla .cmp-mal input.cmp-cod { border-color: var(--danger); }
         .cmp-tabla th.cmp-t, .cmp-tabla td.cmp-t { background: var(--list-bg); }
         .cmp-pie { display: flex; flex-wrap: wrap; gap: .4rem 1.4rem; align-items: baseline; margin: .7rem 0; font-size: .92rem; }
@@ -1262,19 +1272,19 @@
         .cmp-ord-cab small { color: var(--text-muted); }
         .cmp-ord-sub { color: var(--text-muted); font-size: .8rem; margin: .15rem 0 .5rem; }
         .cmp-precios { display: flex; flex-wrap: wrap; gap: .3rem 1.2rem; align-items: center; font-size: .9rem; margin-bottom: .6rem; }
-        .cmp-precios .sube { color: var(--danger); } .cmp-precios .baja { color: #16a34a; }
+        .cmp-precios .sube { color: var(--danger); } .cmp-precios .baja { color: var(--verde-txt); }
         .cmp-tiendas { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: .5rem; }
         .cmp-tienda { border: 1px solid var(--border); border-radius: 10px; padding: .5rem .6rem; font-size: .85rem; display: flex; flex-direction: column; gap: .35rem; }
         .cmp-tienda > small { color: var(--text-muted); }
         .cmp-tienda.listo { border-color: #44AC00; }
         .cmp-marca { display: flex; justify-content: space-between; gap: .4rem; align-items: center; }
-        .cmp-marca.hecho { color: #2f8f00; }
+        .cmp-marca.hecho { color: var(--verde-txt); }
         .cmp-marca small { color: var(--text-muted); display: block; font-size: .74rem; }
         .cmp-marca .btn-mini { white-space: nowrap; }
         .cmp-otabla td, .cmp-otabla th { vertical-align: top; }
         .cmp-otabla td:first-child { min-width: 220px; }
         .cmp-otabla td small { display: block; color: var(--text-muted); font-size: .74rem; line-height: 1.3; }
-        .cmp-otabla td small.sube { color: var(--danger); } .cmp-otabla td small.baja { color: #16a34a; }
+        .cmp-otabla td small.sube { color: var(--danger); } .cmp-otabla td small.baja { color: var(--verde-txt); }
         .cmp-otabla tr.cmp-definir td:first-child { box-shadow: inset 3px 0 0 var(--amar, #eab308); }
         .cmp-oth { text-align: center; min-width: 118px; }
         .cmp-oth small { display: block; font-weight: 400; font-size: .7rem; color: var(--text-muted); text-transform: none; letter-spacing: 0; }
@@ -1295,7 +1305,7 @@
         .cmp-desc-in { width: 64px !important; padding: .3rem .4rem !important; }
         .cmp-tasa { display: inline-flex; align-items: center; gap: .4rem; white-space: nowrap; }   /* la tasa: etiqueta, campo y botón juntos */
         .cmp-tasa input { width: 8.5rem !important; padding: .3rem .5rem !important; text-align: right; }
-        .cmp-cant { display: inline-block; margin-right: .45rem; padding: .1rem .5rem; border-radius: 999px; background: rgba(68,172,0,.14); color: #2f8f00; font-weight: 800; font-size: .92rem; white-space: nowrap; }
+        .cmp-cant { display: inline-block; margin-right: .45rem; padding: .1rem .5rem; border-radius: 999px; background: rgba(68,172,0,.14); color: var(--verde-txt); font-weight: 800; font-size: .92rem; white-space: nowrap; }
         .cmp-cant.sin { background: var(--list-bg); color: var(--text-muted); font-weight: 600; font-size: .78rem; }
         .cmp-imp { margin-left: auto; }
         .cmp-resumen { display: flex; flex-wrap: wrap; gap: .4rem 1.4rem; margin: .2rem 0 .6rem; font-size: .9rem; }
@@ -1689,12 +1699,23 @@
         const pedir = r => new Promise((ok, mal) => { r.onsuccess = () => ok(r.result); r.onerror = () => mal(r.error); });
         function abrir() {
             if (!bd) bd = new Promise(ok => {
-                try { const r = indexedDB.open(BD, 1); r.onupgradeneeded = () => r.result.createObjectStore(ALM, { keyPath: 'idem' }); r.onsuccess = () => ok(r.result); r.onerror = () => ok(null); }
-                catch (e) { ok(null); }
+                try {
+                    const r = indexedDB.open(BD, 1);
+                    r.onupgradeneeded = () => r.result.createObjectStore(ALM, { keyPath: 'idem' });
+                    // Si el navegador cierra la base (al salir, falta de espacio, otra pestaña), la próxima vez se abre de nuevo
+                    r.onsuccess = () => { const db = r.result; db.onclose = () => { bd = null; }; db.onversionchange = () => { try { db.close(); } catch (e) {} bd = null; }; ok(db); };
+                    r.onerror = () => ok(null);
+                } catch (e) { ok(null); }
             });
             return bd;
         }
-        const almacen = async modo => { const db = await abrir(); return db ? db.transaction(ALM, modo).objectStore(ALM) : null; };
+        // La base pudo cerrarse justo ahora ("connection is closing"): se reabre una vez y se sigue
+        const almacen = async modo => {
+            for (let i = 0; ; i++) {
+                const db = await abrir(); if (!db) return null;
+                try { return db.transaction(ALM, modo).objectStore(ALM); } catch (e) { bd = null; if (i) throw e; }
+            }
+        };
         async function lista() { const s = await almacen('readonly'); const l = s ? await pedir(s.getAll()) : [...memoria.values()]; return l.sort((a, b) => a.creado - b.creado); }
         async function poner(x) { const s = await almacen('readwrite'); if (s) await pedir(s.put(x)); else memoria.set(x.idem, x); }
         async function quitar(idem) { const s = await almacen('readwrite'); if (s) await pedir(s.delete(idem)); else memoria.delete(idem); }
@@ -2950,8 +2971,11 @@
     // ==========================================
     // Redondea a céntimos: las sumas de decimales dejan residuos (0,1 + 0,2 − 0,3 = 0,0000000000000000555) y "-0" pasa a 0
     function centimos(v) { const n = Math.round((Number(v) || 0) * 100) / 100; return n === 0 ? 0 : n; }
+    // Formateadores de números reutilizados: crear uno por número era lo más lento al pintar listas largas (3.000 productos: ~400 ms)
+    const NF_VE = {};
+    function nfVE(min, max) { const k = min + '|' + max; return NF_VE[k] || (NF_VE[k] = new Intl.NumberFormat('es-VE', { minimumFractionDigits: min, maximumFractionDigits: max })); }
     function fmt(v) {
-        return new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(centimos(v));
+        return nfVE(2, 2).format(centimos(v));
     }
     function fmtMoneda(v, moneda) {
         return (moneda === '$' ? '$' : 'Bs ') + fmt(v);
@@ -3251,12 +3275,22 @@
         const texto = r => JSON.stringify(r, (k, v) => (k === 'ms' || k === '_ver' || k === 'yaRegistrado') ? undefined : v);
         function abrir() {
             if (!bd) bd = new Promise(ok => {
-                try { const r = indexedDB.open('pv-datos', 1); r.onupgradeneeded = () => r.result.createObjectStore('r', { keyPath: 'k' }); r.onsuccess = () => ok(r.result); r.onerror = () => ok(null); }
-                catch (e) { ok(null); }
+                try {
+                    const r = indexedDB.open('pv-datos', 1); r.onupgradeneeded = () => r.result.createObjectStore('r', { keyPath: 'k' });
+                    // Si el navegador cierra la base, se vuelve a abrir (si no, la copia local quedaba apagada hasta recargar la página)
+                    r.onsuccess = () => { const db = r.result; db.onclose = () => { bd = null; }; db.onversionchange = () => { try { db.close(); } catch (e) {} bd = null; }; ok(db); };
+                    r.onerror = () => ok(null);
+                } catch (e) { ok(null); }
             });
             return bd;
         }
-        async function tienda(modo) { const db = await abrir(); try { return db ? db.transaction('r', modo).objectStore('r') : null; } catch (e) { return null; } }
+        async function tienda(modo) {
+            for (let i = 0; i < 2; i++) {
+                const db = await abrir(); if (!db) return null;
+                try { return db.transaction('r', modo).objectStore('r'); } catch (e) { bd = null; }   // se cerró justo ahora: se reabre una vez
+            }
+            return null;
+        }
         const pedir = r => new Promise(ok => { r.onsuccess = () => ok(r.result); r.onerror = () => ok(null); });
         // Al entrar: se carga a memoria lo guardado de este usuario (lo vencido se borra)
         async function iniciar(nombre) {
@@ -3497,7 +3531,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-06.5';
+    const VERSION_SERVIDOR = '2026-11-06.8';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -4138,13 +4172,24 @@
         pie._tabla = t; pie.dataset.clave = k;
         if (pie._html !== html) { pie._html = html; pie.innerHTML = html; }   // solo si cambió (si no, el vigía se dispararía sin fin)
     }
+    // Las tablas de un bloque recién pintado se paginan EN EL MISMO MOMENTO (pintarConservando): si se esperaba al vigía, el
+    // navegador ya había acomodado todas las filas (3.000 productos: ~0,5 s trabado) para después esconderlas
+    function prepararTablasEn(raiz) {
+        if (!raiz || !raiz.closest || !raiz.closest('.vista') || raiz.closest('.req-dlg, .req-dlg-fondo')) return;
+        raiz.querySelectorAll('table').forEach(t => {
+            if (t.closest('.req-dlg, .req-dlg-fondo')) return;
+            if (!t.closest(DESLIZA) && t.parentElement) { const d = document.createElement('div'); d.className = 'tabla-desliza'; t.parentElement.insertBefore(d, t); d.appendChild(t); }
+            if (!t.matches(PAG_NO)) tabPaginar(t);
+        });
+    }
     function prepararTablas() {
         document.querySelectorAll('.vista table').forEach(t => {
             if (t.closest('.req-dlg, .req-dlg-fondo')) return;
             if (!t.closest(DESLIZA) && t.parentElement) { const d = document.createElement('div'); d.className = 'tabla-desliza'; t.parentElement.insertBefore(d, t); d.appendChild(t); }
             if (!t.matches(PAG_NO)) tabPaginar(t);
         });
-        document.querySelectorAll('.chip:not(button):not([title]), .vista table td.izq:not([title])').forEach(c => { if (c.scrollWidth > c.clientWidth + 1) c.title = c.textContent.trim().replace(/\s+/g, ' '); });
+        // Solo lo visible: las filas escondidas por el paginador se revisan cuando se muestran (eran miles de celdas en cada cambio)
+        document.querySelectorAll('.chip:not(button):not([title]), .vista table tr:not(.pag-oculta) > td.izq:not([title])').forEach(c => { if (c.scrollWidth > c.clientWidth + 1) c.title = c.textContent.trim().replace(/\s+/g, ' '); });
     }
     document.addEventListener('click', e => {
         const mas = e.target.closest && e.target.closest('[data-pag-mas]');
@@ -5137,7 +5182,7 @@
         return fmtNum(v, 0);
     }
     function fmtNum(v, dec) {
-        return new Intl.NumberFormat('es-VE', { minimumFractionDigits: 0, maximumFractionDigits: dec }).format(v);
+        return nfVE(0, dec).format(v);
     }
     function pasoBonito(max) {
         const crudo = max / 4, pot = Math.pow(10, Math.floor(Math.log10(crudo || 1)));
@@ -5366,7 +5411,7 @@
             const colores = Object.fromEntries(datos.tiendas.map(t =>
                 [t.cod, getComputedStyle(document.documentElement).getPropertyValue('--t-' + t.cod).trim()]));
 
-            const { jsPDF } = window.jspdf;
+            const { jsPDF } = await libJsPDF();
             const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
             const W = doc.internal.pageSize.getWidth(), M = 12, anchoUtil = W - 2 * M;
             const titulo = 'Semana ' + textoSemana(ventasSemana, true);
@@ -6838,7 +6883,7 @@
     let reqHist = null, reqTabActual = 'calc';
     const reqVentasCache = {}, reqSemanaCache = {};
 
-    const reqN = (v, d = 2) => new Intl.NumberFormat('es-VE', { minimumFractionDigits: d, maximumFractionDigits: d }).format(v || 0);
+    const reqN = (v, d = 2) => nfVE(d, d).format(v || 0);
     const reqU = p => (p.unidad === 'UND' ? 'und' : 'kg');
     const reqLocalSel = () => document.getElementById('reqLocal').value;
     // Semana administrativa de sábado a viernes (la misma del resto del panel)
@@ -8599,9 +8644,16 @@
     // Repinta un bloque sin que la pantalla salte: conserva el desplazamiento (vertical y horizontal) de la página, del bloque y de cada
     // caja con desplazamiento dentro de él, el campo con el cursor y la posición del cursor. Todo lo que se repinta al tocar algo
     // (interruptores, filtros, páginas, ventanas) debe pintarse con pintarConservando o pintarVentana, también lo que se agregue en adelante.
+    // Recorre los elementos de un bloque SIN entrar en lo escondido (filas que el paginador ocultó, .hidden): ahí nada puede tener
+    // desplazamiento. Antes se leía el de TODOS (3.000 productos: ~48.000 elementos, 165 ms en cada repintado); así son ~4 ms.
+    function elementosVisibles(el) {
+        const l = [], w = document.createTreeWalker(el, NodeFilter.SHOW_ELEMENT, { acceptNode: n => n.classList && (n.classList.contains('pag-oculta') || n.classList.contains('hidden')) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
+        for (let n = el; n; n = w.nextNode()) l.push(n);
+        return l;
+    }
     function pintarConservando(el, html) {
         const marca = e => e.id || (e.className && String(e.className)) || e.tagName;
-        const cajas = [el, ...el.querySelectorAll('*')].filter(e => e.scrollTop > 0 || e.scrollLeft > 0);
+        const cajas = elementosVisibles(el).filter(e => e.scrollTop > 0 || e.scrollLeft > 0);
         const vistas = {}; cajas.forEach(e => { const k = marca(e); (vistas[k] = vistas[k] || []).push([e.scrollTop, e.scrollLeft]); });
         const act = document.activeElement, idAct = act && el.contains(act) ? act.id : '';
         let pos = null; try { pos = idAct && typeof act.selectionStart === 'number' ? act.selectionStart : null; } catch (e) {}
@@ -8611,9 +8663,12 @@
         el.classList.remove('dlg-abriendo');   // un repintado no vuelve a animar la apertura de la ventana
         el.innerHTML = html;
         NUM.todos(el);   // los campos de monto nuevos ya con formato, antes de devolver el cursor
+        prepararTablasEn(el);   // listas largas ya paginadas antes de medir nada (si no, el navegador acomoda miles de filas escondidas)
+        // Cada desplazamiento vuelve a la caja nueva con la misma marca (id, clases o etiqueta), en el mismo orden (las tablas ya
+        // están paginadas: no se recorren las filas escondidas)
         if (Object.keys(vistas).length) {
             const usados = {};
-            [el, ...el.querySelectorAll('*')].forEach(e => { const k = marca(e), l = vistas[k]; if (!l) return; const n = usados[k] = (usados[k] || 0); if (l[n]) { e.scrollTop = l[n][0]; e.scrollLeft = l[n][1]; usados[k]++; } });
+            elementosVisibles(el).forEach(e => { const k = marca(e), l = vistas[k]; if (!l) return; const n = usados[k] = (usados[k] || 0); if (l[n]) { e.scrollTop = l[n][0]; e.scrollLeft = l[n][1]; usados[k]++; } });
         }
         if (window.scrollX !== wx || window.scrollY !== wy) window.scrollTo(wx, wy);
         const foco = idAct && document.getElementById(idAct);
@@ -11780,7 +11835,7 @@
                      ['DEV_PROVEEDOR', 'Devolución a proveedor']];   // sale mercancía de vuelta al proveedor (p. ej. devolver un préstamo)
     const almOpSale = op => op === 'DESCUENTO' || op === 'DEV_PROVEEDOR';   // operaciones que restan del almacén
     const ALM_EMPRESA = { nombre: 'DISTRIBUIDORA PLAZA VALENCIA 20, C.A.', rif: 'J-50076678-5', direccion: 'Av. Carabobo C/C Rocío e Infante, Casa Nro 84-15, Zona Candelaria, Valencia, Carabobo', telefono: '0414-9403766' };
-    const almCant = (n, tipo) => new Intl.NumberFormat('es-VE', { minimumFractionDigits: tipo === 'Pesado' ? 3 : 0, maximumFractionDigits: 3 }).format(Number(n) || 0);
+    const almCant = (n, tipo) => nfVE(tipo === 'Pesado' ? 3 : 0, 3).format(Number(n) || 0);
     const almUnidad = tipo => tipo === 'Pesado' ? 'kg' : 'und';
     const almTasa = () => { const t = tasaBCVdel(fechaLocalHoy()); return t ? t[1] : 0; };
     const almProducto = cod => { const c = String(cod == null ? '' : cod).trim().toUpperCase(); return almDatos && almDatos.productos.find(p => p.codigo.toUpperCase() === c); };   // mayúscula o minúscula da igual
@@ -13172,7 +13227,7 @@
     function cmpLineaNueva(x) { return Object.assign({ codigo: '', descripcion: '', categoria: 'Víveres', iva: 0, conversion: '', claveProveedor: '', descripcionFactura: '', unidad: '', cantidad: 0, costo: 0, costoBs: 0, merma: 0, margenDetal: 0, detal: 0, margenMayor: 0, mayor: 0, regla: '', libre: false, dist: {} }, x || {}); }
     // Costo de la compra: 3 decimales (así la suma cuadra mejor con el total de la factura)
     const cmpR3 = x => Math.round((Number(x) || 0) * 1000) / 1000;
-    const fmt3 = v => new Intl.NumberFormat('es-VE', { minimumFractionDigits: 3, maximumFractionDigits: 3 }).format(Number(v) || 0);
+    const fmt3 = v => nfVE(3, 3).format(Number(v) || 0);
     // Tasa de la compra (Bs por $): la que se escriba a mano, o la del BCV que regía el día de la factura
     const cmpTasaBcvFecha = () => { const t = tasaBCVdel(cmp.fechaFactura || fechaLocalHoy()); return t ? t[1] : almTasa(); };
     const cmpTasaCompra = () => cmp.tasaManual > 0 ? cmp.tasaManual : cmpTasaBcvFecha();
@@ -13859,7 +13914,7 @@ Reglas:
     function cmpListoVista() {
         const r = cmp.resultado || {};
         return `<div class="grafico-card">
-            <h3 style="margin-top:0;color:#3a9400">✓ Compra ${esc(r.compra || '')} guardada</h3>
+            <h3 style="margin-top:0;color:var(--verde-txt)">✓ Compra ${esc(r.compra || '')} guardada</h3>
             ${r.yaRegistrado ? `<div class="banner ok" style="display:block">Esta compra ya se había guardado: Google la registró aunque no respondió a tiempo la primera vez. No se repitió. Véala en "Compras recientes".</div>` : ''}
             <div class="nota" style="margin-top:0">${r.ingreso ? `Entró al almacén con la operación de inventario N° ${esc(r.ingreso.numero)}. ` : ''}${(r.ordenes || []).length} orden(es) de actualización en "Precios en tiendas".</div>
             ${r.libroPendiente ? `<div class="banner" style="display:flex"><span class="btn-cargando">${iconoCargando()}<span>Anotándola en el Libro de compras... (puede seguir trabajando)</span></span></div>`
@@ -13897,7 +13952,7 @@ Reglas:
         try { cmpUsarOrdenes(await llamarApi({ action: 'cmp_desc_divisas', valor: v, claveAdmin: c, ver: cmpOrd.ver })); mostrarBanner(`Descuento por divisas: ${v} % en todas las tiendas.`, 'ok'); }
         catch (e) { el.value = cmpDesc(); mostrarBanner(e.message, 'error'); }
     }
-    const cmpMon = v => !(v > 0) ? '—' : cmpPV.modo === 'bs' ? (cmpTasa() ? 'Bs ' + fmt(cmpEnModo(v)) : 'sin tasa') : (cmpPV.modo === 'desc' ? new Intl.NumberFormat('es-VE', { minimumFractionDigits: 3, maximumFractionDigits: 3 }).format(cmpEnModo(v)) : fmt(v));   // con descuento: 3 decimales, como en el libro
+    const cmpMon = v => !(v > 0) ? '—' : cmpPV.modo === 'bs' ? (cmpTasa() ? 'Bs ' + fmt(cmpEnModo(v)) : 'sin tasa') : (cmpPV.modo === 'desc' ? nfVE(3, 3).format(cmpEnModo(v)) : fmt(v));   // con descuento: 3 decimales, como en el libro
     // Historial de precios por fechas (por defecto, el mes en curso): Google trae solo ese rango
     let cmpHistF = { desde: '', hasta: '' };
     async function cmpCargarOrdenes() {
@@ -14134,10 +14189,11 @@ Reglas:
         } catch (e) { if (e.name !== 'AbortError') mostrarBanner('No se pudo compartir: ' + e.message + '. Use "Descargar foto".', 'warn'); }
     }
     // PDF tamaño carta sin pasar por la impresora: texto y tabla de verdad (jsPDF + autoTable), nítido y con varias páginas si hace falta
-    function cmpDistDescargarPDF() {
+    async function cmpDistDescargarPDF() {
         const c = cmpDistArchivo && cmpDistArchivo.compra; if (!c) return;
         try {
-            const D = cmpDistDatos(c), { jsPDF } = window.jspdf, doc = new jsPDF({ unit: 'mm', format: 'letter' }), M = 12, A = 215.9, nT = CMP_TIENDAS.length;
+            const { jsPDF } = await libJsPDF();
+            const D = cmpDistDatos(c), doc = new jsPDF({ unit: 'mm', format: 'letter' }), M = 12, A = 215.9, nT = CMP_TIENDAS.length;
             doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.setTextColor(15, 23, 42); doc.text(D.titulo, M, M + 4);
             doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(71, 85, 105);
             const subL = doc.splitTextToSize(D.sub, A - 2 * M); doc.text(subL, M, M + 10);
@@ -14509,7 +14565,7 @@ Reglas:
     let bsp = { tienda: '', paso: 'inicio' };
     const BSP_ESTADO = { OK: ['Por cargar', 'st-info'], YA: ['Ya está', 'st-ok'], NOEXISTE: ['No existe en BigSoft', 'st-falta'], SINCODIGO: ['Sin código', 'st-amar'] };
     const bspPintar = () => { if (vistaActual === 'precios' && almTab === 'remoto') almPintar(); };
-    const bspF = (v, d = 2) => v == null || v === '' ? '—' : new Intl.NumberFormat('es-VE', { minimumFractionDigits: d, maximumFractionDigits: d }).format(v);
+    const bspF = (v, d = 2) => v == null || v === '' ? '—' : nfVE(d, d).format(v);
     function bspEspera(texto) {
         const v = bsp.vivo || {}, dormida = v.hace == null || v.hace > 60, t = esc(bsp.tienda);
         return `${cargandoHTML(texto)}<div class="nota" style="text-align:center">${bsp.estadoTarea === 'curso' ? `La PC de ${t} ya lo está haciendo...`
@@ -14643,12 +14699,16 @@ Reglas:
         if (f === 'fecha') return /^\d{4}-\d{2}-\d{2}$/.test(v) ? fechaCorta(v) : esc(v);
         if (typeof v !== 'number') return esc(v);
         const dec = { int: [0, 0], n3: [0, 3], n4: [2, 4], pct: [1, 1] }[f] || [2, 2];
-        return new Intl.NumberFormat('es-VE', { minimumFractionDigits: dec[0], maximumFractionDigits: dec[1] }).format(v) + (f === 'pct' ? ' %' : '');
+        return nfVE(dec[0], dec[1]).format(v) + (f === 'pct' ? ' %' : '');
     }
     // Diferencia en pantalla con los mismos colores del Excel: amarillo si sobra, rojo si falta, sin color si es 0 o casi 0
     const RPT_MARGEN = 0.01;   // diferencia "casi 0": hasta 10 g o 0,01 unidades, sin color
     const rptColor = (col, v) => col.cond !== 'signo' || typeof v !== 'number' || Math.abs(v) <= RPT_MARGEN ? ''
         : v > 0 ? ' style="background:var(--amar-bg);color:var(--amar-txt);font-weight:600"' : ' style="background:var(--bad-bg);color:var(--bad);font-weight:600"';
+    // Buscador de la vista del reporte: mayúsculas y sin tildes; se redibuja cuando se deja de escribir un momento
+    const rptNorm = s => String(s == null ? '' : s).toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    let rptBuscarEspera = 0;
+    function rptBuscar(v) { rpt.buscar = v; clearTimeout(rptBuscarEspera); rptBuscarEspera = setTimeout(almPintar, 180); }
     const rptRepintar = () => { if (vistaActual === 'reportes') almPintar(); };
     function rptVista() {
         const c = rpt.corrida, ocupado = c && !c.fin, hoy = fechaLocalHoy();
@@ -14735,15 +14795,24 @@ Reglas:
         if (!listos.includes(rpt.verTienda)) rpt.verTienda = listos[0];
         const res = c.est[rpt.verTienda].res, hojas = res.hojas || [], hoja = hojas[rpt.verHoja] || hojas[0];
         if (!hoja) return h;
-        const MAX = 100, filas = (hoja.filas || []).slice(0, MAX);
+        // Buscar por código, nombre o cualquier texto de la fila (todas las palabras, sin importar tildes): busca en TODAS las filas
+        const busq = rptNorm(rpt.buscar).split(/\s+/).filter(Boolean), colsTxt = hoja.columnas.map((col, i) => col.f === 'txt' ? i : -1).filter(i => i >= 0);
+        const todas = hoja.filas || [];
+        let halladas = busq.length ? todas.filter(f => { const t = rptNorm(colsTxt.map(i => f[i]).join(' ')); return busq.every(p => t.includes(p)); }) : todas;
+        // Si lo escrito es exactamente un código, ese producto va primero (001 antes que 10010, 7590010…)
+        const iCod = hoja.columnas.findIndex(col => /^c[oó]digo$/i.test(col.t)), exacto = rptNorm(rpt.buscar).trim();
+        if (busq.length && iCod >= 0) halladas = halladas.filter(f => rptNorm(f[iCod]) === exacto).concat(halladas.filter(f => rptNorm(f[iCod]) !== exacto));
+        const MAX = 100, filas = halladas.slice(0, MAX);
         h += `<div class="rpt-vista">${listos.length > 1 ? `<div><label for="rptVerT">Ver tienda</label><select id="rptVerT" onchange="rpt.verTienda=this.value;almPintar()">${listos.map(t => `<option${t === rpt.verTienda ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></div>` : ''}
-            <div><label for="rptVerH">Hoja</label><select id="rptVerH" onchange="rpt.verHoja=Number(this.value);almPintar()">${hojas.map((x, i) => `<option value="${i}"${x === hoja ? ' selected' : ''}>${esc(x.nombre)} (${(x.filas || []).length})</option>`).join('')}</select></div></div>`;
+            <div><label for="rptVerH">Hoja</label><select id="rptVerH" onchange="rpt.verHoja=Number(this.value);almPintar()">${hojas.map((x, i) => `<option value="${i}"${x === hoja ? ' selected' : ''}>${esc(x.nombre)} (${(x.filas || []).length})</option>`).join('')}</select></div>
+            <div class="rpt-buscar"><label for="rptBuscar">Buscar</label><input type="search" id="rptBuscar" autocomplete="off" placeholder="Código o nombre" value="${esc(rpt.buscar || '')}" oninput="rptBuscar(this.value)"></div></div>
+            ${busq.length ? `<div class="nota">${halladas.length ? `${halladas.length} de ${todas.length} renglones con "${esc(rpt.buscar.trim())}".` : `Ningún renglón con "${esc(rpt.buscar.trim())}".`}</div>` : ''}`;
         const izq = f => f === 'txt' || f === 'fecha' ? ' class="izq"' : '';
         h += filas.length ? `<div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr>${hoja.columnas.map(col => `<th${izq(col.f)}>${esc(col.t)}</th>`).join('')}</tr></thead><tbody>
             ${filas.map(f => `<tr>${hoja.columnas.map((col, i) => `<td${izq(col.f)}${rptColor(col, f[i])}>${rptValor(f[i], col.f)}</td>`).join('')}</tr>`).join('')}
-            ${hoja.totales && (hoja.filas || []).length <= MAX ? `<tr class="alm-fila-total">${hoja.columnas.map((col, i) => `<td${izq(col.f)}><b>${rptValor(hoja.totales[i], col.f)}</b></td>`).join('')}</tr>` : ''}
-            </tbody></table></div>${(hoja.filas || []).length > MAX ? `<div class="nota">Se ven los primeros ${MAX} de ${(hoja.filas || []).length} renglones: el Excel trae todo.</div>` : ''}`
-            : '<div class="empty">Esta hoja no tiene renglones.</div>';
+            ${hoja.totales && !busq.length && todas.length <= MAX ? `<tr class="alm-fila-total">${hoja.columnas.map((col, i) => `<td${izq(col.f)}><b>${rptValor(hoja.totales[i], col.f)}</b></td>`).join('')}</tr>` : ''}
+            </tbody></table></div>${halladas.length > MAX ? `<div class="nota">Se ven los primeros ${MAX} de ${halladas.length} renglones${busq.length ? ': escriba más para afinar la búsqueda' : ''}. El Excel trae todo.</div>` : ''}`
+            : busq.length ? '' : '<div class="empty">Esta hoja no tiene renglones.</div>';
         return h;
     }
     // Una hoja de Excel: códigos como texto, fechas como fecha, números con su formato, filtro en los títulos y la fila TOTAL al final
@@ -15693,14 +15762,25 @@ Reglas:
     }
 
     // Las librerías para leer Excel y PDF se cargan solo cuando hacen falta
+    // Una librería se descarga una sola vez; si se pide de nuevo mientras baja, se espera la misma descarga (antes seguía de largo)
+    const scriptsCargando = {};
     function cargarScript(src) {
-        return new Promise((res, rej) => {
-            if (document.querySelector(`script[src="${src}"]`)) return res();
+        if (scriptsCargando[src]) return scriptsCargando[src];
+        return scriptsCargando[src] = new Promise((res, rej) => {
             const s = document.createElement('script');
-            s.src = src; s.onload = res; s.onerror = () => rej(new Error('No se pudo cargar la librería (¿hay internet?)'));
+            s.src = src; s.onload = res;
+            s.onerror = () => { delete scriptsCargando[src]; s.remove(); rej(new Error('No se pudo cargar la librería (¿hay internet?)')); };   // se puede reintentar
             document.head.appendChild(s);
         });
     }
+    // Crear PDF (Visor de ventas, distribución de compras) — libJsPDF; leer PDF del banco es libPDF (pdf.js). Se baja al pedir el primer PDF, no al abrir el panel (eran ~400 KB que frenaban la entrada)
+    async function libJsPDF() {
+        await cargarScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+        await cargarScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js');
+        return window.jspdf;
+    }
+    // Ya con el panel en uso y el equipo desocupado, se baja de fondo: el primer PDF sale al instante y sirve aunque luego falle el internet
+    window.addEventListener('load', () => setTimeout(() => (window.requestIdleCallback || (f => setTimeout(f, 1)))(() => { if (clave) libJsPDF().catch(() => {}); }), 10000));
     async function libXLSX() { await cargarScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'); return window.XLSX; }
     async function libPDF() {
         await cargarScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
