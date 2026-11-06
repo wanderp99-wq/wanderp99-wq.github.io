@@ -3532,7 +3532,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-06.9';
+    const VERSION_SERVIDOR = '2026-11-06.10';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -14577,7 +14577,7 @@ Reglas:
     async function bspRevisar() {
         if (!bsp.tienda) { mostrarBanner('Elija la tienda.', 'warn'); return; }
         const id = Date.now();
-        Object.assign(bsp, { id, paso: 'revisando', errorSuave: false, res: null, marcadas: {}, asignar: {}, eligiendo: null, busqueda: null, final: null, error: '', errClave: '', seg: 0, estadoTarea: 'pendiente' });
+        Object.assign(bsp, { id, paso: 'revisando', errorSuave: false, res: null, marcadas: {}, asignar: {}, registrar: {}, registrando: null, eligiendo: null, busqueda: null, final: null, error: '', errClave: '', seg: 0, estadoTarea: 'pendiente' });
         bspPintar();
         try {
             const t = await bsrTarea('precios_revisar', { local: bsp.tienda }, bspAlEsperar(id), 180, bsp.senal = { detenido: false });
@@ -14588,19 +14588,60 @@ Reglas:
         bspPintar();
     }
     // Se puede cargar: "Por cargar", o "No existe" con un producto de BigSoft elegido aquí
-    const bspCargable = l => l.estado === 'OK' || ((l.estado === 'NOEXISTE' || l.estado === 'SINCODIGO') && bsp.asignar[l.clave]);
+    const bspCargable = l => l.estado === 'OK' || ((l.estado === 'NOEXISTE' || l.estado === 'SINCODIGO') && (bsp.asignar[l.clave] || bsp.registrar[l.clave]));
     function bspMarcar(id, si) { if (si) bsp.marcadas[id] = true; else delete bsp.marcadas[id]; bspPintar(); }
     function bspTodas() {
         const l = bsp.res.lineas.filter(bspCargable), todas = l.every(x => bsp.marcadas[x.id]);
         l.forEach(x => { if (todas) delete bsp.marcadas[x.id]; else bsp.marcadas[x.id] = true; });
         bspPintar();
     }
-    function bspElegir(clave) { bsp.eligiendo = bsp.eligiendo === clave ? null : clave; bsp.busqueda = null; bspPintar(); setTimeout(() => { const b = document.getElementById('bspBus'); if (b) b.focus(); }, 50); }
+    function bspElegir(clave) { bsp.eligiendo = bsp.eligiendo === clave ? null : clave; bsp.registrando = null; bsp.busqueda = null; bspPintar(); setTimeout(() => { const b = document.getElementById('bspBus'); if (b) b.focus(); }, 50); }
     function bspUsar(el) {
         const l = bsp.res.lineas.find(x => x.clave === bsp.eligiendo); if (!l) return;
-        bsp.asignar[l.clave] = { codigo: el.dataset.cod, descripcion: el.dataset.des }; bsp.marcadas[l.id] = true; bsp.eligiendo = null; bspPintar();
+        bsp.asignar[l.clave] = { codigo: el.dataset.cod, descripcion: el.dataset.des }; delete bsp.registrar[l.clave]; bsp.marcadas[l.id] = true; bsp.eligiendo = null; bspPintar();
     }
-    function bspQuitarAsignado(clave) { const l = bsp.res.lineas.find(x => x.clave === clave); delete bsp.asignar[clave]; if (l) delete bsp.marcadas[l.id]; bspPintar(); }
+    function bspQuitarAsignado(clave) { const l = bsp.res.lineas.find(x => x.clave === clave); delete bsp.asignar[clave]; delete bsp.registrar[clave]; if (l) delete bsp.marcadas[l.id]; bspPintar(); }
+    // Registrar en el BigSoft de la tienda un producto que no tiene (como "Registrar nuevo" de Ingresar en BigSoft). Los precios
+    // son los de la orden; lo demás de la ficha se copia de un producto de la misma categoría y unidad. Se hace al pulsar Cargar.
+    function bspRegistrar(clave) { bsp.registrando = bsp.registrando === clave ? null : clave; bsp.eligiendo = null; bsp.busqueda = null; bspPintar(); setTimeout(() => { const b = document.getElementById('bspRCod'); if (b) b.focus(); }, 50); }
+    function bspFichaHTML(l) {
+        const li = bsp.res.listas;
+        const cancelar = `<button type="button" class="btn-ghost" onclick="bsp.registrando=null;almPintar()">Cancelar</button>`;
+        if (!li || !(li.categorias || []).length) return `<div class="bsr-caja"><b>Registrar "${esc(l.descripcion)}" en el BigSoft de ${esc(bsp.tienda)}</b>
+            <div class="banner warn" style="display:block">La PC de ${esc(bsp.tienda)} no mandó las categorías y unidades de su BigSoft: tiene las Utilidades anteriores. Copie en esa PC el paquete nuevo de UTILIDADES, reinicie el avisador y pulse "Revisar de nuevo".</div>
+            <div class="req-acciones" style="justify-content:flex-end;margin:0">${cancelar}</div></div>`;
+        const sin = s => String(s || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+        const catPV = sin({ '01': 'CHARCUTERIA', '02': 'VIVERES', '03': 'BEBIDAS', '04': 'INSUMOS' }[l.categoria] || String(l.categoria || '').split(' ')[0]);
+        const ya = bsp.registrar[l.clave] || {};
+        const opc = (lista, elegir) => { const xs = lista || [], i = Math.max(0, xs.findIndex(elegir)); return xs.map((x, j) => `<option value="${esc(x.codigo)}" data-extra="${x.extra || 0}"${j === i ? ' selected' : ''}>${esc(x.nombre)}</option>`).join(''); };
+        const precio = (t, v) => v > 0 ? `${t} <b>$ ${bspF(v, 3)}</b>` : '';
+        return `<div class="bsr-caja"><h4 class="per-sub" style="margin-top:0">Registrar en el BigSoft de ${esc(bsp.tienda)}: ${esc(l.descripcion)}</h4>
+            <div class="filters" style="margin-bottom:.4rem">
+                <div><label for="bspRCod">Código</label><input type="text" id="bspRCod" maxlength="15" value="${esc(ya.codigo || l.codigo || '')}" placeholder="Código o código de barras"></div>
+                <div style="flex:2 1 260px"><label for="bspRDes">Descripción</label><input type="text" id="bspRDes" maxlength="100" value="${esc(ya.descripcion || String(l.descripcion || '').toUpperCase())}"></div>
+            </div>
+            <div class="filters" style="margin-bottom:.4rem">
+                <div><label for="bspRCat">Categoría</label><select id="bspRCat">${opc(li.categorias, x => ya.categoria ? x.codigo === ya.categoria : catPV && sin(x.nombre).includes(catPV))}</select></div>
+                <div><label for="bspRUnd">Unidad</label><select id="bspRUnd">${opc(li.unidades, x => ya.unidad ? x.codigo === ya.unidad : l.tipo === 'Pesado' ? /^KILO/.test(sin(x.nombre)) : /^UNIDAD/.test(sin(x.nombre)))}</select></div>
+                <div><label for="bspRIva">IVA</label><select id="bspRIva">${opc(li.ivas, x => ya.iva ? x.codigo === ya.iva : !(x.extra > 0))}</select></div>
+                <div><label for="bspRPro">Proveedor</label><select id="bspRPro"><option value="">(ninguno)</option>${(li.proveedores || []).map(x => `<option value="${esc(x.codigo)}"${ya.proveedor === x.codigo ? ' selected' : ''}>${esc(x.nombre)}</option>`).join('')}</select></div>
+            </div>
+            <div class="nota" style="margin-top:0">Precios de la orden: ${[precio('detal', l.detal), precio('mayor', l.mayor), precio('costo', l.costo)].filter(Boolean).join(' · ')} (en $ BCV; BigSoft los guarda en divisas con su tasa). Lo demás de la ficha se copia de un producto de la misma categoría y unidad. Existencia en 0.</div>
+            <div class="login-error" id="bspRErr"></div>
+            <div class="req-acciones" style="margin-bottom:0;justify-content:flex-end">${cancelar}<button type="button" class="btn-primary" onclick="bspRegistrarListo('${esc(l.clave)}')">Usar esta ficha</button></div></div>`;
+    }
+    function bspRegistrarListo(clave) {
+        const l = bsp.res.lineas.find(x => x.clave === clave); if (!l) return;
+        const v = id => document.getElementById(id).value.trim(), err = document.getElementById('bspRErr'), opt = document.getElementById('bspRIva').selectedOptions[0];
+        const d = { codigo: v('bspRCod').toUpperCase(), descripcion: v('bspRDes').toUpperCase().replace(/\s+/g, ' '), categoria: v('bspRCat'), unidad: v('bspRUnd'), iva: v('bspRIva'),
+                    porIva: opt ? Number(opt.dataset.extra) || 0 : 0, proveedor: v('bspRPro') };
+        if (!d.codigo || d.codigo.length > 15) { err.textContent = 'El código debe tener de 1 a 15 caracteres.'; return; }
+        if (!d.descripcion) { err.textContent = 'Escriba la descripción.'; return; }
+        if (!d.categoria || !d.unidad) { err.textContent = 'Elija la categoría y la unidad.'; return; }
+        if (!(l.detal > 0)) { err.textContent = 'Esta orden no trae precio detal: no se puede registrar con ella.'; return; }
+        if (Object.keys(bsp.registrar).some(k => k !== clave && bsp.registrar[k].codigo === d.codigo)) { err.textContent = 'Ese código ya lo va a usar otro producto.'; return; }
+        delete bsp.asignar[clave]; bsp.registrar[clave] = d; bsp.marcadas[l.id] = true; bsp.registrando = null; bspPintar();
+    }
     async function bspBuscar() {
         const txt = (document.getElementById('bspBus') || {}).value || '';
         if (txt.trim().length < 2) return;
@@ -14625,18 +14666,23 @@ Reglas:
             <div class="filters" style="margin:.5rem 0"><div style="flex:1"><label for="bspBus">Buscar en BigSoft</label><input type="search" id="bspBus" autocomplete="off" placeholder="Código o palabras" value="${esc(b ? b.texto : '')}" onkeydown="if(event.key==='Enter'){event.preventDefault();bspBuscar()}"></div>
                 <div style="align-self:end"><button type="button" class="btn-ghost" onclick="bspBuscar()">Buscar</button></div></div>
             ${b && b.cargando ? cargandoHTML('Buscando en el BigSoft de la tienda...') + `<div class="req-acciones" style="justify-content:center"><button type="button" class="btn-ghost btn-mini" onclick="bspDetener()">${ico('detener')}Detener</button></div>` : b && b.error ? `<div class="login-error">${esc(b.error)}</div>`
-              : filas ? `<div class="nota">${b ? 'Resultados' : 'Parecidos'} en BigSoft:</div><div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><tbody>${filas}</tbody></table></div>` : '<div class="nota">No hay parecidos: busque por código o por otra palabra. Si no está, regístrelo en BigSoft (o con "Ingresar en BigSoft" de su nota) y revise de nuevo.</div>'}
-            <div class="req-acciones" style="justify-content:flex-end;margin:0"><button type="button" class="btn-ghost" onclick="bsp.eligiendo=null;almPintar()">Cancelar</button></div></div>`;
+              : filas ? `<div class="nota">${b ? 'Resultados' : 'Parecidos'} en BigSoft:</div><div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><tbody>${filas}</tbody></table></div>` : '<div class="nota">No hay parecidos: busque por código o por otra palabra. Si no está, regístrelo con "No está: registrar nuevo".</div>'}
+            <div class="req-acciones" style="justify-content:flex-end;margin:0"><button type="button" class="btn-ghost" onclick="bsp.eligiendo=null;almPintar()">Cancelar</button><button type="button" class="btn-ghost" onclick="bspRegistrar('${esc(l.clave)}')">No está: registrar nuevo</button></div></div>`;
     }
     async function bspCargar() {
         const r = bsp.res, ids = r.lineas.filter(l => (bspCargable(l) && bsp.marcadas[l.id]) || l.estado === 'YA').map(l => l.id);
-        const asignar = {}; r.lineas.forEach(l => { if (bsp.marcadas[l.id] && bsp.asignar[l.clave]) asignar[l.clave] = bsp.asignar[l.clave].codigo; });
+        const asignar = {}, registrar = {};
+        r.lineas.forEach(l => {
+            if (!bsp.marcadas[l.id]) return;
+            if (bsp.asignar[l.clave]) asignar[l.clave] = bsp.asignar[l.clave].codigo;
+            else if (bsp.registrar[l.clave]) registrar[l.clave] = Object.assign({}, bsp.registrar[l.clave], { costo: l.costo || 0, detal: l.detal || 0, mayor: l.mayor || 0 });
+        });
         const claveAdmin = bsp.claveAdmin || (esPrincipal ? clave : '');
         if (!claveAdmin) { bsp.errClave = 'Escriba la clave de administrador para cargar los precios en BigSoft.'; bspPintar(); return; }
         const id = Date.now();
         Object.assign(bsp, { id, paso: 'cargando', errorSuave: false, seg: 0, estadoTarea: 'pendiente', errClave: '' }); bspPintar();
         try {
-            const t = await bsrTarea('precios_cargar', { local: bsp.tienda, ids, asignar, claveAdmin }, bspAlEsperar(id), 180, bsp.senal = { detenido: false });
+            const t = await bsrTarea('precios_cargar', { local: bsp.tienda, ids, asignar, registrar, claveAdmin }, bspAlEsperar(id), 180, bsp.senal = { detenido: false });
             if (bsp.id !== id) return;
             bsp.final = t.resultado || {}; bsp.paso = 'listo'; cmpOrd = null;   // las órdenes cambiaron: "Por actualizar" se vuelve a leer
         } catch (e) {
@@ -14658,6 +14704,7 @@ Reglas:
         if (bsp.paso === 'listo') {
             const f = bsp.final;
             return cab + `<div class="banner ok" style="display:block">✓ ${f.cargados || 0} precio(s) cargados en el BigSoft de ${esc(bsp.tienda)}${f.marcados ? ` y ${f.marcados} marcado(s) como actualizados` : ''}. Usuario ${esc(f.usuario || '')}.</div>
+                ${(f.registrados || []).length ? `<div class="banner ok" style="display:block">Registrados en el BigSoft de ${esc(bsp.tienda)}: ${f.registrados.map(esc).join(', ')}.</div>` : ''}
                 ${(f.noCargados || []).length ? `<div class="banner warn" style="display:block">No se cargaron (no están en BigSoft): ${f.noCargados.map(esc).join(', ')}.</div>` : ''}
                 ${f.yaNoPendientes ? `<div class="nota">${f.yaNoPendientes} ya no estaban pendientes (alguien los cargó antes).</div>` : ''}
                 ${f.aviso ? `<div class="banner warn" style="display:block">${esc(f.aviso)}</div>` : ''}`;
@@ -14668,26 +14715,28 @@ Reglas:
         const cargables = l.filter(bspCargable), marcadas = cargables.filter(x => bsp.marcadas[x.id]), ya = l.filter(x => x.estado === 'YA');
         const dos = (bcv, div) => bcv > 0 ? `${bspF(bcv, 3)}<small>${bspF(div, 4)} div.</small>` : '—';
         const filas = l.map(x => {
-            const e = BSP_ESTADO[x.estado] || [x.estado, ''], asg = bsp.asignar[x.clave], puede = bspCargable(x);
-            const cod = x.asignado && x.bigsoft ? `${esc(x.codigo || '—')} → ${esc(x.bigsoft.codigo)}` : asg ? `${esc(x.codigo || '—')} → ${esc(asg.codigo)}` : esc(x.codigo || '—');
-            return `<tr${bsp.eligiendo === x.clave ? ' class="bsr-activa"' : ''}><td><input type="checkbox" ${puede ? '' : 'disabled'} ${puede && bsp.marcadas[x.id] ? 'checked' : ''} onchange="bspMarcar('${esc(x.id)}', this.checked)" aria-label="Cargar ${esc(x.descripcion)}"></td>
+            const e = BSP_ESTADO[x.estado] || [x.estado, ''], asg = bsp.asignar[x.clave], reg = bsp.registrar[x.clave], puede = bspCargable(x);
+            const cod = x.asignado && x.bigsoft ? `${esc(x.codigo || '—')} → ${esc(x.bigsoft.codigo)}` : asg ? `${esc(x.codigo || '—')} → ${esc(asg.codigo)}` : reg && reg.codigo !== x.codigo ? `${esc(x.codigo || '—')} → ${esc(reg.codigo)}` : esc(x.codigo || '—');
+            const sinProd = x.estado === 'NOEXISTE' || x.estado === 'SINCODIGO';
+            return `<tr${bsp.eligiendo === x.clave || bsp.registrando === x.clave ? ' class="bsr-activa"' : ''}><td><input type="checkbox" ${puede ? '' : 'disabled'} ${puede && bsp.marcadas[x.id] ? 'checked' : ''} onchange="bspMarcar('${esc(x.id)}', this.checked)" aria-label="Cargar ${esc(x.descripcion)}"></td>
                 <td class="izq"><b>${cod}</b></td>
-                <td class="izq">${esc(x.nombreNuevo || (x.bigsoft ? x.bigsoft.descripcion : x.descripcion))}${x.nombreNuevo ? `<small class="bsr-dec">Toma el nombre de Plaza Valencia (antes: ${esc(x.bigsoft ? x.bigsoft.descripcion : '')})</small>` : ''}${asg ? `<small class="bsr-dec">→ Se carga en ${esc(asg.codigo)} · ${esc(asg.descripcion)}</small>` : ''}</td>
+                <td class="izq">${esc(x.nombreNuevo || (x.bigsoft ? x.bigsoft.descripcion : x.descripcion))}${x.nombreNuevo ? `<small class="bsr-dec">Toma el nombre de Plaza Valencia (antes: ${esc(x.bigsoft ? x.bigsoft.descripcion : '')})</small>` : ''}${asg ? `<small class="bsr-dec">→ Se carga en ${esc(asg.codigo)} · ${esc(asg.descripcion)}</small>` : ''}${reg ? `<small class="bsr-dec">→ Se registra en BigSoft como ${esc(reg.codigo)} · ${esc(reg.descripcion)}</small>` : ''}</td>
                 <td>${dos(x.detal, x.nuevoDetal)}</td><td>${dos(x.mayor, x.nuevoMayor)}</td><td>${dos(x.costo, x.nuevoCosto)}</td>
                 <td>${bspF(x.actualDetal, 4)}</td><td>${x.detalBs != null ? bspF(x.detalBs) : '—'}</td>
-                <td class="izq"><span class="chip ${asg ? 'st-info' : e[1]}">${asg ? 'Asignado' : e[0]}</span></td>
-                <td class="izq">${x.estado === 'NOEXISTE' || x.estado === 'SINCODIGO' ? (asg ? `<button type="button" class="btn-ghost btn-mini" onclick="bspQuitarAsignado('${esc(x.clave)}')">Quitar</button>` : `<button type="button" class="btn-ghost btn-mini" onclick="bspElegir('${esc(x.clave)}')">Elegir producto</button>`) : ''}</td></tr>`;
+                <td class="izq"><span class="chip ${asg || reg ? 'st-info' : e[1]}">${asg ? 'Asignado' : reg ? 'Se registra' : e[0]}</span></td>
+                <td class="izq">${sinProd ? (asg || reg ? `<button type="button" class="btn-ghost btn-mini" onclick="bspQuitarAsignado('${esc(x.clave)}')">Quitar</button>${reg ? ` <button type="button" class="btn-ghost btn-mini" onclick="bspRegistrar('${esc(x.clave)}')">Cambiar ficha</button>` : ''}`
+                    : `<span class="bsr-botones" style="display:inline-flex;gap:.3rem;flex-wrap:nowrap"><button type="button" class="btn-ghost btn-mini" onclick="bspElegir('${esc(x.clave)}')">Elegir producto</button><button type="button" class="btn-ghost btn-mini" onclick="bspRegistrar('${esc(x.clave)}')">Registrar nuevo</button></span>`) : ''}</td></tr>`;
         }).join('');
-        const el = l.find(x => x.clave === bsp.eligiendo);
+        const el = l.find(x => x.clave === bsp.eligiendo), rg = l.find(x => x.clave === bsp.registrando);
         return cab + `<div class="nota" ${tasa.hoy ? '' : 'style="color:var(--warn)"'}>Tasa de precios del BigSoft de ${esc(bsp.tienda)}: <b>${bspF(tasa.precios)}</b> · descuento por pago en divisas ${bspF(tasa.descuento)} %${tasa.hoy ? '' : ` · <b>OJO: no es la de hoy${tasa.fecha ? ' (es del ' + fechaBonita(tasa.fecha) + ')' : ''}: actualice la tasa en la tienda antes de cargar</b>`}</div>
             <div class="req-acciones alm-lista-acc">${cargables.length ? `<button type="button" class="btn-ghost btn-mini" onclick="bspTodas()">${marcadas.length === cargables.length ? 'Quitar todos' : `Marcar todos (${cargables.length})`}</button>` : ''}</div>
             <div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th></th><th class="izq">Código</th><th class="izq">Producto</th><th>Detal $ BCV</th><th>Mayor $ BCV</th><th>Costo $ BCV</th><th>Detal hoy (div.)</th><th>Detal nuevo Bs</th><th class="izq">En BigSoft</th><th></th></tr></thead><tbody>${filas}</tbody></table></div>
-            ${el ? bspElegirHTML(el) : ''}
+            ${el ? bspElegirHTML(el) : rg ? bspFichaHTML(rg) : ''}
             <div class="nota">Debajo de cada precio: cómo queda en BigSoft en divisas (menos el descuento por pago en divisas). El Precio B (gran mayor) no se toca.${ya.length ? ` ${ya.length} ya tenían ese precio: se marcan solos al cargar.` : ''}
                 ${ing.ok ? ` Usuario de BigSoft: <b>${esc(ing.texto)}</b>.` : ing.texto ? ` <b style="color:var(--danger)">${esc(ing.texto)}</b>` : ''}</div>
             <div class="bsr-clave"><label for="bspClave">Clave de administrador</label><input type="password" id="bspClave" autocomplete="off" placeholder="Clave de administrador" value="${esc(bsp.claveAdmin || '')}" oninput="bsp.claveAdmin=this.value;bsp.errClave=''">
                 <small>Cargar precios en BigSoft desde el panel lo hace un administrador o se autoriza con su clave.</small>${bsp.errClave ? `<div class="login-error">${esc(bsp.errClave)}</div>` : ''}</div>
-            <div class="req-acciones" style="justify-content:flex-end"><button type="button" class="btn-primary" onclick="bspCargar()" ${(marcadas.length || ya.length) && ing.ok && !bsp.eligiendo ? '' : 'disabled'}>${marcadas.length ? `Cargar ${marcadas.length} en BigSoft` : 'Marcar los que ya están'}</button></div>`;
+            <div class="req-acciones" style="justify-content:flex-end"><button type="button" class="btn-primary" onclick="bspCargar()" ${(marcadas.length || ya.length) && ing.ok && !bsp.eligiendo && !bsp.registrando ? '' : 'disabled'}>${marcadas.length ? `Cargar ${marcadas.length} en BigSoft` : 'Marcar los que ya están'}</button></div>`;
     }
 
     // ---------- Reportes de tiendas (BigSoft.gs › bsr_pedir tipo "reporte", Utilidades › Reportes.ps1) ----------
@@ -14946,6 +14995,18 @@ Reglas:
     // Un pedido a la PC de la tienda: espera su respuesta (alEsperar muestra cuánto lleva y si el avisador responde)
     // senal (opcional): { detenido, despertar } — con "Detener" se deja de esperar al instante (el error trae .detenido)
     const bsrDetenido = () => { const e = new Error('Se dejó de esperar a la PC de la tienda.'); e.detenido = true; return e; };
+    // PowerShell convierte una lista de UN solo elemento en el elemento suelto (y una vacía en null): con una sola orden de
+    // precio llegaba "lineas" como objeto y fallaba ("forEach is not a function"). Aquí se vuelven listas otra vez.
+    const BSR_LISTAS = new Set(['lineas', 'sugerencias', 'productos', 'categorias', 'unidades', 'ivas', 'proveedores', 'hechos', 'noCargados', 'registrados', 'notas', 'resumen', 'hojas']);
+    function bsrListas(o) {
+        if (!o || typeof o !== 'object') return o;
+        if (Array.isArray(o)) { o.forEach(bsrListas); return o; }
+        Object.keys(o).forEach(k => {
+            if (BSR_LISTAS.has(k) && !Array.isArray(o[k])) o[k] = o[k] == null || o[k] === '' ? [] : [o[k]];
+            bsrListas(o[k]);
+        });
+        return o;
+    }
     async function bsrTarea(tipo, datos, alEsperar, limite = 180, senal = null) {
         const p = await llamarApi(Object.assign({ action: 'bsr_pedir', tipo }, datos));
         if (senal && senal.detenido) throw bsrDetenido();
@@ -14956,7 +15017,7 @@ Reglas:
             if (senal && senal.detenido) throw bsrDetenido();
             let v; try { v = await llamarApi({ action: 'bsr_ver', id: p.id }); } catch (e) { if (Date.now() - t0 > limite * 1000) throw e; continue; }
             const t = v.tarea;
-            if (t.estado === 'hecho' || t.estado === 'atencion') return t;
+            if (t.estado === 'hecho' || t.estado === 'atencion') { bsrListas(t.resultado); return t; }
             if (t.estado === 'error') throw new Error(t.error || 'La PC de la tienda no pudo hacerlo');
             const seg = Math.round((Date.now() - t0) / 1000);
             if (alEsperar) alEsperar(t.estado, v.vivo, seg, p.local, t.avance || null);
