@@ -3497,7 +3497,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-06.4';
+    const VERSION_SERVIDOR = '2026-11-06.5';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -14646,7 +14646,8 @@ Reglas:
         return new Intl.NumberFormat('es-VE', { minimumFractionDigits: dec[0], maximumFractionDigits: dec[1] }).format(v) + (f === 'pct' ? ' %' : '');
     }
     // Diferencia en pantalla con los mismos colores del Excel: amarillo si sobra, rojo si falta, sin color si es 0 o casi 0
-    const rptColor = (col, v) => col.cond !== 'signo' || typeof v !== 'number' || Math.abs(v) < 0.005 ? ''
+    const RPT_MARGEN = 0.01;   // diferencia "casi 0": hasta 10 g o 0,01 unidades, sin color
+    const rptColor = (col, v) => col.cond !== 'signo' || typeof v !== 'number' || Math.abs(v) <= RPT_MARGEN ? ''
         : v > 0 ? ' style="background:var(--amar-bg);color:var(--amar-txt);font-weight:600"' : ' style="background:var(--bad-bg);color:var(--bad);font-weight:600"';
     const rptRepintar = () => { if (vistaActual === 'reportes') almPintar(); };
     function rptVista() {
@@ -14801,7 +14802,7 @@ Reglas:
         await rptGuardarExcel(X, wb, `${titulo.replace(/\//g, '-')} ${varias ? 'todas las tiendas' : c.tiendas[0]}.xlsx`.replace(/[\\/:*?"<>|]/g, ''), colores);
     }
     // Guarda el Excel. Con colores: se agrega a la hoja una regla de formato condicional de Excel (si alguien corrige un número,
-    // el color cambia solo): > 0,0049 amarillo, < -0,0049 rojo, 0 o casi 0 sin color. SheetJS no la escribe: se mete en el XML con JSZip.
+    // el color cambia solo): más de 0,01 amarillo, menos de -0,01 rojo, 0 o casi 0 (hasta 10 g o 0,01 und) sin color. SheetJS no la escribe: se mete en el XML con JSZip.
     async function rptGuardarExcel(X, wb, nombre, colores) {
         if (!colores.length) { X.writeFile(wb, nombre); return; }
         let datos = X.write(wb, { type: 'array', bookType: 'xlsx' });
@@ -14821,8 +14822,10 @@ Reglas:
             for (const h of Object.keys(porHoja)) {
                 const ruta = `xl/worksheets/sheet${h}.xml`, f = zip.file(ruta); if (!f) continue;
                 let xml = await f.async('string');
-                const cf = porHoja[h].map(ref => `<conditionalFormatting sqref="${ref}"><cfRule type="cellIs" dxfId="0" priority="${prio++}" operator="greaterThan"><formula>0.0049</formula></cfRule>`
-                                              + `<cfRule type="cellIs" dxfId="1" priority="${prio++}" operator="lessThan"><formula>-0.0049</formula></cfRule></conditionalFormatting>`).join('');
+                // Solo números: una celda vacía (entradas y salidas) Excel la toma como texto, y el texto es "mayor" que cualquier número
+                const cf = porHoja[h].map(ref => { const c = ref.split(':')[0];
+                    return `<conditionalFormatting sqref="${ref}"><cfRule type="expression" dxfId="0" priority="${prio++}"><formula>AND(ISNUMBER(${c}),${c}&gt;${RPT_MARGEN})</formula></cfRule>`
+                         + `<cfRule type="expression" dxfId="1" priority="${prio++}"><formula>AND(ISNUMBER(${c}),${c}&lt;-${RPT_MARGEN})</formula></cfRule></conditionalFormatting>`; }).join('');
                 // Va después de sheetData / autoFilter / mergeCells y antes de lo que sigue (orden que exige Excel)
                 const m = xml.match(/<(dataValidations|hyperlinks|printOptions|pageMargins|pageSetup|headerFooter|rowBreaks|colBreaks|customProperties|cellWatches|ignoredErrors|smartTags|drawing|legacyDrawing|picture|oleObjects|controls|webPublishItems|tableParts|extLst)\b/);
                 xml = m ? xml.slice(0, m.index) + cf + xml.slice(m.index) : xml.replace('</worksheet>', cf + '</worksheet>');
