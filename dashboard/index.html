@@ -515,6 +515,11 @@
         @keyframes carga-gira { to { transform: rotate(360deg); } }
         @media (prefers-reduced-motion: reduce) { .cuadros, .carga-anillo::after { animation-duration: 2.5s; } }
         .btn-cargando { display: inline-flex; align-items: center; gap: .5rem; }
+        /* Ingresar en BigSoft a distancia */
+        .bsr-caja { border: 1px solid var(--border); border-radius: 12px; padding: .8rem 1rem; margin: .6rem 0; background: var(--list-bg, transparent); }
+        small.bsr-dec { color: var(--primary); font-weight: 600; }
+        td.bsr-bts { white-space: normal; } td.bsr-bts .btn-mini { margin: .1rem .25rem .1rem 0; } .bsr-no { color: var(--danger); }
+        tr.bsr-activa td { background: color-mix(in srgb, var(--primary) 9%, transparent); }
         /* Entrar con huella */
         .huella-entrar { display: flex; flex-direction: column; align-items: stretch; gap: .45rem; margin: .25rem 0 .5rem; }
         .huella-entrar .btn-login { display: inline-flex; align-items: center; justify-content: center; gap: .55rem; margin-top: 0; }
@@ -3324,7 +3329,7 @@
         }
     }
     // Lo que no se guarda para después (necesita respuesta en el momento o es de administración de claves)
-    const NO_COLA = /^(login|ping|cambios|enlinea|nom_autorizar|adm_|alm_|cmp_)/;   // el almacén necesita internet: la nota lleva número y existencia del momento
+    const NO_COLA = /^(login|ping|cambios|enlinea|nom_autorizar|adm_|alm_|cmp_|bsr_|huella_)/;   // el almacén necesita internet: la nota lleva número y existencia del momento
     COLA.configurar({ url: WEB_APP_URL, clave: () => clave, usuario: () => nombreUsuario,
         alTerminar: hechos => mostrarBanner(`Se enviaron ${hechos.length} registro(s) que estaban pendientes sin conexión.` + (hechos.some(x => x.tipo === 'panel') ? ' Pulse Actualizar para verlos.' : ''), 'ok') });
     // Identificador de este equipo (al azar, queda en el navegador): el servidor cuenta los intentos con clave incorrecta por equipo
@@ -3462,7 +3467,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-05.2';
+    const VERSION_SERVIDOR = '2026-11-06.1';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -12782,7 +12787,7 @@
                 <td>${fmt(n.total)}${n.totalBs ? `<small>Bs ${fmt(n.totalBs)}</small>` : ''}</td>
                 <td class="izq">${n.estado === 'Anulada' ? '<span class="chip st-sobra">Anulada</span>' : n.condicion === 'Tienda' ? almChipMarca(n.ingresada, 'Ingresada', 'Por ingresar', 'st-amar') : '—'}</td>
                 <td class="izq">${n.estado === 'Anulada' ? '' : almChipMarca(n.verificada, 'Verificada', 'Sin verificar')}</td>
-                <td class="alm-acc"><button type="button" class="btn-ghost btn-mini" onclick="almVerNota('${esc(n.numero)}')">Ver</button><button type="button" class="btn-ghost btn-mini" onclick="almImprimir('nota', almNotaDe('${esc(n.numero)}'))">Imprimir</button></td></tr>`).join('')}
+                <td class="alm-acc"><button type="button" class="btn-ghost btn-mini" onclick="almVerNota('${esc(n.numero)}')">Ver</button><button type="button" class="btn-ghost btn-mini" onclick="almImprimir('nota', almNotaDe('${esc(n.numero)}'))">Imprimir</button>${n.estado !== 'Anulada' && n.condicion === 'Tienda' && !n.ingresada ? `<button type="button" class="btn-ghost btn-mini" onclick="bsrAbrir('${esc(n.numero)}')" title="Ingresarla en el BigSoft de la tienda desde aquí">Ingresar en BigSoft</button>` : ''}</td></tr>`).join('')}
             </tbody></table></div>` : '<div class="empty">No hay notas con estos filtros.</div>'}`;
     }
     const almNotaDe = numero => (almNotas || []).find(x => x.numero === numero) || (almUltimaNota && almUltimaNota.numero === numero ? almUltimaNota : null);
@@ -12805,6 +12810,7 @@
             ${anulada ? `<div class="banner error" style="display:block;margin-top:.6rem">${esc(n.anulacion)}</div>` : !permisos.includes('movalmacen') ? '' : `<div class="alm-marcas-fila" id="almMarcasNota" data-num="${esc(n.numero)}">${almMarcasHTML(n)}</div>`}
             <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0;flex-wrap:wrap">
                 ${anulada ? '' : `<button type="button" class="btn-eliminar" onclick="almAnular('${esc(n.numero)}')">Anular</button><button type="button" class="btn-ghost" onclick="almModificarNota('${esc(n.numero)}')">Modificar (clave)</button>`}
+                ${!anulada && tienda && !n.ingresada ? `<button type="button" class="btn-primary" onclick="bsrAbrir('${esc(n.numero)}')" title="La PC de la tienda la ingresa en su BigSoft; aquí puede arreglar los renglones">Ingresar en BigSoft</button>` : ''}
                 ${esPrincipal ? `<button type="button" class="btn-ghost" onclick="almEnviarTelegram(almNotaDe('${esc(n.numero)}'))" title="Las notas se envían solas al guardarlas">Reenviar a Telegram</button>` : ''}
                 <button type="button" class="btn-ghost" onclick="almImprimir('nota', almNotaDe('${esc(n.numero)}'))">Imprimir</button><button type="button" class="btn-primary" onclick="almCerrar()" autofocus>Cerrar</button></div></div>`);
     }
@@ -14429,6 +14435,192 @@ Reglas:
             almCerrar(); almUsar(r); almNotas = null; almPintar();
             mostrarBanner(`Nota ${numero} anulada.` + (r.rebajado ? ` Se rebajó $ ${fmt(r.rebajado)} de la deuda del cliente.` : ''), 'ok');
         } catch (e) { document.getElementById('almAnError').textContent = e.message; btn.disabled = false; btn.textContent = 'Anular nota'; }
+    }
+
+    // ---------- Ingresar en BigSoft A DISTANCIA (BigSoft.gs › bsr_*, Utilidades › Remoto.ps1) ----------
+    // El panel pide y el avisador de la PC de la tienda lo hace en SU BigSoft (pregunta cada 15 s; cada 3 s mientras hay trabajo):
+    // 1) revisa la nota renglón por renglón, 2) aquí se arregla lo que haga falta (otro producto, registrar uno nuevo, el nombre,
+    // no ingresar un renglón, o cambiar el producto de un renglón que estaba bien) y 3) la ingresa y la marca en Plaza Valencia.
+    let bsr = null;
+    const sinAcentos = s => String(s || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Z0-9]/g, '');
+    const BSR_MALOS =['NOEXISTE', 'DEPENDE', 'SERIAL', 'SINCODIGO', 'NOMBRE'];
+    const BSR_ESTADO = { OK: ['Lista', 'st-ok'], NOEXISTE: ['No existe en BigSoft', 'st-falta'], SINCODIGO: ['Sin código', 'st-falta'], NOMBRE: ['Otro nombre en BigSoft', 'st-amar'],
+                         DEPENDE: ['Depende de otro código', 'st-falta'], SERIAL: ['Con serial', 'st-falta'], OMITIDO: ['No se ingresa', 'st-amar'] };
+    // Un pedido a la PC de la tienda: espera su respuesta (alEsperar muestra cuánto lleva y si el avisador responde)
+    async function bsrTarea(tipo, datos, alEsperar) {
+        const p = await llamarApi(Object.assign({ action: 'bsr_pedir', tipo }, datos));
+        if (alEsperar) alEsperar('pendiente', p.vivo, 0, p.local);
+        const t0 = Date.now();
+        for (;;) {
+            await new Promise(r => setTimeout(r, 2500));
+            let v; try { v = await llamarApi({ action: 'bsr_ver', id: p.id }); } catch (e) { if (Date.now() - t0 > 180000) throw e; continue; }
+            const t = v.tarea;
+            if (t.estado === 'hecho' || t.estado === 'atencion') return t;
+            if (t.estado === 'error') throw new Error(t.error || 'La PC de la tienda no pudo hacerlo');
+            const seg = Math.round((Date.now() - t0) / 1000);
+            if (alEsperar) alEsperar(t.estado, v.vivo, seg, p.local);
+            if (seg > 180) throw new Error(`La PC de ${p.local} no respondió en 3 minutos. Debe estar encendida, con internet y con el avisador de Plaza Valencia abierto (el icono junto al reloj de Windows).`);
+        }
+    }
+    function bsrEsperaHTML(texto) {
+        const b = bsr || {}, v = b.vivo || {}, dormida = v.hace == null || v.hace > 60;
+        return `${cargandoHTML(texto)}<div class="nota" style="text-align:center">${b.estadoTarea === 'curso' ? 'La PC de ' + esc(b.local || 'la tienda') + ' ya lo está haciendo...'
+            : dormida ? `<b style="color:var(--warn)">La PC de ${esc(b.local || 'la tienda')} no ha respondido ${v.hace == null ? 'hoy' : 'en ' + Math.round(v.hace / 60) + ' min'}.</b> Debe estar encendida, con internet y con el avisador abierto (icono de Plaza Valencia junto al reloj). Se sigue esperando.`
+            : 'Esperando a la PC de ' + esc(b.local || 'la tienda') + ' (responde cada 15 segundos)...'}${b.seg ? ` · ${b.seg} s` : ''}</div>`;
+    }
+    async function bsrAbrir(numero) {
+        bsr = { numero, paso: 'revisando', arr: { asignar: {}, nombres: {}, omitir: {}, registrar: {} }, res: null, eligiendo: null, registrando: null, hechos: [] };
+        bsrPintar();
+        try {
+            const t = await bsrTarea('revisar', { numero }, (estado, vivo, seg, local) => { if (!bsr || bsr.numero !== numero) return; Object.assign(bsr, { estadoTarea: estado, vivo, seg, local: local || bsr.local }); if (bsr.paso === 'revisando') bsrPintar(); });
+            if (!bsr || bsr.numero !== numero) return;
+            bsr.res = t.resultado; bsr.paso = t.resultado && t.resultado.yaIngresada ? 'ya' : 'lista';
+        } catch (e) { if (!bsr || bsr.numero !== numero) return; bsr.paso = 'error'; bsr.error = e.message; }
+        bsrPintar();
+    }
+    // Lo decidido para un renglón (o null)
+    function bsrDecision(l) {
+        const a = bsr.arr, k = l.clave;
+        if (a.omitir[k]) return { tipo: 'omitir', texto: 'No se ingresa (queda anotado en Plaza Valencia)' };
+        if (a.registrar[k]) return { tipo: 'registrar', texto: `Se registra en BigSoft como ${a.registrar[k].codigo} · ${a.registrar[k].descripcion}` };
+        if (a.asignar[k]) return { tipo: 'asignar', texto: `Entra como ${a.asignar[k].codigo} · ${a.asignar[k].descripcion}` };
+        if (a.nombres[k]) return { tipo: 'nombre', texto: a.nombres[k].accion === 'PONER' ? `En BigSoft ${l.codigo} pasa a llamarse ${String(l.descripcionNota).toUpperCase()}` : 'Es el mismo producto: se deja el nombre de BigSoft' };
+        return null;
+    }
+    const bsrPendientes = () => ((bsr.res || {}).lineas || []).filter(l => BSR_MALOS.includes(l.estado) && !bsrDecision(l));
+    function bsrQuitar(k) { ['asignar', 'nombres', 'registrar'].forEach(x => delete bsr.arr[x][k]); delete bsr.arr.omitir[k]; }
+    function bsrDeshacer(k) { bsrQuitar(k); bsrPintar(); }
+    function bsrOmitir(k) { bsrQuitar(k); bsr.arr.omitir[k] = true; bsr.eligiendo = bsr.registrando = null; bsrPintar(); }
+    function bsrNombre(k, accion) { const l = bsr.res.lineas.find(x => x.clave === k); bsrQuitar(k); bsr.arr.nombres[k] = { accion, codigo: l.codigo, nombre: l.descripcionNota }; bsrPintar(); }
+    function bsrElegir(k) { bsr.eligiendo = k; bsr.registrando = null; bsr.busqueda = null; bsrPintar(); setTimeout(() => { const b = document.getElementById('bsrBus'); if (b) b.focus(); }, 50); }
+    function bsrUsar(k, codigo, descripcion) { bsrQuitar(k); bsr.arr.asignar[k] = { codigo, descripcion }; bsr.eligiendo = null; bsrPintar(); }
+    async function bsrBuscar() {
+        const inp = document.getElementById('bsrBus'), texto = (inp.value || '').trim();
+        if (texto.length < 2) return;
+        bsr.busqueda = { texto, cargando: true }; bsrPintar();
+        try { const t = await bsrTarea('buscar', { local: bsr.local, texto }); if (bsr.busqueda && bsr.busqueda.texto === texto) bsr.busqueda = { texto, productos: (t.resultado || {}).productos || [] }; }
+        catch (e) { if (bsr.busqueda) bsr.busqueda = { texto, error: e.message }; }
+        bsrPintar();
+    }
+    // Ficha para registrar un producto nuevo en el BigSoft de la tienda (con lo que sabe Plaza Valencia)
+    function bsrRegistrar(k) { bsr.registrando = k; bsr.eligiendo = null; bsrPintar(); }
+    function bsrFichaHTML(l) {
+        const li = bsr.res.listas || {}, sin = s => String(s || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+        const catPV = sin({ '01': 'CHARCUTERIA', '02': 'VIVERES', '03': 'BEBIDAS', '04': 'INSUMOS' }[l.categoria] || String(l.categoria || '').split(' ')[0]);
+        const opc = (lista, elegir) => { const xs = lista || [], i = Math.max(0, xs.findIndex(elegir)); return xs.map((x, j) => `<option value="${esc(x.codigo)}" data-extra="${x.extra || 0}"${j === i ? ' selected' : ''}>${esc(x.nombre)}</option>`).join(''); };
+        const n3 = v => v > 0 ? String(Math.round(v * 1000) / 1000) : '';
+        const ya = bsr.arr.registrar[l.clave] || {};
+        return `<div class="bsr-caja"><h4 class="per-sub" style="margin-top:0">Registrar en el BigSoft de ${esc(bsr.local || 'la tienda')}: ${esc(l.descripcionNota)}</h4>
+            <div class="filters" style="margin-bottom:.4rem">
+                <div><label for="bsrRCod">Código</label><input type="text" id="bsrRCod" maxlength="15" value="${esc(ya.codigo || l.codigoNota || '')}" placeholder="Código o código de barras"></div>
+                <div style="flex:2 1 260px"><label for="bsrRDes">Descripción</label><input type="text" id="bsrRDes" maxlength="100" value="${esc(ya.descripcion || String(l.descripcionNota || '').toUpperCase())}"></div>
+            </div>
+            <div class="filters" style="margin-bottom:.4rem">
+                <div><label for="bsrRCat">Categoría</label><select id="bsrRCat">${opc(li.categorias, x => ya.categoria ? x.codigo === ya.categoria : catPV && sin(x.nombre).includes(catPV))}</select></div>
+                <div><label for="bsrRUnd">Unidad</label><select id="bsrRUnd">${opc(li.unidades, x => ya.unidad ? x.codigo === ya.unidad : l.tipo === 'Pesado' ? /^KILO/.test(sin(x.nombre)) : /^UNIDAD/.test(sin(x.nombre)))}</select></div>
+                <div><label for="bsrRIva">IVA</label><select id="bsrRIva">${opc(li.ivas, x => ya.iva ? x.codigo === ya.iva : !(x.extra > 0))}</select></div>
+                <div><label for="bsrRPro">Proveedor</label><select id="bsrRPro"><option value="">(ninguno)</option>${(li.proveedores || []).map(x => `<option value="${esc(x.codigo)}"${ya.proveedor === x.codigo ? ' selected' : ''}>${esc(x.nombre)}</option>`).join('')}</select></div>
+            </div>
+            <div class="filters" style="margin-bottom:.4rem">
+                <div><label for="bsrRCos">Costo $</label><input type="text" inputmode="decimal" id="bsrRCos" value="${esc(ya.costo != null ? n3(ya.costo) : n3(l.precio))}"></div>
+                <div><label for="bsrRDet">Precio detal $</label><input type="text" inputmode="decimal" id="bsrRDet" value="${esc(ya.detal != null ? n3(ya.detal) : n3(l.detal))}"></div>
+                <div><label for="bsrRMay">Precio mayor $ (opcional)</label><input type="text" inputmode="decimal" id="bsrRMay" value="${esc(ya.mayor != null ? n3(ya.mayor) : n3(l.mayor))}"></div>
+            </div>
+            <div class="nota" style="margin-top:0">Precios en dólares como en Plaza Valencia${li.tasa ? `: BigSoft les quita su ${fmt(li.tasa.descuento)} % por pago en divisas y calcula los bolívares con su tasa (${fmt(li.tasa.precios)})` : ''}. Lo demás de la ficha se copia de un producto de la misma categoría y unidad. Existencia en 0: entra con la nota.</div>
+            <div class="login-error" id="bsrRErr"></div>
+            <div class="req-acciones" style="margin-bottom:0"><button type="button" class="btn-ghost" onclick="bsr.registrando=null;bsrPintar()">Cancelar</button><button type="button" class="btn-primary" onclick="bsrRegistrarListo('${esc(l.clave)}')">Usar esta ficha</button></div></div>`;
+    }
+    function bsrRegistrarListo(k) {
+        const v = id => document.getElementById(id).value.trim(), num = id => { const s = v(id).replace(',', '.'); return s ? Number(s) : 0; }, err = document.getElementById('bsrRErr');
+        const iva = document.getElementById('bsrRIva'), opt = iva.selectedOptions[0];
+        const d = { codigo: v('bsrRCod').toUpperCase(), descripcion: v('bsrRDes').toUpperCase().replace(/\s+/g, ' '), categoria: v('bsrRCat'), unidad: v('bsrRUnd'), iva: v('bsrRIva'), porIva: opt ? Number(opt.dataset.extra) || 0 : 0,
+                    proveedor: v('bsrRPro'), costo: num('bsrRCos'), detal: num('bsrRDet'), mayor: num('bsrRMay') };
+        if (!d.codigo || d.codigo.length > 15) { err.textContent = 'El código debe tener de 1 a 15 caracteres.'; return; }
+        if (!d.descripcion) { err.textContent = 'Escriba la descripción.'; return; }
+        if (!d.categoria || !d.unidad) { err.textContent = 'Elija la categoría y la unidad.'; return; }
+        if (!(d.detal > 0)) { err.textContent = 'Escriba el precio detal en $.'; return; }
+        if ([d.costo, d.detal, d.mayor].some(x => isNaN(x))) { err.textContent = 'Revise los montos.'; return; }
+        const otro = Object.keys(bsr.arr.registrar).find(x => x !== k && bsr.arr.registrar[x].codigo === d.codigo);
+        if (otro) { err.textContent = 'Ese código ya lo va a usar otro renglón.'; return; }
+        bsrQuitar(k); bsr.arr.registrar[k] = d; bsr.registrando = null; bsrPintar();
+    }
+    function bsrBotones(l) {
+        const k = esc(l.clave), b = (txt, fn, cls) => `<button type="button" class="btn-ghost btn-mini${cls ? ' ' + cls : ''}" onclick="${fn}">${txt}</button>`;
+        if (bsrDecision(l)) return b('Deshacer', `bsrDeshacer('${k}')`);
+        if (l.estado === 'NOMBRE') return b('Poner nombre de Plaza Valencia', `bsrNombre('${k}','PONER')`) + b('Es el mismo', `bsrNombre('${k}','MISMO')`) + b('Es otro: elegir', `bsrElegir('${k}')`);
+        if (l.estado === 'NOEXISTE' || l.estado === 'SINCODIGO') return b('Elegir de BigSoft', `bsrElegir('${k}')`) + b('Registrar nuevo', `bsrRegistrar('${k}')`) + b('No ingresar', `bsrOmitir('${k}')`, 'bsr-no');
+        if (l.estado === 'DEPENDE' || l.estado === 'SERIAL') return b('Elegir otro', `bsrElegir('${k}')`) + b('No ingresar', `bsrOmitir('${k}')`, 'bsr-no');
+        return b('Cambiar producto', `bsrElegir('${k}')`) + b('No ingresar', `bsrOmitir('${k}')`, 'bsr-no');
+    }
+    function bsrElegirHTML(l) {
+        const bus = bsr.busqueda, fila = p => `<button type="button" class="alm-op" data-k="${esc(l.clave)}" data-cod="${esc(p.codigo)}" data-des="${esc(p.descripcion)}" onclick="bsrUsar(this.dataset.k, this.dataset.cod, this.dataset.des)"${p.depende ? ' disabled title="Depende de otro código en BigSoft: elija el principal"' : ''}><b>${esc(p.codigo)}</b><span>${esc(p.descripcion)}</span><small>Existencia ${almCant(p.existencia, 'Pesado')}</small></button>`;
+        const sug = l.sugerencias || [];
+        return `<div class="bsr-caja"><h4 class="per-sub" style="margin-top:0">¿Qué producto del BigSoft de ${esc(bsr.local || 'la tienda')} es "${esc(l.descripcionNota)}"?</h4>
+            ${sug.length && !bus ? `<div class="nota" style="margin-top:0">Parecidos en ese BigSoft:</div><div class="alm-lista corta">${sug.map(fila).join('')}</div>` : ''}
+            <div class="filters" style="margin:.5rem 0"><div style="flex:1 1 260px"><label for="bsrBus">Buscar en el BigSoft de la tienda (código o palabras)</label>
+                <input type="search" id="bsrBus" autocomplete="off" value="${esc(bus ? bus.texto : '')}" onkeydown="if(event.key==='Enter'){event.preventDefault();bsrBuscar()}"></div>
+                <div style="align-self:flex-end"><button type="button" class="btn-ghost" onclick="bsrBuscar()">Buscar</button></div></div>
+            ${bus ? bus.cargando ? bsrEsperaHTML('Buscando en el BigSoft de la tienda...') : bus.error ? `<div class="login-error">${esc(bus.error)}</div>` : bus.productos.length ? `<div class="alm-lista corta">${bus.productos.map(fila).join('')}</div>` : '<div class="empty">No hay productos con esas palabras. Pruebe con otras (o con el código).</div>' : ''}
+            <div class="req-acciones" style="margin-bottom:0"><button type="button" class="btn-ghost" onclick="bsr.eligiendo=null;bsrPintar()">Cancelar</button>
+                ${l.estado === 'NOEXISTE' || l.estado === 'SINCODIGO' || l.estado === 'NOMBRE' ? `<button type="button" class="btn-ghost" onclick="bsrRegistrar('${esc(l.clave)}')">No está: registrar nuevo</button>` : ''}</div></div>`;
+    }
+    function bsrPintar() {
+        if (!bsr) return;
+        const n = almNotaDe(bsr.numero) || {}, cab = `<h3>Ingresar en BigSoft · nota N° ${esc(bsr.numero)}</h3><div class="req-sub">${esc(n.cliente || bsr.local || '')}${bsr.local ? ' · lo hace la PC de la tienda en su BigSoft' : ''}</div>`;
+        const cerrar = `<button type="button" class="btn-ghost" onclick="bsr=null;almCerrar()">Cerrar</button>`;
+        let cuerpo = '';
+        if (bsr.paso === 'revisando') cuerpo = bsrEsperaHTML('Revisando la nota en el BigSoft de la tienda...') + `<div class="req-acciones" style="justify-content:flex-end;margin-bottom:0">${cerrar}</div>`;
+        else if (bsr.paso === 'ingresando') cuerpo = bsrEsperaHTML('Ingresando la nota en el BigSoft de la tienda...') + `<div class="nota" style="text-align:center">Puede cerrar esta ventana: la PC de la tienda la termina igual y la nota queda marcada "Ingresada en tienda".</div><div class="req-acciones" style="justify-content:flex-end;margin-bottom:0">${cerrar}</div>`;
+        else if (bsr.paso === 'error') cuerpo = `<div class="banner error" style="display:block">${esc(bsr.error)}</div><div class="req-acciones" style="justify-content:flex-end;margin-bottom:0">${cerrar}<button type="button" class="btn-primary" onclick="bsrAbrir('${esc(bsr.numero)}')">Intentar de nuevo</button></div>`;
+        else if (bsr.paso === 'ya') cuerpo = `<div class="banner ok" style="display:block">Esta nota ya está en el BigSoft de la tienda (operación ${esc(bsr.res.yaIngresada)}${bsr.res.quien ? ', ' + esc(bsr.res.quien) : ''}). Quedó marcada en Plaza Valencia en la próxima revisión del avisador.</div><div class="req-acciones" style="justify-content:flex-end;margin-bottom:0">${cerrar}</div>`;
+        else if (bsr.paso === 'listo') {
+            const r = bsr.final || {};
+            cuerpo = `<div class="banner ok" style="display:block">✓ ${r.yaEstaba ? `La nota ya estaba en BigSoft (operación ${esc(r.doc)}): quedó marcada como ingresada.` : `Nota ingresada en el BigSoft de ${esc(bsr.local || 'la tienda')}: operación ${esc(r.doc)}, ${r.ingresados} producto(s), usuario ${esc(r.usuario)}.`}</div>
+                ${(r.hechos || []).length ? `<div class="nota">${r.hechos.map(esc).join('<br>')}</div>` : ''}
+                ${r.omitidos ? `<div class="banner warn" style="display:block">No se ingresaron (quedaron anotados en la nota): ${esc(r.omitidos)}</div>` : ''}
+                ${r.aviso ? `<div class="banner warn" style="display:block">${esc(r.aviso)}</div>` : ''}
+                <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-primary" onclick="bsr=null;almCerrar()">Listo</button></div>`;
+        } else {
+            const res = bsr.res, lineas = res.lineas || [], falta = bsrPendientes(), ing = res.ingresa || {};
+            const filas = lineas.map(l => {
+                const d = bsrDecision(l), e = BSR_ESTADO[l.estado] || [l.estado, ''];
+                const cod = l.codigo && l.codigo !== l.codigoNota ? `${esc(l.codigoNota || '—')} → ${esc(l.codigo)}` : esc(l.codigoNota || l.codigo || '—');
+                return `<tr${bsr.eligiendo === l.clave || bsr.registrando === l.clave ? ' class="bsr-activa"' : ''}><td class="izq"><b>${cod}</b></td>
+                    <td class="izq">${esc(l.descripcionNota)}${l.descripcion && l.estado !== 'NOEXISTE' && l.estado !== 'SINCODIGO' && sinAcentos(l.descripcion) !== sinAcentos(l.descripcionNota) ? `<small>En BigSoft: ${esc(l.descripcion)}</small>` : ''}
+                        ${d ? `<small class="bsr-dec">→ ${esc(d.texto)}</small>` : ''}</td>
+                    <td>${almCant(l.cantidad, l.tipo)}<small>${l.estado === 'OK' || l.existe ? 'hay ' + almCant(l.existe || 0, l.tipo) : ''}</small></td>
+                    <td class="izq">${d ? '<span class="chip st-info">Arreglado</span>' : `<span class="chip ${e[1]}">${esc(e[0])}</span>`}</td>
+                    <td class="izq bsr-bts">${bsrBotones(l)}</td></tr>`;
+            }).join('');
+            const ab = lineas.find(l => l.clave === bsr.eligiendo), rg = lineas.find(l => l.clave === bsr.registrando);
+            cuerpo = `${(bsr.hechos || []).length ? `<div class="banner warn" style="display:block">Ya se hizo en la tienda: ${bsr.hechos.map(esc).join(' · ')}. Todavía falta resolver lo marcado abajo.</div>` : ''}
+                <div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Código</th><th class="izq">Producto</th><th>Cantidad</th><th class="izq">En BigSoft</th><th class="izq"></th></tr></thead><tbody>${filas}</tbody></table></div>
+                ${ab ? bsrElegirHTML(ab) : rg ? bsrFichaHTML(rg) : ''}
+                <div class="nota">${ing.ok ? `Entra al depósito ${esc(res.deposito || '')} de ${esc(bsr.local || 'la tienda')} con el usuario de BigSoft <b>${esc(ing.texto)}</b>.` : `<b style="color:var(--danger)">${esc(ing.texto || '')}</b>`}
+                    Los productos elegidos o registrados quedan recordados en esa PC para las próximas notas.</div>
+                ${falta.length ? `<div class="login-error">Falta resolver ${falta.length} renglón(es): ${falta.map(l => esc(l.descripcionNota)).join(', ')}.</div>` : ''}
+                <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0">${cerrar}<button type="button" class="btn-primary" ${falta.length || !ing.ok || bsr.eligiendo || bsr.registrando ? 'disabled' : ''} onclick="bsrIngresar()">Ingresar en BigSoft</button></div>`;
+        }
+        almVentana(`<div class="req-dlg alm-dlg-grande">${cab}${cuerpo}</div>`, () => { bsr = null; });
+    }
+    async function bsrIngresar() {
+        const numero = bsr.numero, a = bsr.arr;
+        const arreglos = { asignar: Object.fromEntries(Object.entries(a.asignar).map(([k, v]) => [k, v.codigo])), nombres: a.nombres, omitir: Object.keys(a.omitir), registrar: a.registrar };
+        bsr.paso = 'ingresando'; bsr.seg = 0; bsr.estadoTarea = 'pendiente'; bsrPintar();
+        try {
+            const t = await bsrTarea('ingresar', { numero, arreglos }, (estado, vivo, seg, local) => { if (!bsr || bsr.numero !== numero) return; Object.assign(bsr, { estadoTarea: estado, vivo, seg }); if (bsr.paso === 'ingresando') bsrPintar(); });
+            const r = t.resultado || {};
+            if (!bsr || bsr.numero !== numero) { if (t.estado === 'hecho') mostrarBanner(`Nota ${numero} ingresada en BigSoft (operación ${r.doc}).`, 'ok'); almNotas = null; almPintar(); return; }
+            if (t.estado === 'atencion') {
+                // Algo sigue sin resolver (p. ej. otro equipo cambió algo): lo que ya se hizo queda hecho; se muestra cómo quedó
+                Object.assign(bsr, { paso: 'lista', res: r, hechos: r.hechos || [], arr: { asignar: {}, nombres: {}, omitir: {}, registrar: {} } });
+            } else {
+                bsr.paso = 'listo'; bsr.final = r;
+                const n = almNotaDe(numero); if (n) n.ingresada = `BigSoft · operación ${r.doc} · a distancia`;
+                almNotas = null; almPintar();
+            }
+        } catch (e) { if (!bsr || bsr.numero !== numero) { mostrarBanner(`Nota ${numero}: ${e.message}`, 'error'); return; } bsr.paso = 'error'; bsr.error = e.message; }
+        bsrPintar();
     }
 
     // ---------- Productos e inventario ----------
