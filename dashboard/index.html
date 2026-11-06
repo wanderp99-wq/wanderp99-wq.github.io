@@ -515,6 +515,16 @@
         @keyframes carga-gira { to { transform: rotate(360deg); } }
         @media (prefers-reduced-motion: reduce) { .cuadros, .carga-anillo::after { animation-duration: 2.5s; } }
         .btn-cargando { display: inline-flex; align-items: center; gap: .5rem; }
+        /* Entrar con huella */
+        .huella-entrar { display: flex; flex-direction: column; align-items: stretch; gap: .45rem; margin: .25rem 0 .5rem; }
+        .huella-entrar .btn-login { display: inline-flex; align-items: center; justify-content: center; gap: .55rem; margin-top: 0; }
+        .huella-entrar .btn-login svg, .huella-oferta svg { width: 22px; height: 22px; flex: 0 0 auto; }
+        .huella-quitar { font-size: .78rem; color: var(--text-muted); text-align: center; }
+        .huella-o { display: flex; align-items: center; gap: .6rem; color: var(--text-muted); font-size: .8rem; margin-top: .35rem; }
+        .huella-o::before, .huella-o::after { content: ''; flex: 1; border-top: 1px solid var(--border); }
+        .huella-oferta { display: flex; align-items: center; gap: .8rem; flex-wrap: wrap; border: 1px solid var(--border); background: var(--card-bg); border-radius: 12px; padding: .75rem 1rem; margin-bottom: 1rem; }
+        .huella-oferta .huella-txt { flex: 1 1 220px; font-size: .9rem; } .huella-oferta .huella-txt small { display: block; color: var(--text-muted); font-size: .78rem; }
+        .huella-oferta .huella-bts { display: flex; gap: .5rem; flex-wrap: wrap; }
         /* Almacén: se ve en mayúsculas mientras el teclado de la tablet compone la palabra (el texto se pasa a mayúsculas al terminarla) */
         #almContenido input[type=text]:not([inputmode=decimal]), #almContenido input[type=search], #almDlg input[type=text]:not([inputmode=decimal]), #almDlg input[type=search] { text-transform: uppercase; }
         #almContenido input::placeholder, #almDlg input::placeholder { text-transform: none; }
@@ -1911,6 +1921,13 @@
             </div>
             <h3>Ingrese su clave de acceso</h3>
             <p class="login-sub">Según la clave se habilitan los módulos disponibles.</p>
+            <div id="huellaEntrar" class="huella-entrar hidden">
+                <button type="button" class="btn-primary btn-login" id="btnHuella" onclick="huellaEntrar()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 11v3a8 8 0 0 1-1.5 4.7"/><path d="M8.5 13.5a3.5 3.5 0 0 1 7 0v1.5a12 12 0 0 1-.6 3.8"/><path d="M5.6 15a9 9 0 0 1-.1-1.5 6.5 6.5 0 0 1 13 0v1"/><path d="M4 10a8.5 8.5 0 0 1 16 0"/><path d="M7 4.5a9 9 0 0 1 10 0"/></svg>
+                    <span>Entrar con huella · <b></b></span></button>
+                <a href="#" class="huella-quitar" onclick="huellaQuitarEquipo(); return false;">Quitar la huella de este equipo</a>
+                <div class="huella-o">o con su clave</div>
+            </div>
             <input type="password" id="loginClave" autocomplete="off" placeholder="Clave" required inputmode="numeric">
             <a href="#" id="tecladoLink" class="link-teclado" onclick="usarTecladoLetras(!tecladoLetras); return false;">Usar teclado con letras</a>
             <div id="loginError" class="login-error"></div>
@@ -1960,7 +1977,7 @@
             <div class="grafico-sub">Personas con la sesión abierta en el panel y el módulo en el que están. Se actualiza solo cada 30 segundos.</div>
             <div id="menuEnLinea"></div>
         </div>
-        <p class="menu-sub" style="margin-top:1.25rem;font-size:.85rem"><a href="#" onclick="verTiempos(); return false;">Ver tiempos de respuesta</a></p>
+        <p class="menu-sub" style="margin-top:1.25rem;font-size:.85rem"><a href="#" onclick="verTiempos(); return false;">Ver tiempos de respuesta</a><span id="huellaMenu"></span></p>
     </section>
 
     <!-- ============ VALIDAR PAGOS (Fase 1: carga de movimientos bancarios) ============ -->
@@ -3445,7 +3462,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-05.1';
+    const VERSION_SERVIDOR = '2026-11-05.2';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -3481,12 +3498,16 @@
 
     async function iniciarSesion(ev) {
         ev.preventDefault();
+        const ok = await entrarConClave(document.getElementById('loginClave').value, document.getElementById('btnLogin'), 'Entrar');
+        if (ok) huellaOfrecer();   // entró con su clave: si el equipo tiene huella, se ofrece activarla
+    }
+    // La clave escrita o la llave de la huella (Seguridad.gs): mismo camino. Devuelve true si entró.
+    async function entrarConClave(c, btn, textoBtn) {
         const input = document.getElementById('loginClave');
         const err = document.getElementById('loginError');
-        const btn = document.getElementById('btnLogin');
         err.textContent = '';
         olvidarClavesAdmin();   // otra persona entra: nada de la sesión anterior
-        clave = input.value;
+        clave = c;
         btn.disabled = true;
         btnCargando(btn, 'Verificando...');
         try {
@@ -3511,13 +3532,149 @@
             else if (avisosSeguridad.claveCorta) mostrarBanner('Su clave tiene menos de 6 caracteres y es fácil de adivinar. ' + (esPrincipal ? 'Cámbiela en Claves y permisos.' : 'Pida a un administrador que le asigne una más larga.'), 'warn');
             setTimeout(precargarModulos, 300);   // en segundo plano: los datos de cada módulo con permiso
             avisarScriptViejo();
+            huellaMenuPintar();
+            return true;
         } catch (e) {
             clave = null;
             err.textContent = e.message;
+            return false;
         } finally {
             btn.disabled = false;
-            btn.textContent = 'Entrar';
+            if (textoBtn) btn.textContent = textoBtn;
         }
+    }
+
+    // ---------- Entrar con la huella (o Face ID / PIN del equipo) ----------
+    // La primera vez se entra con la clave y se activa: el equipo registra la huella (WebAuthn) y Google le da una llave propia
+    // (Seguridad.gs) que reemplaza a la clave. La llave queda en este equipo: cifrada con la huella si el equipo lo permite (PRF),
+    // si no, protegida porque solo se usa después de que el equipo reconoce la huella. Al salir no se borra (es de este equipo).
+    // Se quita desde la pantalla de entrada ("Quitar la huella de este equipo") o en Claves y permisos › Seguridad.
+    const HUELLA_LLAVE = 'panel_huella', HUELLA_NO = 'panel_huella_no';
+    const b64u = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const deB64u = s => Uint8Array.from(atob(String(s).replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - String(s).length % 4) % 4)), ch => ch.charCodeAt(0));
+    const huellaGuardada = () => { try { return JSON.parse(localStorage.getItem(HUELLA_LLAVE) || 'null'); } catch (e) { return null; } };
+    async function huellaDisponible() {
+        try { return !!(window.PublicKeyCredential && window.isSecureContext && navigator.credentials && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()); }
+        catch (e) { return false; }
+    }
+    const huellaEquipo = () => {
+        const u = navigator.userAgent, so = /iPhone/.test(u) ? 'iPhone' : /iPad/.test(u) ? 'iPad' : /Android/.test(u) ? 'Android' : /Windows/.test(u) ? 'Windows' : /Mac/.test(u) ? 'Mac' : 'Equipo';
+        const nav = /Edg\//.test(u) ? 'Edge' : /SamsungBrowser/.test(u) ? 'Samsung' : /CriOS|Chrome\//.test(u) ? 'Chrome' : /Safari\//.test(u) ? 'Safari' : 'navegador';
+        return DISPOSITIVO + ' ' + so + ' · ' + nav;
+    };
+    // Pide la huella para la llave de este equipo. Devuelve la salida PRF (si se pidió y el equipo la da).
+    async function huellaPedir(credId, sal) {
+        const a = await navigator.credentials.get({ publicKey: { challenge: crypto.getRandomValues(new Uint8Array(32)), timeout: 60000, userVerification: 'required',
+            allowCredentials: [{ type: 'public-key', id: deB64u(credId), transports: ['internal', 'hybrid'] }], extensions: sal ? { prf: { eval: { first: sal } } } : {} } });
+        if (!a) throw new Error('No se reconoció la huella');
+        const flags = new Uint8Array(a.response.authenticatorData)[32];
+        if (!(flags & 4)) throw new Error('El equipo no confirmó la huella (ni el PIN). Entre con su clave.');   // UV: el equipo verificó a la persona
+        const ext = a.getClientExtensionResults ? a.getClientExtensionResults() : {};
+        return { prf: ext.prf && ext.prf.results && ext.prf.results.first || null };
+    }
+    const huellaAES = (prf, uso) => crypto.subtle.importKey('raw', prf, 'AES-GCM', false, [uso]);
+    function huellaPintarLogin() {
+        const h = huellaGuardada(), caja = document.getElementById('huellaEntrar'); if (!caja) return;
+        caja.classList.toggle('hidden', !h);
+        if (h) caja.querySelector('b').textContent = h.nombre;
+    }
+    async function huellaEntrar() {
+        const h = huellaGuardada(), btn = document.getElementById('btnHuella'), err = document.getElementById('loginError');
+        if (!h) return;
+        err.textContent = '';
+        let llave = h.llave;
+        try {
+            const r = await huellaPedir(h.credId, h.sal ? deB64u(h.sal) : null);
+            if (h.cifrada) {
+                if (!r.prf) throw new Error('Este equipo no entregó la llave de la huella. Entre con su clave y active la huella de nuevo.');
+                const plano = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: deB64u(h.iv) }, await huellaAES(r.prf, 'decrypt'), deB64u(h.cifrada));
+                llave = new TextDecoder().decode(plano);
+            }
+        } catch (e) {
+            err.textContent = e.name === 'NotAllowedError' || e.name === 'AbortError' ? 'Se canceló o no se reconoció la huella. Intente otra vez o entre con su clave.' : e.message;
+            return;
+        }
+        const html = btn.innerHTML;
+        const ok = await entrarConClave(llave, btn, '');
+        btn.innerHTML = html;
+        huellaPintarLogin();
+        if (!ok && /Clave incorrecta/i.test(err.textContent)) {
+            // La quitaron en Claves y permisos (o la persona se desactivó): ya no sirve en este equipo
+            try { localStorage.removeItem(HUELLA_LLAVE); } catch (e) {}
+            huellaPintarLogin();
+            err.textContent = 'La huella de este equipo ya no está activa. Entre con su clave y, si quiere, vuelva a activarla.';
+        }
+    }
+    async function huellaActivar(btn) {
+        const err = () => document.getElementById('huellaOfertaErr');
+        if (btn) btnCargando(btn, 'Ponga el dedo...');
+        try {
+            const sal = crypto.getRandomValues(new Uint8Array(32));
+            const cred = await navigator.credentials.create({ publicKey: {
+                challenge: crypto.getRandomValues(new Uint8Array(32)), rp: { name: 'Plaza Software' },
+                user: { id: crypto.getRandomValues(new Uint8Array(16)), name: nombreUsuario, displayName: nombreUsuario + ' · Plaza Software' },
+                pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
+                authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'discouraged' },
+                attestation: 'none', timeout: 60000, extensions: { prf: { eval: { first: sal } } } } });
+            if (!cred) throw new Error('No se registró la huella');
+            const ext = cred.getClientExtensionResults ? cred.getClientExtensionResults() : {};
+            let prf = ext.prf && ext.prf.results && ext.prf.results.first || null;
+            const r = await llamarApi({ action: 'huella_activar', equipo: huellaEquipo() });
+            const g = { credId: b64u(cred.rawId), nombre: nombreUsuario, id: r.id, creado: fechaLocalHoy() };
+            // Con PRF la llave queda cifrada con la huella (algunos equipos la dan recién al usarla: se pide una vez más)
+            if (!prf && ext.prf && ext.prf.enabled) { try { prf = (await huellaPedir(g.credId, sal)).prf; } catch (e) {} }
+            if (prf) {
+                const iv = crypto.getRandomValues(new Uint8Array(12));
+                const cif = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await huellaAES(prf, 'encrypt'), new TextEncoder().encode(r.llave));
+                Object.assign(g, { sal: b64u(sal), iv: b64u(iv), cifrada: b64u(cif) });
+            } else g.llave = r.llave;
+            localStorage.setItem(HUELLA_LLAVE, JSON.stringify(g));
+            try { localStorage.removeItem(HUELLA_NO); } catch (e) {}
+            const o = document.getElementById('huellaOferta'); if (o) o.remove();
+            huellaMenuPintar();
+            mostrarBanner('Huella activada en este equipo. La próxima vez pulse "Entrar con huella".', 'ok');
+        } catch (e) {
+            const t = e.name === 'NotAllowedError' || e.name === 'AbortError' ? 'Se canceló o no se reconoció la huella.' : e.name === 'InvalidStateError' ? 'Este equipo ya tiene esa huella registrada: intente de nuevo.' : e.message;
+            if (err()) err().textContent = t; else mostrarBanner('No se activó la huella: ' + t, 'error');
+            if (btn) { btn.disabled = false; btn.textContent = 'Activar huella'; }
+        }
+    }
+    // Después de entrar con la clave: una tarjeta arriba del menú (si el equipo tiene huella y no la tiene ya activada)
+    async function huellaOfrecer() {
+        const h = huellaGuardada();
+        if (h && h.nombre === nombreUsuario) return;
+        let no = {}; try { no = JSON.parse(localStorage.getItem(HUELLA_NO) || '{}') || {}; } catch (e) {}
+        if (no[nombreUsuario] && Date.now() - no[nombreUsuario] < 30 * 864e5) return;   // "Ahora no": se vuelve a ofrecer en 30 días
+        if (!(await huellaDisponible())) return;
+        const menu = document.getElementById('vistaMenu'); if (!menu || document.getElementById('huellaOferta')) return;
+        const d = document.createElement('div'); d.id = 'huellaOferta'; d.className = 'huella-oferta';
+        d.innerHTML = `${document.querySelector('#btnHuella svg').outerHTML}<div class="huella-txt"><b>¿Entrar con su huella en este equipo?</b>
+            <small>La próxima vez pone el dedo y entra, sin escribir la clave.${h ? ' Reemplaza la huella de ' + esc(h.nombre) + ' en este equipo.' : ''}</small><div class="login-error" id="huellaOfertaErr"></div></div>
+            <div class="huella-bts"><button type="button" class="btn-ghost" onclick="huellaAhoraNo()">Ahora no</button><button type="button" class="btn-primary" onclick="huellaActivar(this)">Activar huella</button></div>`;
+        menu.prepend(d);
+    }
+    function huellaAhoraNo() {
+        try { const no = JSON.parse(localStorage.getItem(HUELLA_NO) || '{}') || {}; no[nombreUsuario] = Date.now(); localStorage.setItem(HUELLA_NO, JSON.stringify(no)); } catch (e) {}
+        const o = document.getElementById('huellaOferta'); if (o) o.remove();
+        huellaMenuPintar();
+    }
+    // Abajo del menú: activar (si se dijo "Ahora no") o quitar la huella de este equipo
+    async function huellaMenuPintar() {
+        const el = document.getElementById('huellaMenu'); if (!el) return;
+        const h = huellaGuardada();
+        el.innerHTML = h && h.nombre === nombreUsuario ? ' · <a href="#" onclick="huellaQuitarEquipo(); return false;">Quitar la huella de este equipo</a>'
+            : (await huellaDisponible()) ? ' · <a href="#" onclick="huellaActivar(); return false;">Entrar con huella en este equipo</a>' : '';
+    }
+    async function huellaQuitarEquipo() {
+        const h = huellaGuardada(); if (!h) return;
+        if (!confirm(`¿Quitar la huella de ${h.nombre} en este equipo? Para entrar habrá que escribir la clave.`)) return;
+        try { localStorage.removeItem(HUELLA_LLAVE); } catch (e) {}
+        // En Google también (si la sesión está abierta, con ella; si no, con la llave guardada sin cifrar). Si no se puede, ya no sirve: su llave se borró de aquí.
+        const con = clave || h.llave;
+        if (con && h.id && WEB_APP_URL) fetch(WEB_APP_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ action: 'huella_quitar', id: h.id, idem: nuevoIdem(), clave: con, eq: EQUIPO_ID, disp: DISPOSITIVO }) }).catch(() => {});
+        huellaPintarLogin(); huellaMenuPintar();
+        mostrarBanner('Se quitó la huella de este equipo.', 'ok');
     }
 
     // Claves de administrador que se recuerdan mientras la sesión está abierta (para no escribirlas en cada verificación).
@@ -3580,7 +3737,8 @@
         pagCuentasPromesa = null; pagCuentasListas = false; cuadreModoInicial = false; areaActual = null; reqD = null; perDatos = null; perDeudasPend = null; perDeudasHistDatos = null; asisHoyDatos = null; asisHist = null; asisgDatos = null;
         Object.keys(cuaItems).forEach(k => delete cuaItems[k]);
         try { sessionStorage.removeItem('panel_sesion'); } catch (e) {}
-        irA('login');
+        const of = document.getElementById('huellaOferta'); if (of) of.remove();
+        irA('login'); huellaPintarLogin();
         document.getElementById('loginError').textContent = typeof mensaje === 'string' ? mensaje : '';
     }
 
@@ -6420,6 +6578,12 @@
                 ${eqs.map(e => `<tr><td class="izq"><b>${esc(e.nombre)}</b></td><td class="izq">${esc(e.creado)}</td><td class="izq">${esc(e.uso) || '—'}</td>
                     <td><button type="button" class="btn-ghost btn-mini" style="color:var(--danger)" onclick="admSegAccion('adm_ficha_quitar', { id: '${esc(e.id)}' }, 'Ese equipo ya no podrá enviar fichas si se exige equipo autorizado. ¿Quitarlo?')">Quitar</button></td></tr>`).join('')}</tbody></table></div>`
                 : '<div class="empty">Todavía no hay equipos de ficha autorizados.</div>'}
+            <h4 class="per-sub">Equipos que entran con huella</h4>
+            <div class="nota" style="margin-top:0">Cada persona la activa en su teléfono o PC después de entrar con su clave. Si pierde el equipo o ya no debe entrar desde él, quítela aquí: ese equipo vuelve a pedir la clave. Desactivar a la persona también la quita.</div>
+            ${(s.huellas || []).length ? `<div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">Persona</th><th class="izq">Equipo</th><th class="izq">Activada</th><th class="izq">Último uso</th><th></th></tr></thead><tbody>
+                ${s.huellas.map(h => `<tr><td class="izq"><b>${esc(h.nombre)}</b></td><td class="izq">${esc(h.equipo)}</td><td class="izq">${esc(h.creado)}</td><td class="izq">${esc(h.uso) || '—'}</td>
+                    <td><button type="button" class="btn-ghost btn-mini" style="color:var(--danger)" onclick="admSegAccion('adm_huella_quitar', { id: '${esc(h.id)}' }, '${esc(h.nombre)} ya no podrá entrar con la huella en ${esc(h.equipo)}: tendrá que escribir su clave. ¿Quitarla?')">Quitar</button></td></tr>`).join('')}</tbody></table></div>`
+                : '<div class="empty">Nadie ha activado la huella todavía.</div>'}
             <h4 class="per-sub">Respaldo del libro</h4>
             <div class="filters" style="margin-bottom:.5rem">
                 <div><label for="admRespCada">Hacer una copia</label><select id="admRespCada" onchange="admRespConfig()">${[[1, 'Todos los días'], [2, 'Cada 2 días'], [3, 'Cada 3 días'], [7, 'Cada semana'], [15, 'Cada 15 días']].map(([v, x]) => `<option value="${v}"${v === s.respaldo.cada ? ' selected' : ''}>${x}</option>`).join('')}</select></div>
@@ -16994,11 +17158,12 @@ Reglas:
             if (s && s.clave) {
                 sesionActividad();
                 clave = s.clave; permisos = normalizarPermisos(s.permisos); nombreUsuario = s.nombre || ''; esPrincipal = !!s.principal;
-                irA('menu'); setTimeout(refrescarSesion, 200);
+                irA('menu'); setTimeout(refrescarSesion, 200); huellaMenuPintar();
                 DATOS.iniciar(llaveUsuario()).then(() => setTimeout(precargarModulos, 100));   // primero lo guardado en el equipo
                 return;
             }
         } catch (e) {}
+        huellaPintarLogin();   // equipo con huella activada: botón "Entrar con huella"
         irA(marcaEquipo() ? 'marcaje' : 'login');   // equipo de marcaje ya autorizado: abre directo en marcar asistencia
     })();
 </script>
