@@ -3456,6 +3456,7 @@
         compartir: '<circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="m8.2 10.8 7.6-4.4M8.2 13.2l7.6 4.4"/>',
         imagen: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.8"/><path d="m21 16-5-5-9 9"/>',
         descargar: '<path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 19h16"/>',
+        detener: '<circle cx="12" cy="12" r="9"/><rect x="9" y="9" width="6" height="6" rx="1"/>',
         camara: '<path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/>',
         avisar: '<path d="M3 11v2a1 1 0 0 0 1 1h3l6 4V6L7 10H4a1 1 0 0 0-1 1z"/><path d="M17 9a4 4 0 0 1 0 6"/>',
         campana: '<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/>'
@@ -3531,7 +3532,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-06.8';
+    const VERSION_SERVIDOR = '2026-11-06.9';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -14576,10 +14577,10 @@ Reglas:
     async function bspRevisar() {
         if (!bsp.tienda) { mostrarBanner('Elija la tienda.', 'warn'); return; }
         const id = Date.now();
-        Object.assign(bsp, { id, paso: 'revisando', res: null, marcadas: {}, asignar: {}, eligiendo: null, busqueda: null, final: null, error: '', errClave: '', seg: 0, estadoTarea: 'pendiente' });
+        Object.assign(bsp, { id, paso: 'revisando', errorSuave: false, res: null, marcadas: {}, asignar: {}, eligiendo: null, busqueda: null, final: null, error: '', errClave: '', seg: 0, estadoTarea: 'pendiente' });
         bspPintar();
         try {
-            const t = await bsrTarea('precios_revisar', { local: bsp.tienda }, bspAlEsperar(id));
+            const t = await bsrTarea('precios_revisar', { local: bsp.tienda }, bspAlEsperar(id), 180, bsp.senal = { detenido: false });
             if (bsp.id !== id) return;
             bsp.res = t.resultado || { lineas: [] }; bsp.paso = 'lista';
             bsp.res.lineas.forEach(l => { if (l.estado === 'OK') bsp.marcadas[l.id] = true; });
@@ -14604,8 +14605,16 @@ Reglas:
         const txt = (document.getElementById('bspBus') || {}).value || '';
         if (txt.trim().length < 2) return;
         bsp.busqueda = { texto: txt, cargando: true, productos: [] }; bspPintar();
-        try { const t = await bsrTarea('buscar', { local: bsp.tienda, texto: txt.trim() }); bsp.busqueda = { texto: txt, productos: (t.resultado || {}).productos || [] }; }
-        catch (e) { bsp.busqueda = { texto: txt, error: e.message, productos: [] }; }
+        try { const t = await bsrTarea('buscar', { local: bsp.tienda, texto: txt.trim() }, null, 180, bsp.senalBus = { detenido: false }); if (!bsp.busqueda || !bsp.busqueda.cargando) return; bsp.busqueda = { texto: txt, productos: (t.resultado || {}).productos || [] }; }
+        catch (e) { if (e.detenido) return; bsp.busqueda = { texto: txt, error: e.message, productos: [] }; }
+        bspPintar();
+    }
+    // Detener: deja de esperar a la PC de la tienda (sin internet o apagada) y libera la pantalla
+    function bspDetener() {
+        [bsp.senal, bsp.senalBus].forEach(s => { if (s) { s.detenido = true; if (s.despertar) s.despertar(); } });
+        if (bsp.busqueda && bsp.busqueda.cargando) bsp.busqueda = { texto: bsp.busqueda.texto, error: 'Se dejó de esperar la búsqueda.', productos: [] };
+        if (bsp.paso === 'revisando') { bsp.id = 0; bsp.paso = 'error'; bsp.errorSuave = true; bsp.error = `Detenido: se dejó de esperar a la PC de ${bsp.tienda}. Puede revisar de nuevo cuando tenga conexión.`; }
+        else if (bsp.paso === 'cargando') { bsp.id = 0; bsp.paso = 'error'; bsp.errorSuave = true; bsp.error = `Se dejó de esperar a la PC de ${bsp.tienda}. Si ya recibió el pedido, carga los precios igual y quedan marcados: pulse "Revisar de nuevo" más tarde para ver cómo quedó.`; }
         bspPintar();
     }
     function bspElegirHTML(l) {
@@ -14615,7 +14624,7 @@ Reglas:
         return `<div class="bsr-caja"><b>¿Cuál es "${esc(l.descripcion)}" en el BigSoft de ${esc(bsp.tienda)}?</b>
             <div class="filters" style="margin:.5rem 0"><div style="flex:1"><label for="bspBus">Buscar en BigSoft</label><input type="search" id="bspBus" autocomplete="off" placeholder="Código o palabras" value="${esc(b ? b.texto : '')}" onkeydown="if(event.key==='Enter'){event.preventDefault();bspBuscar()}"></div>
                 <div style="align-self:end"><button type="button" class="btn-ghost" onclick="bspBuscar()">Buscar</button></div></div>
-            ${b && b.cargando ? cargandoHTML('Buscando en el BigSoft de la tienda...') : b && b.error ? `<div class="login-error">${esc(b.error)}</div>`
+            ${b && b.cargando ? cargandoHTML('Buscando en el BigSoft de la tienda...') + `<div class="req-acciones" style="justify-content:center"><button type="button" class="btn-ghost btn-mini" onclick="bspDetener()">${ico('detener')}Detener</button></div>` : b && b.error ? `<div class="login-error">${esc(b.error)}</div>`
               : filas ? `<div class="nota">${b ? 'Resultados' : 'Parecidos'} en BigSoft:</div><div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><tbody>${filas}</tbody></table></div>` : '<div class="nota">No hay parecidos: busque por código o por otra palabra. Si no está, regístrelo en BigSoft (o con "Ingresar en BigSoft" de su nota) y revise de nuevo.</div>'}
             <div class="req-acciones" style="justify-content:flex-end;margin:0"><button type="button" class="btn-ghost" onclick="bsp.eligiendo=null;almPintar()">Cancelar</button></div></div>`;
     }
@@ -14625,9 +14634,9 @@ Reglas:
         const claveAdmin = bsp.claveAdmin || (esPrincipal ? clave : '');
         if (!claveAdmin) { bsp.errClave = 'Escriba la clave de administrador para cargar los precios en BigSoft.'; bspPintar(); return; }
         const id = Date.now();
-        Object.assign(bsp, { id, paso: 'cargando', seg: 0, estadoTarea: 'pendiente', errClave: '' }); bspPintar();
+        Object.assign(bsp, { id, paso: 'cargando', errorSuave: false, seg: 0, estadoTarea: 'pendiente', errClave: '' }); bspPintar();
         try {
-            const t = await bsrTarea('precios_cargar', { local: bsp.tienda, ids, asignar, claveAdmin }, bspAlEsperar(id));
+            const t = await bsrTarea('precios_cargar', { local: bsp.tienda, ids, asignar, claveAdmin }, bspAlEsperar(id), 180, bsp.senal = { detenido: false });
             if (bsp.id !== id) return;
             bsp.final = t.resultado || {}; bsp.paso = 'listo'; cmpOrd = null;   // las órdenes cambiaron: "Por actualizar" se vuelve a leer
         } catch (e) {
@@ -14642,9 +14651,10 @@ Reglas:
         const cab = `<div class="filters"><div><label for="bspTienda">Tienda</label><select id="bspTienda" onchange="bsp.tienda=this.value;bsp.paso='inicio';almPintar()" ${ocupado ? 'disabled' : ''}><option value="">Elija la tienda</option>${CMP_TIENDAS.map(t => `<option${t === bsp.tienda ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></div>
             <div style="align-self:end"><button type="button" class="btn-primary" onclick="bspRevisar()" ${ocupado || !bsp.tienda ? 'disabled' : ''}>${bsp.paso === 'inicio' ? 'Revisar precios en su BigSoft' : 'Revisar de nuevo'}</button></div></div>`;
         if (bsp.paso === 'inicio') return cab + `<div class="nota">La PC de la tienda revisa los precios pendientes contra su BigSoft (como "Actualizar precios" en la tienda). Aquí se eligen y ella los carga: detal, mayor y costo en divisas, los bolívares con su tasa, y el nombre de Plaza Valencia. Debe estar encendida, con internet y con el avisador abierto.</div>`;
-        if (bsp.paso === 'revisando') return cab + bspEspera(`Revisando los precios en el BigSoft de ${bsp.tienda}...`);
-        if (bsp.paso === 'cargando') return cab + bspEspera(`Cargando los precios en el BigSoft de ${bsp.tienda}...`) + '<div class="nota" style="text-align:center">Puede salir de esta pantalla: la PC de la tienda los termina igual y quedan marcados en Plaza Valencia.</div>';
-        if (bsp.paso === 'error') return cab + `<div class="banner error" style="display:block">${esc(bsp.error)}</div>`;
+        const detener = `<div class="req-acciones" style="justify-content:center"><button type="button" class="btn-ghost" onclick="bspDetener()">${ico('detener')}Detener</button></div>`;
+        if (bsp.paso === 'revisando') return cab + bspEspera(`Revisando los precios en el BigSoft de ${bsp.tienda}...`) + detener;
+        if (bsp.paso === 'cargando') return cab + bspEspera(`Cargando los precios en el BigSoft de ${bsp.tienda}...`) + '<div class="nota" style="text-align:center">Puede salir de esta pantalla: la PC de la tienda los termina igual y quedan marcados en Plaza Valencia.</div>' + detener;
+        if (bsp.paso === 'error') return cab + `<div class="banner ${bsp.errorSuave ? 'warn' : 'error'}" style="display:block">${esc(bsp.error)}</div>`;   // detenido por el usuario: ámbar, no rojo
         if (bsp.paso === 'listo') {
             const f = bsp.final;
             return cab + `<div class="banner ok" style="display:block">✓ ${f.cargados || 0} precio(s) cargados en el BigSoft de ${esc(bsp.tienda)}${f.marcados ? ` y ${f.marcados} marcado(s) como actualizados` : ''}. Usuario ${esc(f.usuario || '')}.</div>
@@ -14724,7 +14734,8 @@ Reglas:
         return `<div class="rpt-tipos">${tipos}</div>
             <div class="filters"><div><label for="rptTienda">Tienda</label><select id="rptTienda" onchange="rpt.tienda=this.value" ${dis}><option value="">Todas las tiendas</option>${CMP_TIENDAS.map(t => `<option${t === rpt.tienda ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></div>${fechas}</div>
             ${rapidas}${opcion}
-            <div class="req-acciones"><button type="button" class="btn-primary" onclick="rptGenerar()" ${dis}>${ocupado ? 'Preparando...' : 'Generar reporte'}</button></div>
+            <div class="req-acciones"><button type="button" class="btn-primary" onclick="rptGenerar()" ${dis}>${ocupado ? 'Preparando...' : 'Generar reporte'}</button>
+                ${ocupado ? `<button type="button" class="btn-ghost" onclick="rptDetener()">${ico('detener')}Detener</button>` : ''}</div>
             ${rptResultadoHTML()}`;
     }
     async function rptGenerar(soloFallidas) {
@@ -14742,22 +14753,38 @@ Reglas:
             rpt.verTienda = tiendas[0]; rpt.verHoja = 0;
         }
         const correr = c.tiendas.filter(t => !soloFallidas || c.est[t].paso === 'error');
-        correr.forEach(t => { c.est[t] = { paso: 'pendiente', seg: 0 }; });
+        correr.forEach(t => { c.est[t] = { paso: 'pendiente', seg: 0, senal: { detenido: false } }; });
+        const vuelta = c.vuelta = (c.vuelta || 0) + 1;   // un "Intentar de nuevo" no se mezcla con lo que quedó de la vuelta anterior
         almPintar();
         const datos = { reporte: c.reporte, desde: c.desde, hasta: c.hasta, todos: c.todos, detalle: c.detalle };
         await Promise.all(correr.map(async local => {
             const e = c.est[local];
             try {
-                const t = await bsrTarea('reporte', Object.assign({ local }, datos), (estado, vivo, seg, l, avance) => { Object.assign(e, { paso: estado, vivo, seg, avance: avance || e.avance }); if (rpt.corrida === c) rptRepintar(); }, 300);
+                const t = await bsrTarea('reporte', Object.assign({ local }, datos), (estado, vivo, seg, l, avance) => { if (e.detenido) return; Object.assign(e, { paso: estado, vivo, seg, avance: avance || e.avance }); if (rpt.corrida === c) rptRepintar(); }, 300, e.senal);
+                if (e.detenido) return;
                 e.paso = 'listo'; e.res = t.resultado || {};
             } catch (err) {
+                if (e.detenido) return;   // ya quedó "Detenido" con su mensaje
                 e.paso = 'error';
                 e.error = /Pedido desconocido/i.test(err.message) ? `La PC de ${local} tiene las Utilidades anteriores, que no hacen reportes. Copie en esa PC el paquete nuevo de UTILIDADES y reinicie el avisador (o la PC).` : err.message;
             }
             if (rpt.corrida === c) rptRepintar();
         }));
+        if (c.vuelta !== vuelta) return;
         c.fin = true;
         if (rpt.corrida === c) rptRepintar();
+    }
+    // Detener: deja de esperar a las tiendas que no han respondido (sin internet o con la PC apagada). Lo que ya llegó se puede
+    // descargar; las detenidas quedan para "Intentar de nuevo". En la tienda no se borra nada: el reporte solo lee.
+    function rptDetener() {
+        const c = rpt.corrida; if (!c || c.fin) return;
+        c.tiendas.forEach(t => {
+            const e = c.est[t]; if (!e || e.paso === 'listo' || e.paso === 'error') return;
+            e.detenido = true; e.paso = 'error'; e.error = `Detenido: se dejó de esperar a la PC de ${t}. Puede intentarlo de nuevo cuando tenga conexión.`;
+            if (e.senal) { e.senal.detenido = true; if (e.senal.despertar) e.senal.despertar(); }
+        });
+        c.fin = true; c.vuelta = (c.vuelta || 0) + 1;
+        rptRepintar();
     }
     function rptResultadoHTML() {
         const c = rpt.corrida;
@@ -14766,7 +14793,7 @@ Reglas:
         const estados = c.tiendas.map(t => {
             const e = c.est[t], v = e.vivo || {}, dormida = v.hace == null || v.hace > 60;
             const txt = e.paso === 'listo' ? `<span class="chip st-ok">Listo</span><small>${(e.res.hojas || []).map(h => `${esc(h.nombre)}: ${(h.filas || []).length}`).join(' · ')}${e.res.generado ? ' · sacado ' + esc(e.res.generado.slice(11)) : ''}</small>`
-                : e.paso === 'error' ? `<span class="chip st-falta">No se pudo</span><small class="rpt-mal">${esc(e.error)}</small>`
+                : e.paso === 'error' ? (e.detenido ? `<span class="chip st-pend">Detenido</span><small>${esc(e.error)}</small>` : `<span class="chip st-falta">No se pudo</span><small class="rpt-mal">${esc(e.error)}</small>`)
                 : e.paso === 'curso' ? (() => {
                     // Lo está haciendo la PC: cuánto lleva (lo va diciendo cada 2 s) y en qué paso
                     const a = e.avance, p = a ? a.p : 0;
@@ -14917,12 +14944,16 @@ Reglas:
     const BSR_ESTADO = { OK: ['Lista', 'st-ok'], NOEXISTE: ['No existe en BigSoft', 'st-falta'], SINCODIGO: ['Sin código', 'st-falta'], NOMBRE: ['Otro nombre en BigSoft', 'st-amar'],
                          DEPENDE: ['Depende de otro código', 'st-falta'], SERIAL: ['Con serial', 'st-falta'], OMITIDO: ['No se ingresa', 'st-amar'] };
     // Un pedido a la PC de la tienda: espera su respuesta (alEsperar muestra cuánto lleva y si el avisador responde)
-    async function bsrTarea(tipo, datos, alEsperar, limite = 180) {
+    // senal (opcional): { detenido, despertar } — con "Detener" se deja de esperar al instante (el error trae .detenido)
+    const bsrDetenido = () => { const e = new Error('Se dejó de esperar a la PC de la tienda.'); e.detenido = true; return e; };
+    async function bsrTarea(tipo, datos, alEsperar, limite = 180, senal = null) {
         const p = await llamarApi(Object.assign({ action: 'bsr_pedir', tipo }, datos));
+        if (senal && senal.detenido) throw bsrDetenido();
         if (alEsperar) alEsperar('pendiente', p.vivo, 0, p.local);
         const t0 = Date.now();
         for (;;) {
-            await new Promise(r => setTimeout(r, 2500));
+            await new Promise(r => { const t = setTimeout(r, 2500); if (senal) senal.despertar = () => { clearTimeout(t); r(); }; });
+            if (senal && senal.detenido) throw bsrDetenido();
             let v; try { v = await llamarApi({ action: 'bsr_ver', id: p.id }); } catch (e) { if (Date.now() - t0 > limite * 1000) throw e; continue; }
             const t = v.tarea;
             if (t.estado === 'hecho' || t.estado === 'atencion') return t;
