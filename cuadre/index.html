@@ -2266,9 +2266,27 @@
     }
 
     // Evento de envío y conexión con Apps Script
-    document.getElementById('mainForm').addEventListener('submit', async function(e) {
-        e.preventDefault(); 
-        
+    // Un solo envío a la vez (08/11): antes, mientras la ficha revisaba la asistencia en Google, el botón seguía activo y cada
+    // pulsación de más terminaba en otro "¿Está seguro?" y otra clave. Ahora el botón queda en "Revisando..." desde el primer toque.
+    let fichaEnCurso = false;
+    document.getElementById('mainForm').addEventListener('submit', async function (e) {
+        e.preventDefault();
+        if (fichaEnCurso) return;
+        fichaEnCurso = true;
+        const boton = document.querySelector('.btn-submit'), textoBoton = 'Finalizar Ficha y Preparar Envío';
+        boton.disabled = true; boton.textContent = 'Revisando...';
+        try { await enviarFicha(e); }
+        finally { fichaEnCurso = false; boton.disabled = false; boton.textContent = textoBoton; }
+    });
+    // La misma ficha que ya pasó "¿Está seguro?" y la clave, reenviada después de un error (mismo idem, menos de 20 min):
+    // solo se pregunta una vez si se envía otra vez, sin la clave
+    const FICHA_CONFIRMADA = 'ficha_confirmada';
+    function fichaYaConfirmada() {
+        try { const x = JSON.parse(sessionStorage.getItem(FICHA_CONFIRMADA) || 'null'), idem = localStorage.getItem('caja_idem');
+              return !!(x && idem && x.idem === idem && Date.now() - x.en < 20 * 60000); } catch (e) { return false; }
+    }
+    async function enviarFicha(e) {
+
         // La tasa no se puede escribir a mano: sin tasa automática no se envía
         if (!(parseFloat(document.getElementById('tasaBCV').value) > 0)) {
             alert("No hay tasa BCV. Revise la conexión a internet y presione \"Reintentar\" junto a la tasa.");
@@ -2305,13 +2323,17 @@
             }
         }
 
-        const confirmacion = confirm("¿Estás seguro de que la información está correcta y deseas finalizar la ficha?");
-        if (!confirmacion) return;
+        if (fichaYaConfirmada()) {
+            if (!confirm("¿Enviar la ficha otra vez?")) return;
+        } else {
+            const confirmacion = confirm("¿Estás seguro de que la información está correcta y deseas finalizar la ficha?");
+            if (!confirmacion) return;
 
-        const clave = prompt("Ingrese la clave para continuar:");
-        if (clave !== "0000") {
-            alert("Clave incorrecta. Operación cancelada.");
-            return;
+            const clave = prompt("Ingrese la clave para continuar:");
+            if (clave !== "0000") {
+                alert("Clave incorrecta. Operación cancelada.");
+                return;
+            }
         }
 
         const botonSubmit = document.querySelector('.btn-submit');
@@ -2396,6 +2418,7 @@
             let idemFicha = ''; try { idemFicha = localStorage.getItem('caja_idem') || ''; } catch (e) {}
             if (!idemFicha) { idemFicha = COLA.nuevoIdem(); try { localStorage.setItem('caja_idem', idemFicha); } catch (e) {} }
             payload.idem = idemFicha;
+            try { sessionStorage.setItem(FICHA_CONFIRMADA, JSON.stringify({ idem: idemFicha, en: Date.now() })); } catch (e) {}   // si falla y se reintenta: sin repetir la clave
             payload.equipo = fichaEquipo();    // seguridad: equipo autorizado (lo exige el script si el administrador lo activó)
             // Primero a Firebase: si llega, la ficha ya no se pierde aunque la hoja tarde o no responda
             botonSubmit.textContent = "Guardando en Firebase...";
@@ -2468,7 +2491,7 @@
             botonSubmit.textContent = "Finalizar Ficha y Preparar Envío";
             botonSubmit.disabled = false;
         }
-    });
+    }
 </script>
 <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(r => r.update()).catch(() => {});</script>
 </body>
