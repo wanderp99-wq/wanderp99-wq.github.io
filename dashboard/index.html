@@ -3463,7 +3463,7 @@
                         storageBucket: 'plazavalencia-c2cb0.firebasestorage.app', messagingSenderId: '500821175241', appId: '1:500821175241:web:0bf067ae5c8e92422d9618' };
     const FB_SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
     const FB = (() => {
-        let lib = null, app = null, auth = null, db = null, entrando = null, uidActual = '';
+        let lib = null, app = null, auth = null, db = null, entrando = null, uidActual = '', pase = null;
         async function cargar() {
             if (lib) return lib;
             const [a, au, fs] = await Promise.all([import(FB_SDK + 'firebase-app.js'), import(FB_SDK + 'firebase-auth.js'), import(FB_SDK + 'firebase-firestore.js')]);
@@ -3482,6 +3482,7 @@
             if (auth.currentUser && uidActual && auth.currentUser.uid === uidActual) return { db, auth, lib };
             if (!entrando) entrando = (async () => {
                 const r = await llamarApi({ action: 'fb_token' });
+                pase = r;   // para avisar si las reglas de seguridad no se pudieron publicar
                 if (auth.currentUser && auth.currentUser.uid !== r.uid) await lib.au.signOut(auth);
                 if (!auth.currentUser || auth.currentUser.uid !== r.uid) await lib.au.signInWithCustomToken(auth, r.token);
                 uidActual = r.uid;
@@ -3492,7 +3493,7 @@
         // Escuchar colecciones en vivo (efectivo/AAAA-MM...): cb({ colección: [documentos] }) en cada cambio, cuando ya
         // llegaron todas las colecciones. Cada cambio de otro equipo cuesta 1 lectura (solo el mes que cambió).
         const escuchas = new Set();
-        async function escuchar(colecciones, cb) {
+        async function escuchar(colecciones, cb, alFallar) {
             const { db: base, lib: l } = await listo();
             const datos = {}, quitar = [], nombre = c => typeof c === 'string' ? c : c.col;
             const avisar = () => { if (colecciones.every(c => datos[nombre(c)])) cb(Object.assign({}, datos)); };
@@ -3500,7 +3501,7 @@
             colecciones.forEach(c => {
                 const ref = typeof c === 'string' ? l.fs.collection(base, c) : l.fs.query(l.fs.collection(base, c.col), l.fs.where(...c.donde));
                 quitar.push(l.fs.onSnapshot(ref, s => { datos[nombre(c)] = s.docs.map(d => Object.assign({ _id: d.id }, d.data())); avisar(); },
-                    e => { console.log('Firebase (' + nombre(c) + '): ' + (e.code || e.message)); }));
+                    e => { console.log('Firebase (' + nombre(c) + '): ' + (e.code || e.message)); if (alFallar) alFallar(e, nombre(c)); }));
             });
             const off = () => { quitar.forEach(q => { try { q(); } catch (e) {} }); escuchas.delete(off); };
             escuchas.add(off);
@@ -3519,7 +3520,10 @@
             t0 = t(); const g = await DATOS.aGoogle(() => llamarApi({ action: 'fb_prueba' })); r.googleTotal = t() - t0; r.google = g;
             return r;
         }
-        return { cargar, listo, salir, prueba, escuchar, uid: () => uidActual };
+        // Reglas: '' si están al día; si no, el motivo (no se pudieron publicar o quedó una versión anterior)
+        const problemaReglas = () => !pase ? '' : pase.reglasError ? 'las reglas de seguridad no se pudieron publicar: ' + pase.reglasError
+                                          : pase.reglasQueriendo && pase.reglas !== pase.reglasQueriendo ? 'las reglas de seguridad publicadas son de otra versión (' + (pase.reglas || 'ninguna') + ')' : '';
+        return { cargar, listo, salir, prueba, escuchar, uid: () => uidActual, problemaReglas };
     })();
     // Firebase como dato OFICIAL del efectivo (etapa 2c): activar copia la hoja entera; "Volver a la hoja" termina la copia
     // y la hoja vuelve a mandar; "Copiar a la hoja ahora" no espera la vuelta automática
@@ -3663,7 +3667,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-07.10';
+    const VERSION_SERVIDOR = '2026-11-08.2';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -3930,7 +3934,7 @@
         if (clave && WEB_APP_URL && typeof mensaje !== 'string') llamarApiReal({ action: 'ping', salir: true, vista: '', disp: DISPOSITIVO }, performance.now()).catch(() => {});   // deja de figurar como conectado
         clave = null;
         permisos = [];
-        nombreUsuario = ''; esPrincipal = false; olvidarClavesAdmin(); DATOS.salir(); FB.salir(); efeFbOff = null; efeFbActivo = false;
+        nombreUsuario = ''; esPrincipal = false; olvidarClavesAdmin(); DATOS.salir(); FB.salir(); efeFbOff = null; efeFbActivo = false; efeFbRoto = ''; efeFbLlego = false;
         filas = []; borradores = {}; seleccion = null; cargadoDesde = null; cuadreIniciado = false;
         // Al salir se borra todo lo guardado en memoria (otra persona puede entrar con menos permisos)
         efeDatos = { filas: [], cajaChica: [] }; efeCargado = null; efeCargadoEn = 0; precargadoDesde = null; Object.keys(pagMemoria).forEach(k => delete pagMemoria[k]);
@@ -17274,16 +17278,41 @@ Reglas:
         const conFlujo = permisos.includes('efectivo'), cf = efeFbVerdad ? 'flujo' : 'efectivo', cc = efeFbVerdad ? 'caja' : 'cajachica';
         const cols = conFlujo ? [cf, cc, 'pendientes'] : [cc, { col: 'pendientes', donde: ['accion', '==', 'cc_registrar'] }];
         efeFbOff = 'iniciando';
+        // Si Firebase no manda nada en 12 s (sin permiso, bloqueado, sin conexión) se guarda por Google mientras tanto
+        clearTimeout(efeFbEspera);
+        efeFbEspera = setTimeout(() => { if (!efeFbLlego) efeFbFallo({ code: 'sin respuesta en 12 s' }, ''); }, 12000);
+        efeFbLlego = false;
         FB.escuchar(cols, d => {
+            efeFbLlego = true; clearTimeout(efeFbEspera);
+            if (efeFbRoto) { efeFbRoto = ''; if (esPrincipal) mostrarBanner('Firebase volvió a responder: Efectivo se guarda otra vez al instante.', 'ok'); }
             efeFbBase = { filas: d[cf] ? efeFbAplanar(d[cf]) : efeFbBase.filas, caja: efeFbAplanar(d[cc]), pend: d.pendientes || [] };
             efeFbMezclar();
             if (!efeCargado || (d[cf] && efeCargado === 'caja')) efeCargado = d[cf] ? 'completo' : 'caja';
             efeCargadoEn = Date.now();
             efeFbAvisarErrores();
             efeFbRedibujar();
-        }).then(off => { if (efeFbOff === 'iniciando') efeFbOff = off; else off(); })
-          .catch(e => { efeFbOff = null; console.log('Efectivo en Firebase: ' + e.message); });
+        }, (e, col) => efeFbFallo(e, col)).then(off => { if (efeFbOff === 'iniciando') efeFbOff = off; else off(); })
+          .catch(e => { efeFbOff = null; efeFbFallo(e, ''); });
     }
+    // Firebase no responde: se sigue guardando por Google (más lento, pero se ve) y se avisa por qué. Un administrador ve el
+    // motivo exacto (permiso, conexión) para corregirlo.
+    let efeFbRoto = '', efeFbLlego = false, efeFbEspera = null;
+    function efeFbFallo(e, col) {
+        const motivo = (e && (e.code || e.message)) || 'error';
+        if (efeFbRoto === motivo) return;
+        efeFbRoto = motivo;
+        console.log('Efectivo en Firebase no responde (' + (col || 'general') + '): ' + motivo);
+        const reglas = FB.problemaReglas ? FB.problemaReglas() : '';
+        mostrarBanner(esPrincipal ? `Firebase no respondió (${motivo}${col ? ', ' + col : ''})${reglas ? ': ' + reglas : ''}. Mientras tanto Efectivo se guarda por Google y la lista se actualiza cada 15 segundos.`
+                                  : 'Firebase no responde: Efectivo se guarda por Google mientras tanto y la lista se actualiza cada 15 segundos.', 'warn');
+        if (/^(efectivo|cajachica)$/.test(vistaActual)) DATOS.aGoogle(() => efeCargar()).catch(() => {});
+    }
+    // Sin avisos de Firebase: lo que hacen otros equipos (eliminar, registrar...) se trae de Google cada 15 s mientras se mira Efectivo
+    setInterval(() => {
+        if (!efeFbRoto || !clave || !/^(efectivo|cajachica)$/.test(vistaActual) || document.visibilityState !== 'visible') return;
+        const a = document.activeElement; if (a && a.tagName === 'SELECT') return;
+        DATOS.aGoogle(() => efeCargar()).catch(() => {});
+    }, 15000);
     // Los movimientos de la bandeja se ven como filas más (arriba, las más nuevas) con su estado "Guardando..." o el error.
     // Cuando Apps Script ya lo pasó a la hoja, la fila de la hoja trae el mismo ID y la de la bandeja deja de mostrarse.
     function efeFbMezclar() {
@@ -17327,7 +17356,7 @@ Reglas:
             : '<span class="chip st-pend efe-atraso" title="Ya está guardado en Firebase; pasando a la hoja de Google">Guardando...</span>';
     }
     // ¿Se puede guardar por la bandeja? (espejo activo y escuchando; la fecha de más de 3 días va por Apps Script con clave)
-    const efeFbPuede = () => efeFbActivo && typeof efeFbOff === 'function';
+    const efeFbPuede = () => efeFbActivo && typeof efeFbOff === 'function' && !efeFbRoto && efeFbLlego;
     // Dejar un movimiento en la bandeja: se ve al instante en todos los equipos. Apps Script lo pasa a la hoja por detrás
     // (con la foto, si tiene). Devuelve cuando Firebase lo confirmó (o a los 5 s, sin internet: Firebase lo envía solo después).
     async function efeFbGuardar(accion, datos, comprobante) {
@@ -17335,12 +17364,18 @@ Reglas:
         const tk = await auth.currentUser.getIdTokenResult();
         const id = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
         const limpio = {}; Object.keys(datos).forEach(k => { if (datos[k] !== undefined && datos[k] !== null) limpio[k] = datos[k]; });
-        const escritura = lib.fs.setDoc(lib.fs.doc(db, 'pendientes', id), { uid: auth.currentUser.uid, quien: tk.claims.nombre || nombreUsuario, creado: lib.fs.serverTimestamp(),
-                                                                         creadoLocal: Date.now(), accion, datos: limpio, estado: 'pendiente' });
+        const doc = { uid: auth.currentUser.uid, quien: tk.claims.nombre || nombreUsuario, creadoLocal: Date.now(), accion, datos: limpio, estado: 'pendiente' };
+        const escritura = lib.fs.setDoc(lib.fs.doc(db, 'pendientes', id), Object.assign({}, doc, { creado: lib.fs.serverTimestamp() }));
+        // Se ve AL INSTANTE en este equipo (08/11): no espera el aviso de vuelta de Firebase (si no llegaba, parecía que no se guardó)
+        if (!(efeFbBase.pend || []).some(p => p._id === id)) { efeFbBase.pend = (efeFbBase.pend || []).concat([Object.assign({ _id: id }, doc)]); efeFbMezclar(); }
         const r = await Promise.race([escritura.then(() => 'ok'), new Promise(ok => setTimeout(() => ok('espera'), 5000))]);
         // A la hoja, por detrás. Si no llega, el aviso de "sigo conectado" (cada minuto) lo pasa.
         escritura.then(() => llamarApi({ action: 'fb_aplicar', id, comprobante }))
-            .then(x => { if (x && x.errores && x.errores.length) console.log('Bandeja: ' + x.errores.join('; ')); })
+            .then(x => {
+                if (x && x.errores && x.errores.length) console.log('Bandeja: ' + x.errores.join('; '));
+                // Si Firebase no está avisando los cambios, se lee por Google para que no quede "Guardando..."
+                if (efeFbRoto && /^(efectivo|cajachica)$/.test(vistaActual)) DATOS.aGoogle(() => efeCargar()).catch(() => {});
+            })
             .catch(e => { console.log('Bandeja (se reintenta sola): ' + e.message); });
         return r;
     }
