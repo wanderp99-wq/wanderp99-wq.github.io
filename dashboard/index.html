@@ -3648,7 +3648,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-07.7';
+    const VERSION_SERVIDOR = '2026-11-07.9';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -17351,10 +17351,17 @@ Reglas:
     function efeFbDetener() { if (typeof efeFbOff === 'function') efeFbOff(); efeFbOff = null; }
     // La respuesta de la hoja dice si el espejo está activo: se empieza o se deja de escuchar
     function efeFbVer(r) { if (!r || typeof r.fb !== 'boolean') return; efeFbActivo = r.fb; if (r.fb) efeFbIniciar(); else efeFbDetener(); }
-    // Se redibuja solo si la persona no está a mitad de algo (escribiendo, con una ventana abierta...); si no, en un rato
+    // Lo que llega de Firebase se dibuja AL MOMENTO (07/11). Antes esperaba el mismo "momento tranquilo" que la revisión
+    // de cada 30 s (nada cargando, nadie escribiendo...) y el "Guardando..." se quedaba hasta cambiar de pestaña.
+    // Redibujar solo cambia las tablas y los totales, no los formularios: lo que se está escribiendo no se pierde.
+    // Solo se espera si hay una lista desplegable abierta (se cerraría) o la pestaña del navegador está escondida.
     function efeFbRedibujar() {
         if (!/^(efectivo|cajachica)$/.test(vistaActual)) return;
-        if (!vivoPuede()) { if (!efeFbPendiente) { efeFbPendiente = true; setTimeout(() => { efeFbPendiente = false; efeFbRedibujar(); }, 3000); } return; }
+        const a = document.activeElement;
+        if (document.visibilityState !== 'visible' || (a && a.tagName === 'SELECT')) {
+            if (!efeFbPendiente) { efeFbPendiente = true; setTimeout(() => { efeFbPendiente = false; efeFbRedibujar(); }, 1500); }
+            return;
+        }
         efeCargar(true);
     }
     // Lectura de FLUJO DE EFECTIVO / CAJA CHICA sin dibujar (la usa la precarga del inicio de sesión)
@@ -17383,6 +17390,11 @@ Reglas:
 
     // usarMemoria = dibujar con lo ya cargado, sin pedirlo otra vez
     async function efeCargar(usarMemoria) {
+        // Lo que se está eliminando no se dibuja (viene igual en la copia de Firebase hasta que Google termine)
+        if (efeBorrando.size && efeDatos) {
+            if (efeDatos.filas) efeDatos.filas = efeDatos.filas.filter(f => !efeBorrando.has(efeLlaveFila(f)));
+            if (efeDatos.cajaChica) efeDatos.cajaChica = efeDatos.cajaChica.filter(m => !efeBorrando.has(efeLlaveCaja(m)));
+        }
         if (!WEB_APP_URL) {
             ['efeKpis', 'efePorLlegar'].forEach(id => document.getElementById(id).innerHTML = '<div class="empty">Control de efectivo necesita la hoja real: en modo demostración no hay datos.</div>');
             return;
@@ -17625,6 +17637,11 @@ Reglas:
 
     // ---------- Ventana con clave de administrador y motivo (eliminar gasto / modificar por llegar) ----------
     let efeModalAccion = null;   // { tipo: 'eliminar' | 'modificar', f }
+    // Lo que se está eliminando (mientras Google lo hace) no se muestra. Se reconoce por su contenido: el número de fila
+    // de las de abajo cambia al borrar una.
+    const efeBorrando = new Set();
+    const efeLlaveFila = f => ['f', f.fecha, f.tipo, f.turno, f.bs, f.usd, f.registrado || f.recibidoPor || ''].join('|');
+    const efeLlaveCaja = m => ['c', m.fecha, m.tipo, m.moneda, m.monto, m.concepto, m.registro || ''].join('|');
 
     function efeAbrirModal(accion, titulo, detalle, conMontos) {
         efeModalAccion = accion;
@@ -17701,6 +17718,28 @@ Reglas:
             if (!bs && !usd) { err.textContent = 'Escriba el monto en Bs o en $.'; return; }
             if (Math.abs(bs - f.bs) < 0.001 && Math.abs(usd - f.usd) < 0.001) { err.textContent = 'No cambió ningún monto.'; return; }
             payload = { action: 'efe_modificar', fila: f.fila, bs, usd, bsAnt: f.bs, usdAnt: f.usd };
+        }
+        // Eliminar (07/11): la fila se quita de la pantalla al instante y Google lo hace por detrás. Si Google no lo acepta
+        // (clave incorrecta, la hoja cambió...), la fila vuelve y se avisa por qué.
+        if (/^eliminar/.test(a.tipo)) {
+            if (!claveAdm) { err.textContent = 'Escriba la clave de administrador.'; document.getElementById('efeMClave').focus(); return; }
+            const llave = a.tipo === 'eliminar' ? efeLlaveFila(f) : efeLlaveCaja(a.m);
+            efeBorrando.add(llave); efeCerrarModal(); efeCargar(true);
+            mostrarBanner(a.tipo === 'eliminarCaja' ? `Eliminando de caja chica: ${a.m.concepto}...` : `Eliminando: ${f.turno || 'Egreso manual'}...`, 'ok');
+            llamarApi(Object.assign(payload, { motivo, claveAdmin: claveAdm }))
+                .then(async r => {
+                    efeBorrando.delete(llave);
+                    if (a.tipo === 'eliminarCaja') mostrarBanner(a.m.tipo === 'RECARGA' ? `Recarga externa eliminada: ${a.m.concepto}.` : `Gasto de caja chica eliminado: ${a.m.concepto}. El monto volvió al saldo.`, 'ok');
+                    else mostrarBanner(`${f.tipo === 'EXTERNO' ? 'Dinero externo eliminado' : 'Gasto eliminado'}: ${f.turno || 'Egreso manual'}.` + (r.cajaChica ? ' También se quitó de la caja chica.' : ''), 'ok');
+                    await efeUsarRespuesta(r);
+                })
+                .catch(e => {
+                    efeBorrando.delete(llave);
+                    // La fila vuelve: con Firebase, desde su copia; sin Firebase, se vuelve a leer
+                    if (typeof efeFbOff === 'function') { efeFbMezclar(); efeCargar(true); } else efeCargar();
+                    mostrarBanner('No se eliminó (volvió a la lista): ' + e.message, 'error');
+                });
+            return;
         }
         btn.disabled = true; btnCargando(btn, 'Guardando...');
         try {
