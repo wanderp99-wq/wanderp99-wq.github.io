@@ -3494,10 +3494,14 @@
         const escuchas = new Set();
         async function escuchar(colecciones, cb) {
             const { db: base, lib: l } = await listo();
-            const datos = {}, quitar = [];
-            const avisar = () => { if (colecciones.every(c => datos[c])) cb(Object.assign({}, datos)); };
-            colecciones.forEach(c => quitar.push(l.fs.onSnapshot(l.fs.collection(base, c), s => { datos[c] = s.docs.map(d => Object.assign({ _id: d.id }, d.data())); avisar(); },
-                e => { console.log('Firebase (' + c + '): ' + (e.code || e.message)); })));
+            const datos = {}, quitar = [], nombre = c => typeof c === 'string' ? c : c.col;
+            const avisar = () => { if (colecciones.every(c => datos[nombre(c)])) cb(Object.assign({}, datos)); };
+            // Una colección entera ('efectivo') o con filtro ({ col: 'pendientes', donde: ['accion', '==', 'cc_registrar'] })
+            colecciones.forEach(c => {
+                const ref = typeof c === 'string' ? l.fs.collection(base, c) : l.fs.query(l.fs.collection(base, c.col), l.fs.where(...c.donde));
+                quitar.push(l.fs.onSnapshot(ref, s => { datos[nombre(c)] = s.docs.map(d => Object.assign({ _id: d.id }, d.data())); avisar(); },
+                    e => { console.log('Firebase (' + nombre(c) + '): ' + (e.code || e.message)); }));
+            });
             const off = () => { quitar.forEach(q => { try { q(); } catch (e) {} }); escuchas.delete(off); };
             escuchas.add(off);
             return off;
@@ -3515,7 +3519,7 @@
             t0 = t(); const g = await DATOS.aGoogle(() => llamarApi({ action: 'fb_prueba' })); r.googleTotal = t() - t0; r.google = g;
             return r;
         }
-        return { cargar, listo, salir, prueba, escuchar };
+        return { cargar, listo, salir, prueba, escuchar, uid: () => uidActual };
     })();
     // Activar / desactivar el espejo de Efectivo y Caja chica en Firebase (administradores, en Tiempos)
     async function fbEfectivo(btn, activar) {
@@ -3644,7 +3648,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-07.6';
+    const VERSION_SERVIDOR = '2026-11-07.7';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -17244,18 +17248,105 @@ Reglas:
     // Si el espejo está activo (el servidor lo dice en efe_listar / cc_listar: fb), el panel escucha efectivo/AAAA-MM y
     // cajachica/AAAA-MM en Firebase: lo que guarda otro equipo aparece solo, al instante. Los guardados siguen por Apps Script.
     let efeFbActivo = false, efeFbOff = null, efeFbPendiente = false;
+    // Lo que vino de la hoja (espejo) y la bandeja (pendientes); efeDatos = la mezcla
+    let efeFbBase = { filas: null, caja: null, pend: [] }, efeFbErroresVistos = new Set();
     const efeFbAplanar = docs => (docs || []).flatMap(d => Object.values(d.m || {})).sort((a, b) => a.fila - b.fila);
     function efeFbIniciar() {
         if (efeFbOff || !efeFbActivo || !clave) return;
-        const cols = permisos.includes('efectivo') ? ['efectivo', 'cajachica'] : ['cajachica'];
+        const conFlujo = permisos.includes('efectivo');
+        const cols = conFlujo ? ['efectivo', 'cajachica', 'pendientes'] : ['cajachica', { col: 'pendientes', donde: ['accion', '==', 'cc_registrar'] }];
         efeFbOff = 'iniciando';
         FB.escuchar(cols, d => {
-            efeDatos = { filas: d.efectivo ? efeFbAplanar(d.efectivo) : efeDatos.filas, cajaChica: efeFbAplanar(d.cajachica), responsablesCaja: efeDatos.responsablesCaja || [] };
+            efeFbBase = { filas: d.efectivo ? efeFbAplanar(d.efectivo) : efeFbBase.filas, caja: efeFbAplanar(d.cajachica), pend: d.pendientes || [] };
+            efeFbMezclar();
             if (!efeCargado || (d.efectivo && efeCargado === 'caja')) efeCargado = d.efectivo ? 'completo' : 'caja';
             efeCargadoEn = Date.now();
+            efeFbAvisarErrores();
             efeFbRedibujar();
         }).then(off => { if (efeFbOff === 'iniciando') efeFbOff = off; else off(); })
           .catch(e => { efeFbOff = null; console.log('Efectivo en Firebase: ' + e.message); });
+    }
+    // Los movimientos de la bandeja se ven como filas más (arriba, las más nuevas) con su estado "Guardando..." o el error.
+    // Cuando Apps Script ya lo pasó a la hoja, la fila de la hoja trae el mismo ID y la de la bandeja deja de mostrarse.
+    function efeFbMezclar() {
+        const b = efeFbBase, filas = (b.filas || efeDatos.filas || []).slice(), caja = (b.caja || efeDatos.cajaChica || []).slice();
+        const ids = new Set(filas.map(f => f.id).concat(caja.map(m => m.id)).filter(Boolean));
+        const dosD = n => String(n).padStart(2, '0');
+        (b.pend || []).slice().sort((x, y) => (x.creadoLocal || 0) - (y.creadoLocal || 0)).forEach((p, i) => {
+            if (ids.has(p._id) || ids.has(p._id + '-t')) return;
+            const d = p.datos || {}, t = new Date(p.creadoLocal || Date.now());
+            const reg = `${t.getFullYear()}-${dosD(t.getMonth() + 1)}-${dosD(t.getDate())} ${dosD(t.getHours())}:${dosD(t.getMinutes())}`;
+            const comun = { fila: 1e9 + i, id: p._id, pendiente: p.estado === 'error' ? 'error' : 'guardando', errorPend: p.error || '', fecha: d.fecha || '', foto: '', verificado: '', recibidoPor: '', registrado: reg };
+            if (p.accion === 'efe_egreso') filas.push(Object.assign({}, comun, { tienda: '', etiqueta: 'EGRESO', cajero: d.responsable || p.quien, turno: d.concepto, bs: -(d.bs || 0), bsOk: false, usd: -(d.usd || 0), usdOk: false, tipo: 'EGRESO' }));
+            else if (p.accion === 'efe_externo') filas.push(Object.assign({}, comun, { tienda: '', etiqueta: 'INGRESO EXTERNO', cajero: d.responsable || p.quien, turno: d.concepto, bs: d.bs || 0, bsOk: !!d.bs, usd: d.usd || 0, usdOk: !!d.usd, tipo: 'EXTERNO' }));
+            else if (p.accion === 'cc_registrar') {
+                const moneda = d.moneda === '$' ? '$' : d.moneda === 'BsE' ? 'BsE' : 'Bs', externa = d.tipo === 'RECARGA' && (d.origen === 'externo' || moneda === 'BsE');
+                caja.push({ fila: 1e9 + i, id: p._id, pendiente: comun.pendiente, errorPend: comun.errorPend, fecha: d.fecha || '', tipo: d.tipo === 'RECARGA' ? 'RECARGA' : 'GASTO', moneda, monto: d.monto || 0,
+                            concepto: d.concepto, responsable: d.responsable || p.quien, registradoPor: p.quien, registro: reg, comprobante: '', origen: d.tipo === 'RECARGA' ? (externa ? 'externo' : 'flujo') : '', verificado: '' });
+                if (d.tipo === 'RECARGA' && !externa) filas.push(Object.assign({}, comun, { tienda: '', etiqueta: 'TRASPASO CAJA CHICA', cajero: d.responsable || p.quien, turno: 'Recarga caja chica: ' + d.concepto,
+                            bs: moneda === 'Bs' ? -(d.monto || 0) : 0, bsOk: false, usd: moneda === '$' ? -(d.monto || 0) : 0, usdOk: false, tipo: 'TRASPASO' }));
+            }
+        });
+        efeDatos = { filas: b.filas || efeDatos.filas ? filas : efeDatos.filas, cajaChica: caja, responsablesCaja: efeDatos.responsablesCaja || [] };
+    }
+    // Un movimiento mío que Apps Script rechazó: se avisa una vez
+    function efeFbAvisarErrores() {
+        const uid = FB.uid && FB.uid();
+        (efeFbBase.pend || []).filter(p => p.estado === 'error' && (!uid || p.uid === uid) && !efeFbErroresVistos.has(p._id)).forEach(p => {
+            efeFbErroresVistos.add(p._id);
+            mostrarBanner(`No se pudo registrar "${(p.datos || {}).concepto || ''}": ${p.error || 'error'}. Quedó marcado en rojo en la lista: revíselo y quítelo.`, 'error');
+        });
+    }
+    async function efeFbQuitar(id) {
+        try { const { db, lib } = await FB.listo(); await lib.fs.deleteDoc(lib.fs.doc(db, 'pendientes', id)); }
+        catch (e) { mostrarBanner('No se pudo quitar: ' + e.message, 'error'); }
+    }
+    // Etiqueta bajo la fecha de un movimiento de la bandeja
+    function efePendChip(f) {
+        if (!f.pendiente) return '';
+        return f.pendiente === 'error'
+            ? `<span class="chip st-falta efe-atraso" title="${esc(f.errorPend)}">No se guardó</span><button type="button" class="btn-ghost btn-mini" style="margin-top:.25rem" onclick="efeFbQuitar('${esc(f.id)}')">Quitar</button>`
+            : '<span class="chip st-pend efe-atraso" title="Ya está guardado en Firebase; pasando a la hoja de Google">Guardando...</span>';
+    }
+    // ¿Se puede guardar por la bandeja? (espejo activo y escuchando; la fecha de más de 3 días va por Apps Script con clave)
+    const efeFbPuede = () => efeFbActivo && typeof efeFbOff === 'function';
+    // Dejar un movimiento en la bandeja: se ve al instante en todos los equipos. Apps Script lo pasa a la hoja por detrás
+    // (con la foto, si tiene). Devuelve cuando Firebase lo confirmó (o a los 5 s, sin internet: Firebase lo envía solo después).
+    async function efeFbGuardar(accion, datos, comprobante) {
+        const { db, lib, auth } = await FB.listo();
+        const tk = await auth.currentUser.getIdTokenResult();
+        const id = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+        const limpio = {}; Object.keys(datos).forEach(k => { if (datos[k] !== undefined && datos[k] !== null) limpio[k] = datos[k]; });
+        const escritura = lib.fs.setDoc(lib.fs.doc(db, 'pendientes', id), { uid: auth.currentUser.uid, quien: tk.claims.nombre || nombreUsuario, creado: lib.fs.serverTimestamp(),
+                                                                         creadoLocal: Date.now(), accion, datos: limpio, estado: 'pendiente' });
+        const r = await Promise.race([escritura.then(() => 'ok'), new Promise(ok => setTimeout(() => ok('espera'), 5000))]);
+        // A la hoja, por detrás. Si no llega, el aviso de "sigo conectado" (cada minuto) lo pasa.
+        escritura.then(() => llamarApi({ action: 'fb_aplicar', id, comprobante }))
+            .then(x => { if (x && x.errores && x.errores.length) console.log('Bandeja: ' + x.errores.join('; ')); })
+            .catch(e => { console.log('Bandeja (se reintenta sola): ' + e.message); });
+        return r;
+    }
+    // Guardar un movimiento de dinero: por la bandeja de Firebase si se puede (medio segundo), si no por Apps Script.
+    // Devuelve { resp } (Apps Script, con los datos al día) o { fb: true } (la lista ya lo muestra por Firebase).
+    async function efeMandar(p, comprobante) {
+        if (!efeFbPuede() || p.claveFecha) return { resp: await efeApi(Object.assign({}, p, { comprobante })) };
+        const datos = Object.assign({}, p); delete datos.action; delete datos.claveFecha;
+        if (efeFbRepetido(p.action, datos)) {
+            if (!confirm('Hace menos de 15 minutos ya se registró uno igual: "' + datos.concepto + '". Puede que ya esté guardado.\n\nRevise la lista antes. ¿Es OTRO movimiento distinto y quiere registrarlo de todas formas?'))
+                throw new Error('No se registró: ya había uno igual de hace un momento. Revise la lista.');
+            datos.repetidoOk = true;
+        }
+        const r = await efeFbGuardar(p.action, datos, comprobante);
+        if (r === 'espera') mostrarBanner('Sin conexión estable: quedó guardado en este equipo y se envía solo cuando vuelva la conexión. No lo repita.', 'warn');
+        return { fb: true };
+    }
+    // ¿Hay uno igual registrado hace menos de 15 min? (el mismo control del servidor, aquí antes de guardar)
+    function efeFbRepetido(accion, d) {
+        const hace = Date.now() - 15 * 60000, ig = (a, b) => Math.abs(Math.abs(a || 0) - Math.abs(b || 0)) < 0.001;
+        const reciente = x => { const t = Date.parse(String(efeRegistro(x) || '').replace(' ', 'T')); return x.pendiente || (t && t >= hace); };
+        if (accion === 'cc_registrar') return efeDatos.cajaChica.some(m => reciente(m) && m.fecha === d.fecha && m.tipo === d.tipo && m.moneda === d.moneda && ig(m.monto, d.monto) && String(m.concepto).trim() === d.concepto);
+        const tipo = accion === 'efe_externo' ? 'EXTERNO' : 'EGRESO';
+        return (efeDatos.filas || []).some(f => reciente(f) && f.tipo === tipo && f.fecha === d.fecha && String(f.turno).trim() === d.concepto && ig(f.bs, d.bs) && ig(f.usd, d.usd));
     }
     function efeFbDetener() { if (typeof efeFbOff === 'function') efeFbOff(); efeFbOff = null; }
     // La respuesta de la hoja dice si el espejo está activo: se empieza o se deja de escuchar
@@ -17275,12 +17366,14 @@ Reglas:
                 efeDatos = { filas: efeDatos.filas, cajaChica: r.cajaChica || [], responsablesCaja: r.responsablesCaja || efeDatos.responsablesCaja || [] };
                 if (!efeCargado) efeCargado = 'caja';
                 efeFbVer(r);
+                if (typeof efeFbOff === 'function') { efeFbBase.caja = efeDatos.cajaChica; efeFbMezclar(); }
             } else {
                 const r = await llamarApi({ action: 'efe_listar', fresco: efeFresco });   // "Actualizar" = leer la hoja, no la memoria
                 efeFresco = false;
                 efeDatos = { filas: r.filas || [], cajaChica: r.cajaChica || [], responsablesCaja: r.responsablesCaja || [] };
                 efeCargado = 'completo';
                 efeFbVer(r);
+                if (typeof efeFbOff === 'function') { efeFbBase.filas = efeDatos.filas; efeFbBase.caja = efeDatos.cajaChica; efeFbMezclar(); }
             }
             efeCargadoEn = Date.now();
         })();
@@ -17460,6 +17553,8 @@ Reglas:
             efeDatos = { filas: e.filas || efeDatos.filas, cajaChica: e.cajaChica || [], responsablesCaja: e.responsablesCaja || efeDatos.responsablesCaja || [] };
             efeCargadoEn = Date.now();
             efeFbVer(e);
+            // Escuchando Firebase: lo de la hoja es la base y la bandeja se sigue mostrando encima
+            if (typeof efeFbOff === 'function') { efeFbBase.filas = e.filas || efeFbBase.filas; efeFbBase.caja = e.cajaChica || efeFbBase.caja; efeFbMezclar(); }
             await efeCargar(true);
         } else await efeCargar();
     }
@@ -17504,14 +17599,14 @@ Reglas:
                 <small><b>${esc(cmpNombreCorto(quien))}</b>${m ? esc(cmpCuandoCorto(m[2])) : ''}</small></span>`; };
         document.getElementById('efeHTabla').innerHTML = lista.length ? `<table data-sin-paginar><thead><tr><th class="izq">Fecha</th><th class="izq">Concepto</th>
             <th class="izq">Responsable</th><th class="izq">Turno</th><th>Bs</th><th>$</th><th class="efe-c" title="Foto">Foto</th><th class="efe-c" title="Verificación (solo gastos de oficina)">Verif.</th><th></th></tr></thead><tbody>` +
-            lista.slice(0, efeHLimite).map(f => `<tr class="${f.tipo === 'EGRESO' ? 'fila-egreso' : f.tipo === 'TRASPASO' ? 'fila-traspaso' : f.tipo === 'EXTERNO' ? 'fila-externo' : ''}"><td class="izq">${efeFecha(f.fecha)}${efeAtraso(f)}</td>
+            lista.slice(0, efeHLimite).map(f => `<tr class="${f.tipo === 'EGRESO' ? 'fila-egreso' : f.tipo === 'TRASPASO' ? 'fila-traspaso' : f.tipo === 'EXTERNO' ? 'fila-externo' : ''}"><td class="izq">${efeFecha(f.fecha)}${efeAtraso(f)}${efePendChip(f)}</td>
                 <td class="izq efe-gris">${f.tipo === 'TRASPASO' ? esc(f.turno || 'Traspaso a caja chica') : f.tipo === 'EGRESO' ? esc(f.turno || (f.etiqueta && f.etiqueta !== 'EGRESO' ? f.etiqueta : 'Egreso manual')) : f.tipo === 'EXTERNO' ? esc(f.turno) : esc(f.tienda || 'Ingreso manual')}</td><td class="izq efe-gris">${efeCorto(f.cajero)}</td>
                 <td class="izq efe-gris"><span title="${esc(f.tipo === 'INGRESO' ? f.turno : '')}">${f.tipo !== 'INGRESO' ? '' : turnoCorto(f.turno)}</span></td>
                 <td class="${f.bs < 0 ? 'monto-neg' : ''}">${f.bs ? efeMontoUsd('Bs', f.bs, f.fecha, punto(f, 'bs')) : efeSinEnvio(f) ? `<span class="efe-cifra"><span title="Caja sin envío">Bs 0</span>${punto(f, 'bs')}</span>` : ''}${f.bsOk || f.tipo !== 'INGRESO' ? firma(f, 'bs') : ''}</td>
                 <td class="${f.usd < 0 ? 'monto-neg' : ''}">${f.usd ? `<span class="efe-cifra">${fmtUsd(f.usd)}${punto(f, 'usd')}</span>` : ''}${f.usdOk || f.tipo !== 'INGRESO' ? firma(f, 'usd') : ''}</td>
                 <td class="efe-c">${efeFoto(f.foto)}</td>
                 <td class="efe-c">${efeEstadoVerif(f)}</td>
-                <td class="efe-c">${f.tipo !== 'INGRESO' ? efeBorrar(`efeEliminar(${f.fila})`, f.tipo === 'TRASPASO' ? 'Eliminar este traspaso (también se quita de la caja chica)' : f.tipo === 'EXTERNO' ? 'Eliminar este dinero externo' : 'Eliminar este gasto') : ''}</td></tr>`).join('') +
+                <td class="efe-c">${f.tipo !== 'INGRESO' && !f.pendiente ? efeBorrar(`efeEliminar(${f.fila})`, f.tipo === 'TRASPASO' ? 'Eliminar este traspaso (también se quita de la caja chica)' : f.tipo === 'EXTERNO' ? 'Eliminar este dinero externo' : 'Eliminar este gasto') : ''}</td></tr>`).join('') +
             '</tbody></table>' : '<div class="empty">No hay movimientos con estos filtros.</div>';
         // Paginador (los totales de arriba siempre son de todo lo filtrado)
         const mostrados = Math.min(efeHLimite, lista.length);
@@ -17721,22 +17816,23 @@ Reglas:
             let comprobante = null;
             if (archivo) { btnCargando(btn, 'Subiendo foto...'); comprobante = await efeLeerComprobante(archivo); }
             btnCargando(btn, 'Registrando...');
+            let fb = false;
             if (efeDestinoActual === 'caja') {
                 // Recarga de caja chica desde el flujo general: el script registra el egreso en FLUJO DE EFECTIVO y la suma en CAJA CHICA
-                if (bs) resp = await efeApi({ action: 'cc_registrar', tipo: 'RECARGA', origen: 'flujo', fecha, claveFecha, moneda: 'Bs', monto: bs, concepto, responsable, comprobante });
-                if (usd) resp = await efeApi({ action: 'cc_registrar', tipo: 'RECARGA', origen: 'flujo', fecha, claveFecha, moneda: '$', monto: usd, concepto, responsable, comprobante: bs ? null : comprobante });
+                if (bs) ({ resp, fb } = await efeMandar({ action: 'cc_registrar', tipo: 'RECARGA', origen: 'flujo', fecha, claveFecha, moneda: 'Bs', monto: bs, concepto, responsable }, comprobante));
+                if (usd) ({ resp, fb } = await efeMandar({ action: 'cc_registrar', tipo: 'RECARGA', origen: 'flujo', fecha, claveFecha, moneda: '$', monto: usd, concepto, responsable }, bs ? null : comprobante));
                 mostrarBanner(`Gasto para caja chica registrado: ${concepto}. Se sumó al saldo de la caja chica.`, 'ok');
             } else if (externo) {
-                resp = await efeApi({ action: 'efe_externo', fecha, claveFecha, concepto, responsable, bs, usd, comprobante });
+                ({ resp, fb } = await efeMandar({ action: 'efe_externo', fecha, claveFecha, concepto, responsable, bs, usd }, comprobante));
                 mostrarBanner(`Dinero externo agregado: ${concepto}. Ya está en el disponible.`, 'ok');
             } else {
-                resp = await efeApi({ action: 'efe_egreso', fecha, claveFecha, concepto, responsable, bs, usd, comprobante });
+                ({ resp, fb } = await efeMandar({ action: 'efe_egreso', fecha, claveFecha, concepto, responsable, bs, usd }, comprobante));
                 mostrarBanner(`Gasto registrado: ${concepto}.`, 'ok');
             }
             ['efeEConcepto', 'efeEResp', 'efeEBs', 'efeEUsd', 'efeEFoto'].forEach(id => document.getElementById(id).value = '');
             document.getElementById('efeEFotoVista').innerHTML = '';
             efeFechaReiniciar('E');
-            await efeUsarRespuesta(resp);
+            if (fb) efeCargar(true); else await efeUsarRespuesta(resp);
         } catch (e) { err.textContent = efeSinPrefijo(e.message); }
         finally { btn.disabled = false; efeDestino(efeDestinoActual); }
     }
@@ -17842,16 +17938,16 @@ Reglas:
         const lista = efeDatos.cajaChica.slice().sort((a, b) => a.fila - b.fila)
             .map(m => { saldos[m.moneda] = centimos((saldos[m.moneda] || 0) + (m.tipo === 'RECARGA' ? m.monto : -m.monto)); return Object.assign({ saldo: saldos[m.moneda] }, m); })
             .filter(m => !fm || m.moneda === fm).reverse();
-        const borrable = m => m.tipo === 'GASTO' || (m.tipo === 'RECARGA' && m.origen === 'externo');
+        const borrable = m => !m.pendiente && (m.tipo === 'GASTO' || (m.tipo === 'RECARGA' && m.origen === 'externo'));
         document.getElementById('efeCTabla').innerHTML = lista.length ? `<table><thead><tr><th class="izq">Fecha</th><th class="izq">Tipo</th><th class="izq">Concepto</th>
             <th class="izq">Responsable</th><th>Monto</th><th>Saldo</th><th class="efe-c" title="Comprobante">Comp.</th><th class="efe-c" title="Verificado">Verif.</th><th></th></tr></thead><tbody>` +
-            lista.map(m => `<tr class="${m.tipo === 'GASTO' && !m.verificado ? 'cc-sinverificar' : ''}"><td class="izq">${efeFecha(m.fecha)}${efeAtraso(m)}</td>
+            lista.map(m => `<tr class="${m.tipo === 'GASTO' && !m.verificado ? 'cc-sinverificar' : ''}"><td class="izq">${efeFecha(m.fecha)}${efeAtraso(m)}${efePendChip(m)}</td>
                 <td class="izq"><span class="chip ${m.tipo === 'RECARGA' ? (m.origen === 'externo' ? 'st-info' : 'st-ok') : 'st-falta'}" title="${m.tipo === 'RECARGA' ? (m.origen === 'externo' ? 'Recarga externa (no afecta el flujo general)' : 'Recarga desde el flujo general') : 'Gasto'}">${m.tipo === 'RECARGA' ? 'Recarga' : 'Gasto'}</span></td>
                 <td class="izq efe-gris">${esc(m.concepto)}</td><td class="izq efe-gris">${efeCorto(m.responsable)}</td>
                 <td class="${m.tipo === 'GASTO' ? 'monto-neg' : ''}">${m.tipo === 'GASTO' ? '−' : '+'}${efeMontoUsd(m.moneda, m.monto, m.fecha)}</td>
                 <td>${efeMonto(m.moneda, m.saldo)}</td>
                 <td class="efe-c">${efeFoto(m.comprobante) || (m.tipo === 'GASTO' ? '<span class="efe-falta" title="Sin comprobante">—</span>' : '')}</td>
-                <td class="efe-c">${m.tipo !== 'GASTO' ? '' : efeSwVerif(m.verificado, `efeVerificarCaja(${m.fila})`, `efeDesverificar('caja', ${m.fila})`)}</td>
+                <td class="efe-c">${m.tipo !== 'GASTO' || m.pendiente ? '' : efeSwVerif(m.verificado, `efeVerificarCaja(${m.fila})`, `efeDesverificar('caja', ${m.fila})`)}</td>
                 <td class="efe-c">${borrable(m) ? efeBorrar(`efeEliminarCaja(${m.fila})`, 'Eliminar (pide clave de administrador)') : ''}</td></tr>`).join('') +
             '</tbody></table>' : '<div class="empty">Todavía no hay movimientos de caja chica. Empiece con una recarga.</div>';
     }
@@ -17902,8 +17998,8 @@ Reglas:
     // POR VERIFICAR: gastos de oficina del flujo general (clave de administrador) y gastos de caja chica (acceso al flujo de caja)
     // ==========================================
     const efeSinVerificar = f => f.tipo === 'EGRESO' && (!f.verificado || /^pendiente$/i.test(f.verificado));
-    const efePendFlujo = () => efeDatos.filas.filter(efeSinVerificar);
-    const efePendCaja = () => efeDatos.cajaChica.filter(m => m.tipo === 'GASTO' && !m.verificado);
+    const efePendFlujo = () => efeDatos.filas.filter(f => !f.pendiente && efeSinVerificar(f));   // lo de la bandeja se verifica cuando ya está en la hoja
+    const efePendCaja = () => efeDatos.cajaChica.filter(m => m.tipo === 'GASTO' && !m.verificado && !m.pendiente);
     function efePintarCuentaVerif() {
         const n = efePendFlujo().length + efePendCaja().length, el = document.getElementById('efeVerifCuenta');
         if (!el) return;
@@ -17953,7 +18049,7 @@ Reglas:
     const efeSwRecibido = (f, mon) => { const ok = mon === 'usd' ? f.usdOk : f.bsOk;
         return `<label class="interruptor interruptor-solo" title="${ok ? 'Recibido · apagar si todavía no llegó' : 'Por llegar · encender cuando llegue'}"><input type="checkbox" ${ok ? 'checked' : ''} onchange="efeMarcar(${f.fila}, '${mon}', this.checked)"><span class="sw-pista"></span></label>`; };
     function efeEstadoVerif(f) {
-        if (f.tipo !== 'EGRESO') return '';
+        if (f.tipo !== 'EGRESO' || f.pendiente) return '';
         return efeSwVerif(efeSinVerificar(f) ? '' : f.verificado, `efeVerificarEgreso(${f.fila})`, `efeDesverificar('flujo', ${f.fila})`);
     }
 
@@ -18113,8 +18209,8 @@ Reglas:
             let comprobante = null;
             if (archivo) { btnCargando(btn, 'Subiendo comprobante...'); comprobante = await efeLeerComprobante(archivo); }
             btnCargando(btn, 'Registrando...');
-            const resp = await efeApi({ action: 'cc_registrar', tipo: efeCajaTipoActual, origen: recarga ? efeCajaOrigenActual : '', fecha: document.getElementById('efeCFecha').value, claveFecha: fd.claveFecha, moneda, monto,
-                              concepto: document.getElementById('efeCConcepto').value.trim(), responsable: document.getElementById('efeCResp').value.trim(), comprobante });
+            const { resp, fb } = await efeMandar({ action: 'cc_registrar', tipo: efeCajaTipoActual, origen: recarga ? efeCajaOrigenActual : '', fecha: document.getElementById('efeCFecha').value, claveFecha: fd.claveFecha, moneda, monto,
+                              concepto: document.getElementById('efeCConcepto').value.trim(), responsable: document.getElementById('efeCResp').value.trim() }, comprobante);
             ['efeCMonto', 'efeCConcepto', 'efeCResp', 'efeCFoto'].forEach(id => document.getElementById(id).value = '');
             efePintarResponsables();
             document.getElementById('efeCFotoVista').innerHTML = '';
@@ -18123,7 +18219,7 @@ Reglas:
                 : efeCajaOrigenActual === 'flujo' ? 'Recarga registrada (salió del flujo general: quedó como traspaso en FLUJO DE EFECTIVO).'
                 : 'Recarga externa registrada (no afecta el flujo general).', 'ok');
             guardado = true;
-            await efeUsarRespuesta(resp);
+            if (fb) efeCargar(true); else await efeUsarRespuesta(resp);
         } catch (e) { err.textContent = efeSinPrefijo(e.message); }
         finally { btn.disabled = false; efeCajaTipo(efeCajaTipoActual, !guardado); }
     }
