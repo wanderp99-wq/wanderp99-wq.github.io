@@ -3357,24 +3357,44 @@
         async function aGoogle(fn) { forzar++; try { return await fn(); } finally { forzar--; } }
         return { iniciar, salir, leer, guardar, guardable, olvidarAreas, aGoogle };
     })();
+    // Guardados en curso (07/11): recargar la página mientras Google guarda dejaba el cambio DOS veces (el primero sí entraba).
+    //  - Mientras haya uno en curso, el navegador pregunta antes de recargar o cerrar.
+    //  - El idem de cada guardado queda también en este equipo (localStorage, 6 h como en Google): si después de recargar se
+    //    vuelve a mandar EXACTAMENTE lo mismo, va con el mismo idem y Google responde "ya estaba guardado" en vez de repetirlo.
+    let escriturasEnCurso = 0;
+    const IDEM_LS = 'pv_idem_pend', IDEM_VIDA = 6 * 3600e3;
+    const hashTexto = s => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36) + '.' + s.length.toString(36); };
+    function idemLeerLS() { try { return JSON.parse(localStorage.getItem(IDEM_LS) || '{}') || {}; } catch (e) { return {}; } }
+    function idemGuardado(k) { const x = idemLeerLS()[k]; return x && Date.now() - x.t < IDEM_VIDA ? x.idem : ''; }
+    function idemRecordar(k, idem) {
+        try {
+            const m = idemLeerLS(), ahora = Date.now();
+            Object.keys(m).forEach(j => { if (!m[j] || ahora - m[j].t > IDEM_VIDA) delete m[j]; });
+            if (idem) m[k] = { idem, t: ahora }; else delete m[k];
+            localStorage.setItem(IDEM_LS, JSON.stringify(m));
+        } catch (e) {}
+    }
     async function llamarApiPedido(payload) {
         const t0 = performance.now();
-        let llaveIdem = '';
+        let llaveIdem = '', llaveLS = '';
         // Leer la factura no guarda nada: sin idem (si no, pulsar Leer otra vez mientras Google seguía con el primero daba "todavía se está guardando").
         // La imagen de una nota para Telegram tampoco: Google la acepta una sola vez por nota.
         if (!SOLO_LECTURA.test(payload.action) && !/^(cmp_leer|alm_tg_imagen)$/.test(payload.action)) {
             llaveIdem = JSON.stringify(payload);
-            payload = Object.assign({}, payload, { idem: payload.idem || idemPendientes.get(llaveIdem) || nuevoIdem() });   // quien trae su idem (una nota) lo conserva en cada reenvío
+            llaveLS = hashTexto((nombreUsuario || '') + '|' + llaveIdem);
+            payload = Object.assign({}, payload, { idem: payload.idem || idemPendientes.get(llaveIdem) || idemGuardado(llaveLS) || nuevoIdem() });   // quien trae su idem (una nota) lo conserva en cada reenvío
+            idemRecordar(llaveLS, payload.idem);
+            escriturasEnCurso++;
         }
         try {
             const r = await llamarApiReal(payload, t0);
-            if (llaveIdem) idemPendientes.delete(llaveIdem);
+            if (llaveIdem) { idemPendientes.delete(llaveIdem); idemRecordar(llaveLS, ''); }
             if (r && r._ver) vivoUsar(r._ver);   // qué versión de su área trae esta respuesta (cambios en vivo)
             if (r.yaRegistrado) mostrarBanner('Ese cambio ya estaba guardado (Google lo registró la vez anterior aunque no respondió). No se repitió.', 'ok');
             return r;
         }
         catch (e) {
-            if (llaveIdem) { if (e.sinRespuesta) idemPendientes.set(llaveIdem, payload.idem); else idemPendientes.delete(llaveIdem); }
+            if (llaveIdem) { if (e.sinRespuesta) idemPendientes.set(llaveIdem, payload.idem); else { idemPendientes.delete(llaveIdem); idemRecordar(llaveLS, ''); } }
             anotarTiempo(payload.action, performance.now() - t0, null, false);
             // Sin internet: el cambio queda guardado en este equipo y se envía solo al volver la conexión (con el mismo idem: no se repite)
             if (llaveIdem && e.sinRespuesta && !NO_COLA.test(payload.action) && await COLA.sinInternet()) {
@@ -3394,6 +3414,7 @@
             }
             throw e;
         }
+        finally { if (llaveIdem) escriturasEnCurso--; }
     }
     // Lo que no se guarda para después (necesita respuesta en el momento o es de administración de claves)
     const NO_COLA = /^(login|ping|cambios|enlinea|nom_autorizar|adm_|alm_|cmp_|bsr_|huella_)/;   // el almacén necesita internet: la nota lleva número y existencia del momento
@@ -3537,7 +3558,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-07.1';
+    const VERSION_SERVIDOR = '2026-11-07.3';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -6508,7 +6529,8 @@
     // Bloquear rueda y "e/E/+" en campos numéricos (se permite "-" porque el sistema puede dar negativo)
     document.addEventListener('wheel', () => { if (document.activeElement.type === 'number') document.activeElement.blur(); });
     document.addEventListener('keydown', e => { if (e.target.type === 'number' && ['e', 'E', '+'].includes(e.key)) e.preventDefault(); });
-    window.addEventListener('beforeunload', e => { if (Object.keys(borradores).length) { e.preventDefault(); e.returnValue = ''; } });
+    // Cambios sin guardar, o un guardado que Google todavía no confirma (recargar ahí dejaba el cambio dos veces)
+    window.addEventListener('beforeunload', e => { if (Object.keys(borradores).length || escriturasEnCurso > 0) { e.preventDefault(); e.returnValue = ''; } });
 
     // ==========================================
     // DATOS DE DEMOSTRACIÓN
@@ -17548,7 +17570,17 @@ Reglas:
         if (d > EFE_DIAS_ATRAS && !claveFecha) { err.textContent = `Escriba la clave de administrador: la fecha es de hace ${d} días.`; if (inp) inp.focus(); return null; }
         return { claveFecha };
     }
-    const efeSinPrefijo = m => String(m || '').replace(/^FECHA_ADMIN:\s*/, '');
+    const efeSinPrefijo = m => String(m || '').replace(/^(FECHA_ADMIN|REPETIDO):\s*/, '');
+    // Guardar un movimiento de dinero. Si Google ve que hace poco se registró uno IGUAL (REPETIDO:), se pregunta antes de repetirlo.
+    async function efeApi(p) {
+        try { return await llamarApi(p); }
+        catch (e) {
+            if (!/^REPETIDO:/.test(e.message || '')) throw e;
+            if (!confirm(efeSinPrefijo(e.message) + '\n\nRevise la lista antes. ¿Es OTRO movimiento distinto y quiere registrarlo de todas formas?'))
+                throw new Error('No se registró: ya había uno igual de hace un momento. Revise la lista (pulse Actualizar).');
+            return await llamarApi(Object.assign({}, p, { repetidoOk: true }));
+        }
+    }
     // Después de guardar: la fecha vuelve a hoy (la clave escrita para una fecha vieja no queda servida para el siguiente)
     function efeFechaReiniciar(p) { const c = document.getElementById('efe' + p + 'FechaClave'); document.getElementById('efe' + p + 'Fecha').value = fechaLocalHoy(); if (c) c.dataset.dias = ''; efeFechaRevisar(p); }
 
@@ -17576,14 +17608,14 @@ Reglas:
             btnCargando(btn, 'Registrando...');
             if (efeDestinoActual === 'caja') {
                 // Recarga de caja chica desde el flujo general: el script registra el egreso en FLUJO DE EFECTIVO y la suma en CAJA CHICA
-                if (bs) resp = await llamarApi({ action: 'cc_registrar', tipo: 'RECARGA', origen: 'flujo', fecha, claveFecha, moneda: 'Bs', monto: bs, concepto, responsable, comprobante });
-                if (usd) resp = await llamarApi({ action: 'cc_registrar', tipo: 'RECARGA', origen: 'flujo', fecha, claveFecha, moneda: '$', monto: usd, concepto, responsable, comprobante: bs ? null : comprobante });
+                if (bs) resp = await efeApi({ action: 'cc_registrar', tipo: 'RECARGA', origen: 'flujo', fecha, claveFecha, moneda: 'Bs', monto: bs, concepto, responsable, comprobante });
+                if (usd) resp = await efeApi({ action: 'cc_registrar', tipo: 'RECARGA', origen: 'flujo', fecha, claveFecha, moneda: '$', monto: usd, concepto, responsable, comprobante: bs ? null : comprobante });
                 mostrarBanner(`Gasto para caja chica registrado: ${concepto}. Se sumó al saldo de la caja chica.`, 'ok');
             } else if (externo) {
-                resp = await llamarApi({ action: 'efe_externo', fecha, claveFecha, concepto, responsable, bs, usd, comprobante });
+                resp = await efeApi({ action: 'efe_externo', fecha, claveFecha, concepto, responsable, bs, usd, comprobante });
                 mostrarBanner(`Dinero externo agregado: ${concepto}. Ya está en el disponible.`, 'ok');
             } else {
-                resp = await llamarApi({ action: 'efe_egreso', fecha, claveFecha, concepto, responsable, bs, usd, comprobante });
+                resp = await efeApi({ action: 'efe_egreso', fecha, claveFecha, concepto, responsable, bs, usd, comprobante });
                 mostrarBanner(`Gasto registrado: ${concepto}.`, 'ok');
             }
             ['efeEConcepto', 'efeEResp', 'efeEBs', 'efeEUsd', 'efeEFoto'].forEach(id => document.getElementById(id).value = '');
@@ -17966,7 +17998,7 @@ Reglas:
             let comprobante = null;
             if (archivo) { btnCargando(btn, 'Subiendo comprobante...'); comprobante = await efeLeerComprobante(archivo); }
             btnCargando(btn, 'Registrando...');
-            const resp = await llamarApi({ action: 'cc_registrar', tipo: efeCajaTipoActual, origen: recarga ? efeCajaOrigenActual : '', fecha: document.getElementById('efeCFecha').value, claveFecha: fd.claveFecha, moneda, monto,
+            const resp = await efeApi({ action: 'cc_registrar', tipo: efeCajaTipoActual, origen: recarga ? efeCajaOrigenActual : '', fecha: document.getElementById('efeCFecha').value, claveFecha: fd.claveFecha, moneda, monto,
                               concepto: document.getElementById('efeCConcepto').value.trim(), responsable: document.getElementById('efeCResp').value.trim(), comprobante });
             ['efeCMonto', 'efeCConcepto', 'efeCResp', 'efeCFoto'].forEach(id => document.getElementById(id).value = '');
             efePintarResponsables();
