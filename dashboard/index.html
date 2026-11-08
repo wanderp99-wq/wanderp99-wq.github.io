@@ -3213,7 +3213,7 @@
         if (TIEMPOS.length > 60) TIEMPOS.pop();
     }
     // Solo lectura: si la respuesta de Google no llega, se reintenta una vez sola (no cambia nada en la hoja)
-    const SOLO_LECTURA = /^(login|list|cuadre_detalle|cuadre_detalle_lote|mov_listar|cuentas_listar|conc_listar|efe_listar|cc_listar|req_datos|req_ventas|req_historial|asis_hoy|asis_listar|asisg_listar|per_listar|cxc_deudas|nom_historial|nom_autorizar|nom_ajustes|hor_datos|alm_datos|alm_notas|alm_ingresos|alm_kardex|alm_seguimiento|alm_tiendas|alm_existencias|alm_espera_listar|cmp_compras|cmp_ordenes|cmp_enlazar|cmp_borradores|cmp_borrador|pnom_listar|ping|cambios|pendientes|enlinea|marca_estado)$/;
+    const SOLO_LECTURA = /^(login|fb_token|fb_prueba|list|cuadre_detalle|cuadre_detalle_lote|mov_listar|cuentas_listar|conc_listar|efe_listar|cc_listar|req_datos|req_ventas|req_historial|asis_hoy|asis_listar|asisg_listar|per_listar|cxc_deudas|nom_historial|nom_autorizar|nom_ajustes|hor_datos|alm_datos|alm_notas|alm_ingresos|alm_kardex|alm_seguimiento|alm_tiendas|alm_existencias|alm_espera_listar|cmp_compras|cmp_ordenes|cmp_enlazar|cmp_borradores|cmp_borrador|pnom_listar|ping|cambios|pendientes|enlinea|marca_estado)$/;
     // Guardados sin repetir: cada cambio lleva un "idem". Si no llegó la respuesta y se vuelve a pulsar el MISMO cambio,
     // se manda el mismo idem y Google responde "ya estaba registrado" en vez de guardarlo otra vez.
     const idemPendientes = new Map();   // contenido del cambio -> idem del intento sin respuesta
@@ -3254,7 +3254,7 @@
     // ==========================================
     const DATOS = (() => {
         // Lecturas que no se copian: entrar, avisos, lo que cambia a cada momento o es de una sola vez
-        const NO_COPIAR = /^(login|ping|cambios|pendientes|enlinea|marca_estado|cmp_enlazar|cmp_borrador|nom_autorizar|alm_kardex|alm_seguimiento)$/;
+        const NO_COPIAR = /^(login|fb_token|fb_prueba|ping|cambios|pendientes|enlinea|marca_estado|cmp_enlazar|cmp_borrador|nom_autorizar|alm_kardex|alm_seguimiento)$/;
         const VIGENCIA = 3 * 24 * 3600 * 1000;   // lo guardado hace más de 3 días no se muestra
         const RECIENTE = 20000;                   // leído de Google hace menos de 20 s: no se vuelve a preguntar
         const memoria = new Map();                // llave -> { s (texto), t (cuándo), ver (versiones de sus áreas) }
@@ -3454,6 +3454,91 @@
         conc_listar: 'Cargar conciliación', conc_manual: 'Validar pago', conc_manual_lote: 'Validar varios', conc_desmarcar: 'Quitar validación', mov_guardar: 'Subir banco',
         efe_listar: 'Cargar efectivo', efe_marcar: 'Marcar recibido', efe_egreso: 'Registrar gasto', cc_registrar: 'Caja chica', cc_listar: 'Cargar caja chica',
         req_datos: 'Cargar catálogo', req_ventas: 'Leer ventas', req_historial: 'Historial', req_guardar: 'Guardar requerimiento', req_productos_guardar: 'Guardar catálogo' };
+    // ==========================================
+    // FIREBASE (etapa 1, 07/11 · diseño en sistema/FIREBASE-diseno.md)
+    // El panel entra a Firebase con un pase que firma Apps Script (fb_token) con los permisos de la persona; las reglas de
+    // Firestore los revisan. Se carga solo cuando hace falta (la librería viene de Google: gstatic).
+    // ==========================================
+    const FB_CONFIG = { apiKey: 'AIzaSyChfkb5hOmbIWMtkYOvoVzjZK0KLzxFGgw', authDomain: 'plazavalencia-c2cb0.firebaseapp.com', projectId: 'plazavalencia-c2cb0',
+                        storageBucket: 'plazavalencia-c2cb0.firebasestorage.app', messagingSenderId: '500821175241', appId: '1:500821175241:web:0bf067ae5c8e92422d9618' };
+    const FB_SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
+    const FB = (() => {
+        let lib = null, app = null, auth = null, db = null, entrando = null, uidActual = '';
+        async function cargar() {
+            if (lib) return lib;
+            const [a, au, fs] = await Promise.all([import(FB_SDK + 'firebase-app.js'), import(FB_SDK + 'firebase-auth.js'), import(FB_SDK + 'firebase-firestore.js')]);
+            lib = { a, au, fs };
+            app = a.getApps().find(x => x.name === 'panel') || a.initializeApp(FB_CONFIG, 'panel');
+            auth = au.getAuth(app);
+            // Copia en el equipo y varias pestañas a la vez: abrir es instantáneo y funciona sin internet
+            try { db = fs.initializeFirestore(app, { localCache: fs.persistentLocalCache({ tabManager: fs.persistentMultipleTabManager() }) }); }
+            catch (e) { db = fs.getFirestore(app); }
+            return lib;
+        }
+        // Deja la sesión de Firebase lista para la persona que entró al panel (si había otra en este equipo, la cambia)
+        async function listo() {
+            if (!clave) throw new Error('Entre al panel primero');
+            await cargar();
+            if (auth.currentUser && uidActual && auth.currentUser.uid === uidActual) return { db, auth, lib };
+            if (!entrando) entrando = (async () => {
+                const r = await llamarApi({ action: 'fb_token' });
+                if (auth.currentUser && auth.currentUser.uid !== r.uid) await lib.au.signOut(auth);
+                if (!auth.currentUser || auth.currentUser.uid !== r.uid) await lib.au.signInWithCustomToken(auth, r.token);
+                uidActual = r.uid;
+            })().finally(() => { entrando = null; });
+            await entrando;
+            return { db, auth, lib };
+        }
+        // Escuchar colecciones en vivo (efectivo/AAAA-MM...): cb({ colección: [documentos] }) en cada cambio, cuando ya
+        // llegaron todas las colecciones. Cada cambio de otro equipo cuesta 1 lectura (solo el mes que cambió).
+        const escuchas = new Set();
+        async function escuchar(colecciones, cb) {
+            const { db: base, lib: l } = await listo();
+            const datos = {}, quitar = [];
+            const avisar = () => { if (colecciones.every(c => datos[c])) cb(Object.assign({}, datos)); };
+            colecciones.forEach(c => quitar.push(l.fs.onSnapshot(l.fs.collection(base, c), s => { datos[c] = s.docs.map(d => Object.assign({ _id: d.id }, d.data())); avisar(); },
+                e => { console.log('Firebase (' + c + '): ' + (e.code || e.message)); })));
+            const off = () => { quitar.forEach(q => { try { q(); } catch (e) {} }); escuchas.delete(off); };
+            escuchas.add(off);
+            return off;
+        }
+        async function salir() { uidActual = ''; [...escuchas].forEach(off => off()); try { if (auth) await lib.au.signOut(auth); } catch (e) {} }
+        // Prueba de velocidad: escribir y leer en Firestore desde este equipo, y lo mismo desde Apps Script
+        async function prueba() {
+            const r = {}, t = () => performance.now();
+            let t0 = t(); await cargar(); r.libreria = t() - t0;
+            t0 = t(); await listo(); r.entrar = t() - t0;
+            const ref = lib.fs.doc(db, 'pruebas', uidActual);
+            t0 = t(); await lib.fs.setDoc(ref, { desde: 'panel', cuando: lib.fs.serverTimestamp(), quien: nombreUsuario }); r.escribir = t() - t0;
+            t0 = t(); await lib.fs.getDocFromServer(ref); r.leer = t() - t0;
+            t0 = t(); await lib.fs.setDoc(ref, { desde: 'panel', cuando: lib.fs.serverTimestamp(), quien: nombreUsuario, n: 2 }); r.escribir2 = t() - t0;
+            t0 = t(); const g = await DATOS.aGoogle(() => llamarApi({ action: 'fb_prueba' })); r.googleTotal = t() - t0; r.google = g;
+            return r;
+        }
+        return { cargar, listo, salir, prueba, escuchar };
+    })();
+    // Activar / desactivar el espejo de Efectivo y Caja chica en Firebase (administradores, en Tiempos)
+    async function fbEfectivo(btn, activar) {
+        const out = document.getElementById('fbPruebaRes'); btn.disabled = true; btnCargando(btn, activar ? 'Copiando a Firebase...' : 'Desactivando...');
+        try {
+            const r = await DATOS.aGoogle(() => llamarApi({ action: 'fb_efectivo', activar }));
+            out.innerHTML = r.activo ? `<div class="banner ok" style="display:block">Efectivo y Caja chica ya están en Firebase: ${r.filas} movimientos del flujo y ${r.cajaChica} de caja chica (${r.meses} meses copiados). Al abrir Efectivo se ven en vivo.</div>`
+                                     : '<div class="banner warn" style="display:block">Espejo de Firebase desactivado: Efectivo vuelve a leer solo de la hoja.</div>';
+            efeFbActivo = !!r.activo; if (!r.activo) efeFbDetener(); else efeFbIniciar();
+        } catch (e) { out.innerHTML = `<div class="banner error" style="display:block">${esc(e.message)}</div>`; }
+        finally { btn.disabled = false; btn.textContent = activar ? 'Activar Efectivo en Firebase' : 'Desactivar'; }
+    }
+    async function fbProbar(btn) {
+        const out = document.getElementById('fbPruebaRes'); btn.disabled = true; btnCargando(btn, 'Probando...');
+        const s = ms => ms == null ? '—' : ms < 1000 ? Math.round(ms) + ' ms' : (ms / 1000).toFixed(1) + ' s';
+        try {
+            const r = await FB.prueba();
+            out.innerHTML = `<div class="banner ok" style="display:block">Firebase funciona. Desde este equipo: guardar <b>${s(r.escribir2)}</b> (la primera vez ${s(r.escribir)}), leer <b>${s(r.leer)}</b>.
+                Entrar a Firebase: ${s(r.entrar)} (una vez por sesión) · librería ${s(r.libreria)}.<br>
+                Lo mismo por Apps Script: <b>${s(r.googleTotal)}</b>${r.google && r.google.pasos ? ` <small>(${esc(r.google.pasos)})</small>` : ''} · reglas ${esc((r.google && r.google.reglas) || '')}.</div>`;
+        } catch (e) { out.innerHTML = `<div class="banner error" style="display:block">${esc(e.code ? e.code + ': ' : '')}${esc(e.message)}</div>`; }
+        finally { btn.disabled = false; btn.textContent = 'Probar Firebase'; }
+    }
     // Pantalla "Tiempos de respuesta" (enlace al pie del menú)
     function verTiempos() {
         let fondo = document.getElementById('dlgTiempos');
@@ -3468,7 +3553,8 @@
             <div class="tabla-wrap" style="max-height:60vh;overflow:auto;margin-top:.75rem">${TIEMPOS.length ? `<table><thead><tr><th class="izq">Hora</th><th class="izq">Acción</th><th>Total</th><th>En Google</th></tr></thead><tbody>
             ${TIEMPOS.map(t => `<tr><td class="izq">${t.hora}</td><td class="izq">${esc(NOMBRE_ACCION[t.accion] || t.accion)}${t.ok ? '' : ' <span class="chip st-falta">error</span>'}${t.pasos ? '<small title="Partes del trabajo de Google, en milisegundos">' + esc(t.pasos) + '</small>' : ''}</td>
                 <td><b>${s(t.total)}</b></td><td>${s(t.servidor)}</td></tr>`).join('')}</tbody></table>` : '<div class="empty">Todavía no hay pedidos.</div>'}</div>
-            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-primary" onclick="document.getElementById('dlgTiempos').classList.add('hidden')">Cerrar</button></div></div>`;
+            <div id="fbPruebaRes" style="margin-top:.6rem"></div>
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0">${esPrincipal ? '<button type="button" class="btn-ghost" onclick="fbProbar(this)">Probar Firebase</button><button type="button" class="btn-ghost" onclick="fbEfectivo(this, true)">Activar Efectivo en Firebase</button><button type="button" class="btn-ghost" onclick="fbEfectivo(this, false)">Desactivar</button>' : ''}<button type="button" class="btn-primary" onclick="document.getElementById('dlgTiempos').classList.add('hidden')">Cerrar</button></div></div>`;
         fondo.classList.remove('hidden');
     }
 
@@ -3558,7 +3644,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-07.4';
+    const VERSION_SERVIDOR = '2026-11-07.6';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -3825,7 +3911,7 @@
         if (clave && WEB_APP_URL && typeof mensaje !== 'string') llamarApiReal({ action: 'ping', salir: true, vista: '', disp: DISPOSITIVO }, performance.now()).catch(() => {});   // deja de figurar como conectado
         clave = null;
         permisos = [];
-        nombreUsuario = ''; esPrincipal = false; olvidarClavesAdmin(); DATOS.salir();
+        nombreUsuario = ''; esPrincipal = false; olvidarClavesAdmin(); DATOS.salir(); FB.salir(); efeFbOff = null; efeFbActivo = false;
         filas = []; borradores = {}; seleccion = null; cargadoDesde = null; cuadreIniciado = false;
         // Al salir se borra todo lo guardado en memoria (otra persona puede entrar con menos permisos)
         efeDatos = { filas: [], cajaChica: [] }; efeCargado = null; efeCargadoEn = 0; precargadoDesde = null; Object.keys(pagMemoria).forEach(k => delete pagMemoria[k]);
@@ -17154,6 +17240,32 @@ Reglas:
         finally { btn.disabled = false; btn.textContent = 'Actualizar'; }
     }
 
+    // ---------- Efectivo en vivo desde Firebase (etapa 2a) ----------
+    // Si el espejo está activo (el servidor lo dice en efe_listar / cc_listar: fb), el panel escucha efectivo/AAAA-MM y
+    // cajachica/AAAA-MM en Firebase: lo que guarda otro equipo aparece solo, al instante. Los guardados siguen por Apps Script.
+    let efeFbActivo = false, efeFbOff = null, efeFbPendiente = false;
+    const efeFbAplanar = docs => (docs || []).flatMap(d => Object.values(d.m || {})).sort((a, b) => a.fila - b.fila);
+    function efeFbIniciar() {
+        if (efeFbOff || !efeFbActivo || !clave) return;
+        const cols = permisos.includes('efectivo') ? ['efectivo', 'cajachica'] : ['cajachica'];
+        efeFbOff = 'iniciando';
+        FB.escuchar(cols, d => {
+            efeDatos = { filas: d.efectivo ? efeFbAplanar(d.efectivo) : efeDatos.filas, cajaChica: efeFbAplanar(d.cajachica), responsablesCaja: efeDatos.responsablesCaja || [] };
+            if (!efeCargado || (d.efectivo && efeCargado === 'caja')) efeCargado = d.efectivo ? 'completo' : 'caja';
+            efeCargadoEn = Date.now();
+            efeFbRedibujar();
+        }).then(off => { if (efeFbOff === 'iniciando') efeFbOff = off; else off(); })
+          .catch(e => { efeFbOff = null; console.log('Efectivo en Firebase: ' + e.message); });
+    }
+    function efeFbDetener() { if (typeof efeFbOff === 'function') efeFbOff(); efeFbOff = null; }
+    // La respuesta de la hoja dice si el espejo está activo: se empieza o se deja de escuchar
+    function efeFbVer(r) { if (!r || typeof r.fb !== 'boolean') return; efeFbActivo = r.fb; if (r.fb) efeFbIniciar(); else efeFbDetener(); }
+    // Se redibuja solo si la persona no está a mitad de algo (escribiendo, con una ventana abierta...); si no, en un rato
+    function efeFbRedibujar() {
+        if (!/^(efectivo|cajachica)$/.test(vistaActual)) return;
+        if (!vivoPuede()) { if (!efeFbPendiente) { efeFbPendiente = true; setTimeout(() => { efeFbPendiente = false; efeFbRedibujar(); }, 3000); } return; }
+        efeCargar(true);
+    }
     // Lectura de FLUJO DE EFECTIVO / CAJA CHICA sin dibujar (la usa la precarga del inicio de sesión)
     let efePrecargaPromesa = null, efeCargadoEn = 0;
     function efePrecargar(soloCaja) {
@@ -17162,11 +17274,13 @@ Reglas:
                 const r = await llamarApi({ action: 'cc_listar' });
                 efeDatos = { filas: efeDatos.filas, cajaChica: r.cajaChica || [], responsablesCaja: r.responsablesCaja || efeDatos.responsablesCaja || [] };
                 if (!efeCargado) efeCargado = 'caja';
+                efeFbVer(r);
             } else {
                 const r = await llamarApi({ action: 'efe_listar', fresco: efeFresco });   // "Actualizar" = leer la hoja, no la memoria
                 efeFresco = false;
                 efeDatos = { filas: r.filas || [], cajaChica: r.cajaChica || [], responsablesCaja: r.responsablesCaja || [] };
                 efeCargado = 'completo';
+                efeFbVer(r);
             }
             efeCargadoEn = Date.now();
         })();
@@ -17345,6 +17459,7 @@ Reglas:
             const e = r.efectivo;
             efeDatos = { filas: e.filas || efeDatos.filas, cajaChica: e.cajaChica || [], responsablesCaja: e.responsablesCaja || efeDatos.responsablesCaja || [] };
             efeCargadoEn = Date.now();
+            efeFbVer(e);
             await efeCargar(true);
         } else await efeCargar();
     }
