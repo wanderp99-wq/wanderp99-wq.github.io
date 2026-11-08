@@ -3723,7 +3723,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-08.13';
+    const VERSION_SERVIDOR = '2026-11-08.14';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -6042,7 +6042,7 @@
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && seleccion !== null && document.getElementById('cuaDlg') && !document.getElementById('cuaDlg').classList.contains('hidden')) cuaCerrarCaja(); });
     function seleccionar(fila) {
         const otra = seleccion !== fila;
-        if (otra) { cuaEditando = false; cuaItemEditando = null; cuaItemBorrando = null; cuaFechaAbierta = false; }
+        if (otra) { cuaEditando = false; cuaItemEditando = null; cuaItemBorrando = null; cuaFechaAbierta = false; cuaBorrarAbierta = false; }
         seleccion = fila;
         if (otra) setTimeout(() => { const d = document.getElementById('detalle'); if (d && d.parentElement) d.parentElement.scrollTop = 0; }, 0);
         // Si hay un desglose de pagos abierto, se leen los renglones de la nueva caja
@@ -6066,7 +6066,8 @@
                     <div><strong>${esc(f.tienda)}</strong> · Turno <strong>${esc(f.turno)}</strong></div>
                     <div>Cajero: <strong>${esc(f.cajero)}</strong></div>
                     <div>Ficha ${esc(f.ficha)} · ${fechaBonita(f.fecha)} · Fila ${f.fila}
-                        ${cuaFechaAbierta ? '' : `<button type="button" class="btn-ghost btn-mini" onclick="cuaAbrirFecha()" title="La ficha se subió otro día (sin internet, sin luz)">Cambiar fecha</button>`}</div>
+                        ${cuaFechaAbierta || cuaBorrarAbierta ? '' : `<button type="button" class="btn-ghost btn-mini" onclick="cuaAbrirFecha()" title="La ficha se subió otro día (sin internet, sin luz)">Cambiar fecha</button>
+                        <button type="button" class="btn-ghost btn-mini btn-quitar" onclick="cuaAbrirBorrar()" title="Ficha de prueba o enviada dos veces">Eliminar caja</button>`}</div>
                     <div>Tasa BCV: <strong>${fmt(f.tasa)}</strong></div>
                     ${(f.comentarios || []).length ? `<div><a href="#cuaComentarios" class="link-nota">${f.comentarios.length} comentario(s) en esta caja ↓</a></div>` : ''}
                     ${cuaFondoLinea(f)}
@@ -6078,6 +6079,7 @@
                 </div>
             </div>
             ${cuaFechaAbierta ? cuaFormFecha(f) : ''}
+            ${cuaBorrarAbierta ? cuaFormBorrarCaja(f) : ''}
             <div class="tabla-wrap">
                 <table>
                     <thead>
@@ -6698,6 +6700,48 @@
             if (/clave de administrador/i.test(e.message)) claveAdmin = null;
             mostrarBanner('No se pudo cambiar la fecha: ' + e.message, 'error');
             btn.disabled = false; btn.textContent = 'Cambiar fecha';
+        }
+    }
+
+    // ---------- Eliminar la caja completa (ficha de prueba o enviada dos veces) ----------
+    let cuaBorrarAbierta = false;
+    function cuaAbrirBorrar() { cuaBorrarAbierta = !cuaBorrarAbierta; cuaFechaAbierta = false; renderDetalle(); }
+    function cuaFormBorrarCaja(f) {
+        return `<div class="des-form">
+            <div class="des-titulo">Eliminar esta caja</div>
+            <div class="nota" style="margin-top:0">Se quita todo lo de la ficha ${esc(f.ficha)} (${esc(f.tienda)} · ${esc(f.turno)} · ${esc(f.cajero)} · ${fechaBonita(f.fecha)}): la caja en el cuadre, sus pagos en Validar pagos, sus créditos y gastos, la asistencia que trajo la ficha y lo enviado a oficina en Control de efectivo.
+                No se puede si algo ya está validado en Validar pagos, pagado en Cuentas por cobrar o recibido en Control de efectivo. Todo lo que tenía queda anotado en BD VALIDACIONES.</div>
+            <div class="des-acciones">
+                <input type="text" id="cuab-motivo" placeholder="Motivo (obligatorio), p. ej. ficha de prueba" maxlength="150">
+                ${claveAdmin ? '<span class="nota-fila">Clave de administrador ingresada</span>'
+                             : '<input type="password" id="cuab-clave" placeholder="Clave de administrador" autocomplete="off">'}
+                <button type="button" class="btn-ghost" onclick="cuaAbrirBorrar()">Cancelar</button>
+                <button type="button" class="btn-save btn-quitar" id="cuab-borrar" onclick="cuaBorrarCaja()">Eliminar caja</button>
+            </div>
+        </div>`;
+    }
+    async function cuaBorrarCaja() {
+        const f = filas.find(x => x.fila === seleccion);
+        if (!f) return;
+        const motivo = (document.getElementById('cuab-motivo') || {}).value.trim();
+        if (!motivo) { mostrarBanner('Escriba el motivo.', 'warn'); return; }
+        const cAdmin = claveAdmin || (document.getElementById('cuab-clave') || {}).value || '';
+        if (!cAdmin) { mostrarBanner('Escriba la clave de administrador.', 'warn'); return; }
+        if (!confirm(`¿Eliminar la caja de la ficha ${f.ficha} (${f.tienda} · ${f.turno} · ${f.cajero} · ${fechaBonita(f.fecha)})?\n\nSe quita del cuadre, de Validar pagos, de créditos y gastos y de Control de efectivo.`)) return;
+        const btn = document.getElementById('cuab-borrar');
+        btnCargando(btn, 'Eliminando...');
+        try {
+            const r = await llamarApi({ action: 'cuadre_borrar', fila: f.fila, motivo, claveAdmin: cAdmin, control: cuaControl(f) });
+            claveAdmin = cAdmin;
+            filas = filas.filter(x => x.fila !== f.fila);
+            delete cuaItems[f.fila]; delete borradores[f.fila];
+            seleccion = null; cuaBorrarAbierta = false;
+            mostrarBanner(`Caja de la ficha ${f.ficha} eliminada. Se quitó de: ${(r.hojas || []).join(', ')}.` + ((r.avisos || []).length ? ' Atención: ' + r.avisos.join('; ') + '.' : ''), (r.avisos || []).length ? 'warn' : 'ok');
+            if (vistaActual === 'cuadre') render(); else cuaVentana();
+        } catch (e) {
+            if (/clave de administrador/i.test(e.message)) claveAdmin = null;
+            mostrarBanner('No se pudo eliminar la caja: ' + e.message, 'error');
+            btn.disabled = false; btn.textContent = 'Eliminar caja';
         }
     }
 
