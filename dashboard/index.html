@@ -3521,6 +3521,21 @@
         }
         return { cargar, listo, salir, prueba, escuchar, uid: () => uidActual };
     })();
+    // Firebase como dato OFICIAL del efectivo (etapa 2c): activar copia la hoja entera; "Volver a la hoja" termina la copia
+    // y la hoja vuelve a mandar; "Copiar a la hoja ahora" no espera la vuelta automática
+    async function fbVerdad(btn, que) {
+        const out = document.getElementById('fbPruebaRes'), texto = btn.textContent;
+        if (que === 'activar' && !confirm('Firebase pasará a ser el lugar oficial de Control de efectivo y Caja chica. La hoja queda como copia que se pone al día sola.\n\nDesde ahora, las correcciones se hacen en el panel (lo que se cambie a mano en esas hojas no llega a Firebase). ¿Continuar?')) return;
+        btn.disabled = true; btnCargando(btn, que === 'activar' ? 'Copiando la hoja a Firebase...' : que === 'hoja' ? 'Copiando a la hoja...' : 'Volviendo a la hoja...');
+        try {
+            const r = await DATOS.aGoogle(() => llamarApi(que === 'hoja' ? { action: 'fb_hoja' } : { action: 'fb_verdad', activar: que === 'activar' }));
+            if (que === 'activar') out.innerHTML = `<div class="banner ok" style="display:block">Listo: Firebase es el lugar oficial del efectivo. Se copiaron ${r.filas} movimientos del flujo y ${r.cajaChica} de caja chica (${r.meses} meses)${r.idsNuevos ? `; ${r.idsNuevos} filas de la hoja recibieron su ID` : ''}. La hoja se sigue llenando sola como copia.</div>`;
+            else if (que === 'hoja') { const h = r.hoja || {}; out.innerHTML = `<div class="banner ok" style="display:block">Copia a la hoja al día: ${(h.flujo || 0) + (h.caja || 0)} movimientos${h.borradas ? `, ${h.borradas} filas quitadas` : ''}, ${h.bitacora || 0} anotaciones en BD VALIDACIONES${r.importadas ? `; ${r.importadas} filas nuevas de la hoja entraron a Firebase` : ''}.</div>`; }
+            else out.innerHTML = '<div class="banner warn" style="display:block">La hoja vuelve a ser el lugar oficial del efectivo (quedó con todo lo de Firebase).</div>';
+            if (que !== 'hoja') { efeFbDetener(); efeFbVerdad = que === 'activar'; efeFbActivo = true; if (/^(efectivo|cajachica)$/.test(vistaActual)) efeActualizar(); }
+        } catch (e) { out.innerHTML = `<div class="banner error" style="display:block">${esc(e.message)}</div>`; }
+        finally { btn.disabled = false; btn.textContent = texto; }
+    }
     // Activar / desactivar el espejo de Efectivo y Caja chica en Firebase (administradores, en Tiempos)
     async function fbEfectivo(btn, activar) {
         const out = document.getElementById('fbPruebaRes'); btn.disabled = true; btnCargando(btn, activar ? 'Copiando a Firebase...' : 'Desactivando...');
@@ -3558,7 +3573,7 @@
             ${TIEMPOS.map(t => `<tr><td class="izq">${t.hora}</td><td class="izq">${esc(NOMBRE_ACCION[t.accion] || t.accion)}${t.ok ? '' : ' <span class="chip st-falta">error</span>'}${t.pasos ? '<small title="Partes del trabajo de Google, en milisegundos">' + esc(t.pasos) + '</small>' : ''}</td>
                 <td><b>${s(t.total)}</b></td><td>${s(t.servidor)}</td></tr>`).join('')}</tbody></table>` : '<div class="empty">Todavía no hay pedidos.</div>'}</div>
             <div id="fbPruebaRes" style="margin-top:.6rem"></div>
-            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0">${esPrincipal ? '<button type="button" class="btn-ghost" onclick="fbProbar(this)">Probar Firebase</button><button type="button" class="btn-ghost" onclick="fbEfectivo(this, true)">Activar Efectivo en Firebase</button><button type="button" class="btn-ghost" onclick="fbEfectivo(this, false)">Desactivar</button>' : ''}<button type="button" class="btn-primary" onclick="document.getElementById('dlgTiempos').classList.add('hidden')">Cerrar</button></div></div>`;
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0">${esPrincipal ? '<button type="button" class="btn-ghost" onclick="fbProbar(this)">Probar Firebase</button><button type="button" class="btn-ghost" onclick="fbEfectivo(this, true)">Activar Efectivo en Firebase</button><button type="button" class="btn-ghost" onclick="fbEfectivo(this, false)">Desactivar</button></div><div class="req-acciones" style="justify-content:flex-end;margin:.4rem 0 0"><span class="nota" style="margin:0 auto 0 0">Dato oficial del efectivo:</span><button type="button" class="btn-ghost" onclick="fbVerdad(this, \'activar\')">Hacer oficial Firebase</button><button type="button" class="btn-ghost" onclick="fbVerdad(this, \'hoja\')">Copiar a la hoja ahora</button><button type="button" class="btn-ghost" onclick="fbVerdad(this, \'volver\')">Volver a la hoja</button>' : ''}<button type="button" class="btn-primary" onclick="document.getElementById('dlgTiempos').classList.add('hidden')">Cerrar</button></div></div>`;
         fondo.classList.remove('hidden');
     }
 
@@ -3648,7 +3663,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-07.9';
+    const VERSION_SERVIDOR = '2026-11-07.10';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -17250,16 +17265,19 @@ Reglas:
     let efeFbActivo = false, efeFbOff = null, efeFbPendiente = false;
     // Lo que vino de la hoja (espejo) y la bandeja (pendientes); efeDatos = la mezcla
     let efeFbBase = { filas: null, caja: null, pend: [] }, efeFbErroresVistos = new Set();
-    const efeFbAplanar = docs => (docs || []).flatMap(d => Object.values(d.m || {})).sort((a, b) => a.fila - b.fila);
+    // Con Firebase como dato oficial (efeFbVerdad) se escuchan flujo/caja (por ID, con su "orden" de registro como fila);
+    // si no, el espejo de la hoja (efectivo/cajachica, con el número de fila de la hoja)
+    let efeFbVerdad = false;
+    const efeFbAplanar = docs => (docs || []).flatMap(d => Object.values(d.m || {}).map(m => m.fila == null ? Object.assign({}, m, { fila: Number(m.orden) || 0 }) : m)).sort((a, b) => a.fila - b.fila);
     function efeFbIniciar() {
         if (efeFbOff || !efeFbActivo || !clave) return;
-        const conFlujo = permisos.includes('efectivo');
-        const cols = conFlujo ? ['efectivo', 'cajachica', 'pendientes'] : ['cajachica', { col: 'pendientes', donde: ['accion', '==', 'cc_registrar'] }];
+        const conFlujo = permisos.includes('efectivo'), cf = efeFbVerdad ? 'flujo' : 'efectivo', cc = efeFbVerdad ? 'caja' : 'cajachica';
+        const cols = conFlujo ? [cf, cc, 'pendientes'] : [cc, { col: 'pendientes', donde: ['accion', '==', 'cc_registrar'] }];
         efeFbOff = 'iniciando';
         FB.escuchar(cols, d => {
-            efeFbBase = { filas: d.efectivo ? efeFbAplanar(d.efectivo) : efeFbBase.filas, caja: efeFbAplanar(d.cajachica), pend: d.pendientes || [] };
+            efeFbBase = { filas: d[cf] ? efeFbAplanar(d[cf]) : efeFbBase.filas, caja: efeFbAplanar(d[cc]), pend: d.pendientes || [] };
             efeFbMezclar();
-            if (!efeCargado || (d.efectivo && efeCargado === 'caja')) efeCargado = d.efectivo ? 'completo' : 'caja';
+            if (!efeCargado || (d[cf] && efeCargado === 'caja')) efeCargado = d[cf] ? 'completo' : 'caja';
             efeCargadoEn = Date.now();
             efeFbAvisarErrores();
             efeFbRedibujar();
@@ -17276,12 +17294,12 @@ Reglas:
             if (ids.has(p._id) || ids.has(p._id + '-t')) return;
             const d = p.datos || {}, t = new Date(p.creadoLocal || Date.now());
             const reg = `${t.getFullYear()}-${dosD(t.getMonth() + 1)}-${dosD(t.getDate())} ${dosD(t.getHours())}:${dosD(t.getMinutes())}`;
-            const comun = { fila: 1e9 + i, id: p._id, pendiente: p.estado === 'error' ? 'error' : 'guardando', errorPend: p.error || '', fecha: d.fecha || '', foto: '', verificado: '', recibidoPor: '', registrado: reg };
+            const comun = { fila: 8e15 + i, id: p._id, pendiente: p.estado === 'error' ? 'error' : 'guardando', errorPend: p.error || '', fecha: d.fecha || '', foto: '', verificado: '', recibidoPor: '', registrado: reg };
             if (p.accion === 'efe_egreso') filas.push(Object.assign({}, comun, { tienda: '', etiqueta: 'EGRESO', cajero: d.responsable || p.quien, turno: d.concepto, bs: -(d.bs || 0), bsOk: false, usd: -(d.usd || 0), usdOk: false, tipo: 'EGRESO' }));
             else if (p.accion === 'efe_externo') filas.push(Object.assign({}, comun, { tienda: '', etiqueta: 'INGRESO EXTERNO', cajero: d.responsable || p.quien, turno: d.concepto, bs: d.bs || 0, bsOk: !!d.bs, usd: d.usd || 0, usdOk: !!d.usd, tipo: 'EXTERNO' }));
             else if (p.accion === 'cc_registrar') {
                 const moneda = d.moneda === '$' ? '$' : d.moneda === 'BsE' ? 'BsE' : 'Bs', externa = d.tipo === 'RECARGA' && (d.origen === 'externo' || moneda === 'BsE');
-                caja.push({ fila: 1e9 + i, id: p._id, pendiente: comun.pendiente, errorPend: comun.errorPend, fecha: d.fecha || '', tipo: d.tipo === 'RECARGA' ? 'RECARGA' : 'GASTO', moneda, monto: d.monto || 0,
+                caja.push({ fila: 8e15 + i, id: p._id, pendiente: comun.pendiente, errorPend: comun.errorPend, fecha: d.fecha || '', tipo: d.tipo === 'RECARGA' ? 'RECARGA' : 'GASTO', moneda, monto: d.monto || 0,
                             concepto: d.concepto, responsable: d.responsable || p.quien, registradoPor: p.quien, registro: reg, comprobante: '', origen: d.tipo === 'RECARGA' ? (externa ? 'externo' : 'flujo') : '', verificado: '' });
                 if (d.tipo === 'RECARGA' && !externa) filas.push(Object.assign({}, comun, { tienda: '', etiqueta: 'TRASPASO CAJA CHICA', cajero: d.responsable || p.quien, turno: 'Recarga caja chica: ' + d.concepto,
                             bs: moneda === 'Bs' ? -(d.monto || 0) : 0, bsOk: false, usd: moneda === '$' ? -(d.monto || 0) : 0, usdOk: false, tipo: 'TRASPASO' }));
@@ -17350,7 +17368,12 @@ Reglas:
     }
     function efeFbDetener() { if (typeof efeFbOff === 'function') efeFbOff(); efeFbOff = null; }
     // La respuesta de la hoja dice si el espejo está activo: se empieza o se deja de escuchar
-    function efeFbVer(r) { if (!r || typeof r.fb !== 'boolean') return; efeFbActivo = r.fb; if (r.fb) efeFbIniciar(); else efeFbDetener(); }
+    function efeFbVer(r) {
+        if (!r || typeof r.fb !== 'boolean') return;
+        const verdad = !!r.verdad;
+        if (verdad !== efeFbVerdad) { efeFbDetener(); efeFbVerdad = verdad; }   // cambió de dónde se lee: se escucha lo otro
+        efeFbActivo = r.fb; if (r.fb) efeFbIniciar(); else efeFbDetener();
+    }
     // Lo que llega de Firebase se dibuja AL MOMENTO (07/11). Antes esperaba el mismo "momento tranquilo" que la revisión
     // de cada 30 s (nada cargando, nadie escribiendo...) y el "Guardando..." se quedaba hasta cambiar de pestaña.
     // Redibujar solo cambia las tablas y los totales, no los formularios: lo que se está escribiendo no se pierde.
@@ -17550,7 +17573,7 @@ Reglas:
         poner(valor);
         efeModo(efeModoActual);
         try {
-            await llamarApi({ action: 'efe_marcar', fila, moneda, valor });
+            await llamarApi({ action: 'efe_marcar', fila, id: f && f.id, moneda, valor });
             mostrarBanner(valor ? 'Marcado como recibido.' : 'Desmarcado.', 'ok');
         } catch (e) {
             poner(!valor); if (f) f.recibidoPor = firmaAntes;
@@ -17709,15 +17732,15 @@ Reglas:
         const f = a.f;
         let payload;
         if (a.tipo === 'eliminar') {
-            payload = { action: 'efe_eliminar', fila: f.fila, bs: f.bs, usd: f.usd, concepto: f.turno };
+            payload = { action: 'efe_eliminar', fila: f.fila, id: f.id, bs: f.bs, usd: f.usd, concepto: f.turno };
         } else if (a.tipo === 'eliminarCaja') {
-            payload = { action: 'cc_eliminar', fila: a.m.fila, monto: a.m.monto, concepto: a.m.concepto };
+            payload = { action: 'cc_eliminar', fila: a.m.fila, id: a.m.id, monto: a.m.monto, concepto: a.m.concepto };
         } else {
             const bs = parseFloat(document.getElementById('efeMBs').value) || 0, usd = parseFloat(document.getElementById('efeMUsd').value) || 0;
             if (bs < 0 || usd < 0) { err.textContent = 'Los montos no pueden ser negativos.'; return; }
             if (!bs && !usd) { err.textContent = 'Escriba el monto en Bs o en $.'; return; }
             if (Math.abs(bs - f.bs) < 0.001 && Math.abs(usd - f.usd) < 0.001) { err.textContent = 'No cambió ningún monto.'; return; }
-            payload = { action: 'efe_modificar', fila: f.fila, bs, usd, bsAnt: f.bs, usdAnt: f.usd };
+            payload = { action: 'efe_modificar', fila: f.fila, id: f.id, bs, usd, bsAnt: f.bs, usdAnt: f.usd };
         }
         // Eliminar (07/11): la fila se quita de la pantalla al instante y Google lo hace por detrás. Si Google no lo acepta
         // (clave incorrecta, la hoja cambió...), la fila vuelve y se avisa por qué.
@@ -18004,7 +18027,7 @@ Reglas:
         m.verificado = 'verificando...';
         efeRenderCaja(); if (efeModoActual === 'verificar') efeRenderVerificar();
         try {
-            const r = await llamarApi(Object.assign({ action: 'cc_verificar', fila, monto: m.monto, concepto: m.concepto }, claveAdm ? { claveAdmin: claveAdm } : {}));
+            const r = await llamarApi(Object.assign({ action: 'cc_verificar', fila, id: m.id, monto: m.monto, concepto: m.concepto }, claveAdm ? { claveAdmin: claveAdm } : {}));
             if (claveAdm) efeClaveVerif = claveAdm;
             mostrarBanner(`Gasto verificado: ${m.concepto}.`, 'ok');
             await efeUsarRespuesta(r);
@@ -18066,7 +18089,7 @@ Reglas:
         const claveAdm = efeClaveVerif || await efePedirClave('Marcar como no verificado', `${concepto}: volverá a "por verificar". Un administrador lo autoriza con su clave.`);
         if (!claveAdm) return;
         try {
-            const r = await llamarApi({ action: tipo === 'caja' ? 'cc_desverificar' : 'efe_desverificar', fila, claveAdmin: claveAdm, concepto });
+            const r = await llamarApi({ action: tipo === 'caja' ? 'cc_desverificar' : 'efe_desverificar', fila, id: (tipo === 'caja' ? efeDatos.cajaChica : efeDatos.filas).find(x => x.fila === fila)?.id, claveAdmin: claveAdm, concepto });
             efeClaveVerif = claveAdm;
             mostrarBanner(`${concepto}: marcado como no verificado.`, 'ok');
             await efeUsarRespuesta(r);
@@ -18168,7 +18191,7 @@ Reglas:
         if (!claveAdm) return;
         const btn = document.getElementById('efeBtnTodosFlujo'); if (btn) btnCargando(btn, 'Verificando...');
         try {
-            const r = await llamarApi({ action: 'efe_verificar_lote', claveAdmin: claveAdm, items: pend.map(f => ({ fila: f.fila, bs: f.bs, usd: f.usd, concepto: f.turno })) });
+            const r = await llamarApi({ action: 'efe_verificar_lote', claveAdmin: claveAdm, items: pend.map(f => ({ fila: f.fila, id: f.id, bs: f.bs, usd: f.usd, concepto: f.turno })) });
             efeClaveVerif = claveAdm;
             mostrarBanner(`Verificados ${r.verificados} gasto(s) del flujo general.` + ((r.errores || []).length ? ' No se pudieron: ' + r.errores.join('; ') : ''), (r.errores || []).length ? 'warn' : 'ok');
             await efeUsarRespuesta(r);
@@ -18179,7 +18202,7 @@ Reglas:
         if (!pend.length || !confirm(`¿Verificar los ${pend.length} gasto(s) de caja chica pendientes?`)) return;
         const btn = document.getElementById('efeBtnTodosCaja'); if (btn) btnCargando(btn, 'Verificando...');
         try {
-            const r = await llamarApi({ action: 'cc_verificar_lote', items: pend.map(m => ({ fila: m.fila, monto: m.monto, concepto: m.concepto })) });
+            const r = await llamarApi({ action: 'cc_verificar_lote', items: pend.map(m => ({ fila: m.fila, id: m.id, monto: m.monto, concepto: m.concepto })) });
             mostrarBanner(`Verificados ${r.verificados} gasto(s) de caja chica.` + ((r.errores || []).length ? ' No se pudieron: ' + r.errores.join('; ') : ''), (r.errores || []).length ? 'warn' : 'ok');
             await efeUsarRespuesta(r);
         } catch (e) { mostrarBanner('No se pudo verificar: ' + e.message, 'error'); efeRenderVerificar(); }
@@ -18213,7 +18236,7 @@ Reglas:
         const btn = document.getElementById('efeVerBtn');
         if (desdeVentana && btn) btnCargando(btn, 'Verificando...');
         try {
-            const r = await llamarApi({ action: 'efe_verificar', fila: f.fila, bs: f.bs, usd: f.usd, concepto: f.turno, claveAdmin: claveAdm });
+            const r = await llamarApi({ action: 'efe_verificar', fila: f.fila, id: f.id, bs: f.bs, usd: f.usd, concepto: f.turno, claveAdmin: claveAdm });
             efeClaveVerif = claveAdm;
             const dlg = document.getElementById('efeVerDlg'); if (dlg) dlg.classList.add('hidden');
             mostrarBanner(`Gasto verificado: ${f.turno || 'gasto de oficina'}.`, 'ok');
