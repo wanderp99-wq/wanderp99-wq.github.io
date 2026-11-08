@@ -147,6 +147,9 @@
         td.efe-c { overflow: visible !important; text-overflow: clip !important; }   /* los íconos nunca se cortan con "…" */
         .efe-ico:hover { background: var(--list-bg); } .efe-c { text-align: center !important; } .efe-e { font-size: .62rem; color: var(--text-muted); margin-left: .12rem; font-weight: 700; }
         .efe-falta { color: var(--text-muted); } .efe-tipo { margin-right: .35rem; }
+        /* Fecha atrasada (07/11): etiqueta bajo la fecha y aviso con la clave en el formulario */
+        .chip.efe-atraso { display: table; margin-top: .25rem; font-size: .68rem; padding: .1rem .45rem; white-space: nowrap; }
+        .efe-fecha-clave { margin: .5rem 0 .25rem; } .efe-fecha-clave .banner { margin: 0 0 .5rem; } .efe-fecha-clave .bsr-clave { max-width: 360px; }
         .efe-fecha { font-size: .78rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
         td.efe-gris, td.efe-gris span { color: var(--text-muted); font-size: .84rem; }   /* tienda, concepto, turno y cajero en gris: el monto resalta */
         #efeCTabla th, #efeCTabla td { padding: .35rem .45rem; overflow: hidden; text-overflow: ellipsis; }
@@ -2205,13 +2208,14 @@
                     </div></div>
                 <div class="grafico-sub" id="efeEAyuda"></div>
                 <div class="efe-gasto-campos">
-                    <div><label for="efeEFecha">Fecha</label><input type="date" id="efeEFecha" required></div>
+                    <div><label for="efeEFecha">Fecha</label><input type="date" id="efeEFecha" required onchange="efeFechaRevisar('E')"></div>
                     <div class="efe-concepto"><label for="efeEConcepto">Concepto</label><input type="text" id="efeEConcepto" maxlength="120" required placeholder="Ej. Pago a proveedor de hielo"></div>
                     <div><label for="efeEResp">Responsable</label><input type="text" id="efeEResp" maxlength="60" placeholder="Quién retira"></div>
                     <div><label for="efeEBs">Monto Bs</label><input type="number" id="efeEBs" step="0.01" min="0" placeholder="0,00"></div>
                     <div><label for="efeEUsd">Monto $</label><input type="number" id="efeEUsd" step="0.01" min="0" placeholder="0,00"></div>
                     <div class="efe-gasto-btn"><button type="submit" class="btn-save" id="efeEBtn">Registrar gasto</button></div>
                 </div>
+                <div class="efe-fecha-clave hidden" id="efeEFechaClave"></div>
                 <div class="efe-comprobante efe-foto-opc">
                     <label for="efeEFoto">Foto de la factura o comprobante (opcional) — queda en Drive y en la columna Foto de FLUJO DE EFECTIVO</label>
                     <input type="file" id="efeEFoto" accept="image/*,application/pdf" onchange="efeVistaFoto('efeEFoto', 'efeEFotoVista')">
@@ -2237,7 +2241,7 @@
                     <div><label for="efeHHasta">Hasta</label><input type="date" id="efeHHasta" onchange="efeFiltrarHistorial()"></div>
                     <div><label for="efeHTienda">Tienda</label><select id="efeHTienda" onchange="efeFiltrarHistorial()"><option value="">Todas</option></select></div>
                     <div><label for="efeHTipo">Tipo</label><select id="efeHTipo" onchange="efeFiltrarHistorial()">
-                        <option value="">Todos los movimientos</option><option value="INGRESO">Solo ingresos</option><option value="EGRESO">Solo egresos (gastos de oficina)</option><option value="TRASPASO">Solo traspasos a caja chica</option><option value="EXTERNO">Solo dinero externo</option></select></div>
+                        <option value="">Todos los movimientos</option><option value="INGRESO">Solo ingresos</option><option value="EGRESO">Solo egresos (gastos de oficina)</option><option value="TRASPASO">Solo traspasos a caja chica</option><option value="EXTERNO">Solo dinero externo</option><option value="ATRASO">Solo registrados con atraso</option></select></div>
                     <div><label for="efeHEstado">Estado</label><select id="efeHEstado" onchange="efeFiltrarHistorial()">
                         <option value="">Todos</option><option value="ok">Recibido</option><option value="pend">Por llegar</option></select></div>
                 </div>
@@ -2268,7 +2272,7 @@
                     <span class="nota" id="efeCAyuda"></span>
                 </div>
                 <div class="adm-grid">
-                    <div><label for="efeCFecha">Fecha</label><input type="date" id="efeCFecha" required></div>
+                    <div><label for="efeCFecha">Fecha</label><input type="date" id="efeCFecha" required onchange="efeFechaRevisar('C')"></div>
                     <div class="efe-moneda"><label>Moneda</label><select id="efeCMoneda" class="hidden" onchange="efeCajaOrigen()"><option value="Bs">Bs efectivo</option><option value="BsE">Bs electrónicos</option><option value="$">$ efectivo</option></select>
                         <div class="segmentado efe-seg" id="efeCMonedaBtns"><button type="button" class="activo" data-m="Bs" onclick="efeCajaMoneda('Bs')">Bs efectivo</button><button type="button" data-m="BsE" onclick="efeCajaMoneda('BsE')">Bs electrónicos</button><button type="button" data-m="$" onclick="efeCajaMoneda('$')">$ efectivo</button></div></div>
                     <div><label for="efeCMonto">Monto</label><input type="number" id="efeCMonto" step="0.01" min="0.01" required></div>
@@ -2276,6 +2280,7 @@
                     <div class="efe-resp"><label>Responsable <small class="nota">(personas con acceso a caja chica)</small></label><input type="hidden" id="efeCResp">
                         <div class="segmentado efe-seg" id="efeCRespBtns"></div></div>
                 </div>
+                <div class="efe-fecha-clave hidden" id="efeCFechaClave"></div>
                 <div class="efe-origen hidden" id="efeCOrigenCaja">
                     <label>¿De dónde sale el dinero de la recarga?</label>
                     <div class="segmentado">
@@ -3202,9 +3207,9 @@
     // ==========================================
     // Tiempos de respuesta: cuánto tarda cada pedido (total) y cuánto de eso trabaja Google (servidor)
     const TIEMPOS = [];
-    function anotarTiempo(accion, total, servidor, ok) {
+    function anotarTiempo(accion, total, servidor, ok, pasos) {
         if (accion === 'ping' || accion === 'enlinea' || accion === 'marca_estado') return;   // el aviso de "sigo en línea" no es un tiempo de respuesta
-        TIEMPOS.unshift({ hora: new Date().toLocaleTimeString('es-VE'), accion, total, servidor, ok });
+        TIEMPOS.unshift({ hora: new Date().toLocaleTimeString('es-VE'), accion, total, servidor, ok, pasos: pasos || '' });
         if (TIEMPOS.length > 60) TIEMPOS.pop();
     }
     // Solo lectura: si la respuesta de Google no llega, se reintenta una vez sola (no cambia nada en la hoja)
@@ -3421,7 +3426,7 @@
         // "Acción no válida": el panel es más nuevo que el script de Google (falta publicar la versión nueva de Apps Script)
         if (!data.ok && data.error === 'Acción no válida') throw new Error('El servidor de Google todavía no tiene esta función. Publique la versión nueva de Apps Script (CuadreSistema y Personal: Implementar › Gestionar implementaciones › Nueva versión), salga y vuelva a entrar.');
         if (!data.ok) throw new Error(data.error || 'Error desconocido');
-        anotarTiempo(payload.action, performance.now() - t0, typeof data.ms === 'number' ? data.ms : null, true);
+        anotarTiempo(payload.action, performance.now() - t0, typeof data.ms === 'number' ? data.ms : null, true, data.pasos);
         return data;
     }
     const NOMBRE_ACCION = { login: 'Entrar', list: 'Cargar cajas', save: 'Guardar sistema', cuadre_detalle: 'Detalle de caja', cuadre_coment: 'Comentario',
@@ -3440,7 +3445,7 @@
         fondo.innerHTML = `<div class="req-dlg" style="width:min(640px,100%)"><h3>Tiempos de respuesta</h3>
             <div class="req-sub">Últimos pedidos a Google. "En Google" es lo que tarda el script; el resto es internet y la espera de Google.</div>
             <div class="tabla-wrap" style="max-height:60vh;overflow:auto;margin-top:.75rem">${TIEMPOS.length ? `<table><thead><tr><th class="izq">Hora</th><th class="izq">Acción</th><th>Total</th><th>En Google</th></tr></thead><tbody>
-            ${TIEMPOS.map(t => `<tr><td class="izq">${t.hora}</td><td class="izq">${esc(NOMBRE_ACCION[t.accion] || t.accion)}${t.ok ? '' : ' <span class="chip st-falta">error</span>'}</td>
+            ${TIEMPOS.map(t => `<tr><td class="izq">${t.hora}</td><td class="izq">${esc(NOMBRE_ACCION[t.accion] || t.accion)}${t.ok ? '' : ' <span class="chip st-falta">error</span>'}${t.pasos ? '<small title="Partes del trabajo de Google, en milisegundos">' + esc(t.pasos) + '</small>' : ''}</td>
                 <td><b>${s(t.total)}</b></td><td>${s(t.servidor)}</td></tr>`).join('')}</tbody></table>` : '<div class="empty">Todavía no hay pedidos.</div>'}</div>
             <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-primary" onclick="document.getElementById('dlgTiempos').classList.add('hidden')">Cerrar</button></div></div>`;
         fondo.classList.remove('hidden');
@@ -3532,7 +3537,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-06.10';
+    const VERSION_SERVIDOR = '2026-11-07.1';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -17091,6 +17096,7 @@ Reglas:
             efeCajaTipo('GASTO');
             efeDestino('general');
         }
+        ['E', 'C'].forEach(p => { document.getElementById('efe' + p + 'Fecha').max = hoy; efeFechaRevisar(p); });   // nunca una fecha futura
         // Mientras llegan los datos: el icono en cada sección (se reemplaza al dibujar)
         const espera0 = cargandoHTML(efeSoloCaja ? 'Cargando caja chica...' : 'Cargando FLUJO DE EFECTIVO...');
         // La precarga del inicio de sesión sigue trayendo los datos: se espera esa misma lectura (no se repite)
@@ -17330,13 +17336,15 @@ Reglas:
     function efeRenderHistorial() {
         const desde = document.getElementById('efeHDesde').value, hasta = document.getElementById('efeHHasta').value;
         const ft = document.getElementById('efeHTienda').value, fy = document.getElementById('efeHTipo').value, fe = document.getElementById('efeHEstado').value;
-        // Las filas sin fecha (cargadas a mano en la hoja) se muestran siempre, para que no se pierdan
-        const lista = efeDatos.filas.filter(f => (!f.fecha || ((!desde || f.fecha >= desde) && (!hasta || f.fecha <= hasta))) &&
-                (!ft || (ft === '__EGRESO' ? f.tipo === 'EGRESO' : f.tienda === ft)) && (!fy || f.tipo === fy) &&
+        // Las filas sin fecha (cargadas a mano en la hoja) se muestran siempre, para que no se pierdan. Entra también lo que se
+        // REGISTRÓ en el periodo aunque tenga una fecha vieja (un gasto "de hace un año" metido hoy sale hoy, no se esconde).
+        const enRango = x => (!desde || x >= desde) && (!hasta || x <= hasta);
+        const lista = efeDatos.filas.filter(f => (!f.fecha || enRango(f.fecha) || (efeRegistro(f) && enRango(efeRegistro(f).slice(0, 10)))) &&
+                (!ft || (ft === '__EGRESO' ? f.tipo === 'EGRESO' : f.tienda === ft)) && (!fy || (fy === 'ATRASO' ? efeDiasAtraso(f) >= 2 : f.tipo === fy)) &&
                 (!fe || (f.tipo === 'INGRESO' && (efeSinEnvio(f) ? (fe === 'ok' ? f.bsOk : !f.bsOk)
                     : fe === 'ok' ? (f.bs <= 0 || f.bsOk) && (f.usd <= 0 || f.usdOk) : (f.bs > 0 && !f.bsOk) || (f.usd > 0 && !f.usdOk)))))
-            // Más reciente primero; las filas sin fecha (manuales) van al final
-            .sort((a, b) => (b.fecha || '0000').localeCompare(a.fecha || '0000') || b.fila - a.fila);
+            // En el orden en que se registraron (la hoja agrega cada movimiento al final): lo último registrado arriba
+            .sort((a, b) => b.fila - a.fila);
         const t = efeTotales(lista);
         const kpi = (titulo, bs, usd) => `<div class="kpi"><div class="k-label">${titulo}</div><div class="k-value" style="font-size:1.15rem">${fmtBs(bs)}</div><div class="k-label">${fmtUsd(usd)}</div></div>`;
         document.getElementById('efeHKpis').innerHTML = kpi('Ingresos (enviados por las cajas)', t.ingBs, t.ingUsd) +
@@ -17359,7 +17367,7 @@ Reglas:
                 <small><b>${esc(cmpNombreCorto(quien))}</b>${m ? esc(cmpCuandoCorto(m[2])) : ''}</small></span>`; };
         document.getElementById('efeHTabla').innerHTML = lista.length ? `<table data-sin-paginar><thead><tr><th class="izq">Fecha</th><th class="izq">Concepto</th>
             <th class="izq">Responsable</th><th class="izq">Turno</th><th>Bs</th><th>$</th><th class="efe-c" title="Foto">Foto</th><th class="efe-c" title="Verificación (solo gastos de oficina)">Verif.</th><th></th></tr></thead><tbody>` +
-            lista.slice(0, efeHLimite).map(f => `<tr class="${f.tipo === 'EGRESO' ? 'fila-egreso' : f.tipo === 'TRASPASO' ? 'fila-traspaso' : f.tipo === 'EXTERNO' ? 'fila-externo' : ''}"><td class="izq">${efeFecha(f.fecha)}</td>
+            lista.slice(0, efeHLimite).map(f => `<tr class="${f.tipo === 'EGRESO' ? 'fila-egreso' : f.tipo === 'TRASPASO' ? 'fila-traspaso' : f.tipo === 'EXTERNO' ? 'fila-externo' : ''}"><td class="izq">${efeFecha(f.fecha)}${efeAtraso(f)}</td>
                 <td class="izq efe-gris">${f.tipo === 'TRASPASO' ? esc(f.turno || 'Traspaso a caja chica') : f.tipo === 'EGRESO' ? esc(f.turno || (f.etiqueta && f.etiqueta !== 'EGRESO' ? f.etiqueta : 'Egreso manual')) : f.tipo === 'EXTERNO' ? esc(f.turno) : esc(f.tienda || 'Ingreso manual')}</td><td class="izq efe-gris">${efeCorto(f.cajero)}</td>
                 <td class="izq efe-gris"><span title="${esc(f.tipo === 'INGRESO' ? f.turno : '')}">${f.tipo !== 'INGRESO' ? '' : turnoCorto(f.turno)}</span></td>
                 <td class="${f.bs < 0 ? 'monto-neg' : ''}">${f.bs ? efeMontoUsd('Bs', f.bs, f.fecha, punto(f, 'bs')) : efeSinEnvio(f) ? `<span class="efe-cifra"><span title="Caja sin envío">Bs 0</span>${punto(f, 'bs')}</span>` : ''}${f.bsOk || f.tipo !== 'INGRESO' ? firma(f, 'bs') : ''}</td>
@@ -17372,7 +17380,7 @@ Reglas:
         const mostrados = Math.min(efeHLimite, lista.length);
         const opciones = PAG_OPCIONES.filter(n => n < lista.length);
         document.getElementById('efeHMas').innerHTML = lista.length > EFE_PAGINA ? `
-            <span>Mostrando <b>${mostrados}</b> de <b>${lista.length}</b> movimientos (los más recientes)</span>
+            <span>Mostrando <b>${mostrados}</b> de <b>${lista.length}</b> movimientos (los últimos registrados)</span>
             ${mostrados < lista.length ? `<button type="button" class="btn-ghost btn-mini" onclick="efeVerMas(${efeHLimite + EFE_PAGINA})">Ver ${Math.min(EFE_PAGINA, lista.length - mostrados)} más</button>` : ''}
             ${mostrados > EFE_PAGINA ? `<button type="button" class="btn-ghost btn-mini" onclick="efeVerMas(${Math.max(EFE_PAGINA, mostrados - EFE_PAGINA)})">Ver menos</button>` : ''}
             <label class="pag-cuantos">Mostrar
@@ -17500,6 +17508,50 @@ Reglas:
             : 'Sale del efectivo disponible. Se agrega en FLUJO DE EFECTIVO con monto negativo.';
     }
 
+    // ---------- Fecha de los movimientos (07/11, contra el blanqueo) ----------
+    // Nunca futura. Hasta EFE_DIAS_ATRAS días atrás, libre; más vieja, con la clave de administrador (y avisa al grupo de seguridad).
+    // Las listas van en el orden en que se registraron y marcan lo que se registró días después de su fecha.
+    const EFE_DIAS_ATRAS = 3;
+    const efeDiasEntre = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 864e5);
+    // Cuándo se registró: columna "Registrado" (desde el 07/11) o, en gastos viejos, la firma de quien lo registró
+    function efeRegistro(f) {
+        if (f.registro !== undefined) return f.registro || '';   // caja chica: "Fecha de registro"
+        if (f.registrado) return f.registrado;
+        if (f.tipo === 'INGRESO') return '';
+        const m = /\d{4}-\d{2}-\d{2}(?:\s+\d{2}:\d{2})?/.exec(f.recibidoPor || ''); return m ? m[0] : '';
+    }
+    function efeDiasAtraso(f) { const r = efeRegistro(f).slice(0, 10); return f.fecha && /^\d{4}-\d{2}-\d{2}$/.test(r) ? efeDiasEntre(f.fecha, r) : 0; }
+    function efeAtraso(f) {
+        const d = efeDiasAtraso(f); if (d < 2) return '';
+        return `<span class="chip ${d > EFE_DIAS_ATRAS ? 'st-falta' : 'st-sobra'} efe-atraso" title="Fecha del movimiento: ${esc(fechaBonita(f.fecha))} · registrado el ${esc(efeRegistro(f))}">Registrado ${d} días después</span>`;
+    }
+    function efeFechaRevisar(p) {
+        const caja = document.getElementById('efe' + p + 'FechaClave'), f = document.getElementById('efe' + p + 'Fecha').value;
+        if (!caja) return;
+        const d = f ? efeDiasEntre(f, fechaLocalHoy()) : 0, clave = caja.dataset.dias === String(d) ? caja.innerHTML : '';
+        if (clave) return;   // ya está pintado para esa fecha (no se borra la clave escrita)
+        caja.dataset.dias = String(d);
+        const err = document.getElementById('efe' + p + 'Error'); if (err && /días|fecha/i.test(err.textContent)) err.textContent = '';   // el aviso era de la fecha anterior
+        if (d < 0) { caja.className = 'efe-fecha-clave'; caja.innerHTML = '<div class="banner error" style="display:block">La fecha no puede ser de un día que todavía no llega.</div>'; return; }
+        if (d < 2) { caja.className = 'efe-fecha-clave hidden'; caja.innerHTML = ''; return; }
+        caja.className = 'efe-fecha-clave';
+        caja.innerHTML = d <= EFE_DIAS_ATRAS
+            ? `<div class="banner warn" style="display:block">Fecha de hace ${d} días: se registra, pero en la lista sale arriba (en el orden en que se registró) marcado "Registrado ${d} días después".</div>`
+            : `<div class="banner warn" style="display:block">Fecha de hace ${d} días. Con más de ${EFE_DIAS_ATRAS} días de atraso solo se registra con la clave de administrador, y se avisa al grupo de seguridad.</div>
+               <div class="bsr-clave"><label for="efe${p}ClaveFecha">Clave de administrador</label><input type="password" id="efe${p}ClaveFecha" autocomplete="off" placeholder="Clave de administrador"></div>`;
+    }
+    // Lo que se manda al guardar: la clave (si la fecha la pide). Devuelve null si falta algo (y escribe el error).
+    function efeFechaDatos(p, err) {
+        const f = document.getElementById('efe' + p + 'Fecha').value, d = f ? efeDiasEntre(f, fechaLocalHoy()) : 0;
+        if (d < 0) { err.textContent = 'La fecha no puede ser de un día que todavía no llega.'; return null; }
+        const inp = document.getElementById('efe' + p + 'ClaveFecha'), claveFecha = d > EFE_DIAS_ATRAS && inp ? inp.value : '';
+        if (d > EFE_DIAS_ATRAS && !claveFecha) { err.textContent = `Escriba la clave de administrador: la fecha es de hace ${d} días.`; if (inp) inp.focus(); return null; }
+        return { claveFecha };
+    }
+    const efeSinPrefijo = m => String(m || '').replace(/^FECHA_ADMIN:\s*/, '');
+    // Después de guardar: la fecha vuelve a hoy (la clave escrita para una fecha vieja no queda servida para el siguiente)
+    function efeFechaReiniciar(p) { const c = document.getElementById('efe' + p + 'FechaClave'); document.getElementById('efe' + p + 'Fecha').value = fechaLocalHoy(); if (c) c.dataset.dias = ''; efeFechaRevisar(p); }
+
     async function efeGuardarEgreso(ev) {
         ev.preventDefault();
         const err = document.getElementById('efeEError'), btn = document.getElementById('efeEBtn');
@@ -17508,6 +17560,8 @@ Reglas:
         if (!bs && !usd) { err.textContent = 'Escriba el monto en Bs o en $.'; return; }
         const concepto = document.getElementById('efeEConcepto').value.trim();
         const fecha = document.getElementById('efeEFecha').value, responsable = document.getElementById('efeEResp').value.trim();
+        const fd = efeFechaDatos('E', err); if (!fd) return;
+        const { claveFecha } = fd;
         const externo = efeDestinoActual === 'externo';
         const t = efeTotales(efeDatos.filas);
         if (!externo && ((bs > 0 && bs > t.dispBs + 0.001) || (usd > 0 && usd > t.dispUsd + 0.001)) &&
@@ -17522,20 +17576,21 @@ Reglas:
             btnCargando(btn, 'Registrando...');
             if (efeDestinoActual === 'caja') {
                 // Recarga de caja chica desde el flujo general: el script registra el egreso en FLUJO DE EFECTIVO y la suma en CAJA CHICA
-                if (bs) resp = await llamarApi({ action: 'cc_registrar', tipo: 'RECARGA', origen: 'flujo', fecha, moneda: 'Bs', monto: bs, concepto, responsable, comprobante });
-                if (usd) resp = await llamarApi({ action: 'cc_registrar', tipo: 'RECARGA', origen: 'flujo', fecha, moneda: '$', monto: usd, concepto, responsable, comprobante: bs ? null : comprobante });
+                if (bs) resp = await llamarApi({ action: 'cc_registrar', tipo: 'RECARGA', origen: 'flujo', fecha, claveFecha, moneda: 'Bs', monto: bs, concepto, responsable, comprobante });
+                if (usd) resp = await llamarApi({ action: 'cc_registrar', tipo: 'RECARGA', origen: 'flujo', fecha, claveFecha, moneda: '$', monto: usd, concepto, responsable, comprobante: bs ? null : comprobante });
                 mostrarBanner(`Gasto para caja chica registrado: ${concepto}. Se sumó al saldo de la caja chica.`, 'ok');
             } else if (externo) {
-                resp = await llamarApi({ action: 'efe_externo', fecha, concepto, responsable, bs, usd, comprobante });
+                resp = await llamarApi({ action: 'efe_externo', fecha, claveFecha, concepto, responsable, bs, usd, comprobante });
                 mostrarBanner(`Dinero externo agregado: ${concepto}. Ya está en el disponible.`, 'ok');
             } else {
-                resp = await llamarApi({ action: 'efe_egreso', fecha, concepto, responsable, bs, usd, comprobante });
+                resp = await llamarApi({ action: 'efe_egreso', fecha, claveFecha, concepto, responsable, bs, usd, comprobante });
                 mostrarBanner(`Gasto registrado: ${concepto}.`, 'ok');
             }
             ['efeEConcepto', 'efeEResp', 'efeEBs', 'efeEUsd', 'efeEFoto'].forEach(id => document.getElementById(id).value = '');
             document.getElementById('efeEFotoVista').innerHTML = '';
+            efeFechaReiniciar('E');
             await efeUsarRespuesta(resp);
-        } catch (e) { err.textContent = e.message; }
+        } catch (e) { err.textContent = efeSinPrefijo(e.message); }
         finally { btn.disabled = false; efeDestino(efeDestinoActual); }
     }
 
@@ -17635,15 +17690,15 @@ Reglas:
         const fm = document.getElementById('efeCFiltroMoneda').value;
         // Botones de moneda (la lista desplegable queda oculta y guarda el valor)
         document.querySelectorAll('#efeCFiltroBtns button').forEach(b => b.classList.toggle('activo', b.dataset.m === fm));
-        // Saldo acumulado en orden cronológico (cada moneda por separado)
+        // Saldo acumulado en el orden en que se registraron (cada moneda por separado): así es como cambió de verdad la caja
         const saldos = { Bs: 0, BsE: 0, $: 0 };
-        const lista = efeDatos.cajaChica.slice().sort((a, b) => a.fecha.localeCompare(b.fecha) || a.fila - b.fila)
+        const lista = efeDatos.cajaChica.slice().sort((a, b) => a.fila - b.fila)
             .map(m => { saldos[m.moneda] = centimos((saldos[m.moneda] || 0) + (m.tipo === 'RECARGA' ? m.monto : -m.monto)); return Object.assign({ saldo: saldos[m.moneda] }, m); })
             .filter(m => !fm || m.moneda === fm).reverse();
         const borrable = m => m.tipo === 'GASTO' || (m.tipo === 'RECARGA' && m.origen === 'externo');
         document.getElementById('efeCTabla').innerHTML = lista.length ? `<table><thead><tr><th class="izq">Fecha</th><th class="izq">Tipo</th><th class="izq">Concepto</th>
             <th class="izq">Responsable</th><th>Monto</th><th>Saldo</th><th class="efe-c" title="Comprobante">Comp.</th><th class="efe-c" title="Verificado">Verif.</th><th></th></tr></thead><tbody>` +
-            lista.map(m => `<tr class="${m.tipo === 'GASTO' && !m.verificado ? 'cc-sinverificar' : ''}"><td class="izq">${efeFecha(m.fecha)}</td>
+            lista.map(m => `<tr class="${m.tipo === 'GASTO' && !m.verificado ? 'cc-sinverificar' : ''}"><td class="izq">${efeFecha(m.fecha)}${efeAtraso(m)}</td>
                 <td class="izq"><span class="chip ${m.tipo === 'RECARGA' ? (m.origen === 'externo' ? 'st-info' : 'st-ok') : 'st-falta'}" title="${m.tipo === 'RECARGA' ? (m.origen === 'externo' ? 'Recarga externa (no afecta el flujo general)' : 'Recarga desde el flujo general') : 'Gasto'}">${m.tipo === 'RECARGA' ? 'Recarga' : 'Gasto'}</span></td>
                 <td class="izq efe-gris">${esc(m.concepto)}</td><td class="izq efe-gris">${efeCorto(m.responsable)}</td>
                 <td class="${m.tipo === 'GASTO' ? 'monto-neg' : ''}">${m.tipo === 'GASTO' ? '−' : '+'}${efeMontoUsd(m.moneda, m.monto, m.fecha)}</td>
@@ -17758,9 +17813,9 @@ Reglas:
     function efeRenderVerificar() {
         const caja = document.getElementById('efeVerificar');
         const flujo = efePendFlujo().map(f => ({ origen: 'Flujo general', fila: f.fila, fecha: f.fecha, concepto: f.turno || 'Gasto', quien: f.cajero || '—',
-            bs: Math.abs(f.bs || 0), usd: Math.abs(f.usd || 0), moneda: '', foto: f.foto }));
+            bs: Math.abs(f.bs || 0), usd: Math.abs(f.usd || 0), moneda: '', foto: f.foto, atraso: efeAtraso(f) }));
         const cc = efePendCaja().map(m => ({ origen: 'Caja chica', fila: m.fila, fecha: m.fecha, concepto: m.concepto, quien: m.responsable || m.registradoPor || '—',
-            bs: m.moneda === '$' ? 0 : m.monto, usd: m.moneda === '$' ? m.monto : 0, moneda: m.moneda, foto: m.comprobante }));
+            bs: m.moneda === '$' ? 0 : m.monto, usd: m.moneda === '$' ? m.monto : 0, moneda: m.moneda, foto: m.comprobante, atraso: efeAtraso(m) }));
         const todos = flujo.concat(cc).map(x => Object.assign(x, { enUsd: efeEnUsd(x.bs, x.usd, x.fecha), dias: efeDiasDesde(x.fecha) }))
             .sort((a, b) => a.fecha.localeCompare(b.fecha));   // los más viejos primero
         const suma = l => l.reduce((s, x) => s + x.enUsd, 0);
@@ -17790,7 +17845,7 @@ Reglas:
             <span class="per-barra-monto">${t.cant}<small style="color:var(--text-muted)">${fmtUsd(t.usd)}</small></span></div>`).join('');
 
         const lista = `<div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">Fecha</th><th class="izq">Origen</th><th class="izq">Concepto</th><th class="izq">Responsable</th><th>Monto</th><th class="izq">Foto</th><th></th></tr></thead><tbody>
-            ${todos.map(x => `<tr class="cc-sinverificar"><td class="izq">${fechaBonita(x.fecha)}<small>${x.dias ? 'hace ' + x.dias + ' día' + (x.dias === 1 ? '' : 's') : 'hoy'}</small></td>
+            ${todos.map(x => `<tr class="cc-sinverificar"><td class="izq">${fechaBonita(x.fecha)}<small>${x.dias ? 'hace ' + x.dias + ' día' + (x.dias === 1 ? '' : 's') : 'hoy'}</small>${x.atraso}</td>
                 <td class="izq"><span class="chip ${x.origen === 'Caja chica' ? 'st-sobra' : 'st-info'}">${x.origen}</span></td>
                 <td class="izq">${esc(x.concepto)}</td><td class="izq">${esc(x.quien)}</td>
                 <td class="monto-neg">${x.bs ? (x.moneda === 'BsE' ? fmtCaja('BsE', x.bs) : fmtBs(x.bs)) : ''}${x.bs && x.usd ? '<br>' : ''}${x.usd ? fmtUsd(x.usd) : ''}${x.bs ? enDivisas(x.bs, x.fecha) : ''}</td>
@@ -17904,23 +17959,25 @@ Reglas:
         const archivo = document.getElementById('efeCFoto').files[0];
         if (!recarga && !archivo) { err.textContent = 'Adjunte la foto de la factura o del comprobante del gasto.'; return; }
         if (!recarga && !document.getElementById('efeCResp').value) { err.textContent = 'Elija el responsable del gasto.'; return; }
+        const fd = efeFechaDatos('C', err); if (!fd) return;
         btn.disabled = true;
         let guardado = false;
         try {
             let comprobante = null;
             if (archivo) { btnCargando(btn, 'Subiendo comprobante...'); comprobante = await efeLeerComprobante(archivo); }
             btnCargando(btn, 'Registrando...');
-            const resp = await llamarApi({ action: 'cc_registrar', tipo: efeCajaTipoActual, origen: recarga ? efeCajaOrigenActual : '', fecha: document.getElementById('efeCFecha').value, moneda, monto,
+            const resp = await llamarApi({ action: 'cc_registrar', tipo: efeCajaTipoActual, origen: recarga ? efeCajaOrigenActual : '', fecha: document.getElementById('efeCFecha').value, claveFecha: fd.claveFecha, moneda, monto,
                               concepto: document.getElementById('efeCConcepto').value.trim(), responsable: document.getElementById('efeCResp').value.trim(), comprobante });
             ['efeCMonto', 'efeCConcepto', 'efeCResp', 'efeCFoto'].forEach(id => document.getElementById(id).value = '');
             efePintarResponsables();
             document.getElementById('efeCFotoVista').innerHTML = '';
+            efeFechaReiniciar('C');
             mostrarBanner(!recarga ? 'Gasto de caja chica registrado.'
                 : efeCajaOrigenActual === 'flujo' ? 'Recarga registrada (salió del flujo general: quedó como traspaso en FLUJO DE EFECTIVO).'
                 : 'Recarga externa registrada (no afecta el flujo general).', 'ok');
             guardado = true;
             await efeUsarRespuesta(resp);
-        } catch (e) { err.textContent = e.message; }
+        } catch (e) { err.textContent = efeSinPrefijo(e.message); }
         finally { btn.disabled = false; efeCajaTipo(efeCajaTipoActual, !guardado); }
     }
 
