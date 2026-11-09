@@ -213,6 +213,27 @@
         .btn-quitar { color: var(--bad); }
         /* Listas de la ficha */
         .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+        /* Venta express */
+        .vx-cab { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 14px; align-items: center; margin-bottom: 10px; color: var(--text-main); }
+        .vx-cab-d { color: var(--text-muted); font-size: .9rem; }
+        .vx-entrada { display: flex; gap: 8px; margin: 12px 0 6px; }
+        .vx-entrada input { flex: 1; min-width: 0; font-size: 1.15rem; padding: .7rem .8rem; }
+        .vx-res { display: grid; gap: 4px; margin-bottom: 10px; max-height: 320px; overflow: auto; }
+        .vx-res-item { text-align: left; background: var(--list-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 10px; color: var(--text-main); cursor: pointer; }
+        .vx-res-item span { display: block; color: var(--text-muted); font-size: .85rem; }
+        .vx-res-item.activo { border-color: var(--primary); box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 30%, transparent); }
+        .vx-tabla .vx-q, .grafico-card .vx-q { width: 6.5rem; text-align: right; }
+        .vx-tabla tr.vx-ult td { background: color-mix(in srgb, var(--primary) 10%, transparent); }
+        .vx-dlg { width: min(640px, 100%); }
+        .vx-formas { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+        .vx-formas small { color: var(--text-muted); margin-left: 4px; }
+        .vx-pago { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; background: var(--list-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px; margin-bottom: 6px; }
+        .vx-pago b { min-width: 7.5rem; }
+        .vx-pago input[type=number] { width: 9rem; }
+        .vx-pago input[type=text] { width: 9rem; flex: 1; min-width: 7rem; }
+        .vx-mon { color: var(--text-muted); }
+        .vx-resta { margin: 10px 0; font-size: 1.05rem; color: var(--text-main); }
+        .vx-vuelto { display: inline-flex; gap: 12px; margin-left: 10px; font-size: .95rem; }
         .fl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; margin: 12px 0; }
         .fl-lista { margin: 0; }
         .fl-items { display: flex; flex-direction: column; gap: 6px; margin: 10px 0; }
@@ -2423,6 +2444,7 @@
     <section id="vistaPnom" class="vista hidden"><div id="pnomContenido"></div></section>
 
     <section id="vistaFl" class="vista hidden"><div id="flContenido"></div></section>
+    <section id="vistaVx" class="vista hidden"><div id="vxContenido"></div></section>
 
     <section id="vistaAlm" class="vista hidden">
         <div class="modo-tabs" role="tablist" id="almTabs"></div>
@@ -3526,6 +3548,15 @@
             return off;
         }
         async function salir() { uidActual = ''; [...escuchas].forEach(off => off()); try { if (auth) await lib.au.signOut(auth); } catch (e) {} }
+        // Sin internet (Venta express): la sesión de Firebase que quedó guardada en este equipo la última vez que entró con internet.
+        // Lo que se guarde queda en el equipo y sube solo cuando vuelve la conexión.
+        async function listoGuardado() {
+            await cargar();
+            if (auth.authStateReady) await auth.authStateReady();
+            if (!auth.currentUser) throw new Error('Este equipo nunca entró a Firebase con internet. Conéctelo una vez y vuelva a abrir el módulo.');
+            uidActual = auth.currentUser.uid;
+            return { db, auth, lib };
+        }
         // Prueba de velocidad: escribir y leer en Firestore desde este equipo, y lo mismo desde Apps Script
         async function prueba() {
             const r = {}, t = () => performance.now();
@@ -3541,7 +3572,7 @@
         // Reglas: '' si están al día; si no, el motivo (no se pudieron publicar o quedó una versión anterior)
         const problemaReglas = () => !pase ? '' : pase.reglasError ? 'las reglas de seguridad no se pudieron publicar: ' + pase.reglasError
                                           : pase.reglasQueriendo && pase.reglas !== pase.reglasQueriendo ? 'las reglas de seguridad publicadas son de otra versión (' + (pase.reglas || 'ninguna') + ')' : '';
-        return { cargar, listo, salir, prueba, escuchar, uid: () => uidActual, problemaReglas };
+        return { cargar, listo, listoGuardado, salir, prueba, escuchar, uid: () => uidActual, problemaReglas };
     })();
     // Firebase como dato OFICIAL del efectivo (etapa 2c): activar copia la hoja entera; "Volver a la hoja" termina la copia
     // y la hoja vuelve a mandar; "Copiar a la hoja ahora" no espera la vuelta automática
@@ -3652,6 +3683,7 @@
     };
     const ico = (n, tam) => `<svg class="ico" ${tam ? `style="width:${tam}px;height:${tam}px"` : ''} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO_ACCION[n]}</svg>`;
     const ICONOS = {
+        ventaexpress: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h10v7H7z"/><path d="M9 6h6"/><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 14h2M14 14h2M8 17.5h2M14 17.5h2"/></svg>',
         listasficha: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01"/></svg>',
         cuadre:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="10" width="18" height="11" rx="2"/><path d="M7 10V5h10v5"/><path d="M9 7.5h6"/><path d="M7 14h2M11 14h2M15 14h2M7 17.5h2M11 17.5h2M15 17.5h2"/></svg>',
         pagos:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 4l9 5.5"/><path d="M5 10v7M9.5 10v7M14.5 10v7M19 10v7"/><path d="M3 20h18"/><circle cx="18.5" cy="17.5" r="4" fill="var(--list-bg)"/><path d="m16.8 17.5 1.2 1.2 2.2-2.4"/></svg>',
@@ -3695,6 +3727,7 @@
         { id: 'cxc',    titulo: 'Cuentas por cobrar', desc: 'Clientes (con ID automático) y, próximamente, deudas vencidas y vigentes.', listo: true },
         { id: 'cxp',    titulo: 'Cuentas por pagar',  desc: 'Compromisos y pagos pendientes a proveedores.' },
         { id: 'gastos', titulo: 'Gastos pendientes',  desc: 'Gastos pendientes por pagar.' },
+        { id: 'ventaexpress', titulo: 'Venta express (tiendas)', desc: 'Facturar en una tienda sin BigSoft: ticket de 58 mm, formas de pago y cierre de caja. Funciona sin internet y se guarda en Firebase.', listo: true },
         { id: 'listasficha', titulo: 'Listas de la ficha', desc: 'Bancos, titulares y tipos de gasto que se eligen en la ficha de las tiendas. Se guardan en Firebase.', listo: true },
         { id: 'asistencia', area: 'rrhh',    titulo: 'Control de asistencia', desc: 'Entrada, almuerzo y salida del personal que trabaja fuera de las tiendas.', listo: true },
         { id: 'asisgestion', area: 'rrhh',   titulo: 'Gestión de asistencia', desc: 'Ver y modificar la asistencia de todos los trabajadores: oficina y locales.', listo: true },
@@ -3723,7 +3756,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-08.14';
+    const VERSION_SERVIDOR = '2026-11-09.1';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -4066,8 +4099,8 @@
         claveAdminAuto(document.body);
         // login, menu, cuadre, ventas y admin tienen su propia sección; el resto usa la genérica "en construcción"
         // Caja chica usa la misma sección de Control de efectivo, mostrando solo la caja chica
-        const seccion = vista === 'cajachica' ? 'efectivo' : vista === 'reqcharcu' ? 'req' : vista === 'asistencia' ? 'asis' : vista === 'asisgestion' ? 'asisg' : (vista === 'nomina' || vista === 'talento' || vista === 'cxc' || vista === 'horarios') ? 'per' : (vista === 'inventario' || vista === 'movalmacen' || vista === 'precios' || vista === 'facturar' || vista === 'reportes') ? 'alm' : vista === 'pagonomina' ? 'pnom' : vista === 'listasficha' ? 'fl' : vista === 'marcaje' ? 'marca' : ['login', 'menu', 'cuadre', 'ventas', 'admin', 'pagos', 'efectivo'].includes(vista) ? vista : 'modulo';
-        ['login', 'menu', 'cuadre', 'ventas', 'admin', 'pagos', 'efectivo', 'req', 'asis', 'asisg', 'per', 'alm', 'pnom', 'fl', 'marca', 'modulo'].forEach(v => {
+        const seccion = vista === 'cajachica' ? 'efectivo' : vista === 'reqcharcu' ? 'req' : vista === 'asistencia' ? 'asis' : vista === 'asisgestion' ? 'asisg' : (vista === 'nomina' || vista === 'talento' || vista === 'cxc' || vista === 'horarios') ? 'per' : (vista === 'inventario' || vista === 'movalmacen' || vista === 'precios' || vista === 'facturar' || vista === 'reportes') ? 'alm' : vista === 'pagonomina' ? 'pnom' : vista === 'listasficha' ? 'fl' : vista === 'ventaexpress' ? 'vx' : vista === 'marcaje' ? 'marca' : ['login', 'menu', 'cuadre', 'ventas', 'admin', 'pagos', 'efectivo'].includes(vista) ? vista : 'modulo';
+        ['login', 'menu', 'cuadre', 'ventas', 'admin', 'pagos', 'efectivo', 'req', 'asis', 'asisg', 'per', 'alm', 'pnom', 'fl', 'vx', 'marca', 'modulo'].forEach(v => {
             const el = document.getElementById('vista' + v[0].toUpperCase() + v.slice(1));
             el.dataset.pantalla = '';   // al aparecer entra deslizándose (ANIM)
             el.classList.toggle('hidden', v !== seccion);
@@ -4102,6 +4135,7 @@
         if (vista === 'inventario' || vista === 'movalmacen' || vista === 'precios' || vista === 'facturar' || vista === 'reportes') almIniciar(vista, vistaAntes !== vista);
         if (vista === 'pagonomina') pnomIniciar();
         if (vista === 'listasficha') flIniciar();
+        if (vista === 'ventaexpress') vxIniciar();
         if (vista !== 'login' && vista !== 'marcaje') setTimeout(() => avisarEnLinea(true), 500);
         if (vista === 'efectivo' || vista === 'cajachica') efeIniciar(vista === 'cajachica');
         // Cuadre y Visor de ventas comparten los mismos datos (filas de la hoja de cuadres)
@@ -4131,7 +4165,8 @@
         nomina: () => perCargar(), talento: () => perCargar(), cxc: () => perCargar(), horarios: () => perCargar(),
         inventario: () => almCargar(), facturar: () => almCargar(), movalmacen: () => { cmpCompras = null; return almCargar(); }, precios: () => { cmpOrd = null; return almCargar(); }, pagonomina: () => pnomCargar(),
         reportes: () => almPintar(),   // los reportes se piden con su botón (cada uno lo saca la PC de la tienda)
-        listasficha: () => flCargar()
+        listasficha: () => flCargar(),
+        ventaexpress: () => vxPintar()   // Firebase lo trae en vivo
     };
     // ---------- Cambios en vivo: cada 30 s se pregunta a Google qué áreas cambiaron (respuesta mínima).
     // Si cambió la del módulo abierto, se vuelve a leer solo, sin molestar: no mientras se escribe, hay una ventana abierta o algo se guarda.
@@ -6202,6 +6237,619 @@
         tdd: { banco: ['R4', 'BNC', 'Bancrecer', 'BDV'], titular: ['Plaza Valencia', 'Junior Lanz', 'Raimary Quintero'] },
         pm:  { banco: ['R4', 'BNC', 'Bancrecer', 'BDV', 'Provincial'], titular: ['Plaza Valencia', 'Junior Lanz', 'Raimary Quintero', 'Lisbeth Perez'] }
     };
+
+    // ==========================================
+    // VENTA EXPRESS (09/11): facturar en una tienda cuando su BigSoft no funciona (se dañó el servidor de Santa Rosa).
+    // Como Facturar del almacén (código + Enter, 3*CODIGO, Espacio para totalizar), con los precios de la tienda en $ BCV:
+    // en Bs se cobra precio x tasa BCV; lo que se paga en divisas lleva el descuento por pago en divisas (8 %, como BigSoft
+    // con sus 2 tasas). El mayor aplica desde la cantidad que se fija por producto. Al cobrar sale el ticket de 58 mm solo.
+    // Todo va DIRECTO a Firebase desde este equipo: sin internet queda guardado en el equipo y sube solo al volver.
+    //   express/<tienda>                 datos del ticket (encabezado), % descuento en divisas, tasa manual
+    //   express/<tienda>/datos/productos existencia de partida, costo, detal, mayor y "mayor desde"
+    //   express/<tienda>/ventas/<id>     un ticket (id = caja-número-equipo: dos equipos nunca chocan)
+    //   express/<tienda>/cierres/<id>    cierre de caja (totales por forma de pago, pagos móviles, créditos, lo vendido)
+    //   express/<tienda>/cajas/<id>      último número de ticket de cada caja
+    // ==========================================
+    const VX_SLUG = t => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const VX_FORMAS = { EFE_BS: 'Efectivo Bs', EFE_USD: 'Efectivo $', PM: 'Pago móvil', PUNTO: 'Punto (TDD)', BIO: 'Biopago', CRED: 'Crédito' };
+    const VX_TICKET = { EFE_BS: 'EFECTIVO BS', EFE_USD: 'EFECTIVO $', PM: 'PAGO MOVIL', PUNTO: 'PUNTO', BIO: 'BIOPAGO', CRED: 'CREDITO' };
+    const vxR2 = n => Math.round((Number(n) || 0) * 100) / 100, vxR3 = n => Math.round((Number(n) || 0) * 1000) / 1000;
+    const vxNorm = s => String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
+    let vx = { tab: 'vender', listo: false, conectando: false, error: '', equipo: null, cfg: {}, prods: [], porCod: new Map(), base: null,
+               abiertas: [], cierres: [], pend: 0, venta: { items: [] }, res: [], sel: 0, offs: [], fbl: null, pagos: [], vueltoEn: 'bs',
+               buscaProd: '', mdCambios: {}, contado: {}, verTicket: null, anulando: null };
+    // Este equipo: tienda y número de caja (se eligen una vez)
+    function vxEquipoLeer() {
+        if (vx.equipo) return;
+        try { const e = JSON.parse(localStorage.getItem('vx_equipo') || 'null'); if (e && e.local && e.caja && e.id) vx.equipo = e; } catch (e) {}
+        try { const v = JSON.parse(localStorage.getItem('vx_venta') || 'null'); if (v && Array.isArray(v.items)) vx.venta = v; } catch (e) {}
+    }
+    function vxEquipoGuardar() {
+        const local = (document.getElementById('vxLocal') || {}).value, caja = Number((document.getElementById('vxCajaN') || {}).value);
+        if (!local) { mostrarBanner('Elija la tienda.', 'warn'); return; }
+        if (!(caja >= 1 && caja <= 99)) { mostrarBanner('Escriba el número de caja (1 a 99).', 'warn'); return; }
+        const id = (vx.equipo && vx.equipo.id) || Math.random().toString(36).slice(2, 6);
+        if (vx.equipo && vx.equipo.local !== local) { vx.offs.forEach(o => { try { o(); } catch (e) {} }); vx.offs = []; vx.listo = false; vx.abiertas = []; vx.cierres = []; vx.prods = []; vx.porCod = new Map(); }
+        vx.equipo = { local, caja, id }; vx.cambiando = false;
+        try { localStorage.setItem('vx_equipo', JSON.stringify(vx.equipo)); } catch (e) {}
+        vx.tab = 'vender'; vxIniciar();
+    }
+    const vxL = () => VX_SLUG(vx.equipo.local), vxCajaId = () => String(vx.equipo.caja).padStart(2, '0') + '-' + vx.equipo.id;
+    function vxIniciar() {
+        vxEquipoLeer(); vxPintar();
+        if (!vx.equipo || vx.listo || vx.conectando) { vxFoco(); return; }
+        vxConectar();
+    }
+    async function vxConectar() {
+        vx.conectando = true; vx.error = ''; vxPintar();
+        try {
+            try { vx.fbl = await Promise.race([FB.listo(), new Promise((_, no) => setTimeout(() => no(new Error('sin respuesta')), 9000))]); vx.sinInternet = false; }
+            catch (e) { vx.fbl = await FB.listoGuardado(); vx.sinInternet = true; }   // sin internet: la sesión guardada en el equipo
+            vxEscuchar(); vx.listo = true;
+            if (!vx.sinInternet) { try { flAsegurar(); } catch (e) {} }   // bancos del pago móvil (Listas de la ficha)
+        } catch (e) { vx.error = e.message; }
+        vx.conectando = false; vxPintar(); vxFoco();
+        cargarTasasBCV().then(() => { if (vistaActual === 'ventaexpress') vxPintar(); });
+    }
+    function vxEscuchar() {
+        vx.offs.forEach(o => { try { o(); } catch (e) {} }); vx.offs = [];
+        const { db, lib } = vx.fbl, fs = lib.fs, L = vxL();
+        const err = e => { vx.error = 'Firebase: ' + (e.code === 'permission-denied' ? 'sin permiso (publique la versión nueva y entre otra vez con internet)' : (e.code || e.message)); vxPintar(); };
+        const pinta = () => { if (vistaActual === 'ventaexpress') vxPintar(); };
+        vx.offs.push(fs.onSnapshot(fs.doc(db, 'express', L), s => { vx.cfg = s.exists() ? s.data() : {}; pinta(); }, err));
+        vx.offs.push(fs.onSnapshot(fs.doc(db, 'express', L, 'datos', 'productos'), s => {
+            const d = s.exists() ? s.data() : {};
+            vx.prods = Array.isArray(d.p) ? d.p : []; vx.base = d.base || null; vx.porCod = new Map(vx.prods.map(p => [String(p.c), p])); pinta();
+        }, err));
+        vx.offs.push(fs.onSnapshot(fs.query(fs.collection(db, 'express', L, 'ventas'), fs.where('cierre', '==', '')), { includeMetadataChanges: true }, s => {
+            vx.abiertas = s.docs.map(d => Object.assign({ _id: d.id, _pend: d.metadata.hasPendingWrites }, d.data())).sort((a, b) => (a.creadoMs || 0) - (b.creadoMs || 0));
+            vx.pend = vx.abiertas.filter(v => v._pend).length; pinta();
+        }, err));
+        vx.offs.push(fs.onSnapshot(fs.collection(db, 'express', L, 'cierres'), s => {
+            vx.cierres = s.docs.map(d => d.data()).sort((a, b) => (b.creadoMs || 0) - (a.creadoMs || 0)); pinta();
+        }, err));
+        // Número de ticket de esta caja (por si este equipo perdió su memoria)
+        fs.getDoc(fs.doc(db, 'express', L, 'cajas', vxCajaId())).then(s => { if (s.exists()) vxNroMinimo(Number(s.data().ultimo) || 0); }).catch(() => {});
+    }
+    const vxNroLlave = () => 'vx_nro_' + vxL() + '_' + vxCajaId();
+    function vxNroMinimo(n) { try { if ((Number(localStorage.getItem(vxNroLlave())) || 0) < n) localStorage.setItem(vxNroLlave(), String(n)); } catch (e) {} }
+    function vxNroSiguiente() {
+        const deFirebase = Math.max(0, ...vx.abiertas.filter(v => v.equipo === vx.equipo.id && v.caja === vx.equipo.caja).map(v => Number(v.nro) || 0),
+                                       ...vx.cierres.filter(c => c.equipo === vx.equipo.id && c.caja === vx.equipo.caja).map(c => Number(c.hastaNro) || 0));
+        let n = 0; try { n = Number(localStorage.getItem(vxNroLlave())) || 0; } catch (e) {}
+        n = Math.max(n, deFirebase) + 1;
+        try { localStorage.setItem(vxNroLlave(), String(n)); } catch (e) {}
+        return n;
+    }
+    const vxNroTxt = (caja, nro) => String(caja).padStart(3, '0') + String(nro).padStart(7, '0');
+    // Tasas: BCV del día (DolarApi, la misma de la ficha) o la que fijó un administrador hoy; la de divisas lleva el descuento
+    function vxTasa() {
+        const hoy = fechaLocalHoy(), c = vx.cfg || {};
+        if (Number(c.tasaManual) > 0 && c.tasaManualFecha === hoy) return Number(c.tasaManual);
+        const t = tasaBCVdel(hoy);
+        if (t) { try { localStorage.setItem('vx_tasa', String(t[1])); } catch (e) {} return t[1]; }
+        let g = 0; try { g = Number(localStorage.getItem('vx_tasa')) || 0; } catch (e) {}
+        return g || Number(c.tasaManual) || 0;
+    }
+    const vxDesc = () => { const d = Number((vx.cfg || {}).descDivisas); return d >= 0 && d < 50 ? d : 8; };
+    const vxTasaDiv = () => { const t = vxTasa(); return t ? t / (1 - vxDesc() / 100) : 0; };
+    // Precio: detal, o mayor desde la cantidad fijada para ese producto
+    function vxLinea(it) {
+        const p = vx.porCod.get(String(it.c)) || it, may = Number(p.pm) > 0 && Number(p.md) > 0 && it.q >= Number(p.md);
+        const usd = Number(may ? p.pm : p.pd) || 0, pbs = vxR2(usd * vxTasa());
+        return { usd, may, pbs, sbs: vxR2(pbs * it.q) };
+    }
+    function vxTotales(v) {
+        const items = (v || vx.venta).items, lin = items.map(vxLinea);
+        const totalBs = vxR2(lin.reduce((s, l) => s + l.sbs, 0)), td = vxTasaDiv();
+        return { lin, totalBs, totalUsd: td ? vxR2(totalBs / td) : 0, articulos: vxR3(items.reduce((s, i) => s + (Number(i.q) || 0), 0)) };
+    }
+    // Existencia: la del archivo cargado, menos lo vendido desde entonces (cierres y tickets abiertos, sin los anulados)
+    function vxVendidos() {
+        const m = {}, desde = vx.base ? Number(vx.base.en) || 0 : 0, sumar = (c, q) => { m[c] = vxR3((m[c] || 0) + (Number(q) || 0)); };
+        vx.cierres.forEach(c => { if ((c.creadoMs || 0) >= desde) (c.vendidos || []).forEach(x => sumar(x.c, x.q)); });
+        vx.abiertas.forEach(v => { if (!v.anulada && (v.creadoMs || 0) >= desde) (v.items || []).forEach(i => sumar(i.c, i.q)); });
+        return m;
+    }
+    const vxPesado = p => /KILO|KG/i.test(String(p.u || ''));
+    const vxCant = (q, pesado) => pesado ? nfVE(3, 3).format(q) : nfVE(0, 3).format(q);
+
+    // ---------- Pantalla ----------
+    function vxPintar() {
+        const el = document.getElementById('vxContenido'); if (!el) return;
+        pintarConservando(el, vxVista());
+        const d = document.getElementById('vxDlg'); if (d && !d.classList.contains('hidden') && vx.dlg) pintarVentana(d, vx.dlg());
+    }
+    function vxFoco() { setTimeout(() => { if (vistaActual !== 'ventaexpress' || vx.tab !== 'vender' || vxDlgAbierta()) return; const a = document.activeElement;
+        if (a && a !== document.body && a.closest && a.closest('#vxContenido') && a.id !== 'vxCod') return; const c = document.getElementById('vxCod'); if (c) c.focus(); }, 30); }
+    function vxVista() {
+        if (!vx.equipo || vx.cambiando) return vxVistaEquipo();
+        const tabs = [['vender', 'Vender'], ['tickets', 'Tickets'], ['cierre', 'Cierre de caja'], ['productos', 'Productos y ajustes']];
+        const tasa = vxTasa(), cab = `<div class="vx-cab">
+            <div><b>${esc(vx.equipo.local)}</b> · Caja ${esc(vx.equipo.caja)} · ${esc(nombreUsuario)}</div>
+            <div class="vx-cab-d">${tasa ? `Tasa BCV <b>${fmt(tasa)}</b> · divisas ${fmt(vxTasaDiv())} (−${nfVE(0, 2).format(vxDesc())} %)` : '<span style="color:var(--danger)">Sin tasa BCV: revise internet o fije la tasa en Productos y ajustes</span>'}
+                ${vx.pend ? ` · <span class="chip st-amar">${vx.pend} ticket(s) por subir</span>` : vx.listo ? ' · <span class="chip st-ok">Al día en Firebase</span>' : ''}${vx.sinInternet ? ' <span class="chip st-falta">Sin internet</span>' : ''}</div></div>
+            <div class="modo-tabs">${tabs.map(([k, n]) => `<button type="button" class="tab${vx.tab === k ? ' active' : ''}" onclick="vx.tab='${k}';vxPintar();vxFoco()">${n}</button>`).join('')}</div>`;
+        if (vx.error) return cab + `<div class="banner error" style="display:block">${esc(vx.error)}</div><div class="req-acciones"><button type="button" class="btn-ghost" onclick="vxConectar()">Reintentar</button></div>`;
+        if (!vx.listo) return cab + cargandoHTML('Conectando con Firebase...');
+        if (vx.tab === 'tickets') return cab + vxVistaTickets();
+        if (vx.tab === 'cierre') return cab + vxVistaCierre();
+        if (vx.tab === 'productos') return cab + vxVistaProductos();
+        return cab + vxVistaVender();
+    }
+    function vxVistaEquipo() {
+        const e = vx.equipo || {};
+        return `<div class="grafico-card" style="max-width:520px"><div class="grafico-head"><h3>Este equipo</h3></div>
+            <div class="grafico-sub">Elija la tienda y el número de caja de este equipo. Cada caja numera sus tickets y hace su propio cierre.</div>
+            <div class="filters"><div><label for="vxLocal">Tienda</label><select id="vxLocal"><option value="">Elija...</option>${CMP_TIENDAS.map(t => `<option${t === e.local ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></div>
+                <div><label for="vxCajaN">Caja N°</label><input type="number" id="vxCajaN" min="1" max="99" step="1" value="${esc(e.caja || 1)}"></div></div>
+            <div class="req-acciones"><button type="button" class="btn-primary" onclick="vxEquipoGuardar()">Guardar</button>${vx.equipo ? `<button type="button" class="btn-ghost" onclick="vx.cambiando=false;vxPintar()">Cancelar</button>` : ''}</div></div>`;
+    }
+    function vxVistaVender() {
+        if (!vx.prods.length) return `<div class="empty">Todavía no hay productos de ${esc(vx.equipo.local)}. ${esPrincipal ? 'Cárguelos en "Productos y ajustes".' : 'Un administrador debe cargarlos en "Productos y ajustes".'}</div>`;
+        const t = vxTotales(), vend = vxVendidos(), items = vx.venta.items;
+        const filas = items.map((it, i) => {
+            const l = t.lin[i], p = vx.porCod.get(String(it.c)), ex = p ? vxR3((Number(p.e) || 0) - (vend[it.c] || 0)) : null;
+            return `<tr${i === vx.ultimo ? ' class="vx-ult"' : ''}><td class="n">${i + 1}</td><td class="izq"><b>${esc(it.c)}</b></td>
+                <td class="izq">${esc(it.d)}${l.may ? ' <span class="chip st-info">Mayor</span>' : ''}${ex != null && ex - it.q < 0 ? `<small style="color:var(--warn)">Existencia en el sistema: ${vxCant(ex, it.pesado)}</small>` : ''}</td>
+                <td><input type="number" class="vx-q" id="vxQ${i}" min="0" step="${it.pesado ? '0.001' : '1'}" value="${it.q || ''}" placeholder="${it.pesado ? 'kg' : ''}" oninput="vxCantidad(${i}, this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();vxFocoCod()}"></td>
+                <td>${fmt(l.usd)}</td><td>${fmt(l.pbs)}</td><td><b>${fmt(l.sbs)}</b></td>
+                <td><button type="button" class="btn-ghost btn-mini btn-quitar" onclick="vxQuitar(${i})" aria-label="Quitar ${esc(it.d)}">✕</button></td></tr>`;
+        }).join('');
+        const res = vx.res.length ? `<div class="vx-res" role="listbox">${vx.res.slice(0, 12).map((p, i) => {
+                const ex = vxR3((Number(p.e) || 0) - (vend[p.c] || 0));
+                return `<button type="button" class="vx-res-item${i === vx.sel ? ' activo' : ''}" onclick="vxElegir(${i})"><b>${esc(p.c)}</b> ${esc(p.d)}<span>$ ${fmt(p.pd)} · Bs ${fmt(vxR2(p.pd * vxTasa()))} · exist. ${vxCant(ex, vxPesado(p))}</span></button>`;
+            }).join('')}</div>` : '';
+        return `<div class="vx-entrada"><label for="vxCod" class="sr-only">Código o descripción</label>
+                <input type="text" id="vxCod" autocomplete="off" placeholder="Código o descripción · 3*código · Enter agrega · Espacio totaliza" onkeydown="vxTecla(event)" oninput="vxBuscarEscribiendo(this.value)">
+                <button type="button" class="btn-primary" onclick="vxTotalizar()" ${items.length ? '' : 'disabled'}>Totalizar (Espacio)</button></div>
+            ${res}
+            <div class="tabla-wrap"><table class="req-tabla vx-tabla" data-sin-paginar><thead><tr><th>#</th><th class="izq">Código</th><th class="izq">Descripción</th><th>Cant.</th><th>Precio $</th><th>Precio Bs</th><th>Subtotal Bs</th><th></th></tr></thead>
+                <tbody>${filas || '<tr><td colspan="8" class="empty">Escriba un código y pulse Enter.</td></tr>'}</tbody></table></div>
+            <div class="kpis"><div class="kpi amar"><div class="k-label">Total a pagar</div><div class="k-value">Bs ${fmt(t.totalBs)}</div></div>
+                <div class="kpi"><div class="k-label">Si paga en divisas</div><div class="k-value">$ ${fmt(t.totalUsd)}</div></div>
+                <div class="kpi"><div class="k-label">Artículos</div><div class="k-value">${nfVE(0, 3).format(t.articulos)}</div></div></div>
+            ${items.length ? '<div class="req-acciones"><button type="button" class="btn-ghost" onclick="vxVaciar()">Vaciar la venta</button></div>' : ''}`;
+    }
+    function vxGuardarVenta() { try { localStorage.setItem('vx_venta', JSON.stringify(vx.venta)); } catch (e) {} }
+    function vxFocoCod() { const c = document.getElementById('vxCod'); if (c) c.focus(); }
+    function vxBuscar(txt) {
+        const q = vxNorm(txt); if (!q) return [];
+        const pal = q.split(' ');
+        const exactos = vx.prods.filter(p => vxNorm(p.c).indexOf(q) === 0);
+        const porDesc = vx.prods.filter(p => exactos.indexOf(p) === -1 && pal.every(w => vxNorm(p.d).indexOf(w) !== -1));
+        return exactos.concat(porDesc).slice(0, 40);
+    }
+    let vxBuscaEspera = 0;
+    function vxBuscarEscribiendo(v) {
+        clearTimeout(vxBuscaEspera);
+        vxBuscaEspera = setTimeout(() => { const t = String(v).replace(/^\d+(?:[.,]\d+)?\s*\*\s*/, ''); vx.res = t.length >= 3 && !/^\d+$/.test(t) ? vxBuscar(t) : []; vx.sel = 0; vxPintar(); }, 200);
+    }
+    function vxTecla(e) {
+        const c = e.target;
+        if (e.key === 'ArrowDown' && vx.res.length) { e.preventDefault(); vx.sel = Math.min(vx.sel + 1, Math.min(vx.res.length, 12) - 1); vxPintar(); return; }
+        if (e.key === 'ArrowUp' && vx.res.length) { e.preventDefault(); vx.sel = Math.max(vx.sel - 1, 0); vxPintar(); return; }
+        if (e.key === 'Escape') { if (c.value || vx.res.length) { e.preventDefault(); e.stopPropagation(); c.value = ''; vx.res = []; vxPintar(); } return; }
+        if (e.key === ' ' && !c.value.trim()) { e.preventDefault(); vxTotalizar(); return; }
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        const txt = c.value.trim();
+        if (!txt) { if (vx.venta.items.length) vxTotalizar(); return; }
+        let q = null, cod = txt; const m = /^(\d+(?:[.,]\d+)?)\s*\*\s*(.+)$/.exec(txt);
+        if (m) { q = Number(m[1].replace(',', '.')); cod = m[2].trim(); }
+        const p = vx.porCod.get(cod) || vx.porCod.get(cod.toUpperCase());
+        if (p) { c.value = ''; vx.res = []; vxAgregar(p, q); return; }
+        const l = vx.res.length && !m ? vx.res : vxBuscar(cod);
+        if (vx.res.length && l === vx.res) { c.value = ''; const x = l[vx.sel]; vx.res = []; vxAgregar(x, q); return; }
+        if (l.length === 1) { c.value = ''; vx.res = []; vxAgregar(l[0], q); return; }
+        vx.res = l; vx.sel = 0; vx.qBusca = q; vxPintar();
+        if (!l.length) mostrarBanner(`No hay ningún producto con el código o la descripción "${cod}".`, 'warn');
+    }
+    function vxElegir(i) { const p = vx.res[i]; if (!p) return; const c = document.getElementById('vxCod'); const q = vx.qBusca != null ? vx.qBusca : null; if (c) c.value = ''; vx.res = []; vx.qBusca = null; vxAgregar(p, q); }
+    function vxAgregar(p, q) {
+        const pesado = vxPesado(p), v = vx.venta;
+        const ya = pesado ? -1 : v.items.findIndex(i => String(i.c) === String(p.c));
+        if (ya >= 0) { v.items[ya].q = vxR3(v.items[ya].q + (q != null ? q : 1)); vx.ultimo = ya; }
+        else { v.items.push({ c: String(p.c), d: p.d, u: p.u || '', pesado, q: q != null ? vxR3(q) : (pesado ? 0 : 1), pd: p.pd, pm: p.pm, md: p.md }); vx.ultimo = v.items.length - 1; }
+        vxGuardarVenta(); vxPintar();
+        // Pesado sin cantidad: el cursor va a su peso (en kg)
+        if (pesado && q == null) setTimeout(() => { const x = document.getElementById('vxQ' + vx.ultimo); if (x) { x.focus(); x.select && x.select(); } }, 30); else vxFoco();
+    }
+    function vxCantidad(i, v) { const it = vx.venta.items[i]; if (!it) return; it.q = vxR3(Number(v) || 0); vxGuardarVenta(); clearTimeout(vx.cantEspera); vx.cantEspera = setTimeout(vxPintar, 250); }
+    function vxQuitar(i) { vx.venta.items.splice(i, 1); vx.ultimo = null; vxGuardarVenta(); vxPintar(); vxFoco(); }
+    function vxVaciar() { if (!confirm('¿Vaciar la venta en pantalla?')) return; vx.venta = { items: [] }; vxGuardarVenta(); vxPintar(); vxFoco(); }
+
+    // ---------- Cobro (Totalizar) ----------
+    const vxDlgAbierta = () => { const d = document.getElementById('vxDlg'); return !!d && !d.classList.contains('hidden'); };
+    function vxAbrirDlg(fn) {
+        let d = document.getElementById('vxDlg');
+        if (!d) { d = document.createElement('div'); d.id = 'vxDlg'; d.className = 'req-dlg-fondo'; d.addEventListener('click', e => { if (e.target === d) vxCerrarDlg(); }); document.body.appendChild(d); }
+        vx.dlg = fn; pintarVentana(d, fn()); d.classList.remove('hidden');
+        setTimeout(() => { const p = d.querySelector('[autofocus]') || d.querySelector('input'); if (p) { p.focus(); try { p.select(); } catch (e) {} } }, 30);
+    }
+    function vxCerrarDlg() { const d = document.getElementById('vxDlg'); if (d) d.classList.add('hidden'); vx.dlg = null; vxFoco(); }
+    function vxTotalizar() {
+        const v = vx.venta;
+        if (!v.items.length) return;
+        const sinCant = v.items.find(i => !(i.q > 0));
+        if (sinCant) { mostrarBanner(`Falta la cantidad de ${sinCant.d}.`, 'warn'); const k = v.items.indexOf(sinCant); setTimeout(() => { const x = document.getElementById('vxQ' + k); if (x) x.focus(); }, 30); return; }
+        if (!vxTasa()) { mostrarBanner('No hay tasa BCV: revise internet o fije la tasa en Productos y ajustes.', 'error'); return; }
+        vx.pagos = []; vx.vueltoEn = 'bs'; vx.errPago = '';
+        vxAbrirDlg(vxPagoHTML);
+    }
+    const vxPagoBs = p => p.f === 'EFE_USD' ? vxR2((Number(p.monto) || 0) * vxTasaDiv()) : vxR2(Number(p.monto) || 0);
+    function vxResta() { const t = vxTotales(); return vxR2(t.totalBs - vx.pagos.reduce((s, p) => s + vxPagoBs(p), 0)); }
+    function vxPagoHTML() {
+        const t = vxTotales(), resta = vxResta(), td = vxTasaDiv(), bancos = (CUA_LISTAS.pm && CUA_LISTAS.pm.banco) || [];
+        const lineas = vx.pagos.map((p, i) => {
+            const usd = p.f === 'EFE_USD';
+            return `<div class="vx-pago"><b>${VX_FORMAS[p.f]}</b>
+                <label class="sr-only" for="vxPm${i}">Monto</label><span class="vx-mon">${usd ? '$' : 'Bs'}</span><input type="number" id="vxPm${i}" min="0" step="0.01" value="${esc(p.monto)}" oninput="vxPagoCampo(${i}, 'monto', this.value)" ${i === vx.pagos.length - 1 ? 'autofocus' : ''}>
+                ${p.f === 'PM' ? `<input type="text" inputmode="numeric" maxlength="4" placeholder="Ref. 4 dígitos" value="${esc(p.ref || '')}" oninput="this.value=this.value.replace(/\\D/g,'').slice(0,4);vxPagoCampo(${i}, 'ref', this.value)">
+                    <select onchange="vxPagoCampo(${i}, 'banco', this.value)"><option value="">Banco...</option>${bancos.map(b => `<option${b === p.banco ? ' selected' : ''}>${esc(b)}</option>`).join('')}</select>` : ''}
+                ${p.f === 'CRED' ? `<input type="text" placeholder="Nombre del cliente" value="${esc(p.cliente || '')}" oninput="vxPagoCampo(${i}, 'cliente', this.value)"><input type="text" placeholder="Cédula" value="${esc(p.ced || '')}" oninput="vxPagoCampo(${i}, 'ced', this.value)">` : ''}
+                <button type="button" class="btn-ghost btn-mini btn-quitar" onclick="vx.pagos.splice(${i},1);vxPintar()" aria-label="Quitar">✕</button></div>`;
+        }).join('');
+        const vuelto = resta < -0.009 ? -resta : 0;
+        return `<div class="req-dlg vx-dlg" role="dialog" aria-label="Cobrar"><h3>Cobrar</h3>
+            <div class="kpis"><div class="kpi amar"><div class="k-label">Total a pagar</div><div class="k-value">Bs ${fmt(t.totalBs)}</div></div>
+                <div class="kpi"><div class="k-label">En divisas (−${nfVE(0, 2).format(vxDesc())} %)</div><div class="k-value">$ ${fmt(t.totalUsd)}</div></div></div>
+            <div class="vx-formas">${Object.keys(VX_FORMAS).map((k, i) => `<button type="button" class="btn-ghost" onclick="vxPagoAgregar('${k}')">${VX_FORMAS[k]} <small>F${i + 1}</small></button>`).join('')}</div>
+            ${lineas || '<div class="nota">Elija cómo paga el cliente (puede combinar varias formas de pago).</div>'}
+            <div class="vx-resta" id="vxResta">${vxRestaHTML()}</div>
+            ${vx.errPago ? `<div class="login-error">${esc(vx.errPago)}</div>` : ''}
+            <div class="req-acciones" style="justify-content:flex-end"><button type="button" class="btn-ghost" onclick="vxCerrarDlg()">Volver a la venta</button>
+                <button type="button" class="btn-primary" id="vxCobrarBtn" onclick="vxCobrar()">Cobrar e imprimir (F12)</button></div></div>`;
+    }
+    function vxRestaHTML() {
+        const resta = vxResta(), td = vxTasaDiv();
+        if (resta > 0.009) return `Falta: <b>Bs ${fmt(resta)}</b> · o $ ${fmt(vxR2(resta / td))} en divisas`;
+        if (resta < -0.009) return `Vuelto: <b>Bs ${fmt(-resta)}</b> · o $ ${fmt(vxR2(-resta / td))}
+            <span class="vx-vuelto"><label><input type="radio" name="vxVuelto" ${vx.vueltoEn === 'bs' ? 'checked' : ''} onchange="vx.vueltoEn='bs'"> en Bs</label>
+            <label><input type="radio" name="vxVuelto" ${vx.vueltoEn === 'usd' ? 'checked' : ''} onchange="vx.vueltoEn='usd'"> en $</label></span>`;
+        return '<b style="color:var(--ok)">Pagado completo</b>';
+    }
+    function vxPagoAgregar(f) {
+        const resta = Math.max(0, vxResta()), monto = f === 'EFE_USD' ? vxR2(resta / vxTasaDiv()) : resta;
+        vx.pagos.push({ f, monto: monto ? String(monto) : '' }); vx.errPago = ''; vxPintar();
+        setTimeout(() => { const x = document.getElementById('vxPm' + (vx.pagos.length - 1)); if (x) { x.focus(); try { x.select(); } catch (e) {} } }, 30);
+    }
+    function vxPagoCampo(i, k, v) { const p = vx.pagos[i]; if (!p) return; p[k] = v; if (k === 'monto') { const r = document.getElementById('vxResta'); if (r) r.innerHTML = vxRestaHTML(); } }
+    function vxCobrar() {
+        const t = vxTotales(), resta = vxResta();
+        const malo = m => { vx.errPago = m; vxPintar(); };
+        if (!vx.pagos.length) return malo('Elija la forma de pago.');
+        if (vx.pagos.some(p => !(Number(p.monto) > 0))) return malo('Falta el monto de una forma de pago.');
+        if (resta > 0.009) return malo('Falta por pagar Bs ' + fmt(resta) + '.');
+        const pm = vx.pagos.find(p => p.f === 'PM' && (!/^\d{4}$/.test(p.ref || '') || !p.banco)); if (pm) return malo('Pago móvil: escriba los 4 dígitos de la referencia y elija el banco.');
+        const cr = vx.pagos.find(p => p.f === 'CRED' && !String(p.cliente || '').trim()); if (cr) return malo('Crédito: escriba el nombre del cliente.');
+        const vueltoBs = resta < -0.009 ? -resta : 0;
+        if (vueltoBs && vx.pagos.every(p => p.f !== 'EFE_BS' && p.f !== 'EFE_USD')) return malo('Hay vuelto, pero no pagó en efectivo: revise los montos.');
+        vxGuardarTicket(t, vueltoBs);
+    }
+    function vxGuardarTicket(t, vueltoBs) {
+        const { db, lib, auth } = vx.fbl, fs = lib.fs, L = vxL(), e = vx.equipo, ahora = new Date();
+        const nro = vxNroSiguiente(), id = String(e.caja).padStart(2, '0') + '-' + String(nro).padStart(7, '0') + '-' + e.id, td = vxTasaDiv();
+        const dos = n => String(n).padStart(2, '0');
+        const v = { id, local: e.local, caja: e.caja, equipo: e.id, nro, nroTxt: vxNroTxt(e.caja, nro), fecha: fechaLocalHoy(),
+            hora: dos(ahora.getHours()) + ':' + dos(ahora.getMinutes()) + ':' + dos(ahora.getSeconds()), creadoMs: Date.now(), creado: fs.serverTimestamp(),
+            cajero: nombreUsuario, cajeroUid: auth.currentUser ? auth.currentUser.uid : '', tasa: vxTasa(), desc: vxDesc(), tasaDiv: vxR2(td * 10000) / 10000,
+            items: vx.venta.items.map((it, i) => ({ c: String(it.c), d: it.d, q: vxR3(it.q), u: it.u || '', usd: t.lin[i].usd, pbs: t.lin[i].pbs, sbs: t.lin[i].sbs, may: t.lin[i].may })),
+            totalBs: t.totalBs, totalUsd: t.totalUsd, articulos: t.articulos,
+            pagos: vx.pagos.map(p => Object.assign({ f: p.f, bs: vxPagoBs(p), usd: p.f === 'EFE_USD' ? vxR2(Number(p.monto)) : 0 },
+                p.f === 'PM' ? { ref: p.ref, banco: p.banco } : {}, p.f === 'CRED' ? { cliente: String(p.cliente).trim(), ced: String(p.ced || '').trim() } : {})),
+            vuelto: vueltoBs ? (vx.vueltoEn === 'usd' ? { moneda: 'usd', monto: vxR2(vueltoBs / td) } : { moneda: 'bs', monto: vueltoBs }) : { moneda: 'bs', monto: 0 },
+            cierre: '', anulada: false };
+        const b = fs.writeBatch(db);
+        b.set(fs.doc(db, 'express', L, 'ventas', id), v);
+        b.set(fs.doc(db, 'express', L, 'cajas', vxCajaId()), { ultimo: nro, caja: e.caja, equipo: e.id, cajero: nombreUsuario, en: fs.serverTimestamp() }, { merge: true });
+        // Sin internet la promesa espera hasta que suba: no se espera (la venta ya quedó en el equipo)
+        b.commit().catch(err => vxNoSubio(v, err));
+        vxImprimirTicket(v, false);
+        vx.venta = { items: [] }; vx.pagos = []; vx.ultimo = null; vxGuardarVenta();
+        vxCerrarDlg(); vxPintar();
+        mostrarBanner(`Ticket ${v.nroTxt}: Bs ${fmt(v.totalBs)}${v.vuelto.monto ? ` · vuelto ${v.vuelto.moneda === 'usd' ? '$' : 'Bs'} ${fmt(v.vuelto.monto)}` : ''}.`, 'ok');
+    }
+    // Firebase rechazó el ticket (no es falta de internet): queda guardado en el equipo para reintentarlo
+    function vxNoSubio(v, err) {
+        try { const l = JSON.parse(localStorage.getItem('vx_fallidas') || '[]'); l.push(Object.assign({}, v, { creado: null, _error: String(err && (err.code || err.message) || err) })); localStorage.setItem('vx_fallidas', JSON.stringify(l)); } catch (e) {}
+        mostrarBanner(`El ticket ${v.nroTxt} no se pudo guardar en Firebase (${err && (err.code || err.message)}). Quedó en este equipo: vea "Tickets" › Reintentar.`, 'error');
+        vxPintar();
+    }
+    function vxFallidas() { try { return JSON.parse(localStorage.getItem('vx_fallidas') || '[]'); } catch (e) { return []; } }
+    function vxReintentarFallidas() {
+        const l = vxFallidas(); if (!l.length) return;
+        const { db, lib } = vx.fbl, fs = lib.fs;
+        try { localStorage.setItem('vx_fallidas', '[]'); } catch (e) {}
+        l.forEach(v => { const x = Object.assign({}, v, { creado: fs.serverTimestamp() }); delete x._error; fs.setDoc(fs.doc(db, 'express', vxL(), 'ventas', v.id), x).catch(err => vxNoSubio(v, err)); });
+        mostrarBanner(l.length + ' ticket(s) enviados otra vez a Firebase.', 'ok'); vxPintar();
+    }
+
+    // ---------- Ticket de 58 mm (32 letras por línea, como el de BigSoft) ----------
+    const VX_ANCHO = 32;
+    const vxN = n => (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const vxQ = (q, u) => /KILO|KG/i.test(u || '') || q !== Math.round(q) ? (Number(q) || 0).toFixed(3) : String(q);
+    function vxPartir(t, n) {
+        n = n || VX_ANCHO; const out = []; let l = '';
+        String(t || '').split(/\s+/).filter(Boolean).forEach(w => { while (w.length > n) { if (l) { out.push(l); l = ''; } out.push(w.slice(0, n)); w = w.slice(n); } if ((l ? l.length + 1 : 0) + w.length > n) { out.push(l); l = w; } else l = l ? l + ' ' + w : w; });
+        if (l) out.push(l); return out;
+    }
+    const vxCentro = t => vxPartir(t).map(l => ' '.repeat(Math.max(0, Math.floor((VX_ANCHO - l.length) / 2))) + l);
+    const vxDos = (a, b) => { a = String(a); b = String(b); const sp = VX_ANCHO - a.length - b.length; return sp >= 1 ? a + ' '.repeat(sp) + b : a + '\n' + ' '.repeat(Math.max(0, VX_ANCHO - b.length)) + b; };
+    const VX_RAYA = '-'.repeat(VX_ANCHO);
+    function vxEncabezado() {
+        const t = String((vx.cfg || {}).encabezado || '').trim() || 'DISTRIBUIDORA PLAZA VALENCIA\n' + (vx.equipo ? vx.equipo.local.toUpperCase() : '');
+        return t.split('\n').map(x => x.trim()).filter(Boolean).reduce((a, x) => a.concat(vxCentro(x.toUpperCase())), []);
+    }
+    function vxTicketTexto(v, reimp) {
+        const L = vxEncabezado(), f = String(v.fecha || '').replace(/-/g, '/');
+        if (reimp) L.push('', ...vxCentro('REIMPRESION'));
+        if (v.anulada) L.push('', ...vxCentro('*** TICKET ANULADO ***'));
+        L.push(VX_RAYA, 'Ticket Nro. ' + v.nroTxt, 'Cajero: ' + String(v.cajero || '').toUpperCase().slice(0, 24), vxDos('Fecha: ' + f, 'Hora: ' + String(v.hora || '').slice(0, 5)));
+        const cred = (v.pagos || []).find(p => p.f === 'CRED');
+        if (cred) L.push('Cliente: ' + String(cred.cliente).toUpperCase().slice(0, 23), cred.ced ? 'C.I.: ' + cred.ced : '');
+        L.push(VX_RAYA, 'DESCRIP    CANT   PRECIO    SUBT', VX_RAYA);
+        (v.items || []).forEach(i => {
+            vxPartir(i.d).forEach(x => L.push(x));
+            const q = vxQ(i.q, i.u), pr = vxN(i.pbs), st = vxN(i.sbs);
+            L.push(q.padEnd(8) + pr.padStart(11) + st.padStart(13));
+        });
+        L.push(VX_RAYA, vxDos('TOTAL A PAGAR :', vxN(v.totalBs)));
+        (v.pagos || []).forEach(p => L.push(vxDos(VX_TICKET[p.f] || p.f, p.f === 'EFE_USD' ? '$ ' + vxN(p.usd) : 'Bs ' + vxN(p.bs))));
+        if ((v.pagos || []).some(p => p.f === 'EFE_USD')) L.push(vxDos('TASA DIVISAS', vxN(v.tasaDiv)));
+        L.push(vxDos('VUELTO', (v.vuelto && v.vuelto.moneda === 'usd' ? '$ ' : 'Bs ') + vxN(v.vuelto ? v.vuelto.monto : 0)));
+        L.push('TOTAL ARTICULOS: ' + vxQ(v.articulos, ''), '', '');
+        return L.filter(x => x !== null && x !== undefined).join('\n');
+    }
+    // Imprime en la ticketera. Para que salga SIN preguntar: abrir el panel en Chrome con --kiosk-printing y la ticketera como
+    // impresora predeterminada (ver la nota en "Productos y ajustes").
+    function vxImprimir(texto) {
+        let f = document.getElementById('vxImp');
+        if (!f) { f = document.createElement('iframe'); f.id = 'vxImp'; f.title = 'Ticket'; f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden'; document.body.appendChild(f); }
+        const d = f.contentDocument;
+        d.open(); d.write(`<!doctype html><html><head><meta charset="utf-8"><title>Ticket</title><style>@page{size:58mm auto;margin:0}html,body{margin:0;background:#fff}
+            pre{margin:0;padding:2mm 1mm 4mm 2mm;width:48mm;font-family:'Courier New',Consolas,monospace;font-size:2.5mm;line-height:1.22;color:#000;white-space:pre;font-weight:600}</style></head>
+            <body><pre>${esc(texto)}</pre></body></html>`);
+        d.close();
+        setTimeout(() => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { mostrarBanner('No se pudo imprimir: ' + e.message, 'error'); } vxFoco(); }, 120);
+    }
+    function vxImprimirTicket(v, reimp) { vxImprimir(vxTicketTexto(v, reimp)); }
+
+    // ---------- Tickets (abiertos, sin cierre) ----------
+    function vxVistaTickets() {
+        const l = vx.abiertas.slice().reverse(), fall = vxFallidas();
+        const filas = l.map(v => `<tr><td class="izq"><b>${esc(v.nroTxt)}</b><small>Caja ${esc(v.caja)}</small></td><td class="izq">${esc(fechaBonita(v.fecha))} ${esc(String(v.hora || '').slice(0, 5))}</td>
+            <td class="izq">${esc(v.cajero || '')}</td><td>${fmt(v.totalBs)}</td><td class="izq">${(v.pagos || []).map(p => esc(VX_FORMAS[p.f] || p.f)).join(', ')}</td>
+            <td class="izq">${v.anulada ? '<span class="chip st-falta">Anulado</span>' : v._pend ? '<span class="chip st-amar">Por subir</span>' : '<span class="chip st-ok">En Firebase</span>'}</td>
+            <td class="izq"><span style="display:inline-flex;gap:.3rem"><button type="button" class="btn-ghost btn-mini" onclick="vxReimprimir('${esc(v._id)}')">Reimprimir</button>
+                ${v.anulada ? '' : `<button type="button" class="btn-ghost btn-mini btn-quitar" onclick="vxAnularAbrir('${esc(v._id)}')">Anular</button>`}</span></td></tr>`).join('');
+        return `${fall.length ? `<div class="banner error" style="display:block">${fall.length} ticket(s) no se pudieron guardar en Firebase (${esc(fall[0]._error || '')}). <button type="button" class="btn-ghost btn-mini" onclick="vxReintentarFallidas()">Reintentar</button></div>` : ''}
+            <div class="nota">Tickets de ${esc(vx.equipo.local)} que todavía no están en un cierre de caja. Anular pide la clave de administrador y necesita internet.</div>
+            <div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">Ticket</th><th class="izq">Fecha y hora</th><th class="izq">Cajero</th><th>Total Bs</th><th class="izq">Pago</th><th class="izq">Estado</th><th></th></tr></thead>
+            <tbody>${filas || '<tr><td colspan="7" class="empty">No hay tickets abiertos.</td></tr>'}</tbody></table></div>`;
+    }
+    function vxReimprimir(id) { const v = vx.abiertas.find(x => x._id === id); if (v) vxImprimirTicket(v, true); }
+    function vxAnularAbrir(id) {
+        const v = vx.abiertas.find(x => x._id === id); if (!v) return;
+        vx.anulando = { id, motivo: '', clave: '', error: '' };
+        vxAbrirDlg(() => `<div class="req-dlg" role="dialog" aria-label="Anular ticket"><h3>Anular el ticket ${esc(v.nroTxt)}</h3>
+            <div class="req-sub">Bs ${fmt(v.totalBs)} · ${esc(v.cajero || '')} · ${esc(String(v.hora || '').slice(0, 5))}. La mercancía vuelve a la existencia.</div>
+            <div class="filters"><div><label for="vxAnMot">Motivo</label><input type="text" id="vxAnMot" maxlength="150" value="${esc(vx.anulando.motivo)}" oninput="vx.anulando.motivo=this.value" autofocus></div>
+                ${esPrincipal ? '' : `<div><label for="vxAnClave">Clave de administrador</label><input type="password" id="vxAnClave" autocomplete="off" placeholder="Clave de administrador" oninput="vx.anulando.clave=this.value"></div>`}</div>
+            ${vx.anulando.error ? `<div class="login-error">${esc(vx.anulando.error)}</div>` : ''}
+            <div class="req-acciones" style="justify-content:flex-end"><button type="button" class="btn-ghost" onclick="vxCerrarDlg()">Cancelar</button>
+                <button type="button" class="btn-primary btn-quitar" id="vxAnBtn" onclick="vxAnular()">Anular ticket</button></div></div>`);
+    }
+    async function vxAnular() {
+        const a = vx.anulando; if (!a) return;
+        if (!String(a.motivo).trim()) { a.error = 'Escriba el motivo.'; vxPintar(); return; }
+        const cAdmin = esPrincipal ? clave : a.clave; if (!cAdmin) { a.error = 'Escriba la clave de administrador.'; vxPintar(); return; }
+        const btn = document.getElementById('vxAnBtn'); if (btn) btnCargando(btn, 'Anulando...');
+        try {
+            await llamarApi({ action: 'vx_anular', local: vxL(), id: a.id, motivo: a.motivo, claveAdmin: cAdmin });
+            vxCerrarDlg(); mostrarBanner('Ticket anulado.', 'ok');
+        } catch (e) { a.error = e.message; vxPintar(); }
+    }
+
+    // ---------- Cierre de caja ----------
+    function vxResumen(vs) {
+        const r = { n: 0, anuladas: 0, totalBs: 0, articulos: 0, formas: {}, pm: [], cred: [], vueltoBs: 0, vueltoUsd: 0, vendidos: {}, desdeNro: 0, hastaNro: 0, ids: [] };
+        vs.forEach(v => {
+            r.ids.push(v._id || v.id);
+            r.desdeNro = r.desdeNro ? Math.min(r.desdeNro, v.nro) : v.nro; r.hastaNro = Math.max(r.hastaNro, v.nro);
+            if (v.anulada) { r.anuladas++; return; }
+            r.n++; r.totalBs += v.totalBs || 0; r.articulos += v.articulos || 0;
+            (v.pagos || []).forEach(p => {
+                const f = r.formas[p.f] = r.formas[p.f] || { bs: 0, usd: 0, n: 0 }; f.bs += p.bs || 0; f.usd += p.usd || 0; f.n++;
+                if (p.f === 'PM') r.pm.push({ ref: p.ref, banco: p.banco, bs: p.bs, nro: v.nroTxt });
+                if (p.f === 'CRED') r.cred.push({ cliente: p.cliente, ced: p.ced || '', bs: p.bs, nro: v.nroTxt });
+            });
+            if (v.vuelto && v.vuelto.monto) { if (v.vuelto.moneda === 'usd') r.vueltoUsd += v.vuelto.monto; else r.vueltoBs += v.vuelto.monto; }
+            (v.items || []).forEach(i => { r.vendidos[i.c] = vxR3((r.vendidos[i.c] || 0) + i.q); });
+        });
+        Object.values(r.formas).forEach(f => { f.bs = vxR2(f.bs); f.usd = vxR2(f.usd); });
+        r.totalBs = vxR2(r.totalBs); r.articulos = vxR3(r.articulos); r.vueltoBs = vxR2(r.vueltoBs); r.vueltoUsd = vxR2(r.vueltoUsd);
+        r.efectivoBs = vxR2(((r.formas.EFE_BS || {}).bs || 0) - r.vueltoBs); r.efectivoUsd = vxR2(((r.formas.EFE_USD || {}).usd || 0) - r.vueltoUsd);
+        return r;
+    }
+    const vxDeMiCaja = v => v.equipo === vx.equipo.id && Number(v.caja) === Number(vx.equipo.caja);
+    function vxVistaCierre() {
+        const vs = vx.abiertas.filter(vxDeMiCaja), r = vxResumen(vs), c = vx.contado;
+        const linea = (k, txt, extra) => `<tr><td class="izq">${txt}</td><td>${r.formas[k] ? r.formas[k].n : 0}</td><td>${fmt((r.formas[k] || {}).bs || 0)}</td><td class="izq">${extra || ''}</td></tr>`;
+        const difBs = c.bs !== '' && c.bs != null ? vxR2((Number(c.bs) || 0) - r.efectivoBs) : null, difUsd = c.usd !== '' && c.usd != null ? vxR2((Number(c.usd) || 0) - r.efectivoUsd) : null;
+        const dif = (d, m) => d == null ? '' : `<small style="color:${Math.abs(d) < 0.01 ? 'var(--ok)' : 'var(--bad)'}">${Math.abs(d) < 0.01 ? 'Cuadra' : (d > 0 ? 'Sobra ' : 'Falta ') + m + ' ' + fmt(Math.abs(d))}</small>`;
+        const cierres = vx.cierres.filter(vxDeMiCaja).slice(0, 15).map(x => `<tr><td class="izq">${esc(fechaBonita(x.fecha))} ${esc(String(x.hora || '').slice(0, 5))}</td><td class="izq">${esc(x.cajero || '')}</td>
+            <td>${x.n}</td><td>${fmt(x.totalBs)}</td><td><button type="button" class="btn-ghost btn-mini" onclick="vxReimprimirCierre('${esc(x.id)}')">Reimprimir</button></td></tr>`).join('');
+        return `<div class="nota">Caja ${esc(vx.equipo.caja)} de este equipo: tickets ${r.desdeNro ? vxNroTxt(vx.equipo.caja, r.desdeNro) + ' al ' + vxNroTxt(vx.equipo.caja, r.hastaNro) : '—'}${r.anuladas ? ` · ${r.anuladas} anulado(s)` : ''}.
+                Use estos totales para llenar la ficha del turno.</div>
+            <div class="kpis"><div class="kpi amar"><div class="k-label">Ventas</div><div class="k-value">Bs ${fmt(r.totalBs)}</div></div><div class="kpi"><div class="k-label">Tickets</div><div class="k-value">${r.n}</div></div>
+                <div class="kpi"><div class="k-label">Artículos</div><div class="k-value">${nfVE(0, 3).format(r.articulos)}</div></div></div>
+            <div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Forma de pago</th><th>Pagos</th><th>Bs</th><th class="izq">Detalle</th></tr></thead><tbody>
+                ${linea('EFE_BS', 'Efectivo Bs', r.vueltoBs ? `menos vuelto Bs ${fmt(r.vueltoBs)} = <b>Bs ${fmt(r.efectivoBs)}</b>` : '')}
+                ${linea('EFE_USD', 'Efectivo $', `<b>$ ${fmt(r.efectivoUsd)}</b>${r.vueltoUsd ? ` (con vuelto $ ${fmt(r.vueltoUsd)})` : ''}`)}
+                ${linea('PM', 'Pago móvil')}${linea('PUNTO', 'Punto (TDD)')}${linea('BIO', 'Biopago')}${linea('CRED', 'Crédito')}</tbody></table></div>
+            ${r.pm.length ? `<div class="grafico-sub" style="margin-top:.6rem"><b>Pagos móviles</b></div><div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Ref.</th><th class="izq">Banco</th><th>Bs</th><th class="izq">Ticket</th></tr></thead><tbody>
+                ${r.pm.map(p => `<tr><td class="izq">${esc(p.ref)}</td><td class="izq">${esc(p.banco)}</td><td>${fmt(p.bs)}</td><td class="izq">${esc(p.nro)}</td></tr>`).join('')}</tbody></table></div>` : ''}
+            ${r.cred.length ? `<div class="grafico-sub" style="margin-top:.6rem"><b>Créditos</b></div><div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Cliente</th><th class="izq">Cédula</th><th>Bs</th><th class="izq">Ticket</th></tr></thead><tbody>
+                ${r.cred.map(p => `<tr><td class="izq">${esc(p.cliente)}</td><td class="izq">${esc(p.ced)}</td><td>${fmt(p.bs)}</td><td class="izq">${esc(p.nro)}</td></tr>`).join('')}</tbody></table></div>` : ''}
+            <div class="filters" style="margin-top:.6rem"><div><label for="vxCtBs">Efectivo Bs contado</label><input type="number" id="vxCtBs" min="0" step="0.01" value="${esc(c.bs == null ? '' : c.bs)}" oninput="vx.contado.bs=this.value;clearTimeout(vx.ctE);vx.ctE=setTimeout(vxPintar,400)">${dif(difBs, 'Bs')}</div>
+                <div><label for="vxCtUsd">Efectivo $ contado</label><input type="number" id="vxCtUsd" min="0" step="0.01" value="${esc(c.usd == null ? '' : c.usd)}" oninput="vx.contado.usd=this.value;clearTimeout(vx.ctE);vx.ctE=setTimeout(vxPintar,400)">${dif(difUsd, '$')}</div></div>
+            <div class="req-acciones"><button type="button" class="btn-primary" onclick="vxCerrarCaja()" ${vs.length ? '' : 'disabled'}>Cerrar caja e imprimir</button></div>
+            ${cierres ? `<div class="grafico-sub" style="margin-top:1rem"><b>Cierres anteriores de esta caja</b></div><div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">Fecha</th><th class="izq">Cajero</th><th>Tickets</th><th>Bs</th><th></th></tr></thead><tbody>${cierres}</tbody></table></div>` : ''}`;
+    }
+    function vxCierreTexto(x, reimp) {
+        const L = vxEncabezado();
+        L.push('', ...vxCentro('CIERRE DE CAJA' + (reimp ? ' (REIMPRESION)' : '')), VX_RAYA, 'Caja: ' + x.caja + '   Cajero: ' + String(x.cajero || '').toUpperCase().slice(0, 16),
+               vxDos('Fecha: ' + String(x.fecha).replace(/-/g, '/'), 'Hora: ' + String(x.hora || '').slice(0, 5)),
+               'Tickets: ' + vxNroTxt(x.caja, x.desdeNro) + ' al', '         ' + vxNroTxt(x.caja, x.hastaNro), vxDos('Cantidad de tickets:', String(x.n)) + (x.anuladas ? '\n' + vxDos('Anulados:', String(x.anuladas)) : ''), VX_RAYA);
+        const f = x.formas || {}, bs = k => (f[k] || {}).bs || 0;
+        L.push(vxDos('EFECTIVO BS', vxN(bs('EFE_BS'))));
+        if (x.vueltoBs) L.push(vxDos(' - VUELTO BS', vxN(x.vueltoBs)), vxDos(' = EFECTIVO BS NETO', vxN(x.efectivoBs)));
+        L.push(vxDos('EFECTIVO $', '$ ' + vxN(x.efectivoUsd)));
+        L.push(vxDos('PAGO MOVIL', vxN(bs('PM'))), vxDos('PUNTO', vxN(bs('PUNTO'))), vxDos('BIOPAGO', vxN(bs('BIO'))), vxDos('CREDITO', vxN(bs('CRED'))), VX_RAYA, vxDos('TOTAL VENTAS BS', vxN(x.totalBs)));
+        if (x.contadoBs != null || x.contadoUsd != null) {
+            L.push(VX_RAYA);
+            if (x.contadoBs != null) L.push(vxDos('CONTADO BS', vxN(x.contadoBs)), vxDos('DIFERENCIA BS', vxN(x.contadoBs - x.efectivoBs)));
+            if (x.contadoUsd != null) L.push(vxDos('CONTADO $', vxN(x.contadoUsd)), vxDos('DIFERENCIA $', vxN(x.contadoUsd - x.efectivoUsd)));
+        }
+        if ((x.pm || []).length) { L.push(VX_RAYA, 'PAGOS MOVILES'); x.pm.forEach(p => L.push(vxDos(p.ref + ' ' + String(p.banco || '').slice(0, 12), vxN(p.bs)))); }
+        if ((x.cred || []).length) { L.push(VX_RAYA, 'CREDITOS'); x.cred.forEach(p => L.push(vxDos(String(p.cliente || '').toUpperCase().slice(0, 18), vxN(p.bs)))); }
+        L.push(VX_RAYA, 'TOTAL ARTICULOS: ' + vxQ(x.articulos, ''), '', '', 'Firma: _______________________', '', '');
+        return L.join('\n');
+    }
+    function vxCerrarCaja() {
+        const vs = vx.abiertas.filter(vxDeMiCaja); if (!vs.length) return;
+        const r = vxResumen(vs), c = vx.contado, ahora = new Date(), dos = n => String(n).padStart(2, '0');
+        if (!confirm(`¿Cerrar la caja ${vx.equipo.caja}? ${r.n} ticket(s) por Bs ${fmt(r.totalBs)}. Después los tickets de este cierre ya no se pueden anular.`)) return;
+        const { db, lib, auth } = vx.fbl, fs = lib.fs, L = vxL(), e = vx.equipo;
+        const id = vxCajaId() + '-' + fechaLocalHoy().replace(/-/g, '') + dos(ahora.getHours()) + dos(ahora.getMinutes()) + dos(ahora.getSeconds());
+        const x = { id, local: e.local, caja: e.caja, equipo: e.id, cajero: nombreUsuario, cajeroUid: auth.currentUser ? auth.currentUser.uid : '', fecha: fechaLocalHoy(),
+            hora: dos(ahora.getHours()) + ':' + dos(ahora.getMinutes()), creadoMs: Date.now(), creado: fs.serverTimestamp(), ventas: r.ids, desdeNro: r.desdeNro, hastaNro: r.hastaNro,
+            n: r.n, anuladas: r.anuladas, totalBs: r.totalBs, articulos: r.articulos, formas: r.formas, pm: r.pm, cred: r.cred, vueltoBs: r.vueltoBs, vueltoUsd: r.vueltoUsd,
+            efectivoBs: r.efectivoBs, efectivoUsd: r.efectivoUsd, contadoBs: c.bs !== '' && c.bs != null ? vxR2(c.bs) : null, contadoUsd: c.usd !== '' && c.usd != null ? vxR2(c.usd) : null,
+            vendidos: Object.keys(r.vendidos).map(k => ({ c: k, q: r.vendidos[k] })), tasa: vxTasa() };
+        // El cierre y la marca en cada ticket (de a 400 por guardado)
+        const lotes = []; for (let i = 0; i < r.ids.length; i += 400) lotes.push(r.ids.slice(i, i + 400));
+        lotes.forEach((ids, k) => {
+            const b = fs.writeBatch(db);
+            if (!k) b.set(fs.doc(db, 'express', L, 'cierres', id), x);
+            ids.forEach(vid => b.update(fs.doc(db, 'express', L, 'ventas', vid), { cierre: id }));
+            b.commit().catch(err => mostrarBanner('El cierre no se pudo guardar en Firebase: ' + (err.code || err.message), 'error'));
+        });
+        vxImprimir(vxCierreTexto(x, false));
+        vx.contado = {}; mostrarBanner(`Caja ${e.caja} cerrada: ${r.n} ticket(s), Bs ${fmt(r.totalBs)}.`, 'ok'); vxPintar();
+    }
+    function vxReimprimirCierre(id) { const x = vx.cierres.find(c => c.id === id); if (x) vxImprimir(vxCierreTexto(x, true)); }
+
+    // ---------- Productos y ajustes ----------
+    function vxVistaProductos() {
+        const cfg = vx.cfg || {}, vend = vxVendidos(), q = vxNorm(vx.buscaProd);
+        const lista = (q ? vx.prods.filter(p => vxNorm(p.c).indexOf(q) === 0 || q.split(' ').every(w => vxNorm(p.d).indexOf(w) !== -1)) : vx.prods).slice(0, 150);
+        const cambios = Object.keys(vx.mdCambios).length;
+        const filas = lista.map(p => {
+            const ex = vxR3((Number(p.e) || 0) - (vend[p.c] || 0)), md = p.c in vx.mdCambios ? vx.mdCambios[p.c] : (p.md || '');
+            return `<tr><td class="izq"><b>${esc(p.c)}</b></td><td class="izq">${esc(p.d)}<small>${esc(p.u || '')}${p.g ? ' · ' + esc(p.g) : ''}</small></td>
+                <td>${vxCant(ex, vxPesado(p))}${vend[p.c] ? `<small>vendido ${vxCant(vend[p.c], vxPesado(p))}</small>` : ''}</td><td>${fmt(p.k)}</td><td>${fmt(p.pd)}<small>Bs ${fmt(vxR2(p.pd * vxTasa()))}</small></td><td>${p.pm ? fmt(p.pm) : '—'}</td>
+                <td>${esPrincipal && p.pm ? `<input type="number" class="vx-q" min="0" step="${vxPesado(p) ? '0.001' : '1'}" value="${esc(md)}" aria-label="Mayor desde ${esc(p.d)}" oninput="vx.mdCambios['${esc(p.c)}']=this.value;vxCambiosAviso()">` : (p.md ? vxCant(p.md, vxPesado(p)) : '—')}</td></tr>`;
+        }).join('');
+        const base = vx.base;
+        return `<div class="grafico-card"><div class="grafico-head"><h3>Productos de ${esc(vx.equipo.local)}</h3><span class="chip st-info">${vx.prods.length}</span></div>
+                <div class="grafico-sub">${base ? `Existencia de partida cargada el ${esc(fechaBonita(base.fecha))} por ${esc(base.por || '')}${base.archivo ? ' (' + esc(base.archivo) + ')' : ''}. Lo vendido desde entonces se descuenta solo.` : 'Todavía no se ha cargado la existencia.'}
+                    Precios en $ BCV; el mayor aplica desde la cantidad de "Mayor desde".</div>
+                ${esPrincipal ? `<div class="req-acciones"><label class="btn-ghost" style="cursor:pointer">Cargar existencia (Excel)<input type="file" accept=".xlsx,.xls,.csv" hidden onchange="vxImportar(this.files[0]);this.value=''"></label>
+                    <span class="nota" style="margin:0">Mayor desde para todos los que tienen precio mayor:</span><input type="number" id="vxMdTodos" min="0" step="1" style="width:6rem" placeholder="Cantidad">
+                    <button type="button" class="btn-ghost btn-mini" onclick="vxMdTodos()">Aplicar</button>
+                    <button type="button" class="btn-primary" id="vxMdGuardar" onclick="vxGuardarProductos()" ${cambios ? '' : 'disabled'}>Guardar cambios${cambios ? ' (' + cambios + ')' : ''}</button></div>` : ''}
+                <div class="filters"><div><label for="vxBusP">Buscar</label><input type="search" id="vxBusP" value="${esc(vx.buscaProd)}" placeholder="Código o descripción" oninput="vx.buscaProd=this.value;clearTimeout(vx.bpE);vx.bpE=setTimeout(vxPintar,200)"></div></div>
+                <div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">Código</th><th class="izq">Descripción</th><th>Existencia</th><th>Costo $</th><th>Detal $</th><th>Mayor $</th><th>Mayor desde</th></tr></thead>
+                <tbody>${filas || '<tr><td colspan="7" class="empty">Sin productos.</td></tr>'}</tbody></table></div>
+                ${lista.length === 150 ? '<div class="nota">Se muestran los primeros 150: busque para ver otros.</div>' : ''}</div>
+            ${esPrincipal ? `<div class="grafico-card" style="margin-top:1rem"><div class="grafico-head"><h3>Ticket y tasas</h3></div>
+                <div class="filters"><div style="grid-column:1/-1"><label for="vxEnc">Encabezado del ticket (una línea por renglón: nombre, RIF, dirección)</label>
+                    <textarea id="vxEnc" rows="4" style="width:100%">${esc(cfg.encabezado || '')}</textarea></div>
+                    <div><label for="vxDescD">Descuento por pago en divisas (%)</label><input type="number" id="vxDescD" min="0" max="49" step="0.01" value="${esc(cfg.descDivisas != null ? cfg.descDivisas : 8)}"></div>
+                    <div><label for="vxTasaM">Tasa BCV manual (solo hoy)</label><input type="number" id="vxTasaM" min="0" step="0.0001" value="${esc(cfg.tasaManualFecha === fechaLocalHoy() ? cfg.tasaManual : '')}" placeholder="Vacío: la del BCV"></div></div>
+                <div class="req-acciones"><button type="button" class="btn-primary" onclick="vxGuardarCfg(this)">Guardar</button><button type="button" class="btn-ghost" onclick="vxImprimirPrueba()">Imprimir ticket de prueba</button></div>
+                <div class="nota">Para que el ticket salga solo, sin la ventana de imprimir: ponga la ticketera de 58 mm como impresora predeterminada de Windows y abra el panel con un acceso directo de Chrome que termine en <b>--kiosk-printing</b>.</div></div>` : ''}
+            <div class="grafico-card" style="margin-top:1rem"><div class="grafico-head"><h3>Este equipo</h3></div><div class="grafico-sub">${esc(vx.equipo.local)} · Caja ${esc(vx.equipo.caja)} · código ${esc(vx.equipo.id)}</div>
+                <div class="req-acciones"><button type="button" class="btn-ghost" onclick="vxCambiarEquipo()">Cambiar tienda o caja</button></div></div>`;
+    }
+    function vxCambiarEquipo() { if (vx.abiertas.some(vxDeMiCaja) && !confirm('Esta caja tiene tickets sin cierre. ¿Cambiar igual? (haga el cierre antes)')) return; vx.cambiando = true; vxPintar(); }
+    function vxCambiosAviso() { const b = document.getElementById('vxMdGuardar'), n = Object.keys(vx.mdCambios).length; if (b) { b.disabled = !n; b.textContent = 'Guardar cambios' + (n ? ' (' + n + ')' : ''); } }
+    function vxMdTodos() {
+        const n = Number((document.getElementById('vxMdTodos') || {}).value); if (!(n > 0)) { mostrarBanner('Escriba la cantidad.', 'warn'); return; }
+        vx.prods.filter(p => Number(p.pm) > 0).forEach(p => { vx.mdCambios[p.c] = String(n); }); vxPintar();
+    }
+    function vxEscribirProductos(p, base) {
+        const { db, lib } = vx.fbl, fs = lib.fs;
+        return Promise.race([fs.setDoc(fs.doc(db, 'express', vxL(), 'datos', 'productos'), { p, base, actualizado: fs.serverTimestamp(), por: nombreUsuario }),
+                             new Promise(ok => setTimeout(() => ok('espera'), 15000))]);
+    }
+    async function vxGuardarProductos() {
+        const p = vx.prods.map(x => x.c in vx.mdCambios ? Object.assign({}, x, { md: vxR3(Number(vx.mdCambios[x.c]) || 0) }) : x);
+        const btn = document.getElementById('vxMdGuardar'); if (btn) btnCargando(btn, 'Guardando...');
+        try { const r = await vxEscribirProductos(p, vx.base); vx.mdCambios = {}; mostrarBanner(r === 'espera' ? 'Guardado en este equipo: sube a Firebase cuando haya internet.' : 'Cambios guardados.', 'ok'); }
+        catch (e) { mostrarBanner('No se pudo guardar: ' + (e.code || e.message), 'error'); }
+        vxPintar();
+    }
+    async function vxImportar(file) {
+        if (!file) return;
+        try {
+            const X = await libXLSX(), wb = X.read(await file.arrayBuffer(), { type: 'array' }), ws = wb.Sheets[wb.SheetNames[0]];
+            const filas = X.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' });
+            const hi = filas.findIndex(r => r.some(c => vxNorm(c) === 'CODIGO'));
+            if (hi < 0) throw new Error('No encontré la columna CÓDIGO en el archivo');
+            const h = filas[hi].map(vxNorm), col = (...n) => h.findIndex(x => n.indexOf(x) !== -1);
+            const cC = col('CODIGO'), cD = col('DESCRIPCION'), cE = col('EXISTENCIA'), cK = col('COSTO BCV', 'COSTO'), cPD = col('DETAL BCV', 'DETAL', 'PRECIO DETAL'),
+                  cPM = col('MAYOR BCV', 'MAYOR', 'PRECIO MAYOR'), cG = col('CATEGORIA'), cU = col('UNIDAD'), cMD = col('MAYOR DESDE'), cT = col('TIENDA');
+            if (cD < 0 || cPD < 0) throw new Error('El archivo debe tener DESCRIPCIÓN y DETAL BCV (como el reporte de Existencia)');
+            const num = v => typeof v === 'number' ? v : (/,/.test(String(v)) ? Number(String(v).replace(/\./g, '').replace(',', '.')) : Number(v)) || 0;
+            const p = [], vistos = new Set(), otras = new Set();
+            filas.slice(hi + 1).forEach(r => {
+                if (cT >= 0 && String(r[cT]).trim() && vxNorm(r[cT]) !== vxNorm(vx.equipo.local)) { otras.add(String(r[cT]).trim()); return; }
+                const c = String(r[cC]).trim();
+                if (!c || vxNorm(c) === 'TOTAL' || vistos.has(c)) return;
+                vistos.add(c);
+                const ant = vx.porCod.get(c) || {};
+                p.push({ c, d: String(r[cD]).trim(), e: vxR3(num(r[cE])), k: vxR2(num(r[cK])), pd: vxR2(num(r[cPD])), pm: cPM >= 0 ? vxR2(num(r[cPM])) : 0,
+                         md: cMD >= 0 ? vxR3(num(r[cMD])) : (Number(ant.md) || 0), g: cG >= 0 ? String(r[cG]).trim() : '', u: cU >= 0 ? String(r[cU]).trim() : '' });
+            });
+            if (!p.length) throw new Error('No hay productos de ' + vx.equipo.local + ' en el archivo' + (otras.size ? ' (trae: ' + [...otras].join(', ') + ')' : ''));
+            const conEx = p.filter(x => x.e > 0).length;
+            if (!confirm(`Cargar ${p.length} productos de ${vx.equipo.local} (${conEx} con existencia).\n\nLa existencia queda como la del archivo y desde ahora se descuenta lo que se venda.${vx.prods.length ? ' Reemplaza la lista anterior (se conserva el "Mayor desde").' : ''}\n\n¿Continuar?`)) return;
+            const r = await vxEscribirProductos(p, { en: Date.now(), fecha: fechaLocalHoy(), por: nombreUsuario, archivo: file.name, n: p.length });
+            mostrarBanner(r === 'espera' ? 'Cargado en este equipo: sube a Firebase cuando haya internet.' : `Listo: ${p.length} productos cargados.`, 'ok');
+        } catch (e) { mostrarBanner('No se pudo cargar: ' + (e.code || e.message), 'error'); }
+    }
+    async function vxGuardarCfg(btn) {
+        const enc = document.getElementById('vxEnc').value, desc = Number(document.getElementById('vxDescD').value), tm = Number(document.getElementById('vxTasaM').value);
+        if (!(desc >= 0 && desc < 50)) { mostrarBanner('El descuento debe estar entre 0 y 49 %.', 'warn'); return; }
+        const { db, lib } = vx.fbl, fs = lib.fs; btnCargando(btn, 'Guardando...');
+        try {
+            await Promise.race([fs.setDoc(fs.doc(db, 'express', vxL()), { encabezado: enc.slice(0, 600), descDivisas: desc, tasaManual: tm > 0 ? tm : 0, tasaManualFecha: tm > 0 ? fechaLocalHoy() : '', actualizado: fs.serverTimestamp(), por: nombreUsuario }, { merge: true }),
+                                new Promise(ok => setTimeout(ok, 15000))]);
+            mostrarBanner('Guardado.', 'ok');
+        } catch (e) { mostrarBanner('No se pudo guardar: ' + (e.code || e.message), 'error'); }
+        btn.disabled = false; btn.textContent = 'Guardar'; vxPintar();
+    }
+    function vxImprimirPrueba() {
+        const p = vx.prods.find(x => x.pd > 0) || { c: '001', d: 'PRODUCTO DE PRUEBA', pd: 1 }, t = vxTasa() || 1;
+        vxImprimirTicket({ nroTxt: vxNroTxt(vx.equipo.caja, 0), cajero: nombreUsuario, fecha: fechaLocalHoy(), hora: new Date().toTimeString().slice(0, 5), items: [{ c: p.c, d: p.d, q: 1, u: p.u, pbs: vxR2(p.pd * t), sbs: vxR2(p.pd * t) }],
+                           totalBs: vxR2(p.pd * t), pagos: [{ f: 'EFE_BS', bs: vxR2(p.pd * t) }], vuelto: { moneda: 'bs', monto: 0 }, articulos: 1 }, true);
+    }
+    // Teclas del punto de venta: F1–F6 formas de pago y F12 cobrar (en la ventana de cobro); F12 totaliza en la venta
+    window.addEventListener('keydown', e => {
+        if (vistaActual !== 'ventaexpress' || !vx.equipo) return;
+        if (vxDlgAbierta()) {
+            if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); vxCerrarDlg(); return; }
+            if (vx.dlg !== vxPagoHTML) return;
+            const fk = /^F([1-6])$/.exec(e.key);
+            if (fk) { e.preventDefault(); e.stopPropagation(); vxPagoAgregar(Object.keys(VX_FORMAS)[Number(fk[1]) - 1]); return; }
+            if (e.key === 'F12' || (e.key === 'Enter' && e.target && e.target.tagName === 'INPUT')) { e.preventDefault(); e.stopPropagation(); vxCobrar(); }
+            return;
+        }
+        if (vx.tab === 'vender' && e.key === 'F12') { e.preventDefault(); e.stopPropagation(); vxTotalizar(); }
+    }, true);
 
     // ---------- Módulo "Listas de la ficha": bancos, titulares y tipos de gasto de la ficha de las tiendas (Firebase) ----------
     const FL_LISTAS = [['bancosTDD', 'Bancos de TDD', 'Los bancos de los puntos de venta (lotes de TDD).'],
