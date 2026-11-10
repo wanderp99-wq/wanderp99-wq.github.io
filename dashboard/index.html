@@ -3769,7 +3769,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-10.6';
+    const VERSION_SERVIDOR = '2026-11-10.7';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -4841,6 +4841,12 @@
     function fechaQuitar(d) { fechasSel = fechasSel.filter(x => x !== d); pintarFechas(); cambioDeRango(); }
 
     function filasFiltradas() {
+        // Caja abierta desde Gráficos: la lista de la ventana es la del desglose (semana y estado); la elegida no se va aunque cambie su estado
+        if (cuaDesdeGraf && modoCuadre === 'graficos') {
+            const g = cuaDesdeGraf;
+            return cajasDeSemana(g.semana).filter(x => !g.estado || x.c.estado === g.estado || x.f.fila === seleccion)
+                .sort((a, b) => a.f.fecha.localeCompare(b.f.fecha) || a.f.tienda.localeCompare(b.f.tienda) || (ORDEN_TURNO[a.f.turno.trim()] ?? 9) - (ORDEN_TURNO[b.f.turno.trim()] ?? 9));
+        }
         const fechas = fechasSeleccionadas();
         const estado = document.getElementById('fEstado').value;
         return filas
@@ -4854,6 +4860,7 @@
         if (vistaActual === 'ventas') { renderVentas(); return; }
         if (modoCuadre === 'graficos') {
             renderGraficos();
+            if (cuaDesdeGraf && seleccion !== null) { fondoMapa = calcularFondo(); renderLista(); renderDetalle(); }   // la ventana de la caja, encima
         } else if (modoCuadre === 'externo') {
             renderExterno();
         } else {
@@ -4957,7 +4964,7 @@
     let desgloseAbierto = false;
 
     function cambiarModo(modo) {
-        modoCuadre = modo;
+        modoCuadre = modo; cuaDesdeGraf = null;
         document.body.classList.toggle('modo-graficos', modo === 'graficos');
         document.body.classList.toggle('modo-externo', modo === 'externo');
         document.getElementById('tabCajas').classList.toggle('active', modo === 'cajas');
@@ -5324,10 +5331,14 @@
         document.getElementById('desgloseTabla').innerHTML = html + '</table>';
     }
 
-    // Abrir una caja del desglose en "Cajas del día"
+    // Abrir una caja del desglose. Desde Gráficos (10/11): la ventana de la caja se abre ENCIMA de Gráficos, con la misma lista
+    // filtrada a la izquierda (p. ej. los faltantes de la semana); al cerrarla se sigue en el mismo sitio. Antes cambiaba a
+    // "Cajas del día" y quitaba el filtro, y para seguir revisando había que volver.
+    let cuaDesdeGraf = null;   // { semana, estado } mientras hay una caja abierta desde Gráficos
     function abrirCaja(fila) {
         const f = filas.find(x => x.fila === fila);
         if (!f) return;
+        if (modoCuadre === 'graficos') { cuaDesdeGraf = { semana: semanaSel, estado: document.getElementById('fEstado').value }; seleccionar(fila); return; }
         fechasSel = [f.fecha]; pintarFechas();
         document.getElementById('fEstado').value = '';
         seleccion = fila;
@@ -6056,7 +6067,7 @@
     // Se mueven los mismos elementos (#listaCajas y #detalle), así todo lo del detalle sigue funcionando igual. Al cerrarla vuelven a la página.
     function cuaVentana() {
         const lay = document.getElementById('cuaLayout'), sitio = document.getElementById('cuaSitio');
-        const abierta = vistaActual === 'cuadre' && modoCuadre === 'cajas' && seleccion !== null && filas.some(x => x.fila === seleccion);
+        const abierta = vistaActual === 'cuadre' && (modoCuadre === 'cajas' || (modoCuadre === 'graficos' && cuaDesdeGraf)) && seleccion !== null && filas.some(x => x.fila === seleccion);
         let fondo = document.getElementById('cuaDlg');
         if (abierta) {
             const f = filas.find(x => x.fila === seleccion);
@@ -6084,7 +6095,7 @@
     }
     function cuaCerrarCaja() {
         if (seleccion === null) return;
-        seleccion = null; cuaEditando = false; cuaItemEditando = null;
+        seleccion = null; cuaEditando = false; cuaItemEditando = null; cuaDesdeGraf = null;
         if (vistaActual === 'cuadre') render(); else cuaVentana();
     }
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && seleccion !== null && document.getElementById('cuaDlg') && !document.getElementById('cuaDlg').classList.contains('hidden')) cuaCerrarCaja(); });
@@ -12396,7 +12407,7 @@
         if (!caja) return;
         const val = id => ((document.getElementById(id) || {}).value || '').trim();
         const t = perRegTipo, tasa = Number(val('perRegTasa')) || 0;
-        const sinComp = t === 'ABONO' && (document.getElementById('perRegSinComp') || {}).checked;
+        const sinComp = !!(document.getElementById('perRegSinComp') || {}).checked;   // abono sin comprobante, o deuda/gasto sin foto (clave de administrador)
         // Abonos en la lista y nada escrito en la ventana: ya se puede registrar
         const vacio = t === 'ABONO' && perRegCola.length && !(Number(val('perRegUsd')) > 0) && !((document.getElementById('perRegFoto') || { files: [] }).files[0] || perRegArchivo);
         const btn = document.getElementById('perRegBtn');
@@ -12463,8 +12474,8 @@
                         <div id="perRegVenceTxt" class="nota" style="margin:0"></div></div>`) : ''}
                 ${paso(++n, abono ? 'Nota' : 'Descripción del gasto', `<input id="perRegDesc" value="${v('perRegDesc')}" maxlength="200" placeholder="${abono ? 'Opcional' : gasto ? 'Ej. bolsas, limpieza' : 'Ej. jamón, queso, refresco'}" ${abono ? '' : 'required'}>`)}
                 ${paso(++n, abono ? 'Comprobante del pago' : 'Foto de la factura', `<label class="prg-foto" id="perRegFotoCaja" data-vacio="${vacioFoto}"><input type="file" id="perRegFoto" accept="image/*,application/pdf" capture="environment" onchange="perRegFotoNombre(this)"><span>${vacioFoto}</span></label>
-                    ${abono ? `<label class="per-check prg-sin interruptor"><input type="checkbox" id="perRegSinComp" ${perReg.sinComp ? 'checked' : ''} onchange="perRegGuardarCampos(); perRegPintar()"><span class="sw-pista"></span> Sin comprobante (clave de administrador)</label>
-                        ${perReg.sinComp ? `<input type="password" id="perRegAdm" autocomplete="off" value="${v('perRegAdm')}" placeholder="Clave de administrador" required>` : ''}` : ''}`,
+                    ${`<label class="per-check prg-sin interruptor"><input type="checkbox" id="perRegSinComp" ${perReg.sinComp ? 'checked' : ''} onchange="perRegGuardarCampos(); perRegPintar()"><span class="sw-pista"></span> ${abono ? 'Sin comprobante' : 'Registrar sin foto'} (clave de administrador)</label>
+                        ${perReg.sinComp ? `<input type="password" id="perRegAdm" autocomplete="off" value="${v('perRegAdm')}" placeholder="Clave de administrador" required>` : ''}`}`,
                     abono ? 'obligatorio' : 'obligatoria')}
                 <div id="perRegCalculo"></div>
                 ${abono ? `<button type="button" class="btn-ghost prg-otro" onclick="perRegAgregarOtro()" title="Guarda este abono en la lista y deja la ventana lista para el siguiente de la misma persona">+ Agregar otro abono de esta persona</button>` : ''}
@@ -12709,8 +12720,9 @@
         if (t === 'DEUDA' && !perReg.perRegVence) { mostrarBanner('Indique cuándo vence la deuda: días de crédito o fecha en el calendario.', 'warn'); return; }
         if (perRegMoneda === 'Bs' && !(Number(perReg.perRegTasa) > 0)) { mostrarBanner('Escriba la tasa para pasar los Bs a $.', 'warn'); return; }
         const archivo = document.getElementById('perRegFoto').files[0] || perRegArchivo;
-        const sinComp = t === 'ABONO' && document.getElementById('perRegSinComp').checked;
-        if (!archivo && !sinComp) { mostrarBanner(t === 'ABONO' ? 'Adjunte la captura del comprobante del pago.' : 'Adjunte la foto de la factura.', 'warn'); return; }
+        const sinComp = document.getElementById('perRegSinComp').checked;
+        if (!archivo && !sinComp) { mostrarBanner(t === 'ABONO' ? 'Adjunte la captura del comprobante del pago.' : 'Adjunte la foto de la factura, o marque "Registrar sin foto" con la clave de administrador.', 'warn'); return; }
+        if (!archivo && !(perReg.perRegAdm || '').trim()) { mostrarBanner('Escriba la clave de administrador para registrarlo sin foto.', 'warn'); return; }
         // La ventana se cierra al instante y se registra en segundo plano; si falla, se avisa y los datos vuelven a la ventana
         const pedido = { action: 'cxc_registrar', tipo: t, cuentaId: p ? p.id : '', local: t === 'GASTO' ? perReg.perRegLocal : '',
             fecha: perReg.perRegFecha, moneda: perRegMoneda, monto: Number(perRegMoneda === 'Bs' ? perReg.perRegBs : perReg.perRegUsd), tasa: Number(perReg.perRegTasa) || 0,
