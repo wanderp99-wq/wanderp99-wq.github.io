@@ -225,6 +225,8 @@
         .vx-tabla .vx-q, .grafico-card .vx-q { width: 6.5rem; text-align: right; }
         .vx-tabla tr.vx-ult td { background: color-mix(in srgb, var(--primary) 10%, transparent); }
         .vx-dlg { width: min(640px, 100%); }
+        #vxContenido tr.vx-cambiado td { background: var(--amar-bg); }
+        #vxContenido .req-tabla select { min-width: 8.5rem; max-width: 12rem; }
         .vx-formas { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
         .vx-formas small { color: var(--text-muted); margin-left: 4px; }
         .vx-pago { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; background: var(--list-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px; margin-bottom: 6px; }
@@ -3524,10 +3526,17 @@
                 const r = await llamarApi({ action: 'fb_token' });
                 pase = r;   // para avisar si las reglas de seguridad no se pudieron publicar
                 if (auth.currentUser && auth.currentUser.uid !== r.uid) await lib.au.signOut(auth);
-                // Siempre con el pase nuevo (una vez por página): trae los permisos de HOY. Antes, si este equipo ya había entrado con
-                // la misma persona, se quedaba con el pase viejo y un módulo nuevo (Venta express) daba "sin permiso".
-                await lib.au.signInWithCustomToken(auth, r.token);
-                try { await auth.currentUser.getIdToken(true); } catch (e) {}
+                // Si este equipo ya entró con la misma persona, se compara el pase guardado con los permisos de HOY (sin internet, al
+                // instante): solo si cambiaron se entra con el pase nuevo. Antes nunca se cambiaba y un módulo nuevo (Venta express)
+                // daba "sin permiso"; entrar siempre lo arreglaba pero tardaba unos segundos más cada vez.
+                let entrar = !auth.currentUser || auth.currentUser.uid !== r.uid;
+                if (!entrar) {
+                    try {
+                        const c = (await auth.currentUser.getIdTokenResult()).claims;
+                        entrar = JSON.stringify(c.permisos || []) !== JSON.stringify(r.permisos || []) || !!c.admin !== !!r.admin || !!c.principal !== !!r.principal;
+                    } catch (e) { entrar = true; }
+                }
+                if (entrar) await lib.au.signInWithCustomToken(auth, r.token);
                 uidActual = r.uid;
             })().finally(() => { entrando = null; });
             await entrando;
@@ -3760,7 +3769,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-10.1';
+    const VERSION_SERVIDOR = '2026-11-10.6';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -6260,8 +6269,8 @@
     const vxR2 = n => Math.round((Number(n) || 0) * 100) / 100, vxR3 = n => Math.round((Number(n) || 0) * 1000) / 1000;
     const vxNorm = s => String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
     let vx = { tab: 'vender', listo: false, conectando: false, error: '', equipo: null, cfg: {}, prods: [], porCod: new Map(), base: null,
-               abiertas: [], cierres: [], pend: 0, venta: { items: [] }, res: [], sel: 0, offs: [], fbl: null, pagos: [], vueltoEn: 'bs',
-               buscaProd: '', mdCambios: {}, contado: {}, verTicket: null, anulando: null };
+               abiertas: [], cierres: [], pend: 0, venta: { items: [] }, sug: [], sugIdx: 0, codTxt: '', ultimoTxt: '', offs: [], fbl: null, pagos: [], vueltoEn: 'bs',
+               buscaProd: '', cambios: {}, contado: {}, verTicket: null, anulando: null };
     // Este equipo: tienda y número de caja (se eligen una vez)
     function vxEquipoLeer() {
         if (vx.equipo) return;
@@ -6394,79 +6403,141 @@
                 <div><label for="vxCajaN">Caja N°</label><input type="number" id="vxCajaN" min="1" max="99" step="1" value="${esc(e.caja || 1)}"></div></div>
             <div class="req-acciones"><button type="button" class="btn-primary" onclick="vxEquipoGuardar()">Guardar</button>${vx.equipo ? `<button type="button" class="btn-ghost" onclick="vx.cambiando=false;vxPintar()">Cancelar</button>` : ''}</div></div>`;
     }
+    // Pantalla de venta: la MISMA de Facturar del almacén (código, último producto, total verde, carrito y teclas)
     function vxVistaVender() {
         if (!vx.prods.length) return `<div class="empty">Todavía no hay productos de ${esc(vx.equipo.local)}. ${esPrincipal ? 'Cárguelos en "Productos y ajustes".' : 'Un administrador debe cargarlos en "Productos y ajustes".'}</div>`;
-        const t = vxTotales(), vend = vxVendidos(), items = vx.venta.items;
+        const t = vxTotales(), items = vx.venta.items, vend = vxVendidos(), tasa = vxTasa();
+        const sel = vx.venta.sel == null || vx.venta.sel < 0 || vx.venta.sel >= items.length ? items.length - 1 : vx.venta.sel;
         const filas = items.map((it, i) => {
-            const l = t.lin[i], p = vx.porCod.get(String(it.c)), ex = p ? vxR3((Number(p.e) || 0) - (vend[it.c] || 0)) : null;
-            return `<tr${i === vx.ultimo ? ' class="vx-ult"' : ''}><td class="n">${i + 1}</td><td class="izq"><b>${esc(it.c)}</b></td>
-                <td class="izq">${esc(it.d)}${l.may ? ' <span class="chip st-info">Mayor</span>' : ''}${ex != null && ex - it.q < 0 ? `<small style="color:var(--warn)">Existencia en el sistema: ${vxCant(ex, it.pesado)}</small>` : ''}</td>
-                <td><input type="number" class="vx-q" id="vxQ${i}" min="0" step="${it.pesado ? '0.001' : '1'}" value="${it.q || ''}" placeholder="${it.pesado ? 'kg' : ''}" oninput="vxCantidad(${i}, this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();vxFocoCod()}"></td>
-                <td>${fmt(l.usd)}</td><td>${fmt(l.pbs)}</td><td><b>${fmt(l.sbs)}</b></td>
-                <td><button type="button" class="btn-ghost btn-mini btn-quitar" onclick="vxQuitar(${i})" aria-label="Quitar ${esc(it.d)}">✕</button></td></tr>`;
+            const l = t.lin[i], p = vx.porCod.get(String(it.c)), ex = p ? vxR3((Number(p.e) || 0) - (vend[it.c] || 0)) : null, sinEx = ex != null && ex - it.q < -0.0005;
+            return `<tr class="${i === sel ? 'sel' : ''}${sinEx ? ' alm-sin' : ''}" onclick="vx.venta.sel=${i};vxPintar();vxFoco()">
+                <td class="izq"><b>${esc(it.c)}</b></td><td class="izq">${esc(it.d)}${l.may ? ' <span class="chip st-info">Mayor</span>' : ''}${sinEx ? ' <span class="chip st-sobra">sin existencia</span>' : ''}</td>
+                <td>${vxCant(it.q, it.pesado)} <small>${it.pesado ? 'kg' : 'und'}</small></td><td>${fmt(l.pbs)}<small>$ ${fmt(l.usd)}</small></td><td><b>${fmt(l.sbs)}</b></td></tr>`;
         }).join('');
-        const res = vx.res.length ? `<div class="vx-res" role="listbox">${vx.res.slice(0, 12).map((p, i) => {
-                const ex = vxR3((Number(p.e) || 0) - (vend[p.c] || 0));
-                return `<button type="button" class="vx-res-item${i === vx.sel ? ' activo' : ''}" onclick="vxElegir(${i})"><b>${esc(p.c)}</b> ${esc(p.d)}<span>$ ${fmt(p.pd)} · Bs ${fmt(vxR2(p.pd * vxTasa()))} · exist. ${vxCant(ex, vxPesado(p))}</span></button>`;
-            }).join('')}</div>` : '';
-        return `<div class="vx-entrada"><label for="vxCod" class="sr-only">Código o descripción</label>
-                <input type="text" id="vxCod" autocomplete="off" placeholder="Código o descripción · 3*código · Enter agrega · Espacio totaliza" onkeydown="vxTecla(event)" oninput="vxBuscarEscribiendo(this.value)">
-                <button type="button" class="btn-primary" onclick="vxTotalizar()" ${items.length ? '' : 'disabled'}>Totalizar (Espacio)</button></div>
-            ${res}
-            <div class="tabla-wrap"><table class="req-tabla vx-tabla" data-sin-paginar><thead><tr><th>#</th><th class="izq">Código</th><th class="izq">Descripción</th><th>Cant.</th><th>Precio $</th><th>Precio Bs</th><th>Subtotal Bs</th><th></th></tr></thead>
-                <tbody>${filas || '<tr><td colspan="8" class="empty">Escriba un código y pulse Enter.</td></tr>'}</tbody></table></div>
-            <div class="kpis"><div class="kpi amar"><div class="k-label">Total a pagar</div><div class="k-value">Bs ${fmt(t.totalBs)}</div></div>
-                <div class="kpi"><div class="k-label">Si paga en divisas</div><div class="k-value">$ ${fmt(t.totalUsd)}</div></div>
-                <div class="kpi"><div class="k-label">Artículos</div><div class="k-value">${nfVE(0, 3).format(t.articulos)}</div></div></div>
-            ${items.length ? '<div class="req-acciones"><button type="button" class="btn-ghost" onclick="vxVaciar()">Vaciar la venta</button></div>' : ''}`;
+        const und = items.filter(x => !x.pesado).reduce((s, x) => s + x.q, 0), kg = vxR3(items.filter(x => x.pesado).reduce((s, x) => s + x.q, 0));
+        const teclas = [['Enter', 'Agregar'], ['F2', 'Buscar', 'vxF2()'], ['↑ ↓', 'Elegir renglón'], ['Supr', 'Quitar renglón', 'vxQuitar()'], ['Espacio', 'Totalizar', 'vxTotalizar()']];
+        return `<div class="alm-pos">
+            <form class="alm-pos-top" onsubmit="event.preventDefault(); vxEnter()">
+                <div class="alm-cod"><label for="vxCod">Código</label><input type="text" id="vxCod" autocomplete="off" spellcheck="false" placeholder="Código · 3*código · 520*código (g)" value="${esc(vx.codTxt || '')}"
+                    oninput="vx.codTxt=this.value;vxSugerir()" onkeydown="vxTecla(event)" onblur="setTimeout(() => { if (document.activeElement && document.activeElement.id !== 'vxCod') vxSugCerrar(); }, 150)"
+                    role="combobox" aria-autocomplete="list" aria-expanded="${vx.sug && vx.sug.length ? 'true' : 'false'}">${vxSugHTML()}</div>
+                <div class="alm-ultimo">${vx.ultimoTxt ? esc(vx.ultimoTxt) : '<span>Marque el código y presione Enter</span>'}</div>
+                <div class="alm-total"><small>Total a pagar</small><b>Bs ${fmt(t.totalBs)}</b><small>${tasa ? `En divisas $ ${fmt(t.totalUsd)} · tasa ${fmt(tasa)}` : 'Tasa BCV no disponible'}</small></div>
+            </form>
+            <div class="tabla-wrap alm-carrito"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Código</th><th class="izq">Descripción</th><th>Cantidad</th><th>Precio Bs</th><th>Subtotal Bs</th></tr></thead>
+                <tbody>${filas || '<tr><td colspan="5"><div class="alm-vacio">Venta vacía</div></td></tr>'}</tbody></table></div>
+            <div class="alm-pie"><span>${items.length} renglón(es)${items.length ? ` · ${nfVE(0, 0).format(und)} und · ${vxCant(kg, true)} kg` : ''}</span>
+                <span class="alm-teclas">${teclas.map(([k, x, fn]) => fn ? `<button type="button" class="alm-tecla" onclick="${fn}"><kbd>${k}</kbd>${x}</button>` : `<span class="alm-tecla"><kbd>${k}</kbd>${x}</span>`).join('')}</span></div>
+            ${items.length ? '<div class="req-acciones" style="justify-content:flex-end"><button type="button" class="btn-ghost" onclick="vxVaciar()">Vaciar la venta</button></div>' : ''}
+        </div>`;
     }
     function vxGuardarVenta() { try { localStorage.setItem('vx_venta', JSON.stringify(vx.venta)); } catch (e) {} }
     function vxFocoCod() { const c = document.getElementById('vxCod'); if (c) c.focus(); }
+    const vxNum = v => { const n = almNum(v); return isNaN(n) ? 0 : n; };   // acepta "0,2" y "1.250,50"
     function vxBuscar(txt) {
         const q = vxNorm(txt); if (!q) return [];
         const pal = q.split(' ');
-        const exactos = vx.prods.filter(p => vxNorm(p.c).indexOf(q) === 0);
-        const porDesc = vx.prods.filter(p => exactos.indexOf(p) === -1 && pal.every(w => vxNorm(p.d).indexOf(w) !== -1));
-        return exactos.concat(porDesc).slice(0, 40);
+        const exactos = vx.prods.filter(p => vxNorm(p.c) === q), prefijo = vx.prods.filter(p => vxNorm(p.c) !== q && vxNorm(p.c).indexOf(q) === 0);
+        const porDesc = q.length >= 2 ? vx.prods.filter(p => exactos.indexOf(p) === -1 && prefijo.indexOf(p) === -1 && pal.every(w => vxNorm(p.d).indexOf(w) !== -1))
+                                             .sort((a, b) => String(a.d).localeCompare(String(b.d), 'es')) : [];
+        return exactos.concat(prefijo, porDesc).slice(0, 8);
     }
-    let vxBuscaEspera = 0;
-    function vxBuscarEscribiendo(v) {
-        clearTimeout(vxBuscaEspera);
-        vxBuscaEspera = setTimeout(() => { const t = String(v).replace(/^\d+(?:[.,]\d+)?\s*\*\s*/, ''); vx.res = t.length >= 3 && !/^\d+$/.test(t) ? vxBuscar(t) : []; vx.sel = 0; vxPintar(); }, 200);
+    // Sugerencias al escribir (por código o por nombre), como en Facturar: flechas para elegir y Enter para agregar
+    const vxPartes = txt => { const m = /^(\d+(?:[.,]\d+)?)\s*\*\s*(.*)$/.exec(txt); return m ? { pre: m[1] + '*', mult: m[1], q: m[2] } : { pre: '', mult: null, q: txt }; };
+    function vxSugerir() {
+        const { q } = vxPartes((document.getElementById('vxCod') || {}).value || ''), s = q.trim();
+        if (s.length < 2) { vxSugCerrar(); return; }
+        const l = vxBuscar(s), exacto = vx.porCod.get(s) || vx.porCod.get(s.toUpperCase());
+        vx.sug = l.length === 1 && exacto ? [] : l; vx.sugIdx = 0; vxSugPintar();   // un código exacto solo: sin lista (el lector sigue rápido)
     }
+    function vxSugHTML() {
+        if (!vx.sug || !vx.sug.length) return '';
+        const tasa = vxTasa(), vend = vxVendidos();
+        return `<div class="alm-sug" role="listbox">${vx.sug.map((p, i) => `<button type="button" role="option" class="alm-op${i === vx.sugIdx ? ' sel' : ''}" onmousedown="event.preventDefault()" onclick="vxSugElegir(${i})">
+            <b>${esc(p.c)}</b><span>${esc(p.d)}</span><small>Bs ${fmt(vxR2(p.pd * tasa))} · $ ${fmt(p.pd)}${vxPesado(p) ? ' el kg' : ''} · exist. ${vxCant(vxR3((Number(p.e) || 0) - (vend[p.c] || 0)), vxPesado(p))}</small></button>`).join('')}</div>`;
+    }
+    function vxSugPintar() {
+        const cod = document.getElementById('vxCod'); if (!cod) return;
+        const viejo = cod.parentElement.querySelector('.alm-sug'); if (viejo) viejo.remove();
+        cod.insertAdjacentHTML('afterend', vxSugHTML());
+        cod.setAttribute('aria-expanded', vx.sug && vx.sug.length ? 'true' : 'false');
+        const s = cod.parentElement.querySelector('.alm-sug .sel'); if (s) s.scrollIntoView({ block: 'nearest' });
+    }
+    function vxSugCerrar() { if (!vx.sug || !vx.sug.length) return; vx.sug = []; vxSugPintar(); }
+    function vxSugElegir(i) {
+        const p = vx.sug[i], cod = document.getElementById('vxCod'); if (!p || !cod) return;
+        cod.value = vxPartes(cod.value).pre + p.c; vx.codTxt = cod.value; vx.sug = []; vxSugPintar(); vxEnter();
+    }
+    function vxF2() { const c = document.getElementById('vxCod'); if (c) { c.focus(); c.select(); } mostrarBanner('Escriba parte del nombre del producto y elija con las flechas.', 'ok'); }
     function vxTecla(e) {
-        const c = e.target;
-        if (e.key === 'ArrowDown' && vx.res.length) { e.preventDefault(); vx.sel = Math.min(vx.sel + 1, Math.min(vx.res.length, 12) - 1); vxPintar(); return; }
-        if (e.key === 'ArrowUp' && vx.res.length) { e.preventDefault(); vx.sel = Math.max(vx.sel - 1, 0); vxPintar(); return; }
-        if (e.key === 'Escape') { if (c.value || vx.res.length) { e.preventDefault(); e.stopPropagation(); c.value = ''; vx.res = []; vxPintar(); } return; }
-        if (e.key === ' ' && !c.value.trim()) { e.preventDefault(); vxTotalizar(); return; }
-        if (e.key !== 'Enter') return;
-        e.preventDefault();
-        const txt = c.value.trim();
-        if (!txt) { if (vx.venta.items.length) vxTotalizar(); return; }
-        let q = null, cod = txt; const m = /^(\d+(?:[.,]\d+)?)\s*\*\s*(.+)$/.exec(txt);
-        if (m) { q = Number(m[1].replace(',', '.')); cod = m[2].trim(); }
-        const p = vx.porCod.get(cod) || vx.porCod.get(cod.toUpperCase());
-        if (p) { c.value = ''; vx.res = []; vxAgregar(p, q); return; }
-        const l = vx.res.length && !m ? vx.res : vxBuscar(cod);
-        if (vx.res.length && l === vx.res) { c.value = ''; const x = l[vx.sel]; vx.res = []; vxAgregar(x, q); return; }
-        if (l.length === 1) { c.value = ''; vx.res = []; vxAgregar(l[0], q); return; }
-        vx.res = l; vx.sel = 0; vx.qBusca = q; vxPintar();
-        if (!l.length) mostrarBanner(`No hay ningún producto con el código o la descripción "${cod}".`, 'warn');
+        const c = e.target, vacio = !c.value.trim(), items = vx.venta.items;
+        if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && vx.sug && vx.sug.length) {
+            e.preventDefault(); e.stopPropagation(); vx.sugIdx = Math.max(0, Math.min(vx.sug.length - 1, vx.sugIdx + (e.key === 'ArrowDown' ? 1 : -1))); vxSugPintar(); return;
+        }
+        if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && vacio && items.length) {
+            e.preventDefault(); const s = vx.venta.sel == null || vx.venta.sel < 0 ? items.length - 1 : vx.venta.sel;
+            vx.venta.sel = Math.max(0, Math.min(items.length - 1, s + (e.key === 'ArrowUp' ? -1 : 1))); vxPintar(); vxFoco(); return;
+        }
+        if (e.key === 'Escape') { if (vx.sug && vx.sug.length) { e.preventDefault(); e.stopPropagation(); vxSugCerrar(); } else if (!vacio) { e.preventDefault(); e.stopPropagation(); c.value = ''; vx.codTxt = ''; } return; }
+        if (e.key === ' ' && vacio) { e.preventDefault(); vxTotalizar(); return; }
+        if (e.key === 'Delete' && vacio) { e.preventDefault(); vxQuitar(); return; }
+        if (e.key === 'F2') { e.preventDefault(); vxF2(); }
     }
-    function vxElegir(i) { const p = vx.res[i]; if (!p) return; const c = document.getElementById('vxCod'); const q = vx.qBusca != null ? vx.qBusca : null; if (c) c.value = ''; vx.res = []; vx.qBusca = null; vxAgregar(p, q); }
+    // Enter: "3*026" = 3 unidades; un producto por kilo pide el peso en gramos ("520*001" = 520 g; "0,5*001" = 0,5 kg)
+    function vxEnter() {
+        const cod = document.getElementById('vxCod'), txt = (cod.value || '').trim();
+        if (!txt) return;
+        const pa = vxPartes(txt), codigo = pa.q.trim();
+        let p = vx.porCod.get(codigo) || vx.porCod.get(codigo.toUpperCase());
+        if (!p && vx.sug && vx.sug.length) { vxSugElegir(vx.sugIdx); return; }   // escribió un nombre: toma la sugerencia marcada
+        if (!p) { const l = vxBuscar(codigo); if (l.length === 1) p = l[0]; else if (l.length) { vx.sug = l; vx.sugIdx = 0; vxSugPintar(); return; } }
+        if (!p) { mostrarBanner(`El código ${codigo} no está en los productos de ${vx.equipo.local}. Revise que esté escrito igual, con sus ceros.`, 'warn'); cod.select(); return; }
+        const pesado = vxPesado(p);
+        let mult = pa.mult != null ? Number(String(pa.mult).replace(',', '.')) : null;
+        if (pesado && pa.mult != null && !/[.,]/.test(pa.mult)) mult = vxR3(mult / 1000);   // 520*001 = 520 gramos
+        cod.value = ''; vx.codTxt = ''; vx.sug = []; vxSugPintar();
+        if (pesado && !mult) { vxPedirPeso(p); return; }
+        if (!pesado && mult != null && mult !== Math.round(mult)) { mostrarBanner(`${p.d} se vende por unidad: la cantidad no lleva decimales.`, 'warn'); return; }
+        vxAgregar(p, mult || 1);
+    }
+    // Ventana del peso (como en Facturar): se escribe en gramos y en la venta va en kg
+    function vxPedirPeso(p) {
+        const tasa = vxTasa(), ex = vxR3((Number(p.e) || 0) - (vxVendidos()[p.c] || 0));
+        vx.pesoCod = String(p.c);
+        vxAbrirDlg(() => `<form class="req-dlg alm-peso" onsubmit="event.preventDefault(); vxPesoListo()">
+            <h3>${esc(p.d)}</h3><div class="req-sub">${esc(p.c)} · $ ${fmt(p.pd)} el kg${tasa ? ' · Bs ' + fmt(vxR2(p.pd * tasa)) : ''} · existencia ${vxCant(ex, true)} kg</div>
+            <label for="vxPeso">Peso en gramos</label><input type="number" id="vxPeso" step="1" min="0" required autofocus placeholder="Ej.: 520" oninput="vxPesoMostrar(this.value)">
+            <div class="alm-peso-total" id="vxPesoTotal"></div>
+            <div class="login-error" id="vxPesoError"></div>
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-ghost" onclick="vxCerrarDlg()">Cancelar (Esc)</button><button type="submit" class="btn-primary">Agregar (Enter)</button></div></form>`);
+    }
+    function vxPesoMostrar(v) {
+        const p = vx.porCod.get(vx.pesoCod), kg = vxNum(v) / 1000, el = document.getElementById('vxPesoTotal'); if (!el || !p) return;
+        const it = { c: p.c, q: kg }, l = kg > 0 ? vxLinea(it) : null;
+        el.textContent = l ? `${vxCant(kg, true)} kg · Bs ${fmt(l.sbs)}${l.may ? ' (precio mayor)' : ''}` : '';
+    }
+    function vxPesoListo() {
+        const p = vx.porCod.get(vx.pesoCod), g = vxNum((document.getElementById('vxPeso') || {}).value), kg = vxR3(g / 1000), err = document.getElementById('vxPesoError');
+        if (!(kg > 0)) { if (err) err.textContent = 'Escriba el peso en gramos'; return; }
+        if (g > 100000) { if (err) err.textContent = 'Revise el peso: ' + fmt(g / 1000) + ' kg (se escribe en gramos)'; return; }
+        vxCerrarDlg(); vxAgregar(p, kg);
+    }
     function vxAgregar(p, q) {
         const pesado = vxPesado(p), v = vx.venta;
         const ya = pesado ? -1 : v.items.findIndex(i => String(i.c) === String(p.c));
-        if (ya >= 0) { v.items[ya].q = vxR3(v.items[ya].q + (q != null ? q : 1)); vx.ultimo = ya; }
-        else { v.items.push({ c: String(p.c), d: p.d, u: p.u || '', pesado, q: q != null ? vxR3(q) : (pesado ? 0 : 1), pd: p.pd, pm: p.pm, md: p.md }); vx.ultimo = v.items.length - 1; }
-        vxGuardarVenta(); vxPintar();
-        // Pesado sin cantidad: el cursor va a su peso (en kg)
-        if (pesado && q == null) setTimeout(() => { const x = document.getElementById('vxQ' + vx.ultimo); if (x) { x.focus(); x.select && x.select(); } }, 30); else vxFoco();
+        if (ya >= 0) { v.items[ya].q = vxR3(v.items[ya].q + q); v.sel = ya; }
+        else { v.items.push({ c: String(p.c), d: p.d, u: p.u || '', pesado, q: vxR3(q), pd: p.pd, pm: p.pm, md: p.md }); v.sel = v.items.length - 1; }
+        const it = v.items[v.sel], l = vxLinea(it);
+        vx.ultimoTxt = `${p.d} · ${vxCant(it.q, pesado)} ${pesado ? 'kg' : 'und'} · Bs ${fmt(l.sbs)}`;
+        vxGuardarVenta(); vxPintar(); vxFoco();
     }
-    function vxCantidad(i, v) { const it = vx.venta.items[i]; if (!it) return; it.q = vxR3(Number(v) || 0); vxGuardarVenta(); clearTimeout(vx.cantEspera); vx.cantEspera = setTimeout(vxPintar, 250); }
-    function vxQuitar(i) { vx.venta.items.splice(i, 1); vx.ultimo = null; vxGuardarVenta(); vxPintar(); vxFoco(); }
-    function vxVaciar() { if (!confirm('¿Vaciar la venta en pantalla?')) return; vx.venta = { items: [] }; vxGuardarVenta(); vxPintar(); vxFoco(); }
+    function vxQuitar() {
+        const v = vx.venta; if (!v.items.length) return;
+        const i = v.sel == null || v.sel < 0 || v.sel >= v.items.length ? v.items.length - 1 : v.sel, x = v.items.splice(i, 1)[0];
+        v.sel = v.items.length ? Math.min(i, v.items.length - 1) : -1; vx.ultimoTxt = 'Quitado: ' + x.d;
+        vxGuardarVenta(); vxPintar(); vxFoco();
+    }
+    function vxVaciar() { if (!confirm('¿Vaciar la venta en pantalla?')) return; vx.venta = { items: [] }; vx.ultimoTxt = ''; vxGuardarVenta(); vxPintar(); vxFoco(); }
 
     // ---------- Cobro (Totalizar) ----------
     const vxDlgAbierta = () => { const d = document.getElementById('vxDlg'); return !!d && !d.classList.contains('hidden'); };
@@ -6481,12 +6552,12 @@
         const v = vx.venta;
         if (!v.items.length) return;
         const sinCant = v.items.find(i => !(i.q > 0));
-        if (sinCant) { mostrarBanner(`Falta la cantidad de ${sinCant.d}.`, 'warn'); const k = v.items.indexOf(sinCant); setTimeout(() => { const x = document.getElementById('vxQ' + k); if (x) x.focus(); }, 30); return; }
+        if (sinCant) { mostrarBanner(`Falta la cantidad de ${sinCant.d}: quítelo (Supr) y agréguelo otra vez.`, 'warn'); return; }
         if (!vxTasa()) { mostrarBanner('No hay tasa BCV: revise internet o fije la tasa en Productos y ajustes.', 'error'); return; }
         vx.pagos = []; vx.vueltoEn = 'bs'; vx.errPago = '';
         vxAbrirDlg(vxPagoHTML);
     }
-    const vxPagoBs = p => p.f === 'EFE_USD' ? vxR2((Number(p.monto) || 0) * vxTasaDiv()) : vxR2(Number(p.monto) || 0);
+    const vxPagoBs = p => p.f === 'EFE_USD' ? vxR2(vxNum(p.monto) * vxTasaDiv()) : vxR2(vxNum(p.monto));
     function vxResta() { const t = vxTotales(); return vxR2(t.totalBs - vx.pagos.reduce((s, p) => s + vxPagoBs(p), 0)); }
     function vxPagoHTML() {
         const t = vxTotales(), resta = vxResta(), td = vxTasaDiv(), bancos = (CUA_LISTAS.pm && CUA_LISTAS.pm.banco) || [];
@@ -6528,7 +6599,7 @@
         const t = vxTotales(), resta = vxResta();
         const malo = m => { vx.errPago = m; vxPintar(); };
         if (!vx.pagos.length) return malo('Elija la forma de pago.');
-        if (vx.pagos.some(p => !(Number(p.monto) > 0))) return malo('Falta el monto de una forma de pago.');
+        if (vx.pagos.some(p => !(vxNum(p.monto) > 0))) return malo('Falta el monto de una forma de pago.');
         if (resta > 0.009) return malo('Falta por pagar Bs ' + fmt(resta) + '.');
         const pm = vx.pagos.find(p => p.f === 'PM' && (!/^\d{4}$/.test(p.ref || '') || !p.banco)); if (pm) return malo('Pago móvil: escriba los 4 dígitos de la referencia y elija el banco.');
         const cr = vx.pagos.find(p => p.f === 'CRED' && !String(p.cliente || '').trim()); if (cr) return malo('Crédito: escriba el nombre del cliente.');
@@ -6545,7 +6616,7 @@
             cajero: nombreUsuario, cajeroUid: auth.currentUser ? auth.currentUser.uid : '', tasa: vxTasa(), desc: vxDesc(), tasaDiv: vxR2(td * 10000) / 10000,
             items: vx.venta.items.map((it, i) => ({ c: String(it.c), d: it.d, q: vxR3(it.q), u: it.u || '', usd: t.lin[i].usd, pbs: t.lin[i].pbs, sbs: t.lin[i].sbs, may: t.lin[i].may })),
             totalBs: t.totalBs, totalUsd: t.totalUsd, articulos: t.articulos,
-            pagos: vx.pagos.map(p => Object.assign({ f: p.f, bs: vxPagoBs(p), usd: p.f === 'EFE_USD' ? vxR2(Number(p.monto)) : 0 },
+            pagos: vx.pagos.map(p => Object.assign({ f: p.f, bs: vxPagoBs(p), usd: p.f === 'EFE_USD' ? vxR2(vxNum(p.monto)) : 0 },
                 p.f === 'PM' ? { ref: p.ref, banco: p.banco } : {}, p.f === 'CRED' ? { cliente: String(p.cliente).trim(), ced: String(p.ced || '').trim() } : {})),
             vuelto: vueltoBs ? (vx.vueltoEn === 'usd' ? { moneda: 'usd', monto: vxR2(vueltoBs / td) } : { moneda: 'bs', monto: vueltoBs }) : { moneda: 'bs', monto: 0 },
             cierre: '', anulada: false };
@@ -6555,7 +6626,7 @@
         // Sin internet la promesa espera hasta que suba: no se espera (la venta ya quedó en el equipo)
         b.commit().catch(err => vxNoSubio(v, err));
         vxImprimirTicket(v, false);
-        vx.venta = { items: [] }; vx.pagos = []; vx.ultimo = null; vxGuardarVenta();
+        vx.venta = { items: [] }; vx.pagos = []; vx.ultimoTxt = `Ticket ${v.nroTxt} cobrado: Bs ${fmt(v.totalBs)}`; vxGuardarVenta();
         vxCerrarDlg(); vxPintar();
         mostrarBanner(`Ticket ${v.nroTxt}: Bs ${fmt(v.totalBs)}${v.vuelto.monto ? ` · vuelto ${v.vuelto.moneda === 'usd' ? '$' : 'Bs'} ${fmt(v.vuelto.monto)}` : ''}.`, 'ok');
     }
@@ -6685,7 +6756,7 @@
     function vxVistaCierre() {
         const vs = vx.abiertas.filter(vxDeMiCaja), r = vxResumen(vs), c = vx.contado;
         const linea = (k, txt, extra) => `<tr><td class="izq">${txt}</td><td>${r.formas[k] ? r.formas[k].n : 0}</td><td>${fmt((r.formas[k] || {}).bs || 0)}</td><td class="izq">${extra || ''}</td></tr>`;
-        const difBs = c.bs !== '' && c.bs != null ? vxR2((Number(c.bs) || 0) - r.efectivoBs) : null, difUsd = c.usd !== '' && c.usd != null ? vxR2((Number(c.usd) || 0) - r.efectivoUsd) : null;
+        const difBs = c.bs !== '' && c.bs != null ? vxR2(vxNum(c.bs) - r.efectivoBs) : null, difUsd = c.usd !== '' && c.usd != null ? vxR2(vxNum(c.usd) - r.efectivoUsd) : null;
         const dif = (d, m) => d == null ? '' : `<small style="color:${Math.abs(d) < 0.01 ? 'var(--ok)' : 'var(--bad)'}">${Math.abs(d) < 0.01 ? 'Cuadra' : (d > 0 ? 'Sobra ' : 'Falta ') + m + ' ' + fmt(Math.abs(d))}</small>`;
         const cierres = vx.cierres.filter(vxDeMiCaja).slice(0, 15).map(x => `<tr><td class="izq">${esc(fechaBonita(x.fecha))} ${esc(String(x.hora || '').slice(0, 5))}</td><td class="izq">${esc(x.cajero || '')}</td>
             <td>${x.n}</td><td>${fmt(x.totalBs)}</td><td><button type="button" class="btn-ghost btn-mini" onclick="vxReimprimirCierre('${esc(x.id)}')">Reimprimir</button></td></tr>`).join('');
@@ -6735,7 +6806,7 @@
         const x = { id, local: e.local, caja: e.caja, equipo: e.id, cajero: nombreUsuario, cajeroUid: auth.currentUser ? auth.currentUser.uid : '', fecha: fechaLocalHoy(),
             hora: dos(ahora.getHours()) + ':' + dos(ahora.getMinutes()), creadoMs: Date.now(), creado: fs.serverTimestamp(), ventas: r.ids, desdeNro: r.desdeNro, hastaNro: r.hastaNro,
             n: r.n, anuladas: r.anuladas, totalBs: r.totalBs, articulos: r.articulos, formas: r.formas, pm: r.pm, cred: r.cred, vueltoBs: r.vueltoBs, vueltoUsd: r.vueltoUsd,
-            efectivoBs: r.efectivoBs, efectivoUsd: r.efectivoUsd, contadoBs: c.bs !== '' && c.bs != null ? vxR2(c.bs) : null, contadoUsd: c.usd !== '' && c.usd != null ? vxR2(c.usd) : null,
+            efectivoBs: r.efectivoBs, efectivoUsd: r.efectivoUsd, contadoBs: c.bs !== '' && c.bs != null ? vxR2(vxNum(c.bs)) : null, contadoUsd: c.usd !== '' && c.usd != null ? vxR2(vxNum(c.usd)) : null,
             vendidos: Object.keys(r.vendidos).map(k => ({ c: k, q: r.vendidos[k] })), tasa: vxTasa() };
         // El cierre y la marca en cada ticket (de a 400 por guardado)
         const lotes = []; for (let i = 0; i < r.ids.length; i += 400) lotes.push(r.ids.slice(i, i + 400));
@@ -6754,12 +6825,19 @@
     function vxVistaProductos() {
         const cfg = vx.cfg || {}, vend = vxVendidos(), q = vxNorm(vx.buscaProd);
         const lista = (q ? vx.prods.filter(p => vxNorm(p.c).indexOf(q) === 0 || q.split(' ').every(w => vxNorm(p.d).indexOf(w) !== -1)) : vx.prods).slice(0, 150);
-        const cambios = Object.keys(vx.mdCambios).length;
+        const cambios = Object.keys(vx.cambios).length, cats = vxCategorias();
+        // Cada producto: unidad (por unidad o por peso), categoría, precio mayor y desde qué cantidad aplica (los cambia un administrador)
         const filas = lista.map(p => {
-            const ex = vxR3((Number(p.e) || 0) - (vend[p.c] || 0)), md = p.c in vx.mdCambios ? vx.mdCambios[p.c] : (p.md || '');
-            return `<tr><td class="izq"><b>${esc(p.c)}</b></td><td class="izq">${esc(p.d)}<small>${esc(p.u || '')}${p.g ? ' · ' + esc(p.g) : ''}</small></td>
-                <td>${vxCant(ex, vxPesado(p))}${vend[p.c] ? `<small>vendido ${vxCant(vend[p.c], vxPesado(p))}</small>` : ''}</td><td>${fmt(p.k)}</td><td>${fmt(p.pd)}<small>Bs ${fmt(vxR2(p.pd * vxTasa()))}</small></td><td>${p.pm ? fmt(p.pm) : '—'}</td>
-                <td>${esPrincipal && p.pm ? `<input type="number" class="vx-q" min="0" step="${vxPesado(p) ? '0.001' : '1'}" value="${esc(md)}" aria-label="Mayor desde ${esc(p.d)}" oninput="vx.mdCambios['${esc(p.c)}']=this.value;vxCambiosAviso()">` : (p.md ? vxCant(p.md, vxPesado(p)) : '—')}</td></tr>`;
+            const ch = vx.cambios[p.c] || {}, v = k => k in ch ? ch[k] : p[k], u = v('u') || '', pes = /KILO|KG/i.test(u), g = v('g') || '';
+            const ex = vxR3((Number(p.e) || 0) - (vend[p.c] || 0)), c = esc(p.c), cj = JSON.stringify(String(p.c)).replace(/"/g, '&quot;');
+            const opU = ['UNIDAD', 'KILOGRAMO', 'EMPAQUE'].concat(u && ['UNIDAD', 'KILOGRAMO', 'EMPAQUE'].indexOf(u) === -1 ? [u] : []);
+            const ed = esPrincipal;
+            return `<tr${Object.keys(ch).length ? ' class="vx-cambiado"' : ''}><td class="izq"><b>${c}</b></td><td class="izq">${esc(p.d)}</td>
+                <td class="izq">${ed ? `<select aria-label="Se vende por (${esc(p.d)})" onchange="vxCambio(${cj}, 'u', this.value)"><option value=""${u ? '' : ' selected'}>Unidad</option>${opU.map(x => `<option value="${esc(x)}"${x === u ? ' selected' : ''}>${x === 'KILOGRAMO' ? 'Peso (kg)' : x === 'UNIDAD' ? 'Unidad' : x === 'EMPAQUE' ? 'Empaque' : esc(x)}</option>`).join('')}</select>` : (pes ? 'Peso (kg)' : esc(u || 'Unidad'))}</td>
+                <td class="izq">${ed ? `<select aria-label="Categoría de ${esc(p.d)}" onchange="vxCambioCategoria(${cj}, this)"><option value=""${g ? '' : ' selected'}>Sin categoría</option>${cats.map(x => `<option value="${esc(x)}"${x === g ? ' selected' : ''}>${esc(x)}</option>`).join('')}<option value="__otra">Otra...</option></select>` : esc(g || '—')}</td>
+                <td>${vxCant(ex, pes)}${vend[p.c] ? `<small>vendido ${vxCant(vend[p.c], pes)}</small>` : ''}</td><td>${fmt(p.k)}</td><td>${fmt(p.pd)}<small>Bs ${fmt(vxR2(p.pd * vxTasa()))}</small></td>
+                <td>${ed ? `<input type="number" class="vx-q" min="0" step="0.01" value="${esc(v('pm') || '')}" placeholder="—" aria-label="Precio mayor $ de ${esc(p.d)}" oninput="vxCambio(${cj}, 'pm', this.value)">` : (p.pm ? fmt(p.pm) : '—')}</td>
+                <td>${ed ? `<input type="number" class="vx-q" min="0" step="${pes ? '0.001' : '1'}" value="${esc(v('md') || '')}" placeholder="${pes ? 'kg' : 'und'}" aria-label="Mayor desde (${esc(p.d)})" oninput="vxCambio(${cj}, 'md', this.value)">` : (p.md ? vxCant(p.md, pes) + (pes ? ' kg' : ' und') : '—')}</td></tr>`;
         }).join('');
         const base = vx.base;
         return `<div class="grafico-card"><div class="grafico-head"><h3>Productos de ${esc(vx.equipo.local)}</h3><span class="chip st-info">${vx.prods.length}</span></div>
@@ -6770,8 +6848,8 @@
                     <button type="button" class="btn-ghost btn-mini" onclick="vxMdTodos()">Aplicar</button>
                     <button type="button" class="btn-primary" id="vxMdGuardar" onclick="vxGuardarProductos()" ${cambios ? '' : 'disabled'}>Guardar cambios${cambios ? ' (' + cambios + ')' : ''}</button></div>` : ''}
                 <div class="filters"><div><label for="vxBusP">Buscar</label><input type="search" id="vxBusP" value="${esc(vx.buscaProd)}" placeholder="Código o descripción" oninput="vx.buscaProd=this.value;clearTimeout(vx.bpE);vx.bpE=setTimeout(vxPintar,200)"></div></div>
-                <div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">Código</th><th class="izq">Descripción</th><th>Existencia</th><th>Costo $</th><th>Detal $</th><th>Mayor $</th><th>Mayor desde</th></tr></thead>
-                <tbody>${filas || '<tr><td colspan="7" class="empty">Sin productos.</td></tr>'}</tbody></table></div>
+                <div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">Código</th><th class="izq">Descripción</th><th class="izq">Se vende por</th><th class="izq">Categoría</th><th>Existencia</th><th>Costo $</th><th>Detal $</th><th>Mayor $</th><th>Mayor desde</th></tr></thead>
+                <tbody>${filas || '<tr><td colspan="9" class="empty">Sin productos.</td></tr>'}</tbody></table></div>
                 ${lista.length === 150 ? '<div class="nota">Se muestran los primeros 150: busque para ver otros.</div>' : ''}</div>
             ${esPrincipal ? `<div class="grafico-card" style="margin-top:1rem"><div class="grafico-head"><h3>Ticket y tasas</h3></div>
                 <div class="filters"><div style="grid-column:1/-1"><label for="vxEnc">Encabezado del ticket (una línea por renglón: nombre, RIF, dirección)</label>
@@ -6784,10 +6862,29 @@
                 <div class="req-acciones"><button type="button" class="btn-ghost" onclick="vxCambiarEquipo()">Cambiar tienda o caja</button></div></div>`;
     }
     function vxCambiarEquipo() { if (vx.abiertas.some(vxDeMiCaja) && !confirm('Esta caja tiene tickets sin cierre. ¿Cambiar igual? (haga el cierre antes)')) return; vx.cambiando = true; vxPintar(); }
-    function vxCambiosAviso() { const b = document.getElementById('vxMdGuardar'), n = Object.keys(vx.mdCambios).length; if (b) { b.disabled = !n; b.textContent = 'Guardar cambios' + (n ? ' (' + n + ')' : ''); } }
+    function vxCambiosAviso() { const b = document.getElementById('vxMdGuardar'), n = Object.keys(vx.cambios).length; if (b) { b.disabled = !n; b.textContent = 'Guardar cambios' + (n ? ' (' + n + ')' : ''); } }
+    // Cambios por producto, guardados juntos con "Guardar cambios": u (unidad), g (categoría), pm (precio mayor $), md (mayor desde)
+    function vxCambio(cod, campo, valor) {
+        const ch = vx.cambios[cod] = vx.cambios[cod] || {};
+        ch[campo] = valor; vxCambiosAviso();
+        if (campo === 'u') vxPintar();   // cambia el paso (unidades o kg) de "Mayor desde"
+    }
+    // Categorías: las de los productos (CHARCUTERIA, VIVERES...) más las nuevas que se escriban con "Otra..."
+    function vxCategorias() {
+        const s = new Set(['CHARCUTERIA', 'VIVERES']);
+        vx.prods.forEach(p => { if (p.g) s.add(String(p.g)); });
+        Object.values(vx.cambios).forEach(ch => { if (ch.g) s.add(String(ch.g)); });
+        return [...s].sort((a, b) => a.localeCompare(b, 'es'));
+    }
+    function vxCambioCategoria(cod, sel) {
+        if (sel.value !== '__otra') { vxCambio(cod, 'g', sel.value); return; }
+        const n = vxNorm(prompt('Nombre de la categoría nueva (por ejemplo: BEBIDAS, LACTEOS):') || '');
+        if (!n) { vxPintar(); return; }
+        vxCambio(cod, 'g', n.slice(0, 30)); vxPintar();
+    }
     function vxMdTodos() {
-        const n = Number((document.getElementById('vxMdTodos') || {}).value); if (!(n > 0)) { mostrarBanner('Escriba la cantidad.', 'warn'); return; }
-        vx.prods.filter(p => Number(p.pm) > 0).forEach(p => { vx.mdCambios[p.c] = String(n); }); vxPintar();
+        const n = vxNum((document.getElementById('vxMdTodos') || {}).value); if (!(n > 0)) { mostrarBanner('Escriba la cantidad.', 'warn'); return; }
+        vx.prods.filter(p => Number((vx.cambios[p.c] || {}).pm != null ? vxNum(vx.cambios[p.c].pm) : p.pm) > 0).forEach(p => { (vx.cambios[p.c] = vx.cambios[p.c] || {}).md = String(n); }); vxPintar();
     }
     function vxEscribirProductos(p, base) {
         const { db, lib } = vx.fbl, fs = lib.fs;
@@ -6795,9 +6892,17 @@
                              new Promise(ok => setTimeout(() => ok('espera'), 15000))]);
     }
     async function vxGuardarProductos() {
-        const p = vx.prods.map(x => x.c in vx.mdCambios ? Object.assign({}, x, { md: vxR3(Number(vx.mdCambios[x.c]) || 0) }) : x);
+        const p = vx.prods.map(x => {
+            const ch = vx.cambios[x.c]; if (!ch) return x;
+            const n = Object.assign({}, x);
+            if ('u' in ch) n.u = String(ch.u || '');
+            if ('g' in ch) n.g = String(ch.g || '');
+            if ('pm' in ch) n.pm = vxR2(vxNum(ch.pm));
+            if ('md' in ch) n.md = vxR3(vxNum(ch.md));
+            return n;
+        });
         const btn = document.getElementById('vxMdGuardar'); if (btn) btnCargando(btn, 'Guardando...');
-        try { const r = await vxEscribirProductos(p, vx.base); vx.mdCambios = {}; mostrarBanner(r === 'espera' ? 'Guardado en este equipo: sube a Firebase cuando haya internet.' : 'Cambios guardados.', 'ok'); }
+        try { const r = await vxEscribirProductos(p, vx.base); vx.cambios = {}; mostrarBanner(r === 'espera' ? 'Guardado en este equipo: sube a Firebase cuando haya internet.' : 'Cambios guardados.', 'ok'); }
         catch (e) { mostrarBanner('No se pudo guardar: ' + (e.code || e.message), 'error'); }
         vxPintar();
     }
@@ -6831,7 +6936,7 @@
         } catch (e) { mostrarBanner('No se pudo cargar: ' + (e.code || e.message), 'error'); }
     }
     async function vxGuardarCfg(btn) {
-        const enc = document.getElementById('vxEnc').value, desc = Number(document.getElementById('vxDescD').value), tm = Number(document.getElementById('vxTasaM').value);
+        const enc = document.getElementById('vxEnc').value, desc = vxNum(document.getElementById('vxDescD').value), tm = vxNum(document.getElementById('vxTasaM').value);
         if (!(desc >= 0 && desc < 50)) { mostrarBanner('El descuento debe estar entre 0 y 49 %.', 'warn'); return; }
         const { db, lib } = vx.fbl, fs = lib.fs; btnCargando(btn, 'Guardando...');
         try {
@@ -7767,8 +7872,11 @@
                 : '<div class="empty">Sin registros todavía (hoja BD ACCESOS).</div>'}`;
     }
 
+    // Reportes de tiendas dividido en 3 permisos (10/11): cada uno se habilita aparte
+    const REP_PERMISOS = [['rep_existencia', 'Almacén · Reporte de existencia'], ['rep_ajustes', 'Almacén · Reporte de ajustes'], ['rep_ventas', 'Almacén · Reporte de ventas']];
     function admRenderTabla() {
-        const nombres = Object.assign(Object.fromEntries(MODULOS_ASIGNABLES().map(m => [m.id, m.titulo])), { verexistencia: 'Ve existencia del almacén' });
+        const nombres = Object.assign(Object.fromEntries(MODULOS_ASIGNABLES().map(m => [m.id, m.titulo])), { verexistencia: 'Ve existencia del almacén' },
+                                      Object.fromEntries(REP_PERMISOS.map(([k, t]) => [k, t])));
         const cont = document.getElementById('admTabla');
         if (!admUsuarios.length) {
             cont.innerHTML = '<div class="empty">Todavía no hay claves creadas. Use "+ Nueva clave".</div>';
@@ -7778,7 +7886,7 @@
         cont.innerHTML = `<table><thead><tr><th>Persona</th><th>Módulos</th><th>Estado</th><th></th></tr></thead><tbody>` +
             lista.map(u => `<tr>
                 <td><b>${esc(u.nombre)}</b></td>
-                <td>${u.admin ? '<span class="chip st-ok">Administrador · acceso a todo</span>' : u.permisos.length ? u.permisos.map(p => `<span class="chip-mod">${esc(nombres[p] || p)}</span>`).join('') : '<span class="nota">Ninguno</span>'}</td>
+                <td>${u.admin ? '<span class="chip st-ok">Administrador · acceso a todo</span>' : u.permisos.length ? u.permisos.filter(p => p !== 'reportes').map(p => `<span class="chip-mod">${esc(nombres[p] || p)}</span>`).join('') : '<span class="nota">Ninguno</span>'}</td>
                 <td><span class="chip ${u.activo ? 'st-ok' : 'st-pend'}">${u.activo ? 'Activa' : 'Desactivada'}</span></td>
                 <td><div class="adm-acciones">
                     <button type="button" class="btn-ghost" onclick="admEditar('${u.id}')">Editar</button>
@@ -7799,8 +7907,12 @@
             : 'Mínimo 4 caracteres. No puede repetir la clave de otra persona.';
         document.getElementById('admActivo').checked = u ? u.activo : true;
         const marcados = u ? u.permisos : [];
-        document.getElementById('admModulos').innerHTML = MODULOS_ASIGNABLES().map(m =>
-            `<label><input type="checkbox" value="${m.id}" ${marcados.includes(m.id) ? 'checked' : ''}> ${esc(m.titulo)}</label>`).join('');
+        // Reportes de tiendas: 3 casillas (existencia, ajustes, ventas) en vez de una. Una clave vieja con el módulo y sin las tres
+        // (antes de que el servidor las repartiera) se muestra con las tres marcadas.
+        const repViejo = marcados.includes('reportes') && !marcados.some(p => /^rep_/.test(p));
+        document.getElementById('admModulos').innerHTML = MODULOS_ASIGNABLES().map(m => m.id === 'reportes'
+            ? REP_PERMISOS.map(([k, t]) => `<label><input type="checkbox" value="${k}" ${marcados.includes(k) || repViejo ? 'checked' : ''}> ${esc(t)}</label>`).join('')
+            : `<label><input type="checkbox" value="${m.id}" ${marcados.includes(m.id) ? 'checked' : ''}> ${esc(m.titulo)}</label>`).join('');
         document.getElementById('admVerExist').checked = marcados.includes('verexistencia');
         document.getElementById('admAdmin').checked = !!(u && u.admin);
         admToggleAdmin();
@@ -7828,7 +7940,8 @@
             id: admEditando || undefined,
             nombre: document.getElementById('admNombre').value.trim(),
             clave: c1 || undefined,
-            permisos: [...document.querySelectorAll('#admModulos input:checked')].map(i => i.value).concat(document.getElementById('admVerExist').checked ? ['verexistencia'] : []),
+            permisos: (l => l.some(p => /^rep_/.test(p)) ? l.concat(['reportes']) : l)([...document.querySelectorAll('#admModulos input:checked')].map(i => i.value))   // con algún reporte, el módulo abre en el menú
+                .concat(document.getElementById('admVerExist').checked ? ['verexistencia'] : []),
             admin: document.getElementById('admAdmin').checked,
             activo: document.getElementById('admActivo').checked
         };
@@ -15864,7 +15977,11 @@ Reglas:
         const c = rpt.corrida, ocupado = c && !c.fin, hoy = fechaLocalHoy();
         if (!rpt.desde) { rpt.desde = inicioSemana(hoy); rpt.hasta = hoy; }
         const dis = ocupado ? 'disabled' : '';
-        const tipos = Object.entries(RPT_TIPOS).map(([k, [n, d]]) => `<button type="button" class="rpt-tipo${rpt.reporte === k ? ' activo' : ''}" onclick="rpt.reporte='${k}';almPintar()" ${dis}><b>${n}</b><small>${d}</small></button>`).join('');
+        // Solo los reportes que esta clave tiene habilitados (Claves y permisos: existencia, ajustes y ventas por separado)
+        const permitidos = Object.keys(RPT_TIPOS).filter(k => esPrincipal || permisos.includes('rep_' + k) || (permisos.includes('reportes') && !permisos.some(p => /^rep_/.test(p))));
+        if (!permitidos.length) return '<div class="empty">Esta clave no tiene ningún reporte habilitado. Pídalo en Claves y permisos.</div>';
+        if (!ocupado && permitidos.indexOf(rpt.reporte) === -1) rpt.reporte = permitidos[0];
+        const tipos = Object.entries(RPT_TIPOS).filter(([k]) => permitidos.indexOf(k) !== -1).map(([k, [n, d]]) => `<button type="button" class="rpt-tipo${rpt.reporte === k ? ' activo' : ''}" onclick="rpt.reporte='${k}';almPintar()" ${dis}><b>${n}</b><small>${d}</small></button>`).join('');
         const fechas = rpt.reporte === 'existencia' ? '' : `<div><label for="rptDesde">Desde</label><input type="date" id="rptDesde" value="${esc(rpt.desde)}" max="${hoy}" onchange="rpt.desde=this.value" ${dis}></div>
             <div><label for="rptHasta">Hasta</label><input type="date" id="rptHasta" value="${esc(rpt.hasta)}" max="${hoy}" onchange="rpt.hasta=this.value" ${dis}></div>`;
         const rapidas = rpt.reporte === 'existencia' ? '' : `<div class="rpt-rapidas">${[['hoy', 'Hoy'], ['ayer', 'Ayer'], ['semana', 'Esta semana'], ['mes', 'Este mes'], ['mespasado', 'Mes pasado']]
@@ -15882,7 +15999,8 @@ Reglas:
                 ${ocupado ? `<button type="button" class="btn-ghost" onclick="rptDetener()">${ico('detener')}Detener</button>` : ''}</div>
             ${rptResultadoHTML()}`;
     }
-    const rptPideClave = r => r === 'ajustes' || r === 'ventas';
+    // (10/11) Ningún reporte pide la clave de administrador: cada uno se habilita por persona en Claves y permisos
+    const rptPideClave = () => false;
     async function rptGenerar(soloFallidas) {
         let c = rpt.corrida;
         const reporteAhora = soloFallidas && c ? c.reporte : rpt.reporte;
