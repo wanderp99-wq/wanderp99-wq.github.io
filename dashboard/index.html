@@ -3524,7 +3524,10 @@
                 const r = await llamarApi({ action: 'fb_token' });
                 pase = r;   // para avisar si las reglas de seguridad no se pudieron publicar
                 if (auth.currentUser && auth.currentUser.uid !== r.uid) await lib.au.signOut(auth);
-                if (!auth.currentUser || auth.currentUser.uid !== r.uid) await lib.au.signInWithCustomToken(auth, r.token);
+                // Siempre con el pase nuevo (una vez por página): trae los permisos de HOY. Antes, si este equipo ya había entrado con
+                // la misma persona, se quedaba con el pase viejo y un módulo nuevo (Venta express) daba "sin permiso".
+                await lib.au.signInWithCustomToken(auth, r.token);
+                try { await auth.currentUser.getIdToken(true); } catch (e) {}
                 uidActual = r.uid;
             })().finally(() => { entrando = null; });
             await entrando;
@@ -3572,7 +3575,8 @@
         // Reglas: '' si están al día; si no, el motivo (no se pudieron publicar o quedó una versión anterior)
         const problemaReglas = () => !pase ? '' : pase.reglasError ? 'las reglas de seguridad no se pudieron publicar: ' + pase.reglasError
                                           : pase.reglasQueriendo && pase.reglas !== pase.reglasQueriendo ? 'las reglas de seguridad publicadas son de otra versión (' + (pase.reglas || 'ninguna') + ')' : '';
-        return { cargar, listo, listoGuardado, salir, prueba, escuchar, uid: () => uidActual, problemaReglas };
+        const renovar = () => { uidActual = ''; };   // el próximo listo() pide un pase nuevo
+        return { cargar, listo, listoGuardado, renovar, salir, prueba, escuchar, uid: () => uidActual, problemaReglas };
     })();
     // Firebase como dato OFICIAL del efectivo (etapa 2c): activar copia la hoja entera; "Volver a la hoja" termina la copia
     // y la hoja vuelve a mandar; "Copiar a la hoja ahora" no espera la vuelta automática
@@ -3756,7 +3760,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-09.1';
+    const VERSION_SERVIDOR = '2026-11-10.1';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -6294,7 +6298,12 @@
     function vxEscuchar() {
         vx.offs.forEach(o => { try { o(); } catch (e) {} }); vx.offs = [];
         const { db, lib } = vx.fbl, fs = lib.fs, L = vxL();
-        const err = e => { vx.error = 'Firebase: ' + (e.code === 'permission-denied' ? 'sin permiso (publique la versión nueva y entre otra vez con internet)' : (e.code || e.message)); vxPintar(); };
+        const err = e => {
+            if (vx.error) return;   // un solo aviso (varias escuchas fallan a la vez)
+            const reglas = FB.problemaReglas ? FB.problemaReglas() : '';
+            vx.error = 'Firebase: ' + (e.code === 'permission-denied' ? 'sin permiso' + (reglas ? ': ' + reglas : '. Pulse Reintentar (pide un pase nuevo con sus permisos); si sigue, revise que su clave tenga el módulo Venta express.') : (e.code || e.message));
+            vx.listo = false; vx.offs.forEach(o => { try { o(); } catch (x) {} }); vx.offs = []; vxPintar();
+        };
         const pinta = () => { if (vistaActual === 'ventaexpress') vxPintar(); };
         vx.offs.push(fs.onSnapshot(fs.doc(db, 'express', L), s => { vx.cfg = s.exists() ? s.data() : {}; pinta(); }, err));
         vx.offs.push(fs.onSnapshot(fs.doc(db, 'express', L, 'datos', 'productos'), s => {
@@ -6370,7 +6379,7 @@
             <div class="vx-cab-d">${tasa ? `Tasa BCV <b>${fmt(tasa)}</b> · divisas ${fmt(vxTasaDiv())} (−${nfVE(0, 2).format(vxDesc())} %)` : '<span style="color:var(--danger)">Sin tasa BCV: revise internet o fije la tasa en Productos y ajustes</span>'}
                 ${vx.pend ? ` · <span class="chip st-amar">${vx.pend} ticket(s) por subir</span>` : vx.listo ? ' · <span class="chip st-ok">Al día en Firebase</span>' : ''}${vx.sinInternet ? ' <span class="chip st-falta">Sin internet</span>' : ''}</div></div>
             <div class="modo-tabs">${tabs.map(([k, n]) => `<button type="button" class="tab${vx.tab === k ? ' active' : ''}" onclick="vx.tab='${k}';vxPintar();vxFoco()">${n}</button>`).join('')}</div>`;
-        if (vx.error) return cab + `<div class="banner error" style="display:block">${esc(vx.error)}</div><div class="req-acciones"><button type="button" class="btn-ghost" onclick="vxConectar()">Reintentar</button></div>`;
+        if (vx.error) return cab + `<div class="banner error" style="display:block">${esc(vx.error)}</div><div class="req-acciones"><button type="button" class="btn-ghost" onclick="FB.renovar();vxConectar()">Reintentar</button></div>`;
         if (!vx.listo) return cab + cargandoHTML('Conectando con Firebase...');
         if (vx.tab === 'tickets') return cab + vxVistaTickets();
         if (vx.tab === 'cierre') return cab + vxVistaCierre();
