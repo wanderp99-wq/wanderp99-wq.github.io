@@ -725,6 +725,7 @@
         .per-reg-vence .per-reg-rapido { display: flex; gap: .35rem; flex-wrap: wrap; grid-column: 1 / -1; } .per-reg-vence .nota { grid-column: 1 / -1; }
         .per-num { background: none; border: 0; padding: 0; color: var(--primary); cursor: pointer; text-decoration: underline; font: inherit; font-weight: 700; white-space: nowrap; }
         .per-cuenta { max-width: 640px; overflow-x: hidden; } .per-cuenta .per-reg { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); } .per-cuenta .per-reg input { width: 100%; box-sizing: border-box; min-width: 0; } .per-cuenta .per-desglose td:first-child { color: var(--text-muted); width: 34%; }
+        .per-cuenta .per-desglose { table-layout: fixed; } .per-cuenta .per-desglose td:nth-child(2) { white-space: normal; overflow-wrap: anywhere; }   /* textos largos (vence, nombre) bajan de línea en vez de cortarse */
         .cua-faltante { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: center; margin: .75rem 0; padding: .7rem .9rem; border: 1px solid var(--bad); border-radius: 10px; background: var(--bad-bg); }
         /* Ventana "Nuevo registro" */
         .prg { max-width: 560px; width: 100%; overflow-x: hidden; }
@@ -3770,7 +3771,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-11.1';
+    const VERSION_SERVIDOR = '2026-11-11.3';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -11962,7 +11963,7 @@
     let perDeudasHist = false, perDeudasDesde = '', perDeudasHasta = '';
     // Se guardan las dos lecturas: pendientes y el histórico (por fechas). El histórico trae también todo lo pendiente,
     // así que al volver a "Pendientes" no se pide nada: se quita lo pagado.
-    let perDeudasPend = null, perDeudasHistDatos = null, perDeudasCargandoHist = false;
+    let perDeudasPend = null, perDeudasHistDatos = null, perDeudasCargandoHist = false, perDeudasHistFallo = '';
     const perDeudasClaveHist = () => perDeudasDesde + '|' + perDeudasHasta;
     async function perCargarDeudas() {
         const hist = perDeudasHist, clave = perDeudasClaveHist();
@@ -11973,10 +11974,11 @@
             const r = await llamarApi(Object.assign({ action: 'cxc_deudas' }, hist ? { historico: true, desde: perDeudasDesde, hasta: perDeudasHasta } : {}));
             if (hist) {
                 if (clave !== perDeudasClaveHist()) return;   // cambiaron las fechas mientras tanto
-                perDeudasHistDatos = Object.assign(r, { clave });
+                perDeudasHistDatos = Object.assign(r, { clave }); perDeudasHistFallo = '';
                 perDeudasPend = Object.assign({}, r, { historico: false, deudas: r.deudas.filter(x => x.estado !== 'pagado'), gastosVerif: r.gastosVerif });   // de paso, pendientes al día
             } else perDeudasPend = r;
         } catch (e) {
+            if (hist) perDeudasHistFallo = clave;
             if (!perDeudasPend) { if (perTab === 'deudas') document.getElementById('perContenido').innerHTML = `<div class="banner error">${esc(e.message)}</div>`; else mostrarBanner('No se pudieron leer las deudas: ' + e.message, 'error'); return; }
             mostrarBanner('No se pudo leer el histórico: ' + e.message, 'error');
         } finally { if (hist) perDeudasCargandoHist = false; }
@@ -12105,6 +12107,8 @@
         if (!perDeudasPend) { if (!perDeudasCargandoHist) setTimeout(perCargarDeudas, 0); return cargandoHTML('Cargando deudas de BD NOMINA...'); }
         // Histórico listo para esas fechas, o (mientras llega) lo pendiente
         const histListo = perDeudasHist && perDeudasHistDatos && perDeudasHistDatos.clave === perDeudasClaveHist();
+        // El histórico se borró (abono, cambio, Actualizar) o nunca se pidió para estas fechas: se pide (una vez; si falla, no se insiste)
+        if (perDeudasHist && !histListo && !perDeudasCargandoHist && perDeudasHistFallo !== perDeudasClaveHist()) { perDeudasCargandoHist = true; setTimeout(perCargarDeudas, 0); }
         const perDeudasDatos = histListo ? perDeudasHistDatos : perDeudasPend;
         const gastos = perDeudasQuien === 'gastos';
         // Un filtro de estado que no existe en esta sección (p. ej. "vencido" en gastos) se quita
@@ -12135,7 +12139,9 @@
                 ${perDeudasHist ? `<label class="per-fecha">Desde <input type="date" id="perDDesde" value="${perDeudasDesde}" onchange="perDeudasFechas()"></label>
                                    <label class="per-fecha">Hasta <input type="date" id="perDHasta" value="${perDeudasHasta}" onchange="perDeudasFechas()"></label>` : ''}
             </div>`;
-        const cargandoPag = perDeudasHist && !histListo ? `<div class="per-filtro-activo">Cargando lo pagado del ${fechaBonita(perDeudasDesde)} al ${fechaBonita(perDeudasHasta)}... (mientras, se ve lo pendiente)</div>` : '';
+        const cargandoPag = perDeudasHist && !histListo && perDeudasHistFallo === perDeudasClaveHist()
+            ? `<div class="per-filtro-activo">No se pudo leer lo pagado del ${fechaBonita(perDeudasDesde)} al ${fechaBonita(perDeudasHasta)} (se ve lo pendiente) · <a href="#" onclick="perDeudasHistFallo = ''; perPintar(); return false;">Reintentar</a></div>`
+            : perDeudasHist && !histListo ? `<div class="per-filtro-activo">Cargando lo pagado del ${fechaBonita(perDeudasDesde)} al ${fechaBonita(perDeudasHasta)}... (mientras, se ve lo pendiente)</div>` : '';
         const elegido = exacto ? (lista[0] ? lista[0].nombre : document.getElementById('perBuscar').value) : '';
         const filtro = cargandoPag + (exacto ? `<div class="per-filtro-activo">Mostrando solo a <b>${esc(elegido)}</b> · <a href="#" data-n="${esc(elegido)}" onclick="perHistAbrir(this.dataset.n); return false;"><b>ver historial completo</b></a> · <a href="#" onclick="perLiberarFiltro(); return false;">ver a todos</a></div>` : '');
         const resumen = gastos ? perGastosResumen(lista, perDeudasDatos) : perDeudasResumen(lista, perDeudasDatos.hoy);
