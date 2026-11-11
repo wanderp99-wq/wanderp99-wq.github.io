@@ -1655,20 +1655,60 @@
     function mfEnfocar() { const i = document.getElementById('mfCodigo'); if (i && !document.getElementById('mfPantalla').classList.contains('hidden') && !document.getElementById('mfPasos').innerHTML) i.focus(); }
     document.addEventListener('click', () => setTimeout(mfEnfocar, 50));
     function mfEnviarCampo(ev) { ev.preventDefault(); const i = document.getElementById('mfCodigo'), c = i.value.replace(/\D/g, ''); i.value = ''; if (c) mfMarcar(c); }
-    async function mfMarcar(codigo, paso) {
+    // ---- Marcas en Firebase (11/11): el pase queda PRIMERO en Firestore con la hora del servidor de Firebase (~1 segundo) y ya se
+    // ve "Marca recibida": la persona se puede ir y el siguiente pasa su carnet sin esperar a Google. El resultado (entrada o salida)
+    // llega después de Google; si Google no responde, la marca se pasa sola desde Firebase. Sin internet: como antes (COLA).
+    const MF_CONOCIDOS = 'ficha_marcaje_conocidos';   // código leído -> nombre y foto (para mostrarlos al instante la próxima vez)
+    let mfActual = '';
+    const mfConocidos = () => { try { return JSON.parse(localStorage.getItem(MF_CONOCIDOS) || '{}') || {}; } catch (e) { return {}; } };
+    function mfAprender(codigo, r) {
+        if (!r || !r.nombre) return;
+        try {
+            const m = mfConocidos(); delete m[codigo]; m[codigo] = { n: r.nombre, f: r.foto || '' };
+            const k = Object.keys(m); k.slice(0, Math.max(0, k.length - 300)).forEach(x => delete m[x]);
+            localStorage.setItem(MF_CONOCIDOS, JSON.stringify(m));
+        } catch (e) {}
+    }
+    async function mfAFirebase(id, token, codigo) {
+        if (!/^\d{12,30}$/.test(codigo) || !token || !mfLocalActual) return null;
+        const base = 'projects/plazavalencia-c2cb0/databases/(default)/documents';
+        const cuerpo = { writes: [{ update: { name: base + '/marcas/' + id, fields: { equipo: { stringValue: token }, codigo: { stringValue: codigo },
+            local: { stringValue: mfLocalActual }, estado: { stringValue: 'pendiente' }, creadoLocal: { integerValue: String(Date.now()) } } },
+            updateTransforms: [{ fieldPath: 'creado', setToServerValue: 'REQUEST_TIME' }], currentDocument: { exists: false } }] };
+        try {
+            const c = new AbortController(), t = setTimeout(() => c.abort(), 5000);
+            const r = await fetch('https://firestore.googleapis.com/v1/' + base + ':commit?key=' + FB_LLAVE_API,
+                                  { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo), signal: c.signal });
+            clearTimeout(t);
+            if (!r.ok) return null;
+            const j = await r.json(), ts = ((((j.writeResults || [])[0] || {}).transformResults) || [])[0];
+            const d = new Date((ts && ts.timestampValue) || j.commitTime || Date.now());
+            return isNaN(d) ? null : d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Caracas' });
+        } catch (e) { return null; }
+    }
+    async function mfMarcar(codigo, paso, bandejaId) {
         const token = mfEquipos()[mfLocalActual];
         if (!token || mfOcupado) return;
         if (!paso && codigo === mfUltimo.codigo && Date.now() - mfUltimo.en < 60000) return;   // el mismo carnet otra vez dentro de 1 minuto (cámara o lector USB): no se marca de nuevo
         mfUltimo = { codigo, en: Date.now() }; mfOcupado = true;
         mfResultado({ cargando: true });
-        const idem = COLA.nuevoIdem(), datos = Object.assign({ action: 'marca_registrar', equipo: token, codigo, idem }, paso ? { paso } : {});
+        const idem = COLA.nuevoIdem(), mio = mfActual = idem;
+        const hora = paso ? null : await mfAFirebase(idem, token, codigo);
+        const conocido = mfConocidos()[codigo] || {};
+        const recibida = espera => mfResultado({ recibida: true, espera, hora, nombre: conocido.n || '', foto: conocido.f || '' });
+        if (hora) { mfOcupado = false; recibida(false); }
+        const datos = Object.assign({ action: 'marca_registrar', equipo: token, codigo, idem }, hora ? { bandeja: true } : {}, paso ? { paso } : {}, bandejaId ? { bandejaId } : {});
         try {
             const r = await mfApi(datos);
+            mfAprender(codigo, r);
+            if (mfActual !== mio) return;   // ya pasó otro carnet: no se tapa su pantalla
             if (r.elegirPaso) {
+                const bid = hora ? idem : (bandejaId || '');
                 mfResultado(Object.assign({}, r, { pregunta: true }));
-                document.getElementById('mfPasos').innerHTML = r.opciones.map(p => `<button type="button" class="btn-add" onclick="document.getElementById('mfPasos').innerHTML=''; mfMarcar('${codigo}', '${p}')">${MF_PASOS[p]}</button>`).join('');
+                document.getElementById('mfPasos').innerHTML = r.opciones.map(p => `<button type="button" class="btn-add" onclick="document.getElementById('mfPasos').innerHTML=''; mfMarcar('${codigo}', '${p}', '${bid}')">${MF_PASOS[p]}</button>`).join('');
             } else mfResultado(r);
         } catch (e) {
+            if (hora) { if (mfActual === mio) { if (e.sinRespuesta) recibida(true); else mfResultado({ error: e.message }); } return; }   // ya está en Firebase: se pasa sola
             // Sin internet: la marca queda guardada con la hora de este equipo y se envía sola al volver la conexión
             if (e.sinRespuesta && await COLA.sinInternet()) {
                 const hora = COLA.ahoraLocal().slice(11);
@@ -1679,7 +1719,7 @@
             // El equipo dejó de estar autorizado: se olvida para que lo autoricen otra vez
             if (/no está autorizado/i.test(e.message)) { const eq = mfEquipos(); delete eq[mfLocalActual]; localStorage.setItem(MF_LLAVE, JSON.stringify(eq)); }
             mfResultado({ error: e.message });
-        } finally { mfOcupado = false; }
+        } finally { if (!hora) mfOcupado = false; }
     }
     function mfResultado(r) {
         clearTimeout(mfLimpiarId);
@@ -1687,6 +1727,15 @@
         if (!r || !r.pregunta) document.getElementById('mfPasos').innerHTML = '';
         if (!r) { caja.className = 'mf-resultado'; caja.innerHTML = '<div class="mf-espera">Pase el carnet por el lector, o muestre a la cámara el código QR (el cuadrado) del carnet</div>'; return; }
         if (r.cargando) { caja.className = 'mf-resultado'; caja.innerHTML = '<div class="mf-espera">Marcando...</div>'; return; }
+        if (r.recibida) {   // ya está en Firebase con su hora; el detalle llega de Google
+            const foto = mfFoto(r.foto);
+            caja.className = 'mf-resultado ok';
+            caja.innerHTML = `<div class="mf-persona">${foto ? `<img src="${foto}" alt="">` : `<span class="mf-inicial">${escAsis((r.nombre || '✓').slice(0, 1))}</span>`}
+                <div>${r.nombre ? `<div class="mf-nombre">${escAsis(r.nombre)}</div>` : ''}<div class="mf-titulo">Marca recibida · ${mfHora(r.hora)}</div>
+                <div class="mf-msj">${r.espera ? 'Quedó guardada y se registrará sola en unos minutos. No pase el carnet otra vez.' : 'Confirmando entrada o salida...'}</div></div></div>`;
+            mfLimpiarId = setTimeout(() => { mfResultado(null); mfEnfocar(); }, 12000);
+            return;
+        }
         if (r.pendiente) { caja.className = 'mf-resultado alerta'; caja.innerHTML = `<div class="mf-titulo">Marca guardada sin conexión · ${mfHora(r.hora)}</div><div class="mf-msj">Se registrará sola, con esta hora, cuando vuelva internet. No pase el carnet otra vez.</div>`; mfLimpiarId = setTimeout(() => { mfResultado(null); mfEnfocar(); }, 12000); return; }
         if (r.error) { caja.className = 'mf-resultado mal'; caja.innerHTML = `<div class="mf-titulo">No se marcó</div><div class="mf-msj">${escAsis(r.error)}</div>`; }
         else {

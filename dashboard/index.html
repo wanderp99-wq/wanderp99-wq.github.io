@@ -3772,7 +3772,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-11.4';
+    const VERSION_SERVIDOR = '2026-11-11.5';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -17043,7 +17043,40 @@ Reglas:
         i.value = '';
         if (c) marcaRegistrar(c);
     }
-    async function marcaRegistrar(codigo, paso) {
+    // ---- Marcas en Firebase (11/11): el pase queda PRIMERO en Firestore (con la hora del servidor de Firebase, en ~1 segundo) y la
+    // pantalla ya dice "Marca recibida": la persona se puede ir y el siguiente pasa su carnet sin esperar a Google. Después llega
+    // de Google el resultado (entrada o salida, mensajes) y se muestra si nadie más pasó. Si Google no responde, la marca se pasa
+    // sola desde Firebase (Firebase.gs · fbMarcasAplicar). Sin internet: como antes (queda en este equipo y se envía al volver).
+    const MARCA_CONOCIDOS = 'marcaje_conocidos';   // código leído -> nombre y foto (para mostrarlos al instante la próxima vez)
+    let marcaActual = '';
+    const marcaConocidos = () => { try { return JSON.parse(localStorage.getItem(MARCA_CONOCIDOS) || '{}') || {}; } catch (e) { return {}; } };
+    function marcaAprender(codigo, r) {
+        if (!r || !r.nombre) return;
+        try {
+            const m = marcaConocidos(); delete m[codigo]; m[codigo] = { n: r.nombre, f: r.foto || '' };
+            const k = Object.keys(m); k.slice(0, Math.max(0, k.length - 300)).forEach(x => delete m[x]);
+            localStorage.setItem(MARCA_CONOCIDOS, JSON.stringify(m));
+        } catch (e) {}
+    }
+    // Deja el pase en Firestore marcas/{id}. Devuelve la hora "HH:mm" que puso Firebase, o null si no se pudo (sin internet, reglas)
+    async function marcaAFirebase(id, eq, codigo) {
+        if (!/^\d{12,30}$/.test(codigo) || !eq.token || !eq.local) return null;
+        const base = `projects/${FB_CONFIG.projectId}/databases/(default)/documents`;
+        const cuerpo = { writes: [{ update: { name: `${base}/marcas/${id}`, fields: { equipo: { stringValue: eq.token }, codigo: { stringValue: codigo },
+            local: { stringValue: eq.local }, estado: { stringValue: 'pendiente' }, creadoLocal: { integerValue: String(Date.now()) } } },
+            updateTransforms: [{ fieldPath: 'creado', setToServerValue: 'REQUEST_TIME' }], currentDocument: { exists: false } }] };
+        try {
+            const c = new AbortController(), t = setTimeout(() => c.abort(), 5000);
+            const r = await fetch(`https://firestore.googleapis.com/v1/${base}:commit?key=${FB_CONFIG.apiKey}`,
+                                  { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo), signal: c.signal });
+            clearTimeout(t);
+            if (!r.ok) return null;
+            const j = await r.json(), ts = ((((j.writeResults || [])[0] || {}).transformResults) || [])[0];
+            const d = new Date((ts && ts.timestampValue) || j.commitTime || Date.now());
+            return isNaN(d) ? null : d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Caracas' });
+        } catch (e) { return null; }
+    }
+    async function marcaRegistrar(codigo, paso, bandejaId) {
         const eq = marcaEquipo();
         if (!eq || marcaOcupado) return;
         // La cámara lee el mismo carnet varias veces seguidas: se ignora lo repetido en 4 segundos
@@ -17051,17 +17084,32 @@ Reglas:
         marcaUltimo = { codigo, en: Date.now() };
         marcaOcupado = true;
         marcaResultado({ cargando: true });
+        const id = 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10), mio = marcaActual = id;
+        // 1) Firebase: en cuanto la marca está a salvo, el equipo queda libre para el siguiente carnet
+        const hora = paso ? null : await marcaAFirebase(id, eq, codigo);
+        const conocido = marcaConocidos()[codigo] || {};
+        const recibida = espera => marcaResultado({ recibida: true, espera, hora, nombre: conocido.n || '', foto: conocido.f || '' });
+        if (hora) { marcaOcupado = false; recibida(false); }
+        // 2) Google: el resultado de siempre (entrada o salida, mensajes, o la pregunta de la oficina)
         try {
-            const r = await llamarApi(Object.assign({ action: 'marca_registrar', equipo: eq.token, codigo }, paso ? { paso } : {}));
-            if (r.elegirPaso) marcaElegirPaso(codigo, r); else marcaResultado(r);
-        } catch (e) { marcaResultado({ error: e.message }); }
-        finally { marcaOcupado = false; }
+            const r = await llamarApi(Object.assign({ action: 'marca_registrar', equipo: eq.token, codigo, idem: id }, hora ? { bandeja: true } : {},
+                                                    paso ? { paso } : {}, bandejaId ? { bandejaId } : {}));
+            marcaAprender(codigo, r);
+            if (marcaActual !== mio) return;   // ya pasó otro carnet: no se tapa su pantalla
+            if (r.pendiente && hora) recibida(true);
+            else if (r.elegirPaso) marcaElegirPaso(codigo, r, hora ? id : (bandejaId || ''));
+            else marcaResultado(r);
+        } catch (e) {
+            if (marcaActual !== mio) return;
+            if (hora && e.sinRespuesta) recibida(true);   // ya está en Firebase: se pasa sola
+            else marcaResultado({ error: e.message });
+        } finally { if (!hora) marcaOcupado = false; }
     }
     // Oficina: después de la entrada puede tocar salida a almuerzo o salida
-    function marcaElegirPaso(codigo, r) {
+    function marcaElegirPaso(codigo, r, bandejaId) {
         marcaResultado(Object.assign({}, r, { pregunta: true }));
         document.getElementById('marcaPasos').innerHTML = r.opciones.map(p =>
-            `<button type="button" class="btn-primary marca-paso" onclick="document.getElementById('marcaPasos').innerHTML=''; marcaRegistrar('${codigo}', '${p}')">${MARCA_PASOS[p]}</button>`).join('');
+            `<button type="button" class="btn-primary marca-paso" onclick="document.getElementById('marcaPasos').innerHTML=''; marcaRegistrar('${codigo}', '${p}', '${bandejaId || ''}')">${MARCA_PASOS[p]}</button>`).join('');
     }
     function marcaResultado(r) {
         clearTimeout(marcaLimpiar);
@@ -17069,6 +17117,15 @@ Reglas:
         if (!r || (!r.pregunta)) document.getElementById('marcaPasos').innerHTML = '';
         if (!r) { caja.className = 'marca-resultado'; caja.innerHTML = '<div class="marca-espera">Pase su carnet por el lector, o muestre a la cámara el código QR (el cuadrado) del carnet</div>'; return; }
         if (r.cargando) { caja.className = 'marca-resultado'; caja.innerHTML = '<div class="marca-espera">Marcando...</div>'; return; }
+        if (r.recibida) {   // ya está en Firebase con su hora; el detalle llega de Google
+            const foto = r.foto ? fotoDrive(r.foto, 300) : '';
+            caja.className = 'marca-resultado ok';
+            caja.innerHTML = `<div class="marca-persona">${foto ? `<img src="${foto}" alt="">` : `<span class="marca-inicial">${esc((r.nombre || '✓').slice(0, 1))}</span>`}
+                <div>${r.nombre ? `<div class="marca-nombre">${esc(r.nombre)}</div>` : ''}<div class="marca-titulo">Marca recibida · ${esc(horaAmPm(r.hora))}</div>
+                <div class="marca-msj">${r.espera ? 'Quedó guardada y se registrará sola en unos minutos. No pase el carnet otra vez.' : 'Confirmando entrada o salida...'}</div></div></div>`;
+            marcaLimpiar = setTimeout(() => { marcaResultado(null); marcaEnfocar(); }, 12000);
+            return;
+        }
         if (r.pendiente) { caja.className = 'marca-resultado alerta'; caja.innerHTML = `<div class="marca-titulo">Marca guardada sin conexión · ${esc(r.hora)}</div><div class="marca-msj">Se registrará sola, con esta hora, cuando vuelva internet. No pase el carnet otra vez.</div>`; marcaLimpiar = setTimeout(() => marcaResultado(null), 12000); return; }
         if (r.error) { caja.className = 'marca-resultado mal'; caja.innerHTML = `<div class="marca-titulo">No se marcó</div><div class="marca-msj">${esc(r.error)}</div>`; }
         else {
