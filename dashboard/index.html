@@ -3302,7 +3302,7 @@
         if (TIEMPOS.length > 60) TIEMPOS.pop();
     }
     // Solo lectura: si la respuesta de Google no llega, se reintenta una vez sola (no cambia nada en la hoja)
-    const SOLO_LECTURA = /^(nom_semana|login|fb_token|fb_prueba|list|cuadre_detalle|cuadre_detalle_lote|mov_listar|cuentas_listar|conc_listar|efe_listar|cc_listar|req_datos|req_ventas|req_historial|asis_hoy|asis_listar|asisg_listar|per_listar|cxc_deudas|nom_historial|nom_autorizar|nom_ajustes|hor_datos|alm_datos|alm_notas|alm_ingresos|alm_kardex|alm_seguimiento|alm_tiendas|alm_existencias|alm_espera_listar|cmp_compras|cmp_ordenes|cmp_enlazar|cmp_borradores|cmp_borrador|pnom_listar|ping|cambios|pendientes|enlinea|marca_estado)$/;
+    const SOLO_LECTURA = /^(nom_semana|fb_hoja_leer|login|fb_token|fb_prueba|list|cuadre_detalle|cuadre_detalle_lote|mov_listar|cuentas_listar|conc_listar|efe_listar|cc_listar|req_datos|req_ventas|req_historial|asis_hoy|asis_listar|asisg_listar|per_listar|cxc_deudas|nom_historial|nom_autorizar|nom_ajustes|hor_datos|alm_datos|alm_notas|alm_ingresos|alm_kardex|alm_seguimiento|alm_tiendas|alm_existencias|alm_espera_listar|cmp_compras|cmp_ordenes|cmp_enlazar|cmp_borradores|cmp_borrador|pnom_listar|ping|cambios|pendientes|enlinea|marca_estado)$/;
     // Guardados sin repetir: cada cambio lleva un "idem". Si no llegó la respuesta y se vuelve a pulsar el MISMO cambio,
     // se manda el mismo idem y Google responde "ya estaba registrado" en vez de guardarlo otra vez.
     const idemPendientes = new Map();   // contenido del cambio -> idem del intento sin respuesta
@@ -3343,7 +3343,7 @@
     // ==========================================
     const DATOS = (() => {
         // Lecturas que no se copian: entrar, avisos, lo que cambia a cada momento o es de una sola vez
-        const NO_COPIAR = /^(login|fb_token|fb_prueba|ping|cambios|pendientes|enlinea|marca_estado|cmp_enlazar|cmp_borrador|nom_autorizar|alm_kardex|alm_seguimiento)$/;
+        const NO_COPIAR = /^(login|fb_token|fb_prueba|fb_hoja_leer|ping|cambios|pendientes|enlinea|marca_estado|cmp_enlazar|cmp_borrador|nom_autorizar|alm_kardex|alm_seguimiento)$/;
         const VIGENCIA = 3 * 24 * 3600 * 1000;   // lo guardado hace más de 3 días no se muestra
         const RECIENTE = 20000;                   // leído de Google hace menos de 20 s: no se vuelve a preguntar
         const memoria = new Map();                // llave -> { s (texto), t (cuándo), ver (versiones de sus áreas) }
@@ -3650,6 +3650,358 @@
         } catch (e) { out.innerHTML = `<div class="banner error" style="display:block">${esc(e.message)}</div>`; }
         finally { if (document.getElementById('fbEstado')) setTimeout(fbEstadoCargar, 0); btn.disabled = false; btn.textContent = texto; }
     }
+    // ---------- Hojas de Firebase leídas DIRECTO por el panel (12/11, Nómina etapa 1) ----------
+    // Misma forma que guarda Apps Script (HojaFirebase.gs): <col>/meta { ultima }, <col>/b<n> { f: { r<fila>: { c<col>: valor } } }.
+    // Se arma igual que getValues() de Google: filas 2 a la última, celdas vacías = ''. Las columnas calculadas ya vienen guardadas.
+    const FBH_HOJAS = { 'BD ASISTENCIA': ['hoja_asistencia', 10], 'BD ASISTENCIA OFICINA': ['hoja_asis_oficina', 10], 'BASE DE DATOS CUADRE DE CAJA': ['hoja_cuadre', 42],
+        'BD NOMINA': ['hoja_nomina', 13], 'BD CXC': ['hoja_cxc', 20], 'BD PAGOS NOMINA': ['hoja_pagos_nomina', 35], 'BD NOMINA AJUSTES': ['hoja_nomina_ajustes', 6],
+        'BD TRABAJADORES': ['hoja_trabajadores', 17], 'BD PERFILES': ['hoja_perfiles', 13], 'BD HORARIOS': ['hoja_horarios', 15], 'BD CLIENTES': ['hoja_clientes', 7],
+        'ALM CLIENTES': ['hoja_alm_clientes', 11], 'ALM PROVEEDORES': ['hoja_alm_proveedores', 7] };
+    const FBH = (() => {
+        function armar(nombre, docs) {
+            const cols = FBH_HOJAS[nombre][1], filas = {};
+            let ultima = 1;
+            docs.forEach(d => {
+                const x = typeof d.data === 'function' ? d.data() : d, id = d.id || d._id;
+                if (id === 'meta') ultima = Number(x.ultima) || 1;
+                else if (/^b\d+$/.test(id)) Object.keys(x.f || {}).forEach(k => { const n = Number(k.slice(1)); if (n >= 1) filas[n] = x.f[k] || {}; });
+            });
+            const valores = [];
+            for (let n = 2; n <= ultima; n++) { const r = filas[n] || {}, fila = []; for (let c = 1; c <= cols; c++) { const v = r['c' + c]; fila.push(v === undefined || v === null ? '' : v); } valores.push(fila); }
+            return { nombre, ultima, valores };
+        }
+        async function leer(nombre, desdeServidor) {
+            const { db, lib } = await FB.listo(), ref = lib.fs.collection(db, FBH_HOJAS[nombre][0]);
+            const s = await (desdeServidor ? lib.fs.getDocsFromServer(ref) : lib.fs.getDocs(ref));
+            return armar(nombre, s.docs);
+        }
+        // Lo que publica Apps Script aparte (config/nomina, vista/trabajadores): { datos: JSON }
+        async function doc(ruta) {
+            const { db, lib } = await FB.listo(), [c, d] = ruta.split('/'), s = await lib.fs.getDocFromServer(lib.fs.doc(db, c, d));
+            return s.exists() ? JSON.parse(s.data().datos || 'null') : null;
+        }
+        return { leer, armar, doc };
+    })();
+    // ---------- La nómina de la semana calculada EN EL PANEL con lo de Firebase (12/11, etapa 2) ----------
+    // Son las MISMAS reglas que nom_semana en Apps Script, copiadas de CuadreSistema.gs (asisGestionListar, asisLeer, personaOficial,
+    // bloquePorFecha...) y de Personal.gs (cxcDeudas, leerCxc, nominaHistorial, horLeer, nominaAjustesLeer...). Si se cambia una regla
+    // allá, hay que cambiarla aquí también: el modo comparar (Tiempos) lo avisa.
+    // H = { nombre de hoja: FBH.armar(...) }, cfg = config/nomina, trabajadores = vista/trabajadores (sin el código del carnet).
+    const NOMFB = (() => {
+        const normTxt = v => String(v || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
+        const textoCelda = v => String(v == null ? '' : v).trim();
+        const numCelda = v => { const n = Number(String(v).replace(',', '.')); return isFinite(n) ? n : 0; };
+        const esVerdadero = v => v === true || String(v).toUpperCase() === 'TRUE';
+        function normalizarFecha(v) {
+            const t = String(v || '').trim();
+            let m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+            if (m) return m[1] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[3]).slice(-2);
+            m = t.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+            if (m) return m[3] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[1]).slice(-2);
+            return '';
+        }
+        const TIENDAS = { SR: 'Santa Rosa', RU: 'Ricardo Urriera', IS: 'Isabelica', PS: 'Parcelas' };
+        function nombreTienda(v) {
+            const t = String(v || '').trim();
+            if (TIENDAS[t.toUpperCase()]) return TIENDAS[t.toUpperCase()];
+            const simple = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
+            return Object.keys(TIENDAS).map(k => TIENDAS[k]).find(n => simple(n) === simple(t)) || t;
+        }
+        function asisHora(v) { const m = String(v || '').trim().match(/^(\d{1,2}):(\d{2})/); return m ? ('0' + m[1]).slice(-2) + ':' + m[2] : ''; }
+        const asisMin = h => { const m = /^(\d{2}):(\d{2})$/.exec(h || ''); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
+        function asisHoras(r) {
+            const e = asisMin(r.entrada), sa = asisMin(r.salidaAlmuerzo), ra = asisMin(r.regresoAlmuerzo), s = asisMin(r.salida);
+            const dif = (a, b) => { let d = b - a; if (d < 0) d += 24 * 60; return d; };
+            const almuerzo = sa !== null && ra !== null ? dif(sa, ra) : 0;
+            return { horasAlmuerzo: sa !== null && ra !== null ? Math.round(almuerzo / 6) / 10 : '', horasTrabajadas: e !== null && s !== null ? Math.round((dif(e, s) - almuerzo) / 6) / 10 : '' };
+        }
+        function horaVista(t) {
+            const m = /^(\d{1,2}):(\d{2})(?::\d{2})?\s*([ap])?\.?\s*m?\.?$/i.exec(textoCelda(t));
+            if (!m) return '';
+            let h = +m[1];
+            if (m[3]) { const pm = /p/i.test(m[3]); if (pm && h < 12) h += 12; if (!pm && h === 12) h = 0; }
+            return h > 23 || +m[2] > 59 ? '' : ('0' + h).slice(-2) + ':' + m[2];
+        }
+        const sumarDiasISO = (iso, n) => { const p = iso.split('-').map(Number); return new Date(Date.UTC(p[0], p[1] - 1, p[2] + n)).toISOString().slice(0, 10); };
+        const fechaEn = (zona, ms) => new Intl.DateTimeFormat('en-CA', { timeZone: zona, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ms));
+        function viernesDeLaSemana(iso) {
+            const p = iso.split('-').map(Number), d = new Date(Date.UTC(p[0], p[1] - 1, p[2]));
+            d.setUTCDate(d.getUTCDate() + (5 - d.getUTCDay() + 7) % 7);
+            return d.toISOString().slice(0, 10);
+        }
+        // Una hoja armada: filas 2..última como { r, fila }, igual que filasHoja
+        const vacia = { ultima: 1, valores: [] };
+        const filasHoja = (h, n) => (h || vacia).valores.map((r, i) => ({ r: r.slice(0, n), fila: i + 2 }));
+        const celda = (h, fila, col) => { const r = h.valores[fila - 2]; return r && r[col - 1] !== undefined ? r[col - 1] : ''; };
+        // bloquePorFecha igual que en Google: de atrás hacia adelante en trozos de 1500 filas; para cuando un trozo ya no tiene fechas recientes
+        function bloquePorFecha(h, colFecha, numCols, desde, hasta) {
+            h = h || vacia;
+            const ultima = h.ultima;
+            if (ultima < 2) return [];
+            hasta = hasta || '9999-12-31';
+            const limite = sumarDiasISO(desde, -15), TROZO = 1500, salida = [];
+            let fin = ultima;
+            while (fin >= 2) {
+                const ini = Math.max(2, fin - TROZO + 1);
+                let hayRecientes = false, a = -1, b = -1;
+                for (let f = ini; f <= fin; f++) {
+                    const fe = normalizarFecha(celda(h, f, colFecha)), i = f - ini;
+                    if (fe && fe >= limite) hayRecientes = true;
+                    if (fe && fe >= desde && fe <= hasta) { if (a < 0) a = i; b = i; }
+                }
+                if (a >= 0) for (let f = ini + a; f <= ini + b; f++) {
+                    const r = []; for (let c = 1; c <= numCols; c++) r.push(celda(h, f, c));
+                    const fe = normalizarFecha(r[colFecha - 1]);
+                    if (fe && fe >= desde && fe <= hasta) salida.push({ r, fila: f });
+                }
+                if (!hayRecientes) break;
+                fin = ini - 1;
+            }
+            return salida.sort((x, y) => x.fila - y.fila);
+        }
+
+        function calcular(sem, H, cfg, trabajadores) {
+            const zona = cfg.zona || 'America/Caracas', hoy = fechaEn(zona, Date.now()), desde = sem, hasta = sumarDiasISO(sem, 6);
+            const C = cfg.horarios || {}, trab = trabajadores || [];
+            const tolerancia = Number(C.tolerancia) || 5, deps = C.departamentos || [];
+            // personaOficial: el nombre oficial de BD TRABAJADORES (exacto, o el único que tiene todas esas palabras)
+            const pal = s => normTxt(s).replace(/[^A-Z0-9 ]/g, ' ').split(/\s+/).filter(w => w.length > 2);
+            const ofi = { exacto: new Map(trab.map(t => [normTxt(t.nombre), t.nombre])), lista: trab.map(t => ({ nombre: t.nombre, p: new Set(pal(t.nombre)) })), memo: {} };
+            const personaOficial = nombre => {
+                const n = String(nombre || '').trim(); if (!n) return n;
+                const k = normTxt(n);
+                if (!(k in ofi.memo)) { let r = ofi.exacto.get(k); if (!r) { const w = pal(n), m = w.length >= 2 ? ofi.lista.filter(x => w.every(y => x.p.has(y))) : []; r = m.length === 1 ? m[0].nombre : n; } ofi.memo[k] = r; }
+                return ofi.memo[k];
+            };
+            // ---- Asistencia (asisGestionListar) ----
+            const shO = H['BD ASISTENCIA OFICINA'];
+            const oficina = filasHoja(shO, 10).map(({ r, fila }) => {
+                const x = { fila, fecha: normalizarFecha(r[0]), persona: personaOficial(r[1]), entrada: asisHora(r[2]), salidaAlmuerzo: asisHora(r[3]), regresoAlmuerzo: asisHora(r[4]), salida: asisHora(r[5]),
+                            nota: String(r[8] || '').trim(), modificado: String(r[9] || '').trim() };
+                return Object.assign(x, asisHoras(x));
+            }).filter(x => x.fecha && x.persona).filter(x => x.fecha >= desde && x.fecha <= hasta);
+            const shL = H['BD ASISTENCIA'] || vacia;
+            const locales = bloquePorFecha(shL, 1, 10, desde, hasta).map(({ r, fila }) => ({
+                fila, fecha: normalizarFecha(r[0]), tienda: nombreTienda(r[1]) || String(r[1]).trim(), turno: String(r[2]).trim(), trabajador: personaOficial(r[3]),
+                entrada: asisHora(r[4]), salida: asisHora(r[5]), horas: r[6] === '' || r[6] === null ? '' : Number(r[6]) || 0,
+                responsable: String(r[7]).trim(), ficha: String(r[8]).trim(), registrado: String(r[9] || '').trim()
+            })).filter(x => x.fecha && x.trabajador);
+            const letraTurno = t => /^MAN/.test(normTxt(t)) ? 'M' : /^TAR/.test(normTxt(t)) ? 'T' : normTxt(t);
+            const conCarnet = new Set(locales.filter(x => /^carnet/i.test(x.responsable)).map(x => x.fecha + '|' + normTxt(x.trabajador) + '|' + letraTurno(x.turno)));
+            for (let i = locales.length - 1; i >= 0; i--) {
+                const x = locales[i];
+                if (!/^carnet/i.test(x.responsable) && !/^panel$/i.test(x.ficha) && conCarnet.has(x.fecha + '|' + normTxt(x.trabajador) + '|' + letraTurno(x.turno))) locales.splice(i, 1);
+            }
+            const faltantes = [];
+            if (shL.ultima >= 2) {
+                const inicio = normalizarFecha(celda(shL, 2, 1)) || desde, conAsis = {}, vistos = {};
+                locales.forEach(x => { conAsis[[x.fecha, x.tienda, normTxt(x.turno)].join('|')] = true; });
+                bloquePorFecha(H['BASE DE DATOS CUADRE DE CAJA'], 4, 9, inicio > desde ? inicio : desde, hasta).forEach(({ r }) => {
+                    const fecha = normalizarFecha(r[3]), tienda = nombreTienda(r[2]), turno = String(r[8]).trim();
+                    if (!fecha || !tienda || !turno) return;
+                    const k = [fecha, tienda, normTxt(turno)].join('|');
+                    if (conAsis[k] || vistos[k]) return;
+                    vistos[k] = true;
+                    faltantes.push({ fecha, tienda, turno, cajero: String(r[7]).trim(), ficha: String(r[0]).trim() });
+                });
+            }
+            // horariosPropios: el horario de su perfil (BD PERFILES, columnas L y M como se ven en la hoja)
+            const perfilesH = {};
+            filasHoja(H['BD PERFILES'], 13).filter(x => textoCelda(x.r[0])).forEach(({ r }) => {
+                const ent = horaVista(String(r[11])) || asisHora(r[11]), sal = horaVista(String(r[12])) || asisHora(r[12]);
+                if (ent && sal) perfilesH[normTxt(r[0])] = { entrada: ent, salida: sal, salidaPermitida: sal, perfil: textoCelda(r[0]) };
+            });
+            const propios = {}; trab.forEach(t => { const h = perfilesH[normTxt(t.perfil)]; if (h) propios[normTxt(t.nombre)] = h; });
+            const nombresDep = new Set(deps.map(d => normTxt(d.nombre))), deptoDe = {};
+            trab.forEach(t => { if (nombresDep.has(normTxt(t.local))) deptoDe[normTxt(t.nombre)] = t.local; });
+            const asis = { oficina, locales, faltantes, horarios: C.horarios || [], toleranciaMin: tolerancia, departamentos: deps, deptoDe, propios,
+                           fichas: trab.filter(t => t.activo).map(t => ({ id: t.id, nombre: t.nombre, cargo: t.cargo, perfil: t.perfil, local: t.local, turno: t.turno, restricciones: t.restricciones || [] })) };
+
+            // ---- Deudas (cxcDeudas, sin histórico) ----
+            const cli = filasHoja(H['BD CLIENTES'], 7).filter(x => textoCelda(x.r[1])).map(({ r }) => ({ id: textoCelda(r[0]), nombre: textoCelda(r[1]) }));
+            const vistosA = new Set();
+            const cliAlm = filasHoja(H['ALM CLIENTES'], 11).filter(x => textoCelda(x.r[1]) && !vistosA.has(textoCelda(x.r[0])) && vistosA.add(textoCelda(x.r[0])))
+                .map(({ r }) => ({ id: textoCelda(r[0]), nombre: textoCelda(r[1]), tipo: /^tienda$/i.test(textoCelda(r[9])) ? 'Tienda' : 'Cliente' })).filter(c => c.tipo !== 'Tienda');
+            const prov = filasHoja(H['ALM PROVEEDORES'], 7).filter(x => textoCelda(x.r[1])).map(({ r }) => ({ id: textoCelda(r[0]), nombre: textoCelda(r[1]) }));
+            const cuentas = trab.map(t => ({ nombre: t.nombre, id: t.id, tipo: 'Trabajador' })).concat(cli.map(c => ({ nombre: c.nombre, id: c.id, tipo: 'Cliente' })))
+                .concat(cliAlm.map(c => ({ nombre: c.nombre, id: c.id, tipo: 'Almacén' }))).concat(prov.map(c => ({ nombre: c.nombre, id: c.id, tipo: 'Proveedor' })));
+            const porNombre = new Map(cuentas.map(c => [normTxt(c.nombre), { id: c.id, tipo: c.tipo }])), porId = new Map(cuentas.map(c => [c.id, { id: c.id, tipo: c.tipo }]));
+            const trabPal = trab.map(t => ({ t, p: new Set(pal(t.nombre)) }));
+            const buscarPersona = nombre => {
+                const ya = porNombre.get(normTxt(nombre)); if (ya) return ya;
+                const w = pal(nombre); if (w.length < 2) return null;
+                const c = trabPal.filter(x => w.every(y => x.p.has(y)));
+                return c.length === 1 ? { id: c[0].t.id, tipo: 'Trabajador' } : null;
+            };
+            const cxc = filasHoja(H['BD CXC'], 20).filter(x => textoCelda(x.r[0])).map(({ r, fila }) => ({
+                fila, id: textoCelda(r[0]), fecha: normalizarFecha(r[1]) || textoCelda(r[1]), tipo: textoCelda(r[2]).toUpperCase(), cuentaId: textoCelda(r[3]),
+                cuenta: textoCelda(r[4]), local: textoCelda(r[5]), moneda: textoCelda(r[6]), monto: numCelda(r[7]), tasa: numCelda(r[8]),
+                usd: Math.round(numCelda(r[9]) * 100) / 100, bs: Math.round(numCelda(r[10]) * 100) / 100, descripcion: textoCelda(r[11]), comprobante: textoCelda(r[12]),
+                pagado: esVerdadero(r[13]), aplicado: textoCelda(r[14]), sinAplicar: numCelda(r[15]), registradoPor: textoCelda(r[16]), registro: textoCelda(r[17]), nota: textoCelda(r[18]),
+                vence: normalizarFecha(r[19]) || textoCelda(r[19])
+            }));
+            const aplic = {};
+            cxc.filter(x => x.tipo === 'ABONO' || x.tipo === 'DESCUENTO').forEach(x => x.aplicado.split(';').forEach(p => {
+                const a = /^([NX]):(\d+):([\d.]+)$/.exec(p.trim());
+                if (a) (aplic[a[1] + ':' + a[2]] = aplic[a[1] + ':' + a[2]] || []).push({ id: x.id, tipo: x.tipo, fecha: x.fecha, usd: Number(a[3]), nota: x.descripcion, quien: x.registradoPor });
+            }));
+            const abonado = {}; Object.keys(aplic).forEach(k => { abonado[k] = aplic[k].reduce((s, x) => s + x.usd, 0); });
+            const conAbonado = x => {
+                if (aplic[x.ref]) x.aplicaciones = aplic[x.ref];
+                const a = x.estado === 'pagado' ? 0 : Math.round((abonado[x.ref] || 0) * 100) / 100;
+                if (!a) return x;
+                const resta = Math.max(0, Math.round((x.usd - a) * 100) / 100);
+                return Object.assign(x, { usdTotal: x.usd, abonado: a, bs: x.usd ? Math.round(x.bs * resta / x.usd * 100) / 100 : x.bs, usd: resta });
+            };
+            const venceAj = {};
+            cxc.filter(m => m.tipo === 'VENCE').forEach(m => { if (/^\d{4}-\d{2}-\d{2}$/.test(m.vence)) venceAj[m.aplicado] = m.vence; });
+            const deudas = [];
+            filasHoja(H['BD NOMINA'], 13).forEach(({ r, fila }) => {
+                const pagado = esVerdadero(r[3]), fecha = normalizarFecha(r[1]), nombre = textoCelda(r[5]);
+                if (pagado) return;
+                const bs = numCelda(r[8]), tasa = numCelda(r[4]);
+                let usd = numCelda(r[0]) || numCelda(r[9]);
+                if (!usd && bs && tasa) usd = bs / tasa;
+                if (!fecha || !nombre || (!bs && !usd)) return;
+                const gasto = /^gastos\b/i.test(nombre), quien = gasto ? null : buscarPersona(nombre);
+                const vence = gasto ? '' : (venceAj['N:' + fila] || viernesDeLaSemana(fecha));
+                deudas.push(conAbonado({
+                    ref: 'N:' + fila, num: 'NOM-' + fila, fila, origen: 'BD NOMINA', fecha, nombre, id: quien ? quien.id : '', tipoPersona: gasto ? 'Gasto de tienda' : quien ? quien.tipo : 'Sin registrar',
+                    local: textoCelda(r[6]), tipo: textoCelda(r[7]), bs: Math.round(bs * 100) / 100, usd: Math.round(usd * 100) / 100, tasa,
+                    descripcion: textoCelda(r[10]), ficha: textoCelda(r[11]), turno: textoCelda(r[12]),
+                    vence, estado: gasto ? 'pendiente' : vence < hoy ? 'vencido' : 'vigente'
+                }));
+            });
+            cxc.filter(m => m.tipo === 'DEUDA' || m.tipo === 'GASTO').forEach(m => {
+                if (m.pagado) return;
+                const gasto = m.tipo === 'GASTO', quien = gasto ? null : (porId.get(m.cuentaId) || buscarPersona(m.cuenta));
+                const vence = gasto ? '' : (/^\d{4}-\d{2}-\d{2}$/.test(m.vence) ? m.vence : viernesDeLaSemana(m.fecha));
+                deudas.push(conAbonado({
+                    ref: 'X:' + m.fila, num: m.id, fila: m.fila, origen: 'BD CXC', moneda: m.moneda, monto: m.monto, registradoPor: m.registradoPor, fecha: m.fecha, nombre: m.cuenta, id: m.cuentaId || (quien ? quien.id : ''),
+                    tipoPersona: gasto ? 'Gasto de tienda' : quien ? quien.tipo : 'Sin registrar', local: m.local, tipo: gasto ? 'GASTO' : 'DEUDA',
+                    bs: m.bs, usd: m.usd, tasa: m.tasa, descripcion: m.descripcion, ficha: '', turno: '', comprobante: m.comprobante, panel: true,
+                    vence, estado: gasto ? 'pendiente' : vence < hoy ? 'vencido' : 'vigente'
+                }));
+            });
+
+            // ---- Nóminas cerradas de la semana (nominaHistorial / leerPagosNomina, sin las anuladas) ----
+            const cerradas = filasHoja(H['BD PAGOS NOMINA'], 35).filter(x => textoCelda(x.r[0]) && !/^anulad/i.test(textoCelda(x.r[30]))).map(({ r, fila }) => ({
+                fila, id: textoCelda(r[0]), desde: normalizarFecha(r[1]) || textoCelda(r[1]), hasta: normalizarFecha(r[2]) || textoCelda(r[2]),
+                trabajadorId: textoCelda(r[3]), trabajador: textoCelda(r[4]), local: textoCelda(r[5]), perfil: textoCelda(r[6]),
+                turnos: numCelda(r[7]), horas: numCelda(r[8]), pagoTurnos: numCelda(r[9]), horasExtra: numCelda(r[10]), tarifaExtra: numCelda(r[11]), pagoExtra: numCelda(r[12]),
+                bonoPuntualidad: numCelda(r[13]), bonoProductividad: numCelda(r[14]), bonoAdicional: numCelda(r[15]), motivoBono: textoCelda(r[16]),
+                generado: numCelda(r[17]), sueldoBase: numCelda(r[18]), ayudaSocial: numCelda(r[19]), descontado: numCelda(r[20]), deudasDescontadas: textoCelda(r[21]),
+                deudasExcluidas: textoCelda(r[22]), neto: numCelda(r[23]), movimiento: textoCelda(r[24]), cerro: textoCelda(r[25]), fechaCierre: textoCelda(r[26]), detalle: textoCelda(r[27]),
+                tasa: numCelda(r[28]), netoBs: numCelda(r[29]),
+                pagado: /^pagad/i.test(textoCelda(r[30])), pagadoPor: textoCelda(r[31]), fechaPago: textoCelda(r[32]), referencia: textoCelda(r[33]), comprobante: textoCelda(r[34])
+            })).filter(p => p.desde >= sem && p.desde <= sem)
+              .sort((a, b) => b.desde.localeCompare(a.desde) || b.id.localeCompare(a.id) || a.trabajador.localeCompare(b.trabajador));
+
+            // ---- Horario guardado de la semana (horLeer) ----
+            const horario = filasHoja(H['BD HORARIOS'], 15).filter(x => textoCelda(x.r[0])).map(({ r, fila }) => ({
+                fila, semana: normalizarFecha(r[0]) || textoCelda(r[0]), local: textoCelda(r[1]), id: textoCelda(r[2]), nombre: textoCelda(r[3]), puesto: textoCelda(r[4]),
+                dias: r.slice(5, 12).map(v => textoCelda(v).toUpperCase().slice(0, 1)), guardado: textoCelda(r[12]), guardo: textoCelda(r[13]), enviado: textoCelda(r[14])
+            })).filter(x => x.semana === sem);
+
+            // ---- Ajustes de la semana (nominaAjustesLeer) ----
+            const ajustes = {};
+            filasHoja(H['BD NOMINA AJUSTES'], 6).filter(x => (normalizarFecha(x.r[0]) || textoCelda(x.r[0])) === sem)
+                .forEach(({ r }) => { try { const o = JSON.parse(textoCelda(r[3]) || '{}'); if (o && typeof o === 'object') ajustes[textoCelda(r[1])] = o; } catch (e) {} });
+
+            return { semana: sem, asis, deudas, cerradas, horario, ajustes };
+        }
+        // Todo lo que hace falta leer de Firebase (13 hojas + configuración + trabajadores sin carnet)
+        const HOJAS = ['BD ASISTENCIA', 'BD ASISTENCIA OFICINA', 'BASE DE DATOS CUADRE DE CAJA', 'BD NOMINA', 'BD CXC', 'BD PAGOS NOMINA', 'BD NOMINA AJUSTES',
+                       'BD PERFILES', 'BD HORARIOS', 'BD CLIENTES', 'ALM CLIENTES', 'ALM PROVEEDORES'];
+        async function leerTodo(desdeServidor) {
+            const H = {};
+            await Promise.all(HOJAS.map(async n => { H[n] = await FBH.leer(n, desdeServidor); }));
+            const [cfg, trabajadores] = await Promise.all([FBH.doc('config/nomina'), FBH.doc('vista/trabajadores')]);
+            if (!cfg || !trabajadores) throw new Error('Falta publicar la configuración o los trabajadores de la nómina en Firebase');
+            return { H, cfg, trabajadores };
+        }
+        return { calcular, leerTodo, HOJAS };
+    })();
+    // JSON con las propiedades ordenadas: para comparar sin que importe el orden de las claves
+    const jsonOrdenado = v => JSON.stringify(v, (k, x) => x && typeof x === 'object' && !Array.isArray(x) ? Object.keys(x).sort().reduce((o, c) => { o[c] = x[c]; return o; }, {}) : x);
+    // Modo comparar, etapa 2: la nómina COMPLETA de la semana calculada en el panel vs. la de Google (nom_semana), parte por parte
+    function nomfbComparar(fb, g) {
+        const partes = { 'Asistencia de oficina': [fb.asis.oficina, (g.asis || {}).oficina], 'Asistencia de locales': [fb.asis.locales, (g.asis || {}).locales],
+            'Turnos sin asistencia': [fb.asis.faltantes, (g.asis || {}).faltantes], 'Horarios y departamentos': [[fb.asis.horarios, fb.asis.toleranciaMin, fb.asis.departamentos, fb.asis.deptoDe, fb.asis.propios], [(g.asis || {}).horarios, (g.asis || {}).toleranciaMin, (g.asis || {}).departamentos, (g.asis || {}).deptoDe, (g.asis || {}).propios]],
+            'Fichas de trabajadores': [fb.asis.fichas, (g.asis || {}).fichas], 'Deudas': [fb.deudas, g.deudas], 'Nóminas cerradas': [fb.cerradas, g.cerradas], 'Horario de la semana': [fb.horario, g.horario], 'Ajustes': [fb.ajustes, g.ajustes] };
+        return Object.keys(partes).map(p => {
+            const [a, b] = partes[p], ja = jsonOrdenado(a), jb = jsonOrdenado(b);
+            if (ja === jb) return { parte: p, igual: true, n: Array.isArray(a) ? a.length : Object.keys(a || {}).length };
+            let detalle = '';
+            if (Array.isArray(a) && Array.isArray(b)) {
+                if (a.length !== b.length) detalle = `Firebase ${a.length} · Google ${b.length}`;
+                else { const i = a.findIndex((x, k) => jsonOrdenado(x) !== jsonOrdenado(b[k])); detalle = `#${i + 1}: Firebase ${jsonOrdenado(a[i]).slice(0, 160)} · Google ${jsonOrdenado(b[i]).slice(0, 160)}`; }
+            } else detalle = `Firebase ${ja.slice(0, 160)} · Google ${jb.slice(0, 160)}`;
+            return { parte: p, igual: false, detalle };
+        });
+    }
+
+    // Modo comparar (administradores): cada hoja de la nómina leída directo de Firebase vs. como la lee Google. Tienen que ser iguales
+    // antes de que la nómina se calcule en el panel. También dice cuánto tarda cada lectura directa.
+    async function fbhComparar(btn) {
+        btnCargando(btn, 'Comparando...');
+        const res = [];
+        let nomRes = null;
+        try {
+            for (const nombre of Object.keys(FBH_HOJAS)) {
+                let fb = null, g = null, err = '';
+                const t0 = performance.now();
+                try { fb = await FBH.leer(nombre, true); } catch (e) { err = 'Firebase: ' + (e.code || e.message); }
+                const ms = Math.round(performance.now() - t0);
+                try { g = await DATOS.aGoogle(() => llamarApi({ action: 'fb_hoja_leer', nombre })); } catch (e) { err = err || 'Google: ' + e.message; }
+                let dif = 0, ejemplo = '';
+                if (fb && g) {
+                    const n = Math.max(fb.valores.length, g.filas.length);
+                    for (let i = 0; i < n; i++) {
+                        const a = JSON.stringify(fb.valores[i] || null), b = JSON.stringify(g.filas[i] || null);
+                        if (a !== b) { dif++; if (!ejemplo) ejemplo = `fila ${i + 2}: Firebase ${a.slice(0, 140)} · Google ${b.slice(0, 140)}`; }
+                    }
+                }
+                res.push({ nombre, err, filas: g ? g.filas.length : fb ? fb.valores.length : 0, dif, ejemplo, ms });
+            }
+            for (const ruta of ['config/nomina', 'vista/trabajadores']) {
+                const t0 = performance.now();
+                let err = '', n = 0;
+                try { const d = await FBH.doc(ruta); if (!d) err = 'No está publicado todavía'; else n = Array.isArray(d) ? d.length : Object.keys(d).length; } catch (e) { err = e.code || e.message; }
+                res.push({ nombre: ruta, err, filas: n, dif: 0, ejemplo: '', ms: Math.round(performance.now() - t0), aparte: true });
+            }
+            // Etapa 2: la nómina completa de la semana (la abierta en Nómina, o la última completa) calculada aquí vs. Google
+            const sem = nomSemana || sumarDias(inicioSemana(fechaLocalHoy()), -7);
+            try {
+                const t0 = performance.now(), L = await NOMFB.leerTodo(true), t1 = performance.now();
+                const fb = NOMFB.calcular(sem, L.H, L.cfg, L.trabajadores), t2 = performance.now();
+                const g = await DATOS.aGoogle(() => llamarApi({ action: 'nom_semana', semana: sem }));
+                nomRes = { sem, partes: nomfbComparar(fb, g), leer: Math.round(t1 - t0), calcular: Math.round(t2 - t1) };
+            } catch (e) { nomRes = { sem, error: e.message }; }
+        } finally { btn.disabled = false; btn.textContent = 'Comparar Nómina (Firebase directo)'; }
+        const bien = res.every(r => !r.err && !r.dif) && nomRes && !nomRes.error && nomRes.partes.every(p => p.igual);
+        let fondo = document.getElementById('fbhDlg');
+        if (!fondo) { fondo = document.createElement('div'); fondo.id = 'fbhDlg'; fondo.className = 'req-dlg-fondo'; document.body.appendChild(fondo); }
+        fondo.onclick = e => { if (e.target === fondo) fondo.classList.add('hidden'); };
+        fondo.innerHTML = `<div class="req-dlg" style="max-width:760px"><h3>Nómina: lectura directa de Firebase</h3>
+            <div class="req-sub">${bien ? '✓ Todas las hojas se leen igual que en Google.' : 'Hay diferencias o errores: no se puede pasar todavía.'} Tiempo = leer directo de Firebase (sin Google).</div>
+            <div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">Hoja</th><th>Filas</th><th>Tiempo</th><th class="izq">Resultado</th></tr></thead><tbody>
+            ${res.map(r => `<tr><td class="izq">${esc(r.nombre)}</td><td>${r.filas}</td><td>${(r.ms / 1000).toFixed(2).replace('.', ',')} s</td>
+                <td class="izq">${r.err ? `<span class="chip st-falta">${esc(r.err)}</span>` : r.dif ? `<span class="chip st-sobra">${r.dif} fila(s) distintas</span><small>${esc(r.ejemplo)}</small>` : `<span class="chip st-ok">${r.aparte ? 'Publicado' : 'Igual'}</span>`}</td></tr>`).join('')}
+            </tbody></table></div>
+            ${nomRes ? `<h3 style="margin-top:1rem">Nómina de la semana del ${fechaBonita(nomRes.sem)}: calculada en el panel vs. Google</h3>
+                ${nomRes.error ? `<div class="banner error" style="display:block">${esc(nomRes.error)}</div>` : `<div class="req-sub">Leer de Firebase ${(nomRes.leer / 1000).toFixed(2).replace('.', ',')} s · calcular ${(nomRes.calcular / 1000).toFixed(2).replace('.', ',')} s (por Google tarda 5 a 6 s)</div>
+                <div class="tabla-wrap"><table class="req-tabla"><tbody>${nomRes.partes.map(p => `<tr><td class="izq">${esc(p.parte)}</td><td class="izq">${p.igual ? `<span class="chip st-ok">Igual</span> <small>${p.n}</small>` : `<span class="chip st-sobra">Distinto</span><small>${esc(p.detalle)}</small>`}</td></tr>`).join('')}</tbody></table></div>`}` : ''}
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-ghost" onclick="fbhPublicar(this)">Publicar config y trabajadores ahora</button><button type="button" class="btn-primary" onclick="document.getElementById('fbhDlg').classList.add('hidden')">Cerrar</button></div></div>`;
+        fondo.classList.remove('hidden');
+    }
+    async function fbhPublicar(btn) {
+        btnCargando(btn, 'Publicando...');
+        try { await DATOS.aGoogle(() => llamarApi({ action: 'fb_nomina_publicar' })); mostrarBanner('Configuración y trabajadores de la nómina publicados en Firebase.', 'ok'); }
+        catch (e) { mostrarBanner('No se pudo publicar: ' + e.message, 'error'); }
+        finally { btn.disabled = false; btn.textContent = 'Publicar config y trabajadores ahora'; }
+    }
+
     // Hojas enteras en Firebase (08/11): Validar pagos = flujo general + movimientos del banco + validaciones.
     // "Pasar a Firebase" copia las hojas y Firebase pasa a ser el dato oficial; la hoja de Google queda como copia.
     const FB_GRUPOS = { pagos: ['Validar pagos', 'el flujo general (lo que mandan las fichas), los movimientos del banco y las validaciones'],
@@ -3659,14 +4011,15 @@
                         personal: ['Personal', 'trabajadores, perfiles, clientes, cambios de trabajador, horarios de trabajo y frases', 'Personal (trabajadores, perfiles, clientes, horarios)'],
                         pagosnomina: ['La nómina', 'las nóminas cerradas con sus pagos y los ajustes de la semana', 'Nómina (cierres, pagos y ajustes)'],
                         almacen: ['El almacén', 'productos, movimientos, notas, ingresos, clientes y proveedores del almacén y las notas en espera', 'Almacén (productos, movimientos, notas, ingresos)'],
-                        compras: ['Compras y precios', 'las compras, los precios, las órdenes de precio, las equivalencias de proveedores y las compras en curso', 'Compras y precios (compras, precios, órdenes)'] };
+                        compras: ['Compras y precios', 'las compras, los precios, las órdenes de precio, las equivalencias de proveedores y las compras en curso', 'Compras y precios (compras, precios, órdenes)'],
+                        req: ['Requerimientos de charcutería', 'el catálogo de charcutería, la exhibición y variedad mínima, las ventas cargadas y los requerimientos guardados (están en otro archivo de Google)', 'Requerimientos de charcutería'] };
     // Filas de Tiempos de los grupos de la etapa 6 (el tercer texto de FB_GRUPOS es el título de la fila)
-    const fbFilasGrupos = () => ['personal', 'pagosnomina', 'almacen', 'compras'].map(g => `<div class="req-acciones" style="justify-content:flex-end;margin:.4rem 0 0"><span class="nota" style="margin:0 auto 0 0">${FB_GRUPOS[g][2]}:</span>`
+    const fbFilasGrupos = () => ['personal', 'pagosnomina', 'almacen', 'compras', 'req'].map(g => `<div class="req-acciones" style="justify-content:flex-end;margin:.4rem 0 0"><span class="nota" style="margin:0 auto 0 0">${FB_GRUPOS[g][2]}:</span>`
         + [['estado', 'Ver estado'], ['activar', 'Pasar a Firebase'], ['copiar', 'Copiar a la hoja ahora'], ['volver', 'Volver a la hoja']].map(([q, txt]) => `<button type="button" class="btn-ghost" onclick="fbHojas(this, '${q}', '${g}')">${txt}</button>`).join('') + '</div>').join('');
     // ---- Tabla de Tiempos (11/11): qué se guarda en Firebase y qué en la hoja de Google, con el botón que corresponde en cada fila ----
     // El resumen no gasta lecturas de Firebase (lo dice Apps Script de sus propiedades); el detalle por hoja, con "Detalle".
     const FB_ORDEN = [['efectivo', 'Control de efectivo y caja chica'], ['pagos', 'Validar pagos'], ['cuadre', 'Cuadre de caja'], ['nomina', 'Gastos y créditos de la ficha · Cuentas por cobrar'],
-                      ['asistencia', 'Asistencia'], ['personal', 'Personal'], ['pagosnomina', 'Nómina'], ['almacen', 'Almacén'], ['compras', 'Compras y precios']];
+                      ['asistencia', 'Asistencia'], ['personal', 'Personal'], ['pagosnomina', 'Nómina'], ['almacen', 'Almacén'], ['compras', 'Compras y precios'], ['req', 'Requerimientos de charcutería']];
     let fbEstadoDatos = null;
     async function fbEstadoCargar() {
         const el = document.getElementById('fbEstado'); if (!el) return;
@@ -3703,7 +4056,7 @@
                 <div class="fb-ind"><span>Revisión automática (cada 5 min)</span><b>${rev ? (revHace != null ? `Activa · corrió hace ${revHace} min` : 'Activa · todavía no corre (el ping hace el trabajo de fondo)') : 'No activa (el trabajo de fondo lo hace el ping de los paneles)'}</b>${rev ? '' : '<button type="button" class="btn-primary btn-mini" onclick="fbRevision(this)">Activar</button>'}</div>
             </div>
             <div class="tabla-wrap"><table class="req-tabla fb-tabla" data-sin-paginar><thead><tr><th class="izq">Módulo</th><th class="izq">Dónde se guarda</th><th></th></tr></thead><tbody>${filas.map(f => f.html).join('')}</tbody></table></div>
-            <div class="req-acciones" style="justify-content:flex-end;margin:.5rem 0 0"><button type="button" class="btn-ghost btn-mini" onclick="fbHojas(this, 'copiar', 'pagos')">Copiar todo a la hoja ahora</button><button type="button" class="btn-ghost btn-mini" onclick="fbProbar(this)">Probar Firebase</button><button type="button" class="btn-ghost btn-mini" onclick="fbEstadoDatos=null;fbEstadoCargar()">Actualizar</button></div>
+            <div class="req-acciones" style="justify-content:flex-end;margin:.5rem 0 0"><button type="button" class="btn-ghost btn-mini" onclick="fbHojas(this, 'copiar', 'pagos')">Copiar todo a la hoja ahora</button><button type="button" class="btn-ghost btn-mini" onclick="fbProbar(this)">Probar Firebase</button><button type="button" class="btn-ghost btn-mini" onclick="fbhComparar(this)">Comparar Nómina (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="fbEstadoDatos=null;fbEstadoCargar()">Actualizar</button></div>
             <div class="nota">"En Firebase": lo que se guarda en ese módulo vive en Firebase y la hoja de Google se llena sola como copia (lo que se cambie a mano en la hoja ya no cuenta). "Volver a la hoja" copia todo a Google antes de cambiar.</div>`;
     }
     async function fbHojas(btn, que, grupo) {
@@ -3871,7 +4224,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-12.2';
+    const VERSION_SERVIDOR = '2026-11-12.6';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -14653,6 +15006,7 @@
         out.dataset.cmpPaso = cmp.paso;
         out.innerHTML = cmp.paso === 'revisar' ? cmpRevisarVista() : cmp.paso === 'listo' ? cmpListoVista() : cmpFotoVista();
         if (cmp.paso === 'foto' && !cmpCompras) cmpCargarCompras();
+        else if (cmp.paso === 'foto' && Date.now() - cmpListasHora > 10000) cmpRefrescarListas();   // (12/11) lo guardado después (avance automático, otro equipo)
     }
     // ---------- Plan B: transcribir con cualquier IA (ChatGPT, Gemini, Claude...) y pegar el texto ----------
     const CMP_PROMPT = `Transcribe la factura de compra de la foto. Responde SOLO con texto en este formato exacto, sin explicaciones, sin tablas de markdown y sin comillas:
@@ -14819,12 +15173,29 @@ Reglas:
                 + (r.avisos.length ? '\nRevise: ' + r.avisos.join(' ') : ''), r.avisos.length ? 'warn' : 'ok');
         } catch (e) { document.getElementById('cmpAnError').textContent = e.message; btn.disabled = false; btn.textContent = 'Anular compra'; }
     }
+    // (12/11) Las compras en curso se leían una sola vez (al entrar a Almacén): una guardada después (el avance se guarda solo, o
+    // desde otro equipo) no aparecía hasta recargar la página. Ahora se releen al volver a esta pantalla, y un error ya no se esconde.
+    let cmpListasHora = 0, cmpListasLeyendo = false;
+    const cmpErrorBorradores = e => { if (!/no válida/i.test(e.message)) mostrarBanner('No se pudieron leer las compras en curso: ' + e.message, 'error'); return { borradores: cmpBorradores || [] }; };
     async function cmpCargarCompras() {
         cmpCompras = [];   // mientras carga no se vuelve a pedir
+        cmpListasLeyendo = true;
         const [c, b] = await Promise.all([llamarApi({ action: 'cmp_compras' }).catch(e => { mostrarBanner('No se pudieron leer las compras: ' + e.message, 'error'); return {}; }),
-                                          llamarApi({ action: 'cmp_borradores' }).catch(() => ({ borradores: [] }))]);   // script anterior sin compras en curso: lista vacía
+                                          llamarApi({ action: 'cmp_borradores' }).catch(cmpErrorBorradores)]);   // script anterior sin compras en curso: lista vacía
+        cmpListasLeyendo = false; cmpListasHora = Date.now();
         cmpCompras = c.compras || []; cmpBorradores = b.borradores || [];
         if (almTab === 'compra' && cmp.paso === 'foto') cmpPintarCompra(document.getElementById('almContenido'), true);
+    }
+    async function cmpRefrescarListas() {
+        if (cmpListasLeyendo) return;
+        cmpListasLeyendo = true; cmpListasHora = Date.now();
+        try {
+            const [c, b] = await Promise.all([DATOS.aGoogle(() => llamarApi({ action: 'cmp_compras' })).catch(() => null), DATOS.aGoogle(() => llamarApi({ action: 'cmp_borradores' })).catch(cmpErrorBorradores)]);
+            const antes = JSON.stringify([cmpCompras, cmpBorradores]);
+            if (c && c.compras) cmpCompras = c.compras;
+            if (b && b.borradores) cmpBorradores = b.borradores;
+            if (antes !== JSON.stringify([cmpCompras, cmpBorradores]) && almTab === 'compra' && cmp.paso === 'foto' && !cmp.leyendo) cmpPintarCompra(document.getElementById('almContenido'), true);
+        } finally { cmpListasLeyendo = false; }
     }
     // ---------- Compras en curso: el avance se guarda en Google (solo, en segundo plano) para seguir después o en otro equipo ----------
     let cmpBorradores = [], cmpAvanceEspera = 0, cmpAvanceEnviando = false, cmpAvanceEstado = '';
@@ -14855,6 +15226,9 @@ Reglas:
         try {
             const r = await llamarApi({ action: 'cmp_borrador_guardar', id: cmp.borradorId || '', version: cmp.borradorVer || '', datos: cmpAvanceDatos() });
             cmp.borradorId = r.id; cmp.borradorVer = r.version;
+            const ya = (cmpBorradores || []).find(b => b.id === r.id), linea = { id: r.id, actualizada: r.actualizada, actualizo: nombreUsuario, proveedor: (cmp.proveedorLeido || {}).nombre || (ya && ya.proveedor) || '',
+                factura: cmp.factura || '', renglones: (cmp.lineas || []).filter(l => l && (l.codigo || l.descripcion || l.cantidad)).length, creo: ya ? ya.creo : nombreUsuario, creada: ya ? ya.creada : r.actualizada };
+            cmpBorradores = [linea].concat((cmpBorradores || []).filter(b => b.id !== r.id));
             cmpAvanceEstadoPintar(`✓ Avance guardado (${r.id}) a las ${String(r.actualizada).slice(11)}`);
             return true;
         } catch (e) { cmpAvanceEstadoPintar(e.enCola ? 'Sin conexión: se guardará al volver' : 'No se pudo guardar el avance: ' + e.message, true); return false; }
@@ -14963,7 +15337,7 @@ Reglas:
         try {
             const imagenes = cmp.fotos.slice();
             const leer = () => Promise.race([llamarApi({ action: 'cmp_leer', imagenes, fotosAparte: true }),
-                new Promise((_, mal) => setTimeout(() => mal(new Error('Gemini tardó más de 2 minutos sin responder. Vuelva a intentar; si se repite, recorte la foto a solo la factura.')), 120000))]);
+                new Promise((_, mal) => setTimeout(() => mal(new Error('Gemini tardó más de 2 minutos y medio sin responder. Vuelva a intentar en un momento; si se repite, recorte la foto a solo la factura o use "Pegar texto de otra IA".')), 150000))]);
             let r;
             // Leer no guarda nada: si la conexión se corta (Google no llegó a responder), se vuelve a pedir una vez, solo
             try { r = await leer(); }
