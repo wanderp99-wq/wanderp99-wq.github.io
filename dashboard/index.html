@@ -3485,6 +3485,8 @@
         } catch (e) {}
     }
     async function llamarApiPedido(payload) {
+        // (12/11) Lecturas del almacén con "Usar Firebase en el Almacén" encendido: se responden aquí con lo de Firebase (sin Google)
+        if (ALMVIVO_ACC.test(payload.action) && !almVivoSaltar) { const r = await almVivoResponder(payload); if (r) return r; }
         const t0 = performance.now();
         let llaveIdem = '', llaveLS = '';
         // Leer la factura no guarda nada: sin idem (si no, pulsar Leer otra vez mientras Google seguía con el primero daba "todavía se está guardando").
@@ -3676,7 +3678,10 @@
     const FBH_HOJAS = { 'BD ASISTENCIA': ['hoja_asistencia', 10], 'BD ASISTENCIA OFICINA': ['hoja_asis_oficina', 10], 'BASE DE DATOS CUADRE DE CAJA': ['hoja_cuadre', 42],
         'BD NOMINA': ['hoja_nomina', 13], 'BD CXC': ['hoja_cxc', 20], 'BD PAGOS NOMINA': ['hoja_pagos_nomina', 35], 'BD NOMINA AJUSTES': ['hoja_nomina_ajustes', 6],
         'BD TRABAJADORES': ['hoja_trabajadores', 17], 'BD PERFILES': ['hoja_perfiles', 13], 'BD HORARIOS': ['hoja_horarios', 15], 'BD CLIENTES': ['hoja_clientes', 7],
-        'ALM CLIENTES': ['hoja_alm_clientes', 11], 'ALM PROVEEDORES': ['hoja_alm_proveedores', 7] };
+        'ALM CLIENTES': ['hoja_alm_clientes', 11], 'ALM PROVEEDORES': ['hoja_alm_proveedores', 7],
+        'ALM PRODUCTOS': ['hoja_alm_productos', 14], 'ALM NOTAS': ['hoja_alm_notas', 25], 'ALM INGRESOS': ['hoja_alm_ingresos', 13], 'ALM PRECIOS': ['hoja_alm_precios', 12],
+        'ALM ORDENES PRECIO': ['hoja_alm_ordenes', 22], 'ALM COMPRAS': ['hoja_alm_compras', 17], 'ALM COMPRAS EN CURSO': ['hoja_alm_compras_curso', 10] };
+    const ALMFB_SOLO = ['ALM PRODUCTOS', 'ALM NOTAS', 'ALM INGRESOS', 'ALM PRECIOS', 'ALM ORDENES PRECIO', 'ALM COMPRAS', 'ALM COMPRAS EN CURSO'];   // del almacén y compras, no de la nómina (no van en "Comparar Nómina")
     const FBH = (() => {
         function armar(nombre, docs) {
             const cols = FBH_HOJAS[nombre][1], filas = {};
@@ -3702,6 +3707,280 @@
         }
         return { leer, armar, doc };
     })();
+    // ---------- Almacén leído DIRECTO de Firebase (12/11) ----------
+    // Las MISMAS reglas que alm_datos / alm_notas / alm_ingresos / alm_existencias en Apps Script (Almacen.gs: almLeerProductos,
+    // almLeerClientes, leerClientes, almLeerProveedores, almNotaDesdeFila, almIngresoDesdeFila, almPendientes, almSiguiente; Compras.gs:
+    // cmpPreciosPanel). Si se cambia una regla allá, hay que cambiarla aquí: "Comparar Almacén" (Tiempos) lo avisa.
+    // Solo para quien VE el inventario (almVeExist): quien solo factura sigue por Google, que le quita la existencia y el costo.
+    const ALMFB_HOJAS = ['ALM PRODUCTOS', 'ALM NOTAS', 'ALM INGRESOS', 'ALM CLIENTES', 'ALM PROVEEDORES', 'ALM PRECIOS', 'BD CLIENTES'];
+    const ALMFB = (() => {
+        const textoCelda = v => String(v == null ? '' : v).trim();
+        const numCelda = v => { const n = Number(String(v).replace(',', '.')); return isFinite(n) ? n : 0; };
+        function normalizarFecha(v) {
+            const t = String(v || '').trim();
+            let m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+            if (m) return m[1] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[3]).slice(-2);
+            m = t.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+            if (m) return m[3] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[1]).slice(-2);
+            return '';
+        }
+        const almR = (n, d) => { const f = Math.pow(10, d == null ? 2 : d); return Math.round((Number(n) || 0) * f) / f; };
+        const almCodigo = c => String(c == null ? '' : c).trim().toUpperCase();
+        const almNumero = n => ('00000' + n).slice(-6);
+        const almHora = v => textoCelda(v).slice(0, 5);
+        const CATEGORIAS = [['01', 'Charcutería'], ['02', 'Víveres'], ['03', 'Bebidas y lácteos'], ['04', 'Insumos']];
+        const filas = (H, n) => H[n].valores.map((r, i) => ({ r, fila: i + 2 }));
+        const json = (v, d) => { try { return JSON.parse(String(v || d)); } catch (e) { return JSON.parse(d); } };
+        const fechaQ = v => /^\d{4}-\d{2}-\d{2}$/.test(String(v));
+        function productos(H) {
+            return filas(H, 'ALM PRODUCTOS').filter(x => almCodigo(x.r[0])).map(({ r, fila }) => ({
+                fila, codigo: almCodigo(r[0]), descripcion: textoCelda(r[1]), categoria: textoCelda(r[2]), tipo: /^pes/i.test(textoCelda(r[3])) ? 'Pesado' : 'Unidad',
+                costo: numCelda(r[4]), precio: numCelda(r[5]), bulto: numCelda(r[6]), minimo: numCelda(r[7]), proveedor: textoCelda(r[8]),
+                iva: /16|iva/i.test(textoCelda(r[9])) ? 'IVA 16%' : 'Exento', existencia: almR(numCelda(r[10]), 3),
+                activo: !(r[11] === false || /^(no|false|0)$/i.test(textoCelda(r[11]))), registrado: textoCelda(r[12]), modificado: textoCelda(r[13])
+            }));
+        }
+        function clientesAlm(H) {
+            const vistos = new Set();
+            return filas(H, 'ALM CLIENTES').filter(x => textoCelda(x.r[1]) && !vistos.has(textoCelda(x.r[0])) && vistos.add(textoCelda(x.r[0]))).map(({ r }) => ({
+                id: textoCelda(r[0]), nombre: textoCelda(r[1]), cedula: textoCelda(r[2]), telefono: textoCelda(r[3]), direccion: textoCelda(r[4]),
+                contacto: textoCelda(r[5]), dias: numCelda(r[6]), tipo: /^tienda$/i.test(textoCelda(r[9])) ? 'Tienda' : 'Cliente', local: textoCelda(r[10]), origen: 'Almacén'
+            }));
+        }
+        // Clientes de Cuentas por cobrar (BD CLIENTES: ID, nombre, teléfono, cédula...)
+        const clientesCxc = H => filas(H, 'BD CLIENTES').filter(x => textoCelda(x.r[1])).map(({ r }) => ({ id: textoCelda(r[0]), nombre: textoCelda(r[1]), cedula: textoCelda(r[3]),
+            telefono: textoCelda(r[2]), direccion: '', contacto: '', dias: 0, tipo: 'Cliente', local: '', origen: 'Cuentas por cobrar' }));
+        const proveedores = H => filas(H, 'ALM PROVEEDORES').filter(x => textoCelda(x.r[1])).map(({ r }) => ({ id: textoCelda(r[0]), nombre: textoCelda(r[1]), rif: textoCelda(r[2]),
+            telefono: textoCelda(r[3]), contacto: textoCelda(r[4]) }));
+        function notaDesdeFila(r, fila) {
+            return { fila, numero: almCodigo(r[0]), fecha: normalizarFecha(r[1]) || textoCelda(r[1]), hora: almHora(r[2]), clienteId: textoCelda(r[3]), cliente: textoCelda(r[4]),
+                     cedula: textoCelda(r[5]), telefono: textoCelda(r[6]), condicion: textoCelda(r[7]), vence: normalizarFecha(r[8]) || textoCelda(r[8]), renglones: numCelda(r[9]),
+                     subtotal: numCelda(r[10]), descuento: numCelda(r[11]), total: numCelda(r[12]), tasa: numCelda(r[13]), totalBs: numCelda(r[14]), estado: textoCelda(r[15]) || 'Emitida',
+                     usuario: textoCelda(r[16]), cxc: textoCelda(r[17]), anulacion: textoCelda(r[18]), detalle: json(r[19], '[]'), direccion: textoCelda(r[20]), comentario: textoCelda(r[21]),
+                     ingresada: textoCelda(r[22]), verificada: textoCelda(r[23]), modificaciones: textoCelda(r[24]) };
+        }
+        function ingresoDesdeFila(r, fila) {
+            return { fila, numero: almCodigo(r[0]), fecha: normalizarFecha(r[1]) || textoCelda(r[1]), hora: almHora(r[2]), operacion: textoCelda(r[3]),
+                     tercero: textoCelda(r[4]), documento: textoCelda(r[5]), renglones: numCelda(r[6]), total: numCelda(r[7]), usuario: textoCelda(r[8]), nota: textoCelda(r[9]),
+                     detalle: json(r[10], '[]'), verificada: textoCelda(r[11]), fiscal: /^s/i.test(textoCelda(r[12])) };
+        }
+        function notas(H, d) {
+            const desde = fechaQ(d.desde) ? d.desde : '0000-00-00', hasta = fechaQ(d.hasta) ? d.hasta : '9999-12-31';
+            return filas(H, 'ALM NOTAS').filter(x => almCodigo(x.r[0])).map(({ r, fila }) => notaDesdeFila(r, fila))
+                .filter(n => (d.numero && n.numero === almNumero(Number(String(d.numero).replace(/\D/g, '')))) || (!d.numero && n.fecha >= desde && n.fecha <= hasta))
+                .sort((a, b) => b.numero.localeCompare(a.numero)).slice(0, 1000);
+        }
+        function ingresos(H, d) {
+            const desde = fechaQ(d.desde) ? d.desde : '0000-00-00', hasta = fechaQ(d.hasta) ? d.hasta : '9999-12-31';
+            return filas(H, 'ALM INGRESOS').filter(x => almCodigo(x.r[0])).map(({ r, fila }) => ingresoDesdeFila(r, fila))
+                .filter(n => n.fecha >= desde && n.fecha <= hasta).sort((a, b) => b.numero.localeCompare(a.numero)).slice(0, 1000);
+        }
+        function pendientes(H) {
+            const ns = notas(H, {}).filter(n => n.estado !== 'Anulada'), ops = ingresos(H, {});
+            const sinIngresar = ns.filter(n => n.condicion === 'Tienda' && !n.ingresada);
+            return { porIngresar: sinIngresar.length, porIngresarUsd: almR(sinIngresar.reduce((s, n) => s + n.total, 0)),
+                     notasPorVerificar: ns.filter(n => !n.verificada).length, opsPorVerificar: ops.filter(o => !o.verificada).length,
+                     sinExistencia: ns.filter(n => !n.verificada && (n.detalle || []).some(x => x.sinExist)).length };
+        }
+        // El mayor número de la columna A + 1 (como almSiguiente)
+        const siguiente = (H, n) => almNumero(H[n].valores.reduce((m, r) => Math.max(m, Number(String(r[0]).replace(/\D/g, '')) || 0), 0) + 1);
+        function precios(H) {
+            const out = {};
+            filas(H, 'ALM PRECIOS').filter(x => almCodigo(x.r[0])).forEach(({ r }) => {
+                out[almCodigo(r[0])] = { costo: numCelda(r[2]), merma: numCelda(r[3]), margenDetal: numCelda(r[5]), detal: numCelda(r[6]), margenMayor: numCelda(r[7]),
+                                         mayor: numCelda(r[8]), gran: numCelda(r[11]), actualizado: textoCelda(r[9]) };
+            });
+            return out;
+        }
+        function datos(H, cfg) {
+            const clientes = clientesAlm(H).concat(clientesCxc(H)).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+            return { productos: productos(H), clientes, categorias: CATEGORIAS.map(c => ({ codigo: c[0], nombre: c[1] })),
+                     proveedores: proveedores(H).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')), telegram: !!(cfg && cfg.telegram), pendientes: pendientes(H),
+                     proximaNota: siguiente(H, 'ALM NOTAS'), proximoIngreso: siguiente(H, 'ALM INGRESOS'), precios: precios(H) };
+        }
+        function horaCaracas() {
+            const p = {}; new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Caracas', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+                .formatToParts(new Date()).forEach(x => { p[x.type] = x.value; });
+            return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}`;
+        }
+        // ---------- Compras y Precios en tiendas (Compras.gs: cmpOrdenDesdeFila, cmpRespuestaOrdenes, cmpCompraDesdeFila, cmpListarCompras,
+        // cmpBorradoresFilas / cmpBorradoresListar / cmpBorradorLeer) ----------
+        const normTxt = v => String(v || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
+        const cmpJson = (t, def) => { try { return JSON.parse(String(t || '')) || def; } catch (e) { return def; } };
+        const ordenDesdeFila = (r, fila) => ({ fila, id: textoCelda(r[0]), fecha: textoCelda(r[1]), origen: textoCelda(r[2]),
+            proveedor: textoCelda(r[3]), codigo: almCodigo(r[4]), descripcion: textoCelda(r[5]), categoria: textoCelda(r[6]), tipo: textoCelda(r[7]) || 'Unidad',
+            costoAnt: numCelda(r[8]), costo: numCelda(r[9]), merma: numCelda(r[10]), detalAnt: numCelda(r[11]), detal: numCelda(r[12]), mayorAnt: numCelda(r[13]), mayor: numCelda(r[14]),
+            estado: textoCelda(r[15]), creadaPor: textoCelda(r[16]), definidoPor: textoCelda(r[17]), dist: cmpJson(r[18], {}), marcas: cmpJson(r[19], {}),
+            granAnt: numCelda(r[20]), gran: numCelda(r[21]) });
+        const leerOrdenes = H => filas(H, 'ALM ORDENES PRECIO').filter(x => textoCelda(x.r[0])).map(({ r, fila }) => ordenDesdeFila(r, fila));
+        const compraDesdeFila = (r, fila) => ({ fila, numero: almCodigo(r[0]), fecha: normalizarFecha(r[1]) || textoCelda(r[1]), hora: almHora(r[2]), proveedorId: textoCelda(r[3]), proveedor: textoCelda(r[4]), factura: textoCelda(r[5]),
+            fechaFactura: textoCelda(r[6]), renglones: numCelda(r[7]), total: numCelda(r[8]), operacion: textoCelda(r[9]), notas: cmpJson(r[10], {}), fotos: textoCelda(r[11]).split(' ').filter(Boolean),
+            usuario: textoCelda(r[12]), detalle: cmpJson(r[13], []), queda: cmpJson(r[14], {}), libro: textoCelda(r[15]), anulada: textoCelda(r[16]) });
+        function listarCompras(H, d) {
+            const todas = filas(H, 'ALM COMPRAS').filter(x => textoCelda(x.r[0])).map(({ r, fila }) => compraDesdeFila(r, fila)).reverse();
+            return d && d.todas ? todas : todas.slice(0, 200).map(c => { const x = Object.assign({}, c); delete x.fila; return x; });
+        }
+        function respuestaOrdenes(H, d, cfg) {
+            const ver = (d && d.ver) || 'pendientes', descDivisas = cfg && cfg.descDivisas != null ? Number(cfg.descDivisas) : 8;
+            if (ver === 'historial') {
+                const desde = fechaQ(d.desde) ? d.desde : '0000-00-00', hasta = fechaQ(d.hasta) ? d.hasta : '9999-12-31', q = normTxt(d.q || '');
+                const todas = leerOrdenes(H);
+                const lista = todas.filter(o => (o.detal > 0 || o.mayor > 0) && String(o.fecha).slice(0, 10) >= desde && String(o.fecha).slice(0, 10) <= hasta
+                    && (!q || normTxt(o.codigo + ' ' + o.descripcion + ' ' + o.proveedor).indexOf(q) !== -1)).reverse().slice(0, 1500);
+                const porId = new Map(todas.map(o => [o.id, o]));
+                let compras = null;
+                const origenDe = c => 'Compra · factura ' + (c.factura || 's/n') + (c.operacion ? ' · operación ' + c.operacion : '');
+                lista.forEach(o => {
+                    if (!/^Reemplazada/.test(o.estado)) return;
+                    const otra = /Reemplazada por (OP-\S+)/.exec(o.estado);
+                    if (otra) {
+                        const n = porId.get(otra[1]);
+                        o.fin = n ? { tipo: 'otra', id: n.id, origen: n.origen, fecha: n.fecha, creadaPor: n.creadaPor, definidoPor: n.definidoPor, detal: n.detal, mayor: n.mayor, gran: n.gran } : { tipo: 'otra', id: otra[1] };
+                        return;
+                    }
+                    if (/anulada/i.test(o.estado)) {
+                        compras = compras || listarCompras(H, { todas: true });
+                        const c = compras.find(x => x.anulada && origenDe(x) === o.origen) || compras.find(x => x.anulada && ('compra ' + x.numero) === ((/compra (\d+)/i.exec(o.estado) || [])[0] || '').toLowerCase());
+                        const partes = c ? String(c.anulada).split(' · ') : [];
+                        o.fin = { tipo: 'anulada', compra: c ? c.numero : ((/compra (\d+)/i.exec(o.estado) || [])[1] || ''), cuando: partes[0] || '', quien: partes[1] || '', motivo: partes.slice(2).join(' · ') };
+                    }
+                });
+                return { ordenes: lista, ver, desde, hasta, descDivisas };
+            }
+            const todas = leerOrdenes(H).filter(o => !/^Reemplazada/.test(o.estado)).reverse();
+            const lista = ver === 'completas' ? todas.filter(o => o.estado === 'Completa').slice(0, 300) : todas.filter(o => o.estado !== 'Completa');
+            return { ordenes: lista, ver, descDivisas, porDefinir: todas.filter(o => o.estado === 'Por definir precio').length, porActualizar: todas.filter(o => o.estado === 'Por actualizar').length };
+        }
+        const borradoresFilas = H => filas(H, 'ALM COMPRAS EN CURSO').filter(x => textoCelda(x.r[0])).map(({ r, fila }) => ({
+            fila, id: textoCelda(r[0]), creada: textoCelda(r[1]), creo: textoCelda(r[2]), actualizada: textoCelda(r[3]), actualizo: textoCelda(r[4]),
+            proveedor: textoCelda(r[5]), factura: textoCelda(r[6]), renglones: numCelda(r[7]), version: textoCelda(r[8]), datos: textoCelda(r[9]) }));
+        const borradoresListar = H => borradoresFilas(H).map(b => { const x = Object.assign({}, b); delete x.datos; delete x.fila; return x; })
+            .sort((a, b) => b.actualizada.localeCompare(a.actualizada));
+        // La misma respuesta que daría Apps Script a esa acción (null = que la responda Google)
+        function responder(p, H, cfg) {
+            if (p.action === 'cmp_ordenes') return respuestaOrdenes(H, p, cfg);
+            if (p.action === 'cmp_compras') return { compras: listarCompras(H, p) };
+            if (p.action === 'cmp_borradores') return { borradores: borradoresListar(H) };
+            if (p.action === 'cmp_borrador') {   // si no está, que Google dé su mensaje de siempre
+                const b = borradoresFilas(H).find(x => x.id === textoCelda(p.id));
+                return b ? { borrador: Object.assign({}, b, { datos: cmpJson(b.datos, {}) }) } : null;
+            }
+            if (p.action === 'alm_datos') return datos(H, cfg);
+            if (p.action === 'alm_notas') return { notas: notas(H, p).slice(0, p.ultimas ? 100 : 1000), pendientes: pendientes(H) };
+            if (p.action === 'alm_ingresos') return { ingresos: ingresos(H, p).slice(0, p.ultimas ? 100 : 1000), pendientes: pendientes(H) };
+            if (p.action === 'alm_existencias') return { productos: productos(H).filter(x => x.activo).map(x => ({ codigo: x.codigo, descripcion: x.descripcion, existencia: x.existencia, tipo: x.tipo, categoria: x.categoria })),
+                                                          hora: horaCaracas() };
+            return null;
+        }
+        return { responder };
+    })();
+    // Las 7 hojas del almacén + config/almacen escuchadas en vivo. Lo que guarda otro equipo llega solo (1 lectura por documento que cambió).
+    // Solo se responde con datos ya confirmados por el servidor de Firebase (no con la copia del equipo: podría ser vieja).
+    const ALMVIVO = (() => {
+        let quitar = [], estado = 'apagado', error = '', usado = 0, lista = [];
+        const H = {}, sinc = {}; let cfg = null, cfgSinc = false;
+        const completo = () => !!(cfg && cfgSinc && lista.length && lista.every(n => H[n] && sinc[n]));
+        async function iniciar() {
+            if (estado === 'escuchando' || estado === 'iniciando') return;
+            estado = 'iniciando'; error = ''; lista = almVivoHojas();   // solo las hojas que los permisos de esta persona dejan leer
+            try {
+                const { db, lib } = await FB.listo(), meta = { includeMetadataChanges: true };
+                const fallo = e => { error = (e && (e.code || e.message)) || 'sin respuesta'; detener(); estado = 'roto'; };
+                lista.forEach(n => quitar.push(lib.fs.onSnapshot(lib.fs.collection(db, FBH_HOJAS[n][0]), meta, s => {
+                    if (!H[n] || s.docChanges().length) H[n] = FBH.armar(n, s.docs);
+                    sinc[n] = !s.metadata.fromCache;
+                }, fallo)));
+                quitar.push(lib.fs.onSnapshot(lib.fs.doc(db, 'config', 'almacen'), meta, s => { cfg = s.exists() ? (JSON.parse(s.data().datos || 'null') || {}) : {}; cfgSinc = !s.metadata.fromCache; }, fallo));
+                if (estado === 'iniciando') estado = 'escuchando';
+            } catch (e) { error = e.message; estado = 'roto'; }
+        }
+        function detener() {
+            quitar.forEach(q => { try { q(); } catch (e) {} }); quitar = [];
+            Object.keys(H).forEach(n => { delete H[n]; }); Object.keys(sinc).forEach(n => { delete sinc[n]; }); cfg = null; cfgSinc = false; lista = [];
+            if (estado !== 'roto') estado = 'apagado';
+        }
+        async function esperar(ms) {
+            const desde = Date.now();
+            while (!completo()) {
+                if (estado === 'roto') throw new Error('Firebase no respondió: ' + error);
+                if (Date.now() - desde > ms) throw new Error('Firebase tardó más de ' + Math.round(ms / 1000) + ' s en mandar el almacén');
+                await new Promise(r => setTimeout(r, 100));
+            }
+        }
+        const reiniciar = () => { detener(); estado = 'apagado'; error = ''; };
+        return { iniciar, detener, reiniciar, esperar, completo, directa: () => !!(cfg && cfg.directa), responder: p => ALMFB.responder(p, H, cfg),
+                 tiene: n => lista.includes(n), estado: () => estado, error: () => error, tocar: () => { usado = Date.now(); }, usado: () => usado };
+    })();
+    const ALMVIVO_ACC = /^(alm_(datos|notas|ingresos|existencias)|cmp_(ordenes|compras|borradores|borrador))$/;
+    // Mismos permisos que Apps Script (y que las reglas de Firebase) para cada lectura
+    const almVivoTiene = (...m) => !!esPrincipal || m.some(x => permisos.includes(x));
+    const ALMVIVO_HOJAS_DE = { inventario: ['ALM PRODUCTOS', 'ALM NOTAS', 'ALM INGRESOS', 'ALM CLIENTES', 'ALM PROVEEDORES', 'ALM PRECIOS', 'BD CLIENTES'],
+                               compras: ['ALM ORDENES PRECIO', 'ALM COMPRAS'], curso: ['ALM COMPRAS EN CURSO'] };
+    function almVivoGrupo(accion) {
+        if (/^alm_/.test(accion)) return almVeExist() ? 'inventario' : '';
+        if (accion === 'cmp_ordenes') return almVivoTiene('precios', 'movalmacen', 'inventario') ? 'compras' : '';
+        if (accion === 'cmp_compras') return almVivoTiene('precios', 'movalmacen') ? 'compras' : '';
+        if (/^cmp_borrador/.test(accion)) return almVivoTiene('movalmacen') ? 'curso' : '';
+        return '';
+    }
+    function almVivoHojas() {
+        const g = [];
+        if (almVeExist()) g.push('inventario');
+        if (almVivoTiene('precios', 'movalmacen', 'inventario')) g.push('compras');
+        if (almVivoTiene('movalmacen')) g.push('curso');
+        return [].concat(...g.map(x => ALMVIVO_HOJAS_DE[x]));
+    }
+    let almVivoDirecta = null, almVivoDirectaHora = 0, almVivoRotoHora = 0, almVivoAvisado = false, almVivoSaltar = 0;
+    // ¿Está encendido "Usar Firebase en el Almacén"? Apagado: config/almacen se lee una vez cada 5 minutos (1 lectura) y no se escucha nada.
+    async function almVivoActiva() {
+        if (!clave || typeof FB === 'undefined' || !almVivoHojas().length) return false;
+        if (ALMVIVO.estado() === 'roto') {   // Firebase falló: 2 minutos por Google y después se vuelve a intentar
+            if (!almVivoRotoHora) almVivoRotoHora = Date.now();
+            if (Date.now() - almVivoRotoHora < 120000) return false;
+            ALMVIVO.reiniciar(); almVivoRotoHora = 0; almVivoAvisado = false;
+        }
+        if (ALMVIVO.completo()) return ALMVIVO.directa();
+        if (almVivoDirecta === null || Date.now() - almVivoDirectaHora > 300000) {
+            let c = null;
+            try { c = await FBH.doc('config/almacen'); } catch (e) { console.log('Almacén con Firebase: no se pudo leer config/almacen (' + (e.code || e.message) + ')'); }
+            almVivoDirecta = !!(c && c.directa); almVivoDirectaHora = Date.now();
+        }
+        return almVivoDirecta;
+    }
+    // Firebase ya tiene el último cambio del almacén que este panel conoce (el aviso al instante llega en el mismo orden que las hojas)
+    const almVivoAlDia = () => vivoFbSano() && ['alm', 'per'].every(a => !verConocida[a] || Number(vivoFbVer[a] || 0) >= Number(verConocida[a]));
+    // Lecturas del almacén respondidas aquí, con lo de Firebase (sin Google). null = que siga por Google como siempre.
+    async function almVivoResponder(p) {
+        if (almVivoSaltar || !ALMVIVO_ACC.test(p.action)) return null;
+        const grupo = almVivoGrupo(p.action);
+        if (!grupo) return null;   // sin ese permiso: Google (que tampoco se lo da)
+        try {
+            if (!(await almVivoActiva())) return null;
+            ALMVIVO.tocar();
+            const t0 = performance.now();
+            await ALMVIVO.iniciar();
+            await ALMVIVO.esperar(10000);
+            if (!ALMVIVO.directa()) { ALMVIVO.detener(); almVivoDirecta = false; return null; }   // lo apagaron mientras tanto
+            if (!ALMVIVO_HOJAS_DE[grupo].every(n => ALMVIVO.tiene(n))) return null;   // los permisos cambiaron desde que empezó a escuchar
+            const desde = Date.now();
+            while (!almVivoAlDia()) {
+                if (Date.now() - desde > 3000) { console.log('Almacén con Firebase: todavía no llega el último cambio (se pide a Google)'); return null; }
+                await new Promise(r => setTimeout(r, 100));
+            }
+            const r = ALMVIVO.responder(p);
+            anotarTiempo(p.action + ' (Firebase)', Math.round(performance.now() - t0), 0, true);
+            return r;
+        } catch (e) {
+            console.log('Almacén con Firebase: ' + e.message + ' (se pide a Google)');
+            if (esPrincipal && !almVivoAvisado) { almVivoAvisado = true; mostrarBanner('El Almacén no pudo leerse de Firebase (' + e.message + '). Mientras tanto se pide a Google.', 'warn'); }
+            return null;
+        }
+    }
+    // Fuera del almacén, las escuchas se apagan a los 3 minutos (no gastan lecturas de Firebase)
+    setInterval(() => {
+        if ((VISTA_AREAS[vistaActual] || []).includes('alm')) { if (ALMVIVO.estado() === 'escuchando') ALMVIVO.tocar(); return; }
+        if (ALMVIVO.estado() === 'escuchando' && Date.now() - ALMVIVO.usado() > 180000) ALMVIVO.detener();
+    }, 30000);
     // ---------- La nómina de la semana calculada EN EL PANEL con lo de Firebase (12/11, etapa 2) ----------
     // Son las MISMAS reglas que nom_semana en Apps Script, copiadas de CuadreSistema.gs (asisGestionListar, asisLeer, personaOficial,
     // bloquePorFecha...) y de Personal.gs (cxcDeudas, leerCxc, nominaHistorial, horLeer, nominaAjustesLeer...). Si se cambia una regla
@@ -3968,7 +4247,7 @@
         const res = [];
         let nomRes = null;
         try {
-            for (const nombre of Object.keys(FBH_HOJAS)) {
+            for (const nombre of Object.keys(FBH_HOJAS).filter(n => !ALMFB_SOLO.includes(n))) {
                 let fb = null, g = null, err = '';
                 const t0 = performance.now();
                 try { fb = await FBH.leer(nombre, true); } catch (e) { err = 'Firebase: ' + (e.code || e.message); }
@@ -4027,6 +4306,68 @@
             await DATOS.aGoogle(() => llamarApi({ action: 'fb_nomina_directa', activar }));
             nomVivoDirecta = null; NOMVIVO.reiniciar(); Object.keys(nomCache).forEach(k => delete nomCache[k]); nomDatos = null;
             mostrarBanner(activar ? 'Nómina con Firebase encendida: se calcula en el panel y se actualiza en vivo.' : 'Nómina con Firebase apagada: vuelve a pedirse a Google.', 'ok');
+            document.getElementById('fbhDlg').classList.add('hidden');
+        } catch (e) { mostrarBanner('No se pudo cambiar: ' + e.message, 'error'); btn.disabled = false; }
+    }
+    // Modo comparar del Almacén (administradores): cada respuesta calculada en el panel con lo de Firebase vs. la de Google, parte por parte.
+    // Tienen que ser iguales antes de encender "Usar Firebase en el Almacén".
+    async function almfbComparar(btn) {
+        btnCargando(btn, 'Comparando...');
+        const partes = [];
+        let error = '', directa = false, leer = 0, nHojas = 0;
+        try {
+            const t0 = performance.now(), H = {}, hojas = almVivoHojas();
+            await Promise.all(hojas.map(async n => { H[n] = await FBH.leer(n, true); }));
+            nHojas = hojas.length;
+            let cfg = null;
+            try { cfg = await FBH.doc('config/almacen'); } catch (e) {}
+            if (!cfg) partes.push({ parte: 'config/almacen', igual: false, detalle: 'No está publicado todavía: se publica al encender o en la revisión automática' });
+            cfg = cfg || {}; directa = !!cfg.directa; leer = Math.round(performance.now() - t0);
+            const fuera = ['ms', '_ver', 'hora', 'ok', 'sinInventario', 'yaRegistrado', 'pasos'];   // pasos = tiempos internos de Google
+            const pedidos = [['Datos', { action: 'alm_datos' }], ['Últimas notas', { action: 'alm_notas', ultimas: true }], ['Últimas operaciones', { action: 'alm_ingresos', ultimas: true }],
+                             ['Existencias', { action: 'alm_existencias' }], ['Órdenes pendientes', { action: 'cmp_ordenes', ver: 'pendientes' }],
+                             ['Órdenes completas', { action: 'cmp_ordenes', ver: 'completas' }], ['Historial de precios', { action: 'cmp_ordenes', ver: 'historial', desde: '2000-01-01', hasta: '2100-12-31' }],
+                             ['Compras', { action: 'cmp_compras' }], ['Compras en curso', { action: 'cmp_borradores' }]].filter(([, p]) => almVivoGrupo(p.action));
+            almVivoSaltar++;
+            try {
+                for (const [titulo, p] of pedidos) {
+                    const fb = ALMFB.responder(p, H, cfg), g = await DATOS.aGoogle(() => llamarApi(p));
+                    [...new Set(Object.keys(fb).concat(Object.keys(g)))].filter(k => !fuera.includes(k)).forEach(k => {
+                        const a = fb[k], b = g[k], ja = jsonOrdenado(a), jb = jsonOrdenado(b), parte = titulo + ' · ' + k;
+                        if (ja === jb) { partes.push({ parte, igual: true, n: Array.isArray(a) ? a.length : a && typeof a === 'object' ? Object.keys(a).length : String(a) }); return; }
+                        let detalle;
+                        if (Array.isArray(a) && Array.isArray(b) && a.length !== b.length) detalle = `Firebase ${a.length} · Google ${b.length}`;
+                        else if (Array.isArray(a) && Array.isArray(b)) { const i = a.findIndex((x, j) => jsonOrdenado(x) !== jsonOrdenado(b[j])); detalle = `#${i + 1}: Firebase ${jsonOrdenado(a[i]).slice(0, 160)} · Google ${jsonOrdenado(b[i]).slice(0, 160)}`; }
+                        else if (a && b && typeof a === 'object') { const c = [...new Set(Object.keys(a).concat(Object.keys(b)))].find(x => jsonOrdenado(a[x]) !== jsonOrdenado(b[x])); detalle = `${c}: Firebase ${String(jsonOrdenado(a[c])).slice(0, 140)} · Google ${String(jsonOrdenado(b[c])).slice(0, 140)}`; }
+                        else detalle = `Firebase ${String(ja).slice(0, 140)} · Google ${String(jb).slice(0, 140)}`;
+                        partes.push({ parte, igual: false, detalle });
+                    });
+                }
+            } finally { almVivoSaltar--; }
+        } catch (e) { error = e.code || e.message; }
+        finally { btn.disabled = false; btn.textContent = 'Comparar Almacén y compras (Firebase directo)'; }
+        const bien = !error && partes.length && partes.every(p => p.igual);
+        let fondo = document.getElementById('fbhDlg');
+        if (!fondo) { fondo = document.createElement('div'); fondo.id = 'fbhDlg'; fondo.className = 'req-dlg-fondo'; document.body.appendChild(fondo); }
+        fondo.onclick = e => { if (e.target === fondo) fondo.classList.add('hidden'); };
+        fondo.innerHTML = `<div class="req-dlg" style="max-width:760px"><h3>Almacén y compras: lectura directa de Firebase</h3>
+            <div class="req-sub">${error ? 'No se pudo comparar.' : bien ? '✓ Todo sale igual que en Google.' : 'Hay diferencias: no conviene encenderlo todavía.'} Leer ${nHojas} hojas de Firebase: ${(leer / 1000).toFixed(2).replace('.', ',')} s.
+                Cada persona lee solo lo que sus permisos le dejan ver; quien solo factura sigue por Google.</div>
+            ${error ? `<div class="banner error" style="display:block">${esc(error)}</div>` : `<div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><tbody>${partes.map(p => `<tr><td class="izq">${p.igual ? '<span class="chip st-ok">Igual</span>' : '<span class="chip st-sobra">Distinto</span>'}</td><td class="izq">${esc(p.parte)}<small>${esc(p.igual ? String(p.n) : p.detalle)}</small></td></tr>`).join('')}</tbody></table></div>`}
+            <div class="fb-ind" style="margin-top:1rem"><span>Usar Firebase en el Almacén y Compras (leído en el panel, en vivo)</span><b>${directa ? 'Encendido' : 'Apagado (se pide a Google)'}</b>
+                ${directa ? '<button type="button" class="btn-ghost btn-mini" onclick="almfbDirecta(this, false)">Apagar (volver a Google)</button>'
+                          : `<button type="button" class="btn-primary btn-mini" onclick="almfbDirecta(this, true)" ${bien ? '' : 'title="Hay diferencias: revíselas antes de encenderlo"'}>Encender</button>`}</div>
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-primary" onclick="document.getElementById('fbhDlg').classList.add('hidden')">Cerrar</button></div></div>`;
+        fondo.classList.remove('hidden');
+    }
+    // Interruptor "Usar Firebase en el Almacén": llega a todos los paneles por config/almacen
+    async function almfbDirecta(btn, activar) {
+        if (activar && !confirm('¿Encender el Almacén y Compras con Firebase? Productos, notas, operaciones, órdenes de precio y compras se leerán en cada panel directo de Firebase, en vivo (sin gastar llamadas de Google). Guardar sigue igual. Se puede apagar aquí mismo en cualquier momento.')) return;
+        btnCargando(btn, activar ? 'Encendiendo...' : 'Apagando...');
+        try {
+            await DATOS.aGoogle(() => llamarApi({ action: 'fb_almacen_directo', activar }));
+            almVivoDirecta = null; ALMVIVO.reiniciar(); almVivoRotoHora = 0; almVivoAvisado = false; DATOS.olvidarAreas('alm_datos');
+            mostrarBanner(activar ? 'Almacén con Firebase encendido: se lee en el panel y se actualiza en vivo.' : 'Almacén con Firebase apagado: vuelve a pedirse a Google.', 'ok');
             document.getElementById('fbhDlg').classList.add('hidden');
         } catch (e) { mostrarBanner('No se pudo cambiar: ' + e.message, 'error'); btn.disabled = false; }
     }
@@ -4094,7 +4435,7 @@
                 <div class="fb-ind"><span>Revisión automática (cada 5 min)</span><b>${rev ? (revHace != null ? `Activa · corrió hace ${revHace} min` : 'Activa · todavía no corre (el ping hace el trabajo de fondo)') : 'No activa (el trabajo de fondo lo hace el ping de los paneles)'}</b>${rev ? '' : '<button type="button" class="btn-primary btn-mini" onclick="fbRevision(this)">Activar</button>'}</div>
             </div>
             <div class="tabla-wrap"><table class="req-tabla fb-tabla" data-sin-paginar><thead><tr><th class="izq">Módulo</th><th class="izq">Dónde se guarda</th><th></th></tr></thead><tbody>${filas.map(f => f.html).join('')}</tbody></table></div>
-            <div class="req-acciones" style="justify-content:flex-end;margin:.5rem 0 0"><button type="button" class="btn-ghost btn-mini" onclick="fbHojas(this, 'copiar', 'pagos')">Copiar todo a la hoja ahora</button><button type="button" class="btn-ghost btn-mini" onclick="fbProbar(this)">Probar Firebase</button><button type="button" class="btn-ghost btn-mini" onclick="fbhComparar(this)">Comparar Nómina (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="fbEstadoDatos=null;fbEstadoCargar()">Actualizar</button></div>
+            <div class="req-acciones" style="justify-content:flex-end;margin:.5rem 0 0"><button type="button" class="btn-ghost btn-mini" onclick="fbHojas(this, 'copiar', 'pagos')">Copiar todo a la hoja ahora</button><button type="button" class="btn-ghost btn-mini" onclick="fbProbar(this)">Probar Firebase</button><button type="button" class="btn-ghost btn-mini" onclick="fbhComparar(this)">Comparar Nómina (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="almfbComparar(this)">Comparar Almacén y compras (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="fbEstadoDatos=null;fbEstadoCargar()">Actualizar</button></div>
             <div class="nota">"En Firebase": lo que se guarda en ese módulo vive en Firebase y la hoja de Google se llena sola como copia (lo que se cambie a mano en la hoja ya no cuenta). "Volver a la hoja" copia todo a Google antes de cambiar.</div>`;
     }
     async function fbHojas(btn, que, grupo) {
@@ -4262,7 +4603,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-12.12';
+    const VERSION_SERVIDOR = '2026-11-12.15';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -4530,7 +4871,7 @@
         if (clave && WEB_APP_URL && typeof mensaje !== 'string') llamarApiReal({ action: 'ping', salir: true, vista: '', disp: DISPOSITIVO }, performance.now()).catch(() => {});   // deja de figurar como conectado
         clave = null;
         permisos = [];
-        nombreUsuario = ''; esPrincipal = false; olvidarClavesAdmin(); DATOS.salir(); vivoFbDetener(); NOMVIVO.reiniciar(); nomVivoDirecta = null; nomVivoAvisado = false; nomVivoRotoHora = 0; FB.salir(); efeFbOff = null; efeFbActivo = false; efeFbRoto = ''; efeFbLlego = false;
+        nombreUsuario = ''; esPrincipal = false; olvidarClavesAdmin(); DATOS.salir(); vivoFbDetener(); NOMVIVO.reiniciar(); nomVivoDirecta = null; nomVivoAvisado = false; nomVivoRotoHora = 0; ALMVIVO.reiniciar(); almVivoDirecta = null; almVivoAvisado = false; almVivoRotoHora = 0; FB.salir(); efeFbOff = null; efeFbActivo = false; efeFbRoto = ''; efeFbLlego = false;
         filas = []; borradores = {}; seleccion = null; cargadoDesde = null; cuadreIniciado = false;
         // Al salir se borra todo lo guardado en memoria (otra persona puede entrar con menos permisos)
         efeDatos = { filas: [], cajaChica: [] }; efeCargado = null; efeCargadoEn = 0; precargadoDesde = null; Object.keys(pagMemoria).forEach(k => delete pagMemoria[k]);
@@ -19494,6 +19835,17 @@ Reglas:
 
     // Ficha de una caja que envió 0 Bs y 0 $ a oficina (se muestra igual, para confirmarla)
     const efeSinEnvio = f => f.tipo === 'INGRESO' && !(f.bs > 0) && !(f.usd > 0) && !!f.tienda;
+    // Envíos de las cajas repetidos (12/11): mismo día, tienda, cajero, turno y montos. Devuelve las filas que tienen gemelo.
+    const efeNorm = v => String(v || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    const efeLlaveEnvio = f => [f.fecha, efeNorm(f.tienda), efeNorm(f.cajero), efeNorm(f.turno), Number(f.bs || 0).toFixed(2), Number(f.usd || 0).toFixed(2)].join('|');
+    function efeRepetidos() {
+        const grupos = new Map();
+        efeDatos.filas.forEach(f => { if (f.tipo !== 'INGRESO' || f.pendiente || !(f.bs > 0 || f.usd > 0)) return;
+            const k = efeLlaveEnvio(f); (grupos.get(k) || (grupos.set(k, []), grupos.get(k))).push(f.fila); });
+        const s = new Set(); grupos.forEach(l => { if (l.length > 1) l.forEach(x => s.add(x)); });
+        return s;
+    }
+    const efeYaRecibido = f => (f.bs > 0 && f.bsOk) || (f.usd > 0 && f.usdOk);
 
     function efeRenderResumen() {
         const t = efeTotales(efeDatos.filas);
@@ -19603,6 +19955,11 @@ Reglas:
             return `<i class="efe-punto ${cls}" title="${txt}"></i>`;
         };
         const turnoCorto = t => /^ma/i.test(t || '') ? 'M' : /^ta/i.test(t || '') ? 'T' : esc(t || '');
+        const repetidos = efeRepetidos();
+        const chipRep = f => repetidos.has(f.fila) ? `<span class="chip st-sobra efe-atraso" title="Hay otro envío igual (mismo día, tienda, cajero, turno y monto). Elimine el que sobra con el botón de la derecha.">Repetido</span>` : '';
+        const borrarFila = f => f.pendiente ? '' : f.tipo !== 'INGRESO'
+            ? efeBorrar(`efeEliminar(${f.fila})`, f.tipo === 'TRASPASO' ? 'Eliminar este traspaso (también se quita de la caja chica)' : f.tipo === 'EXTERNO' ? 'Eliminar este dinero externo' : 'Eliminar este gasto')
+            : repetidos.has(f.fila) ? efeBorrar(`efeEliminar(${f.fila})`, efeYaRecibido(f) ? 'Este ya está recibido: elimine el otro (por llegar)' : 'Eliminar este envío repetido') : '';
         // Firma debajo del monto ("Bs: Ana · 2026-10-31 14:05 | $: ..."), discreta: nombre corto y día · hora.
         // Envíos de las cajas: quien lo recibió. Gastos, traspasos y dinero externo: quien lo registró.
         const firma = (f, mon) => { if (!f.recibidoPor) return ''; const et = mon === 'usd' ? '$' : 'Bs';
@@ -19613,14 +19970,14 @@ Reglas:
                 <small><b>${esc(cmpNombreCorto(quien))}</b>${m ? esc(cmpCuandoCorto(m[2])) : ''}</small></span>`; };
         document.getElementById('efeHTabla').innerHTML = lista.length ? `<table data-sin-paginar><thead><tr><th class="izq">Fecha</th><th class="izq">Concepto</th>
             <th class="izq">Responsable</th><th class="izq">Turno</th><th>Bs</th><th>$</th><th class="efe-c" title="Foto">Foto</th><th class="efe-c" title="Verificación (solo gastos de oficina)">Verif.</th><th></th></tr></thead><tbody>` +
-            lista.slice(0, efeHLimite).map(f => `<tr class="${f.tipo === 'EGRESO' ? 'fila-egreso' : f.tipo === 'TRASPASO' ? 'fila-traspaso' : f.tipo === 'EXTERNO' ? 'fila-externo' : ''}"><td class="izq">${efeFecha(f.fecha)}${efeAtraso(f)}${efePendChip(f)}</td>
+            lista.slice(0, efeHLimite).map(f => `<tr class="${f.tipo === 'EGRESO' ? 'fila-egreso' : f.tipo === 'TRASPASO' ? 'fila-traspaso' : f.tipo === 'EXTERNO' ? 'fila-externo' : ''}"><td class="izq">${efeFecha(f.fecha)}${efeAtraso(f)}${efePendChip(f)}${chipRep(f)}</td>
                 <td class="izq efe-gris">${f.tipo === 'TRASPASO' ? esc(f.turno || 'Traspaso a caja chica') : f.tipo === 'EGRESO' ? esc(f.turno || (f.etiqueta && f.etiqueta !== 'EGRESO' ? f.etiqueta : 'Egreso manual')) : f.tipo === 'EXTERNO' ? esc(f.turno) : esc(f.tienda || 'Ingreso manual')}</td><td class="izq efe-gris">${efeCorto(f.cajero)}</td>
                 <td class="izq efe-gris"><span title="${esc(f.tipo === 'INGRESO' ? f.turno : '')}">${f.tipo !== 'INGRESO' ? '' : turnoCorto(f.turno)}</span></td>
                 <td class="${f.bs < 0 ? 'monto-neg' : ''}">${f.bs ? efeMontoUsd('Bs', f.bs, f.fecha, punto(f, 'bs')) : efeSinEnvio(f) ? `<span class="efe-cifra"><span title="Caja sin envío">Bs 0</span>${punto(f, 'bs')}</span>` : ''}${f.bsOk || f.tipo !== 'INGRESO' ? firma(f, 'bs') : ''}</td>
                 <td class="${f.usd < 0 ? 'monto-neg' : ''}">${f.usd ? `<span class="efe-cifra">${fmtUsd(f.usd)}${punto(f, 'usd')}</span>` : ''}${f.usdOk || f.tipo !== 'INGRESO' ? firma(f, 'usd') : ''}</td>
                 <td class="efe-c">${efeFoto(f.foto)}</td>
                 <td class="efe-c">${efeEstadoVerif(f)}</td>
-                <td class="efe-c">${f.tipo !== 'INGRESO' && !f.pendiente ? efeBorrar(`efeEliminar(${f.fila})`, f.tipo === 'TRASPASO' ? 'Eliminar este traspaso (también se quita de la caja chica)' : f.tipo === 'EXTERNO' ? 'Eliminar este dinero externo' : 'Eliminar este gasto') : ''}</td></tr>`).join('') +
+                <td class="efe-c">${borrarFila(f)}</td></tr>`).join('') +
             '</tbody></table>' : '<div class="empty">No hay movimientos con estos filtros.</div>';
         // Paginador (los totales de arriba siempre son de todo lo filtrado)
         const mostrados = Math.min(efeHLimite, lista.length);
@@ -19671,9 +20028,15 @@ Reglas:
         const concepto = f.turno || f.etiqueta || 'Egreso manual';
         const montos = [f.bs ? fmtBs(Math.abs(f.bs)) : '', f.usd ? fmtUsd(Math.abs(f.usd)) : ''].filter(Boolean).join(' y ');
         const caja = /^Recarga caja chica:/i.test(f.turno) ? '\nEs una recarga de caja chica: también se quitará de la caja chica.' : '';
+        if (f.tipo === 'INGRESO') {
+            if (!efeRepetidos().has(f.fila)) return mostrarBanner('Solo se puede eliminar un envío de caja que está repetido.', 'warn');
+            if (efeYaRecibido(f)) return mostrarBanner('Ese envío ya está marcado como recibido. Elimine el otro (el que está por llegar), o apague "recibido" primero.', 'warn');
+            return efeAbrirModal({ tipo: 'eliminar', f }, 'Eliminar envío repetido',
+                `${f.tienda} · ${f.turno} · ${f.cajero} · ${montos} (${fechaBonita(f.fecha)})\nHay otro envío igual. Se quitará solo este; el otro se queda. La caja en Cuadre de caja no cambia.`, false);
+        }
         if (f.tipo === 'EXTERNO') return efeAbrirModal({ tipo: 'eliminar', f }, 'Eliminar dinero externo',
             `${concepto} · ${montos} (${fechaBonita(f.fecha)})\nSe borrará la fila de FLUJO DE EFECTIVO y el monto saldrá del disponible.`, false);
-        efeAbrirModal({ tipo: 'eliminar', f }, 'Eliminar gasto',
+        return efeAbrirModal({ tipo: 'eliminar', f }, 'Eliminar gasto',
             `${concepto} · ${montos} (${fechaBonita(f.fecha)})\nSe borrará la fila de FLUJO DE EFECTIVO y el monto volverá al disponible.${caja}`, false);
     }
 
@@ -19712,6 +20075,7 @@ Reglas:
         let payload;
         if (a.tipo === 'eliminar') {
             payload = { action: 'efe_eliminar', fila: f.fila, id: f.id, bs: f.bs, usd: f.usd, concepto: f.turno };
+            if (f.tipo === 'INGRESO') Object.assign(payload, { repetido: true, fecha: f.fecha, tienda: f.tienda, cajero: f.cajero });
         } else if (a.tipo === 'eliminarCaja') {
             payload = { action: 'cc_eliminar', fila: a.m.fila, id: a.m.id, monto: a.m.monto, concepto: a.m.concepto };
         } else {
@@ -19732,6 +20096,7 @@ Reglas:
                 .then(async r => {
                     efeBorrando.delete(llave);
                     if (a.tipo === 'eliminarCaja') mostrarBanner(a.m.tipo === 'RECARGA' ? `Recarga externa eliminada: ${a.m.concepto}.` : `Gasto de caja chica eliminado: ${a.m.concepto}. El monto volvió al saldo.`, 'ok');
+                    else if (f.tipo === 'INGRESO') mostrarBanner(`Envío repetido eliminado: ${f.tienda} · ${f.turno} (${fechaBonita(f.fecha)}). Quedó uno solo.`, 'ok');
                     else mostrarBanner(`${f.tipo === 'EXTERNO' ? 'Dinero externo eliminado' : 'Gasto eliminado'}: ${f.turno || 'Egreso manual'}.` + (r.cajaChica ? ' También se quitó de la caja chica.' : ''), 'ok');
                     await efeUsarRespuesta(r);
                 })

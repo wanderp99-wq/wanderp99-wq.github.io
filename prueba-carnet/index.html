@@ -85,7 +85,7 @@
     </section>
 </main>
 <script>
-    const URL_HOJA = "https://script.google.com/macros/s/AKfycbyS0CMaKtl9A0ViefcNY_E6Mafqv1rCSFVDLbjjkZXWmtu04ZA-WjtkXyx3ZVS48CwV/exec";
+    const URL_HOJA = "https://script.google.com/macros/s/AKfycbwB4qpxVZG3kQYpC1OJFfgrovqvt2x5G7O6qwZVDLcf1VKZ78jLtmP1iPPbL0bR3Qc/exec";
     const $ = id => document.getElementById(id);
     const esc = t => String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const fotoDe = url => { const m = /[-\w]{25,}/.exec(url || ''); return m ? `https://drive.google.com/thumbnail?id=${m[0]}&sz=w300` : ''; };
