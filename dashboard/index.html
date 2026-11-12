@@ -702,6 +702,9 @@
         tr.fila-traspaso td { background: color-mix(in srgb, var(--primary) 5%, transparent); }
         .monto-neg { color: var(--bad); }
         tr.fila-egreso td { background: color-mix(in srgb, var(--bad) 5%, transparent); }
+        /* (13/11) Eliminado del flujo: queda como constancia, gris y tachado (no suma en nada) */
+        tr.fila-eliminada td { background: var(--list-bg); color: var(--text-muted); }
+        tr.fila-eliminada .efe-cifra, tr.fila-eliminada .efe-usd { text-decoration: line-through; opacity: .7; }
         .marca.ext { color: var(--ok); background: var(--ok-bg); cursor: default; }
         tr.fila-externo td { background: color-mix(in srgb, var(--ok) 5%, transparent); }
         .efe-foto-opc { margin-top: .6rem; }
@@ -2514,6 +2517,7 @@
 
     <section id="vistaFl" class="vista hidden"><div id="flContenido"></div></section>
     <section id="vistaVx" class="vista hidden"><div id="vxContenido"></div></section>
+    <section id="vistaCxp" class="vista hidden"><div id="cxpContenido"></div></section>
 
     <section id="vistaAlm" class="vista hidden">
         <div class="modo-tabs" role="tablist" id="almTabs"></div>
@@ -3489,6 +3493,8 @@
         if (ALMVIVO_ACC.test(payload.action) && !almVivoSaltar) { const r = await almVivoResponder(payload); if (r) return r; }
         if (CAJAVIVO_ACC.test(payload.action) && !cajaVivoSaltar) { const r = await cajaVivoResponder(payload); if (r) return r; }
         if (PERVIVO_ACC.test(payload.action) && !perVivoSaltar) { const r = await perVivoResponder(payload); if (r) return r; }
+        if (REQVIVO_ACC.test(payload.action)) { const r = await reqDirecto.responder(payload); if (r) return r; }
+        if (FACTVIVO_ACC.test(payload.action)) { const r = await factDirecto.responder(payload); if (r) return r; }
         const t0 = performance.now();
         let llaveIdem = '', llaveLS = '';
         // Leer la factura no guarda nada: sin idem (si no, pulsar Leer otra vez mientras Google seguía con el primero daba "todavía se está guardando").
@@ -3683,9 +3689,12 @@
         'ALM CLIENTES': ['hoja_alm_clientes', 11], 'ALM PROVEEDORES': ['hoja_alm_proveedores', 7],
         'ALM PRODUCTOS': ['hoja_alm_productos', 14], 'ALM NOTAS': ['hoja_alm_notas', 25], 'ALM INGRESOS': ['hoja_alm_ingresos', 13], 'ALM PRECIOS': ['hoja_alm_precios', 12],
         'ALM ORDENES PRECIO': ['hoja_alm_ordenes', 22], 'ALM COMPRAS': ['hoja_alm_compras', 17], 'ALM COMPRAS EN CURSO': ['hoja_alm_compras_curso', 10],
-        'COMENTARIOS CUADRE': ['hoja_comentarios', 9], 'BASE DE DATOS FLUJO DE CAJA GENERAL': ['hoja_flujogeneral', 13], 'BD MOVIMIENTOS BANCARIOS': ['hoja_movimientos', 18] };
+        'COMENTARIOS CUADRE': ['hoja_comentarios', 9], 'BASE DE DATOS FLUJO DE CAJA GENERAL': ['hoja_flujogeneral', 13], 'BD MOVIMIENTOS BANCARIOS': ['hoja_movimientos', 18],
+        'PRODUCTOS': ['hoja_req_productos', 11], 'EXHIBICION': ['hoja_req_exhibicion', 4], 'VARIEDAD MINIMA': ['hoja_req_variedad', 4], 'VENTAS': ['hoja_req_ventas', 11],
+        'REQUERIMIENTOS': ['hoja_req_requerimientos', 19], 'ALM ESPERA': ['hoja_alm_espera', 7] };
     const ALMFB_SOLO = ['ALM PRODUCTOS', 'ALM NOTAS', 'ALM INGRESOS', 'ALM PRECIOS', 'ALM ORDENES PRECIO', 'ALM COMPRAS', 'ALM COMPRAS EN CURSO',
-                        'COMENTARIOS CUADRE', 'BASE DE DATOS FLUJO DE CAJA GENERAL', 'BD MOVIMIENTOS BANCARIOS'];   // del almacén y compras, no de la nómina (no van en "Comparar Nómina")
+                        'COMENTARIOS CUADRE', 'BASE DE DATOS FLUJO DE CAJA GENERAL', 'BD MOVIMIENTOS BANCARIOS',
+                        'PRODUCTOS', 'EXHIBICION', 'VARIEDAD MINIMA', 'VENTAS', 'REQUERIMIENTOS', 'ALM ESPERA'];   // del almacén y compras, no de la nómina (no van en "Comparar Nómina")
     const FBH = (() => {
         function armar(nombre, docs) {
             const cols = FBH_HOJAS[nombre][1], filas = {};
@@ -4581,6 +4590,192 @@
         if (['cxc', 'asisgestion', 'horarios', 'nomina', 'talento'].includes(vistaActual)) { if (PERVIVO.estado() === 'escuchando') PERVIVO.tocar(); return; }
         if (PERVIVO.estado() === 'escuchando' && Date.now() - PERVIVO.usado() > 180000) PERVIVO.detener();
     }, 30000);
+
+    // ---------- Escucha en vivo genérica (12/11): hojas armadas + documentos { datos: JSON } + colecciones crudas ----------
+    // Igual que ALMVIVO / CAJAVIVO / PERVIVO: solo se responde con lo ya confirmado por el servidor de Firebase.
+    function crearVivo(docsRutas, colecciones) {
+        let quitar = [], estado = 'apagado', error = '', usado = 0, lista = [];
+        const H = {}, sinc = {}, D = {}, dSinc = {}, C = {}, cSinc = {};
+        const completo = () => !!(lista.length + colecciones.length && lista.every(n => H[n] && sinc[n]) && docsRutas.every(r => D[r] !== undefined && dSinc[r]) && colecciones.every(c => C[c] && cSinc[c]));
+        async function iniciar(hojas) {
+            if (estado === 'escuchando' || estado === 'iniciando') return;
+            estado = 'iniciando'; error = ''; lista = hojas.slice();
+            try {
+                const { db, lib } = await FB.listo(), meta = { includeMetadataChanges: true };
+                const fallo = e => { error = (e && (e.code || e.message)) || 'sin respuesta'; detener(); estado = 'roto'; };
+                lista.forEach(n => quitar.push(lib.fs.onSnapshot(lib.fs.collection(db, FBH_HOJAS[n][0]), meta, s => {
+                    if (!H[n] || s.docChanges().length) H[n] = FBH.armar(n, s.docs); sinc[n] = !s.metadata.fromCache; }, fallo)));
+                docsRutas.forEach(r => { const [c, d] = r.split('/'); quitar.push(lib.fs.onSnapshot(lib.fs.doc(db, c, d), meta, s => {
+                    D[r] = s.exists() ? JSON.parse(s.data().datos || 'null') : null; dSinc[r] = !s.metadata.fromCache; }, fallo)); });
+                colecciones.forEach(c => quitar.push(lib.fs.onSnapshot(lib.fs.collection(db, c), meta, s => {
+                    const m = {}; s.docs.forEach(x => { m[x.id] = x.data(); }); C[c] = m; cSinc[c] = !s.metadata.fromCache; }, fallo)));
+                if (estado === 'iniciando') estado = 'escuchando';
+            } catch (e) { error = e.message; estado = 'roto'; }
+        }
+        function detener() {
+            quitar.forEach(q => { try { q(); } catch (e) {} }); quitar = [];
+            [H, sinc, D, dSinc, C, cSinc].forEach(o => Object.keys(o).forEach(k => { delete o[k]; })); lista = [];
+            if (estado !== 'roto') estado = 'apagado';
+        }
+        async function esperar(ms) {
+            const desde = Date.now();
+            while (!completo()) {
+                if (estado === 'roto') throw new Error('Firebase no respondió: ' + error);
+                if (Date.now() - desde > ms) throw new Error('Firebase tardó más de ' + Math.round(ms / 1000) + ' s en mandar los datos');
+                await new Promise(r => setTimeout(r, 100));
+            }
+        }
+        return { iniciar, detener, reiniciar: () => { detener(); estado = 'apagado'; error = ''; }, esperar, completo, H, D, C,
+                 tiene: n => lista.includes(n), lista: () => lista.slice(), estado: () => estado, error: () => error, tocar: () => { usado = Date.now(); }, usado: () => usado };
+    }
+    // Lo común de cada módulo leído directo: interruptor, 2 minutos por Google si falla, al día con los avisos al instante, medir el tiempo
+    function crearDirecto(o) {   // o = { nombre, vivo, leerCfg(), hojas(cfg, accion), areas(accion), listo(), responder(p), aviso }
+        const s = { cfg: null, cfgHora: 0, roto: 0, avisado: false, saltar: 0 };
+        async function config() {
+            if (!clave || typeof FB === 'undefined') return null;
+            if (o.vivo.estado() === 'roto') { if (!s.roto) s.roto = Date.now(); if (Date.now() - s.roto < 120000) return null; o.vivo.reiniciar(); s.roto = 0; s.avisado = false; }
+            if (o.vivo.completo()) return o.cfgVivo();
+            if (s.cfg === null || Date.now() - s.cfgHora > 300000) {
+                let c = null;
+                try { c = await o.leerCfg(); } catch (e) { console.log(o.nombre + ' con Firebase: no se pudo leer su configuración (' + (e.code || e.message) + ')'); }
+                s.cfg = c || {}; s.cfgHora = Date.now();
+            }
+            return s.cfg;
+        }
+        async function responder(p) {
+            if (s.saltar || !o.acepta(p)) return null;
+            try {
+                const cfg = await config();
+                if (!cfg || !cfg.directa) return null;
+                const necesita = o.hojas(cfg, p.action);
+                if (!necesita) return null;   // alguna hoja todavía está en Google
+                o.vivo.tocar();
+                const t0 = performance.now(), todas = o.todas(cfg);
+                if (o.vivo.estado() === 'escuchando' && !necesita.every(n => o.vivo.tiene(n))) o.vivo.detener();
+                await o.vivo.iniciar(todas);
+                await o.vivo.esperar(12000);
+                const c = o.cfgVivo();
+                if (!c.directa) { o.vivo.detener(); s.cfg = c; return null; }
+                if (!o.hojas(c, p.action) || !o.listo()) return null;
+                const areas = o.areas(p.action), desde = Date.now();
+                while (!(vivoFbSano() && areas.every(a => !verConocida[a] || Number(vivoFbVer[a] || 0) >= Number(verConocida[a])))) {
+                    if (Date.now() - desde > 3000) { console.log(o.nombre + ' con Firebase: todavía no llega el último cambio (se pide a Google)'); return null; }
+                    await new Promise(r => setTimeout(r, 100));
+                }
+                const r = o.responder(p);
+                if (r) anotarTiempo(p.action + ' (Firebase)', Math.round(performance.now() - t0), 0, true);
+                return r;
+            } catch (e) {
+                console.log(o.nombre + ' con Firebase: ' + e.message + ' (se pide a Google)');
+                if (esPrincipal && !s.avisado) { s.avisado = true; mostrarBanner(o.nombre + ' no pudo leerse de Firebase (' + e.message + '). Mientras tanto se pide a Google.', 'warn'); }
+                return null;
+            }
+        }
+        const reiniciar = () => { o.vivo.reiniciar(); s.cfg = null; s.roto = 0; s.avisado = false; };
+        setInterval(() => {
+            if (o.vistas.includes(vistaActual)) { if (o.vivo.estado() === 'escuchando') o.vivo.tocar(); return; }
+            if (o.vivo.estado() === 'escuchando' && Date.now() - o.vivo.usado() > 180000) o.vivo.detener();
+        }, 30000);
+        return { responder, reiniciar, s, config };
+    }
+
+    // ---------- Requerimientos de charcutería leídos DIRECTO de Firebase (12/11) ----------
+    // Las MISMAS reglas que req_datos / req_ventas / req_historial (Requerimientos.gs: reqDatosHoja, reqLeerVentas, reqHistorial).
+    const REQFB = (() => {
+        const REQ_LOCALES = ['Santa Rosa', 'Ricardo Urriera', 'Isabelica', 'Parcelas'];
+        const reqTxt = v => v == null ? '' : String(v).trim();
+        function reqFecha(v) {
+            const s = reqTxt(v), m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (m) return m[0];
+            const m2 = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+            return m2 ? m2[3] + '-' + ('0' + m2[2]).slice(-2) + '-' + ('0' + m2[1]).slice(-2) : s;
+        }
+        const reqUnidad = v => { const u = reqTxt(v).toUpperCase(); return /^U/.test(u) ? 'UND' : /^G/.test(u) ? 'GRANEL' : 'KG'; };
+        const reqNum = v => { const n = Number(String(v == null ? '' : v).replace(',', '.')); return isNaN(n) ? 0 : n; };
+        const filas = (H, n) => (H[n] || { valores: [] }).valores;
+        function datos(H) {
+            const productos = filas(H, 'PRODUCTOS').filter(f => reqTxt(f[0]) || reqTxt(f[2])).map(f => ({
+                codigo: reqTxt(f[0]), codigoCava: reqTxt(f[1]), nombre: reqTxt(f[2]), categoria: reqTxt(f[3]), tipo: reqTxt(f[4]), marca: reqTxt(f[5]), sabor: reqTxt(f[6]),
+                presentacion: reqTxt(f[7]), unidad: reqUnidad(f[8]), peso: reqNum(f[9]), activo: !/^(no|n|0|false|inactivo)$/i.test(reqTxt(f[10])) }));
+            const exhibicion = filas(H, 'EXHIBICION').filter(f => reqTxt(f[0]) && reqTxt(f[1])).map(f => ({ local: reqTxt(f[0]), codigo: reqTxt(f[1]), nombre: reqTxt(f[2]), cantidad: reqNum(f[3]) }));
+            const variedad = filas(H, 'VARIEDAD MINIMA').filter(f => reqTxt(f[0])).map(f => ({ local: reqTxt(f[0]), categoria: reqTxt(f[1]) || '*', tipo: reqTxt(f[2]), minimo: reqNum(f[3]) }));
+            const per = {};
+            filas(H, 'VENTAS').forEach(f => {
+                const id = reqTxt(f[0]); if (!id) return;
+                const p = per[id] || (per[id] = { periodo: id, local: reqTxt(f[1]), desde: reqFecha(f[2]), hasta: reqFecha(f[3]), dias: reqNum(f[4]),
+                                                  productos: 0, total: 0, archivo: reqTxt(f[8]), cargado: reqTxt(f[9]), usuario: reqTxt(f[10]) });
+                p.productos++; p.total += reqNum(f[7]);
+            });
+            return { productos, exhibicion, variedad, periodos: Object.keys(per).map(k => per[k]), locales: REQ_LOCALES };
+        }
+        function ventas(H, periodos) {
+            const quiero = {}; (periodos || []).forEach(p => { quiero[String(p)] = true; });
+            return filas(H, 'VENTAS').filter(f => quiero[reqTxt(f[0])]).map(f => ({ periodo: reqTxt(f[0]), codigo: reqTxt(f[5]), nombre: reqTxt(f[6]), cantidad: reqNum(f[7]) }));
+        }
+        function historial(H, desde, hasta) {
+            desde = reqFecha(desde || '0000-00-00'); hasta = reqFecha(hasta || '9999-12-31');
+            return { filas: filas(H, 'REQUERIMIENTOS').filter(f => reqTxt(f[0])).map(f => ({
+                id: reqTxt(f[0]), semana: reqFecha(f[1]), fecha: reqTxt(f[2]) || reqFecha(f[2]), local: reqTxt(f[3]), usuario: reqTxt(f[4]), dias: reqNum(f[5]),
+                codigo: reqTxt(f[6]), nombre: reqTxt(f[7]), categoria: reqTxt(f[8]), tipo: reqTxt(f[9]), unidad: reqTxt(f[10]),
+                ventaDiaria: reqNum(f[11]), exhibicion: reqNum(f[12]), existencia: reqNum(f[13]), necesidad: reqNum(f[14]),
+                piezas: reqNum(f[15]), deCava: reqNum(f[16]), aComprar: reqNum(f[17]), nota: reqTxt(f[18]) })).filter(x => x.semana >= desde && x.semana <= hasta) };
+        }
+        function responder(p, H) {
+            if (p.action === 'req_datos') return Object.assign({ ok: true }, datos(H));
+            if (p.action === 'req_ventas') return { ok: true, ventas: ventas(H, p.periodos) };
+            if (p.action === 'req_historial') return Object.assign({ ok: true }, historial(H, p.desde, p.hasta));
+            return null;
+        }
+        return { responder };
+    })();
+    const REQ_HOJAS = ['PRODUCTOS', 'EXHIBICION', 'VARIEDAD MINIMA', 'VENTAS', 'REQUERIMIENTOS'];
+    const REQVIVO_ACC = /^req_(datos|ventas|historial)$/;
+    const REQVIVO = crearVivo(['config/req'], []);
+    const reqDirecto = crearDirecto({ nombre: 'Requerimientos de charcutería', vivo: REQVIVO, vistas: ['reqcharcu'],
+        acepta: p => REQVIVO_ACC.test(p.action) && almVivoTiene('reqcharcu'),
+        leerCfg: () => FBH.doc('config/req'), cfgVivo: () => REQVIVO.D['config/req'] || {},
+        hojas: (cfg, a) => (cfg.grupos || []).includes('req') ? REQ_HOJAS : null, todas: () => REQ_HOJAS,
+        areas: () => ['req'], listo: () => true, responder: p => REQFB.responder(p, REQVIVO.H) });
+
+    // ---------- Facturar leído DIRECTO de Firebase (12/11) ----------
+    // Quien solo factura (sin ver el inventario ni Precios en tiendas) lee vista_facturar: lo que Apps Script le publica, que es exactamente
+    // lo que hoy le responde (sin existencia, mínimo ni costo). Nunca las hojas del almacén. Las ventas en espera (sin costo) se leen de su hoja.
+    const factSolo = () => almVivoTiene('facturar') && !almVeExist() && !almVivoTiene('precios');
+    const FACTVIVO_ACC = /^alm_(datos|notas|espera_listar)$/;
+    const FACTVIVO = crearVivo([], ['vista_facturar']);
+    // Une los trozos de una parte ("datos" o "notas") según meta.partes; null si falta alguno
+    function factParte(nombre) {
+        const v = FACTVIVO.C.vista_facturar || {}, meta = v.meta ? JSON.parse(v.meta.datos || 'null') : null;
+        const n = meta && meta.partes && meta.partes[nombre];
+        if (!n) return null;
+        let t = '';
+        for (let i = 0; i < n; i++) { const d = v[nombre + '_' + i]; if (!d || typeof d.datos !== 'string') return null; t += d.datos; }
+        try { return JSON.parse(t); } catch (e) { return null; }
+    }
+    const factCfg = () => { const v = (FACTVIVO.C.vista_facturar || {}).meta; return v ? (JSON.parse(v.datos || 'null') || {}) : {}; };
+    function factResponder(p) {
+        if (p.action === 'alm_espera_listar') {
+            const h = FACTVIVO.H['ALM ESPERA']; if (!h) return null;
+            const t = v => String(v == null ? '' : v).trim(), n = v => { const x = Number(String(v).replace(',', '.')); return isFinite(x) ? x : 0; };
+            return { ok: true, esperas: h.valores.filter(r => t(r[0]) && !t(r[6])).map(r => {
+                let items = []; try { items = JSON.parse(String(r[5] || '[]')); } catch (e) {}
+                return { id: t(r[0]), guardada: t(r[1]), usuario: t(r[2]), renglones: n(r[3]), total: n(r[4]), items };
+            }) };
+        }
+        if (!factSolo()) return null;
+        if (p.action === 'alm_datos') { const d = factParte('datos'); return d ? Object.assign({ ok: true }, d) : null; }
+        if (p.action === 'alm_notas') { const d = factParte('notas'); return d ? Object.assign({ ok: true }, d) : null; }
+        return null;
+    }
+    const factDirecto = crearDirecto({ nombre: 'Facturar', vivo: FACTVIVO, vistas: ['facturar'],
+        // Notas: solo "las últimas" (lo que se carga al entrar); con fechas o búsqueda, Google
+        acepta: p => FACTVIVO_ACC.test(p.action) && (p.action === 'alm_espera_listar' ? almVivoTiene('facturar')
+                   : factSolo() && (p.action === 'alm_datos' || (p.ultimas && Object.keys(p).every(k => ['action', 'ultimas'].includes(k))))),
+        leerCfg: async () => { const { db, lib } = await FB.listo(), s = await lib.fs.getDocFromServer(lib.fs.doc(db, 'vista_facturar', 'meta')); return s.exists() ? JSON.parse(s.data().datos || 'null') : null; },
+        cfgVivo: factCfg,
+        hojas: (cfg, a) => a === 'alm_espera_listar' ? ((cfg.grupos || []).includes('almacen') ? ['ALM ESPERA'] : null) : [],
+        todas: cfg => (cfg.grupos || []).includes('almacen') ? ['ALM ESPERA'] : [],
+        areas: a => a === 'alm_espera_listar' ? ['alm'] : ['alm', 'per'], listo: () => true, responder: factResponder });
     // ---------- La nómina de la semana calculada EN EL PANEL con lo de Firebase (12/11, etapa 2) ----------
     // Son las MISMAS reglas que nom_semana en Apps Script, copiadas de CuadreSistema.gs (asisGestionListar, asisLeer, personaOficial,
     // bloquePorFecha...) y de Personal.gs (cxcDeudas, leerCxc, nominaHistorial, horLeer, nominaAjustesLeer...). Si se cambia una regla
@@ -5078,6 +5273,170 @@
             document.getElementById('fbhDlg').classList.add('hidden');
         } catch (e) { mostrarBanner('No se pudo cambiar: ' + e.message, 'error'); btn.disabled = false; }
     }
+    // Modo comparar de Cuentas por cobrar, Gestión de asistencia y Horarios de trabajo (administradores)
+    async function perfbComparar(btn) {
+        const texto = btn.textContent;
+        btnCargando(btn, 'Comparando...');
+        const partes = [];
+        let error = '', directa = false, leer = 0, nHojas = 0, periodo = '';
+        try {
+            const t0 = performance.now(), H = {};
+            let cfg = null, cfgN = null, personas = null;
+            try { [cfg, cfgN, personas] = await Promise.all(['config/personal', 'config/nomina', 'vista/personas'].map(r => FBH.doc(r).catch(() => null))); } catch (e) {}
+            if (!cfg) partes.push({ parte: 'config/personal', igual: false, detalle: 'No está publicado todavía: se publica al encender o en la revisión automática' });
+            if (!cfgN || !personas) throw new Error('Falta publicar en Firebase la configuración de la nómina o la lista de personas (se publican al encender o en la revisión automática).');
+            cfg = cfg || { grupos: ['nomina', 'personal', 'almacen', 'asistencia', 'cuadre'] }; directa = !!cfg.directa;
+            const hojas = perVivoHojas(cfg.grupos);
+            if (!hojas.length) throw new Error('Estas hojas todavía están en la hoja de Google (Tiempos: "Pasar a Firebase").');
+            await Promise.all(hojas.map(async n => { H[n] = await FBH.leer(n, true); }));
+            nHojas = hojas.length; leer = Math.round(performance.now() - t0);
+            const fuera = ['ms', '_ver', 'ok', 'pasos'];
+            const puede = a => perVivoPermite(a) && PERVIVO_HOJAS_DE[a].every(n => hojas.includes(n));
+            const sumar = (iso, n) => { const p = iso.split('-').map(Number); return new Date(Date.UTC(p[0], p[1] - 1, p[2] + n)).toISOString().slice(0, 10); };
+            // La última semana (de sábado a viernes) que tiene asistencia; sin asistencia, la de hoy
+            let ref = fechaLocalHoy();
+            if (H['BD ASISTENCIA']) ref = H['BD ASISTENCIA'].valores.reduce((m, r) => { const f = String(r[0] || '').slice(0, 10); return /^\d{4}-\d{2}-\d{2}$/.test(f) && f > m ? f : m; }, '') || ref;
+            const dia = new Date(ref + 'T12:00:00').getDay(), sabado = sumar(ref, -((dia + 1) % 7)), viernes = sumar(sabado, 6);
+            periodo = fechaBonita(sabado) + ' al ' + fechaBonita(viernes);
+            const pedidos = [['Cuentas por cobrar (pendientes)', { action: 'cxc_deudas' }], ['Cuentas por cobrar (histórico 30 días)', { action: 'cxc_deudas', historico: true, desde: sumar(viernes, -30), hasta: viernes }],
+                             ['Gestión de asistencia', { action: 'asisg_listar', desde: sabado, hasta: viernes }], ['Horarios de trabajo', { action: 'hor_datos', semana: sabado }]].filter(([, p]) => puede(p.action));
+            perVivoSaltar++;
+            try {
+                for (const [titulo, p] of pedidos) {
+                    const fb = NOMFB.responder(p, H, cfgN, personas) || {}, g = await DATOS.aGoogle(() => llamarApi(p));
+                    [...new Set(Object.keys(fb).concat(Object.keys(g)))].filter(k => !fuera.includes(k)).forEach(k => {
+                        const a = fb[k], b = g[k], ja = jsonOrdenado(a), jb = jsonOrdenado(b), parte = titulo + ' · ' + k;
+                        if (ja === jb) { partes.push({ parte, igual: true, n: Array.isArray(a) ? a.length : a && typeof a === 'object' ? Object.keys(a).length : String(a) }); return; }
+                        let detalle;
+                        if (Array.isArray(a) && Array.isArray(b) && a.length !== b.length) detalle = `Firebase ${a.length} · Google ${b.length}`;
+                        else if (Array.isArray(a) && Array.isArray(b)) { const i = a.findIndex((x, j) => jsonOrdenado(x) !== jsonOrdenado(b[j])); detalle = `#${i + 1}: Firebase ${jsonOrdenado(a[i]).slice(0, 160)} · Google ${jsonOrdenado(b[i]).slice(0, 160)}`; }
+                        else if (a && b && typeof a === 'object') { const c = [...new Set(Object.keys(a).concat(Object.keys(b)))].find(x => jsonOrdenado(a[x]) !== jsonOrdenado(b[x])); detalle = `${c}: Firebase ${String(jsonOrdenado(a[c])).slice(0, 140)} · Google ${String(jsonOrdenado(b[c])).slice(0, 140)}`; }
+                        else detalle = `Firebase ${String(ja).slice(0, 140)} · Google ${String(jb).slice(0, 140)}`;
+                        partes.push({ parte, igual: false, detalle });
+                    });
+                }
+            } finally { perVivoSaltar--; }
+        } catch (e) { error = e.code || e.message; }
+        finally { btn.disabled = false; btn.textContent = texto; }
+        const bien = !error && partes.length && partes.every(p => p.igual);
+        let fondo = document.getElementById('fbhDlg');
+        if (!fondo) { fondo = document.createElement('div'); fondo.id = 'fbhDlg'; fondo.className = 'req-dlg-fondo'; document.body.appendChild(fondo); }
+        fondo.onclick = e => { if (e.target === fondo) fondo.classList.add('hidden'); };
+        fondo.innerHTML = `<div class="req-dlg" style="max-width:760px"><h3>Cuentas por cobrar, asistencia y horarios: lectura directa de Firebase</h3>
+            <div class="req-sub">${error ? 'No se pudo comparar.' : bien ? '✓ Todo sale igual que en Google.' : 'Hay diferencias: no conviene encenderlo todavía.'}${periodo ? ' Semana comparada: ' + esc(periodo) + '.' : ''} Leer ${nHojas} hojas de Firebase: ${(leer / 1000).toFixed(2).replace('.', ',')} s.
+                Cada persona lee solo lo que sus permisos le dejan ver. Personal (Talento humano) sigue por Google porque trae los códigos del carnet. Guardar sigue por Google.</div>
+            ${error ? `<div class="banner error" style="display:block">${esc(error)}</div>` : `<div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><tbody>${partes.map(p => `<tr><td class="izq">${p.igual ? '<span class="chip st-ok">Igual</span>' : '<span class="chip st-sobra">Distinto</span>'}</td><td class="izq">${esc(p.parte)}<small>${esc(p.igual ? String(p.n) : p.detalle)}</small></td></tr>`).join('')}</tbody></table></div>`}
+            <div class="fb-ind" style="margin-top:1rem"><span>Usar Firebase en Cuentas por cobrar, Gestión de asistencia y Horarios (leído en el panel, en vivo)</span><b>${directa ? 'Encendido' : 'Apagado (se pide a Google)'}</b>
+                ${directa ? '<button type="button" class="btn-ghost btn-mini" onclick="perfbDirecta(this, false)">Apagar (volver a Google)</button>'
+                          : `<button type="button" class="btn-primary btn-mini" onclick="perfbDirecta(this, true)" ${bien ? '' : 'title="Hay diferencias: revíselas antes de encenderlo"'}>Encender</button>`}</div>
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-primary" onclick="document.getElementById('fbhDlg').classList.add('hidden')">Cerrar</button></div></div>`;
+        fondo.classList.remove('hidden');
+    }
+    async function perfbDirecta(btn, activar) {
+        if (activar && !confirm('¿Encender Cuentas por cobrar, Gestión de asistencia y Horarios de trabajo con Firebase? Se leerán en cada panel directo de Firebase, en vivo (sin gastar llamadas de Google). Guardar sigue igual. Se puede apagar aquí mismo en cualquier momento.')) return;
+        btnCargando(btn, activar ? 'Encendiendo...' : 'Apagando...');
+        try {
+            await DATOS.aGoogle(() => llamarApi({ action: 'fb_personal_directo', activar }));
+            perVivoCfg = null; PERVIVO.reiniciar(); perVivoRotoHora = 0; perVivoAvisado = false;
+            mostrarBanner(activar ? 'Cuentas por cobrar, asistencia y horarios con Firebase encendidos: se leen en el panel y se actualizan en vivo.' : 'Cuentas por cobrar, asistencia y horarios con Firebase apagados: vuelven a pedirse a Google.', 'ok');
+            document.getElementById('fbhDlg').classList.add('hidden');
+        } catch (e) { mostrarBanner('No se pudo cambiar: ' + e.message, 'error'); btn.disabled = false; }
+    }
+    // Lo que Google le quita a quien solo factura (Almacen.gs, almOcultarInventario, sin Precios en tiendas): para comparar como administrador
+    function factOcultar(res) {
+        res = JSON.parse(JSON.stringify(res || {}));
+        if (Array.isArray(res.productos)) res.productos = res.productos.map(p => { delete p.existencia; delete p.minimo; delete p.costo; return p; });
+        if (Array.isArray(res.cambios)) res.cambios = res.cambios.map(c => ({ codigo: c.codigo }));
+        if (res.precios) res.precios = {};
+        const limpiar = n => n && Array.isArray(n.detalle) ? Object.assign({}, n, { detalle: n.detalle.map(x => { const y = Object.assign({}, x); delete y.sinExist; return y; }) }) : n;
+        if (Array.isArray(res.notas)) res.notas = res.notas.map(limpiar);
+        if (res.nota) res.nota = limpiar(res.nota);
+        if (res.pendientes) { res.pendientes = Object.assign({}, res.pendientes); delete res.pendientes.sinExistencia; }
+        res.sinInventario = true;
+        return res;
+    }
+    // Modo comparar de Requerimientos de charcutería y Facturar (administradores)
+    async function reqfactComparar(btn) {
+        const texto = btn.textContent;
+        btnCargando(btn, 'Comparando...');
+        const partes = [];
+        let error = '', reqDirecta = false, factDirecta = false, leer = 0;
+        const comparar = (titulo, fb, g) => {
+            const fuera = ['ms', '_ver', 'ok', 'pasos'];
+            if (!fb) { partes.push({ parte: titulo, igual: false, detalle: 'Firebase no tiene esto todavía (se publica al encender o en la revisión automática)' }); return; }
+            [...new Set(Object.keys(fb).concat(Object.keys(g)))].filter(k => !fuera.includes(k)).forEach(k => {
+                const a = fb[k], b = g[k], ja = jsonOrdenado(a), jb = jsonOrdenado(b), parte = titulo + ' · ' + k;
+                if (ja === jb) { partes.push({ parte, igual: true, n: Array.isArray(a) ? a.length : a && typeof a === 'object' ? Object.keys(a).length : String(a) }); return; }
+                let detalle;
+                if (Array.isArray(a) && Array.isArray(b) && a.length !== b.length) detalle = `Firebase ${a.length} · Google ${b.length}`;
+                else if (Array.isArray(a) && Array.isArray(b)) { const i = a.findIndex((x, j) => jsonOrdenado(x) !== jsonOrdenado(b[j])); detalle = `#${i + 1}: Firebase ${jsonOrdenado(a[i]).slice(0, 160)} · Google ${jsonOrdenado(b[i]).slice(0, 160)}`; }
+                else if (a && b && typeof a === 'object') { const c = [...new Set(Object.keys(a).concat(Object.keys(b)))].find(x => jsonOrdenado(a[x]) !== jsonOrdenado(b[x])); detalle = `${c}: Firebase ${String(jsonOrdenado(a[c])).slice(0, 140)} · Google ${String(jsonOrdenado(b[c])).slice(0, 140)}`; }
+                else detalle = `Firebase ${String(ja).slice(0, 140)} · Google ${String(jb).slice(0, 140)}`;
+                partes.push({ parte, igual: false, detalle });
+            });
+        };
+        try {
+            const t0 = performance.now(), { db, lib } = await FB.listo();
+            // Requerimientos: las 5 hojas
+            let cfgR = null; try { cfgR = await FBH.doc('config/req'); } catch (e) {}
+            reqDirecta = !!(cfgR && cfgR.directa);
+            if (!cfgR) partes.push({ parte: 'config/req', igual: false, detalle: 'No está publicado todavía: se publica al encender o en la revisión automática' });
+            if (!cfgR || (cfgR.grupos || []).includes('req')) {
+                const H = {}; await Promise.all(REQ_HOJAS.map(async n => { H[n] = await FBH.leer(n, true); }));
+                reqDirecto.s.saltar++;
+                try {
+                    const d = REQFB.responder({ action: 'req_datos' }, H), periodos = (d.periodos || []).map(x => x.periodo);
+                    for (const [titulo, p] of [['Requerimientos · datos', { action: 'req_datos' }], ['Requerimientos · ventas', { action: 'req_ventas', periodos }], ['Requerimientos · historial', { action: 'req_historial' }]])
+                        comparar(titulo, REQFB.responder(p, H), await DATOS.aGoogle(() => llamarApi(p)));
+                } finally { reqDirecto.s.saltar--; }
+            } else partes.push({ parte: 'Requerimientos', igual: false, detalle: 'Todavía está en la hoja de Google (Tiempos: "Pasar a Firebase")' });
+            // Facturar: lo publicado para quien solo factura vs. lo que Google le daría
+            const s = await lib.fs.getDocsFromServer(lib.fs.collection(db, 'vista_facturar')), v = {}; s.docs.forEach(x => { v[x.id] = x.data(); });
+            const meta = v.meta ? JSON.parse(v.meta.datos || 'null') : null;
+            factDirecta = !!(meta && meta.directa);
+            const parte = n => { const k = meta && meta.partes && meta.partes[n]; if (!k) return null; let t = ''; for (let i = 0; i < k; i++) { if (!v[n + '_' + i]) return null; t += v[n + '_' + i].datos; } try { return JSON.parse(t); } catch (e) { return null; } };
+            factDirecto.s.saltar++; almVivoSaltar++;
+            try {
+                comparar('Facturar · catálogo (sin existencia ni costo)', parte('datos'), factOcultar(await DATOS.aGoogle(() => llamarApi({ action: 'alm_datos' }))));
+                comparar('Facturar · últimas notas', parte('notas'), factOcultar(await DATOS.aGoogle(() => llamarApi({ action: 'alm_notas', ultimas: true }))));
+                if (!meta || (meta.grupos || []).includes('almacen')) {
+                    const He = { 'ALM ESPERA': await FBH.leer('ALM ESPERA', true) }, guardar = FACTVIVO.H['ALM ESPERA'];
+                    FACTVIVO.H['ALM ESPERA'] = He['ALM ESPERA'];
+                    try { comparar('Facturar · ventas en espera', factResponder({ action: 'alm_espera_listar' }), await DATOS.aGoogle(() => llamarApi({ action: 'alm_espera_listar' }))); }
+                    finally { if (guardar) FACTVIVO.H['ALM ESPERA'] = guardar; else delete FACTVIVO.H['ALM ESPERA']; }
+                }
+            } finally { factDirecto.s.saltar--; almVivoSaltar--; }
+            leer = Math.round(performance.now() - t0);
+        } catch (e) { error = e.code || e.message; }
+        finally { btn.disabled = false; btn.textContent = texto; }
+        const bien = !error && partes.length && partes.every(p => p.igual);
+        let fondo = document.getElementById('fbhDlg');
+        if (!fondo) { fondo = document.createElement('div'); fondo.id = 'fbhDlg'; fondo.className = 'req-dlg-fondo'; document.body.appendChild(fondo); }
+        fondo.onclick = e => { if (e.target === fondo) fondo.classList.add('hidden'); };
+        const sw = (nombre, on, fn) => `<div class="fb-ind" style="margin-top:.6rem"><span>${nombre}</span><b>${on ? 'Encendido' : 'Apagado (se pide a Google)'}</b>
+            ${on ? `<button type="button" class="btn-ghost btn-mini" onclick="${fn}(this, false)">Apagar (volver a Google)</button>`
+                 : `<button type="button" class="btn-primary btn-mini" onclick="${fn}(this, true)" ${bien ? '' : 'title="Hay diferencias: revíselas antes de encenderlo"'}>Encender</button>`}</div>`;
+        fondo.innerHTML = `<div class="req-dlg" style="max-width:760px"><h3>Requerimientos y Facturar: lectura directa de Firebase</h3>
+            <div class="req-sub">${error ? 'No se pudo comparar.' : bien ? '✓ Todo sale igual que en Google.' : 'Hay diferencias: revíselas antes de encender.'} Leer y comparar: ${(leer / 1000).toFixed(2).replace('.', ',')} s.
+                Facturar: quien solo factura lee lo que Google le daría (sin existencia, mínimo ni costo); quien ve el inventario usa el Almacén con Firebase. La primera vez, al encender Facturar, se publica lo que ve quien solo factura.</div>
+            ${error ? `<div class="banner error" style="display:block">${esc(error)}</div>` : `<div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><tbody>${partes.map(p => `<tr><td class="izq">${p.igual ? '<span class="chip st-ok">Igual</span>' : '<span class="chip st-sobra">Distinto</span>'}</td><td class="izq">${esc(p.parte)}<small>${esc(p.igual ? String(p.n) : p.detalle)}</small></td></tr>`).join('')}</tbody></table></div>`}
+            ${sw('Usar Firebase en Requerimientos de charcutería', reqDirecta, 'reqfbDirecta')}
+            ${sw('Usar Firebase en Facturar (quien solo factura) y ventas en espera', factDirecta, 'factfbDirecta')}
+            <div class="req-acciones" style="justify-content:flex-end;margin:1rem 0 0"><button type="button" class="btn-primary" onclick="document.getElementById('fbhDlg').classList.add('hidden')">Cerrar</button></div></div>`;
+        fondo.classList.remove('hidden');
+    }
+    async function reqfbDirecta(btn, activar) { return interruptorDirecto(btn, activar, 'fb_req_directo', reqDirecto, 'Requerimientos de charcutería'); }
+    async function factfbDirecta(btn, activar) { return interruptorDirecto(btn, activar, 'fb_facturar_directo', factDirecto, 'Facturar'); }
+    async function interruptorDirecto(btn, activar, accion, mod, nombre) {
+        if (activar && !confirm('¿Encender ' + nombre + ' con Firebase? Se leerá en cada panel directo de Firebase, en vivo (sin gastar llamadas de Google). Guardar sigue igual. Se puede apagar aquí mismo en cualquier momento.')) return;
+        btnCargando(btn, activar ? 'Encendiendo...' : 'Apagando...');
+        try {
+            await DATOS.aGoogle(() => llamarApi({ action: accion, activar }));
+            mod.reiniciar();
+            mostrarBanner(nombre + (activar ? ' con Firebase encendido: se lee en el panel y se actualiza en vivo.' : ' con Firebase apagado: vuelve a pedirse a Google.'), 'ok');
+            document.getElementById('fbhDlg').classList.add('hidden');
+        } catch (e) { mostrarBanner('No se pudo cambiar: ' + e.message, 'error'); btn.disabled = false; }
+    }
     async function fbhPublicar(btn) {
         btnCargando(btn, 'Publicando...');
         try { await DATOS.aGoogle(() => llamarApi({ action: 'fb_nomina_publicar' })); mostrarBanner('Configuración y trabajadores de la nómina publicados en Firebase.', 'ok'); }
@@ -5142,7 +5501,7 @@
                 <div class="fb-ind"><span>Revisión automática (cada 5 min)</span><b>${rev ? (revHace != null ? `Activa · corrió hace ${revHace} min` : 'Activa · todavía no corre (el ping hace el trabajo de fondo)') : 'No activa (el trabajo de fondo lo hace el ping de los paneles)'}</b>${rev ? '' : '<button type="button" class="btn-primary btn-mini" onclick="fbRevision(this)">Activar</button>'}</div>
             </div>
             <div class="tabla-wrap"><table class="req-tabla fb-tabla" data-sin-paginar><thead><tr><th class="izq">Módulo</th><th class="izq">Dónde se guarda</th><th></th></tr></thead><tbody>${filas.map(f => f.html).join('')}</tbody></table></div>
-            <div class="req-acciones" style="justify-content:flex-end;margin:.5rem 0 0"><button type="button" class="btn-ghost btn-mini" onclick="fbHojas(this, 'copiar', 'pagos')">Copiar todo a la hoja ahora</button><button type="button" class="btn-ghost btn-mini" onclick="fbProbar(this)">Probar Firebase</button><button type="button" class="btn-ghost btn-mini" onclick="fbhComparar(this)">Comparar Nómina (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="almfbComparar(this)">Comparar Almacén y compras (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="cajafbComparar(this)">Comparar Cuadre y Validar pagos (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="fbEstadoDatos=null;fbEstadoCargar()">Actualizar</button></div>
+            <div class="req-acciones" style="justify-content:flex-end;margin:.5rem 0 0"><button type="button" class="btn-ghost btn-mini" onclick="fbHojas(this, 'copiar', 'pagos')">Copiar todo a la hoja ahora</button><button type="button" class="btn-ghost btn-mini" onclick="fbProbar(this)">Probar Firebase</button><button type="button" class="btn-ghost btn-mini" onclick="fbhComparar(this)">Comparar Nómina (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="almfbComparar(this)">Comparar Almacén y compras (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="cajafbComparar(this)">Comparar Cuadre y Validar pagos (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="perfbComparar(this)">Comparar Cuentas por cobrar, asistencia y horarios (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="reqfactComparar(this)">Comparar Requerimientos y Facturar (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="fbEstadoDatos=null;fbEstadoCargar()">Actualizar</button></div>
             <div class="nota">"En Firebase": lo que se guarda en ese módulo vive en Firebase y la hoja de Google se llena sola como copia (lo que se cambie a mano en la hoja ya no cuenta). "Volver a la hoja" copia todo a Google antes de cambiar.</div>`;
     }
     async function fbHojas(btn, que, grupo) {
@@ -5279,7 +5638,7 @@
         { id: 'efectivo', titulo: 'Control de efectivo', desc: 'Disponible, por llegar, egresos y caja chica.', listo: true },
         { id: 'cajachica', titulo: 'Caja chica',      desc: 'Gastos de caja chica con su comprobante (personal de compras).', listo: true },
         { id: 'cxc',    titulo: 'Cuentas por cobrar', desc: 'Clientes (con ID automático) y, próximamente, deudas vencidas y vigentes.', listo: true },
-        { id: 'cxp',    titulo: 'Cuentas por pagar',  desc: 'Compromisos y pagos pendientes a proveedores.' },
+        { id: 'cxp',    titulo: 'Cuentas por pagar',  desc: 'Facturas de proveedores y préstamos: vencimientos, retención de IVA, pronto pago, pagos y comprobantes. En tiempo real.', listo: true },
         { id: 'gastos', titulo: 'Gastos pendientes',  desc: 'Gastos pendientes por pagar.' },
         { id: 'ventaexpress', titulo: 'Venta express (tiendas)', desc: 'Facturar en una tienda sin BigSoft: ticket de 58 mm, formas de pago y cierre de caja. Funciona sin internet y se guarda en Firebase.', listo: true },
         { id: 'listasficha', titulo: 'Listas de la ficha', desc: 'Bancos, titulares y tipos de gasto que se eligen en la ficha de las tiendas. Se guardan en Firebase.', listo: true },
@@ -5310,7 +5669,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-12.16';
+    const VERSION_SERVIDOR = '2026-11-13.5';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -5578,7 +5937,7 @@
         if (clave && WEB_APP_URL && typeof mensaje !== 'string') llamarApiReal({ action: 'ping', salir: true, vista: '', disp: DISPOSITIVO }, performance.now()).catch(() => {});   // deja de figurar como conectado
         clave = null;
         permisos = [];
-        nombreUsuario = ''; esPrincipal = false; olvidarClavesAdmin(); DATOS.salir(); vivoFbDetener(); NOMVIVO.reiniciar(); nomVivoDirecta = null; nomVivoAvisado = false; nomVivoRotoHora = 0; ALMVIVO.reiniciar(); almVivoDirecta = null; almVivoAvisado = false; almVivoRotoHora = 0; CAJAVIVO.reiniciar(); cajaVivoCfg = null; cajaVivoAvisado = false; cajaVivoRotoHora = 0; PERVIVO.reiniciar(); perVivoCfg = null; perVivoAvisado = false; perVivoRotoHora = 0; FB.salir(); efeFbOff = null; efeFbActivo = false; efeFbRoto = ''; efeFbLlego = false;
+        nombreUsuario = ''; esPrincipal = false; olvidarClavesAdmin(); DATOS.salir(); vivoFbDetener(); pendFbDetener(); cxpDetener(); cxp.docs = []; cxp.cargado = false; cxp.pagos = null; NOMVIVO.reiniciar(); nomVivoDirecta = null; nomVivoAvisado = false; nomVivoRotoHora = 0; ALMVIVO.reiniciar(); almVivoDirecta = null; almVivoAvisado = false; almVivoRotoHora = 0; CAJAVIVO.reiniciar(); cajaVivoCfg = null; cajaVivoAvisado = false; cajaVivoRotoHora = 0; PERVIVO.reiniciar(); perVivoCfg = null; perVivoAvisado = false; perVivoRotoHora = 0; reqDirecto.reiniciar(); factDirecto.reiniciar(); FB.salir(); efeFbOff = null; efeFbActivo = false; efeFbRoto = ''; efeFbLlego = false;
         filas = []; borradores = {}; seleccion = null; cargadoDesde = null; cuadreIniciado = false;
         // Al salir se borra todo lo guardado en memoria (otra persona puede entrar con menos permisos)
         efeDatos = { filas: [], cajaChica: [] }; efeCargado = null; efeCargadoEn = 0; precargadoDesde = null; Object.keys(pagMemoria).forEach(k => delete pagMemoria[k]);
@@ -5654,8 +6013,8 @@
         claveAdminAuto(document.body);
         // login, menu, cuadre, ventas y admin tienen su propia sección; el resto usa la genérica "en construcción"
         // Caja chica usa la misma sección de Control de efectivo, mostrando solo la caja chica
-        const seccion = vista === 'cajachica' ? 'efectivo' : vista === 'reqcharcu' ? 'req' : vista === 'asistencia' ? 'asis' : vista === 'asisgestion' ? 'asisg' : (vista === 'nomina' || vista === 'talento' || vista === 'cxc' || vista === 'horarios') ? 'per' : (vista === 'inventario' || vista === 'movalmacen' || vista === 'precios' || vista === 'facturar' || vista === 'reportes') ? 'alm' : vista === 'pagonomina' ? 'pnom' : vista === 'listasficha' ? 'fl' : vista === 'ventaexpress' ? 'vx' : vista === 'marcaje' ? 'marca' : ['login', 'menu', 'cuadre', 'ventas', 'admin', 'pagos', 'efectivo'].includes(vista) ? vista : 'modulo';
-        ['login', 'menu', 'cuadre', 'ventas', 'admin', 'pagos', 'efectivo', 'req', 'asis', 'asisg', 'per', 'alm', 'pnom', 'fl', 'vx', 'marca', 'modulo'].forEach(v => {
+        const seccion = vista === 'cajachica' ? 'efectivo' : vista === 'reqcharcu' ? 'req' : vista === 'asistencia' ? 'asis' : vista === 'asisgestion' ? 'asisg' : (vista === 'nomina' || vista === 'talento' || vista === 'cxc' || vista === 'horarios') ? 'per' : (vista === 'inventario' || vista === 'movalmacen' || vista === 'precios' || vista === 'facturar' || vista === 'reportes') ? 'alm' : vista === 'pagonomina' ? 'pnom' : vista === 'listasficha' ? 'fl' : vista === 'ventaexpress' ? 'vx' : vista === 'marcaje' ? 'marca' : vista === 'cxp' ? 'cxp' : ['login', 'menu', 'cuadre', 'ventas', 'admin', 'pagos', 'efectivo'].includes(vista) ? vista : 'modulo';
+        ['login', 'menu', 'cuadre', 'ventas', 'admin', 'pagos', 'efectivo', 'req', 'asis', 'asisg', 'per', 'alm', 'pnom', 'fl', 'vx', 'marca', 'cxp', 'modulo'].forEach(v => {
             const el = document.getElementById('vista' + v[0].toUpperCase() + v.slice(1));
             el.dataset.pantalla = '';   // al aparecer entra deslizándose (ANIM)
             el.classList.toggle('hidden', v !== seccion);
@@ -5691,6 +6050,7 @@
         if (vista === 'pagonomina') pnomIniciar();
         if (vista === 'listasficha') flIniciar();
         if (vista === 'ventaexpress') vxIniciar();
+        if (vista === 'cxp') cxpIniciar();
         if (vista !== 'login' && vista !== 'marcaje') setTimeout(() => avisarEnLinea(true), 500);
         if (vista === 'efectivo' || vista === 'cajachica') efeIniciar(vista === 'cajachica');
         // Cuadre y Visor de ventas comparten los mismos datos (filas de la hoja de cuadres)
@@ -5721,7 +6081,8 @@
         inventario: () => almCargar(), facturar: () => almCargar(), movalmacen: () => { cmpCompras = null; return almCargar(); }, precios: () => { cmpOrd = null; return almCargar(); }, pagonomina: () => pnomCargar(),
         reportes: () => almPintar(),   // los reportes se piden con su botón (cada uno lo saca la PC de la tienda)
         listasficha: () => flCargar(),
-        ventaexpress: () => vxPintar()   // Firebase lo trae en vivo
+        ventaexpress: () => vxPintar(),   // Firebase lo trae en vivo
+        cxp: () => { cxp.pagos = null; cxpPintar(); }   // en vivo (Firebase); los pagos hechos se vuelven a leer
     };
     // ---------- Cambios en vivo: cada 30 s se pregunta a Google qué áreas cambiaron (respuesta mínima).
     // Si cambió la del módulo abierto, se vuelve a leer solo, sin molestar: no mientras se escribe, hay una ventana abierta o algo se guarda.
@@ -6132,9 +6493,52 @@
     const pendModTitulo = id => (MODULOS.find(m => m.id === id) || {}).titulo || id;
     const pendTotal = grupos => (grupos || []).reduce((s, g) => s + g.items.reduce((a, x) => a + x.n, 0), 0);
     const pendBaseClave = () => 'pend_base_' + asisgClave(nombreUsuario);
+    // (13/11) La campanita se lee de Firebase (pend/<sección>, lo que publica la revisión automática cada 5 min): cada panel escucha
+    // solo las secciones de sus permisos, sin preguntarle a Google. Si Firebase no responde (o falta alguna sección), Google cada 5 min.
+    const PEND_FB_SECC = [['cuadre', ['cuadre']], ['pagos', ['pagos']], ['efectivo', ['efectivo', 'cajachica']], ['cxc', ['cxc']], ['asisgestion', ['asisgestion']],
+                          ['nomina', ['nomina']], ['pagonomina', ['pagonomina']], ['movalmacen', ['movalmacen', 'inventario']], ['precios', ['precios']], ['cxp', ['cxp', 'cxp_admin']]];
+    let pendFbOff = [], pendFbDocs = {}, pendFbEstado = 'apagado', pendFbRotoHora = 0;
+    const pendFbMias = () => PEND_FB_SECC.filter(([, ps]) => esPrincipal || ps.some(p => permisos.includes(p))).map(([id]) => id);
+    const pendFbListo = () => pendFbEstado === 'escuchando' && pendFbMias().every(id => pendFbDocs[id]);
+    function pendFbArmar() {
+        const grupos = [], horas = [];
+        pendFbMias().forEach(id => {
+            const d = pendFbDocs[id]; if (!d) return;
+            if (d.hora) horas.push(d.hora);
+            // Efectivo: el grupo "efectivo" solo para quien tiene Control de efectivo (el de caja chica para los dos), como en el servidor
+            (d.g || []).filter(g => id !== 'efectivo' || g.modulo !== 'efectivo' || esPrincipal || permisos.includes('efectivo')).forEach(g => grupos.push(g));
+        });
+        return { grupos, hora: horas.sort().pop() || '' };
+    }
+    async function pendFbIniciar() {
+        if (pendFbEstado !== 'apagado' || !clave || typeof FB === 'undefined') return;
+        const mias = pendFbMias();
+        if (!mias.length) return;
+        pendFbEstado = 'iniciando'; pendFbDocs = {};
+        try {
+            const { db, lib } = await FB.listo();
+            const fallo = e => { console.log('Campanita en Firebase: ' + ((e && (e.code || e.message)) || 'error') + ' (se pregunta a Google)'); pendFbDetener(); pendFbEstado = 'roto'; pendFbRotoHora = Date.now(); pendRevisar(true); };
+            mias.forEach(id => pendFbOff.push(lib.fs.onSnapshot(lib.fs.doc(db, 'pend', id), s => {
+                if (!s.exists()) return;   // todavía no publicada: sigue Google
+                try { pendFbDocs[id] = JSON.parse(s.data().datos || '{}'); } catch (e) { return; }
+                if (!pendFbListo()) return;
+                pendDatos = pendFbArmar(); pendUltima = Date.now();
+                pendAvisarNuevos(pendDatos.grupos);
+                pendPintar();
+            }, fallo)));
+            if (pendFbEstado === 'iniciando') pendFbEstado = 'escuchando';
+        } catch (e) { pendFbEstado = 'roto'; pendFbRotoHora = Date.now(); }
+    }
+    function pendFbDetener() { pendFbOff.forEach(q => { try { q(); } catch (e) {} }); pendFbOff = []; pendFbDocs = {}; pendFbEstado = 'apagado'; }
     async function pendRevisar(forzar) {
         if (!clave || !WEB_APP_URL || pendCargando || vistaActual === 'login' || vistaActual === 'marcaje') return;
-        if (!forzar && Date.now() - pendUltima < PEND_CADA) return;
+        if (pendFbEstado === 'roto' && Date.now() - pendFbRotoHora > 600000) pendFbEstado = 'apagado';   // a los 10 min se reintenta Firebase
+        if (pendFbEstado === 'apagado') pendFbIniciar();
+        // Recién entrando: unos segundos para que llegue lo de Firebase antes de preguntarle a Google
+        for (let i = 0; i < 40 && !pendDatos && pendFbEstado !== 'roto' && pendFbEstado !== 'apagado' && !pendFbListo(); i++) await new Promise(r => setTimeout(r, 100));
+        if (pendFbListo()) { pendDatos = pendFbArmar(); pendPintar(); return; }   // al día por Firebase: sin Google
+        // Por Google: cada 5 min (con ⟳ o un cambio, como mucho una vez por minuto)
+        if (Date.now() - pendUltima < (forzar ? 60000 : PEND_CADA)) return;
         pendCargando = true; pendUltima = Date.now();
         try {
             const r = await llamarApi({ action: 'pendientes' });
@@ -9455,9 +9859,10 @@
 
     // Reportes de tiendas dividido en 3 permisos (10/11): cada uno se habilita aparte
     const REP_PERMISOS = [['rep_existencia', 'Almacén · Reporte de existencia'], ['rep_ajustes', 'Almacén · Reporte de ajustes'], ['rep_ventas', 'Almacén · Reporte de ventas']];
+    const CXP_PERMISOS = [['cxp', 'Cuentas por pagar · Tesorería (ver lo aprobado y pagar)'], ['cxp_admin', 'Cuentas por pagar · Administración (revisar, condiciones, préstamos y aprobar)']];
     function admRenderTabla() {
         const nombres = Object.assign(Object.fromEntries(MODULOS_ASIGNABLES().map(m => [m.id, m.titulo])), { verexistencia: 'Ve existencia del almacén' },
-                                      Object.fromEntries(REP_PERMISOS.map(([k, t]) => [k, t])));
+                                      Object.fromEntries(REP_PERMISOS.map(([k, t]) => [k, t])), Object.fromEntries(CXP_PERMISOS.map(([k, t]) => [k, t])));
         const cont = document.getElementById('admTabla');
         if (!admUsuarios.length) {
             cont.innerHTML = '<div class="empty">Todavía no hay claves creadas. Use "+ Nueva clave".</div>';
@@ -9493,6 +9898,8 @@
         const repViejo = marcados.includes('reportes') && !marcados.some(p => /^rep_/.test(p));
         document.getElementById('admModulos').innerHTML = MODULOS_ASIGNABLES().map(m => m.id === 'reportes'
             ? REP_PERMISOS.map(([k, t]) => `<label><input type="checkbox" value="${k}" ${marcados.includes(k) || repViejo ? 'checked' : ''}> ${esc(t)}</label>`).join('')
+            // Cuentas por pagar (13/11): Tesorería (ver lo aprobado y pagar) y Administración (revisar, condiciones, préstamos, aprobar)
+            : m.id === 'cxp' ? CXP_PERMISOS.map(([k, t]) => `<label><input type="checkbox" value="${k}" ${marcados.includes(k) ? 'checked' : ''}> ${esc(t)}</label>`).join('')
             : `<label><input type="checkbox" value="${m.id}" ${marcados.includes(m.id) ? 'checked' : ''}> ${esc(m.titulo)}</label>`).join('');
         document.getElementById('admVerExist').checked = marcados.includes('verexistencia');
         document.getElementById('admAdmin').checked = !!(u && u.admin);
@@ -9521,7 +9928,7 @@
             id: admEditando || undefined,
             nombre: document.getElementById('admNombre').value.trim(),
             clave: c1 || undefined,
-            permisos: (l => l.some(p => /^rep_/.test(p)) ? l.concat(['reportes']) : l)([...document.querySelectorAll('#admModulos input:checked')].map(i => i.value))   // con algún reporte, el módulo abre en el menú
+            permisos: (l => (l.some(p => /^rep_/.test(p)) ? l.concat(['reportes']) : l).concat(l.includes('cxp_admin') && !l.includes('cxp') ? ['cxp'] : []))([...document.querySelectorAll('#admModulos input:checked')].map(i => i.value))   // con algún reporte, el módulo abre en el menú (y Administración de CxP también paga)
                 .concat(document.getElementById('admVerExist').checked ? ['verexistencia'] : []),
             admin: document.getElementById('admAdmin').checked,
             activo: document.getElementById('admActivo').checked
@@ -14683,6 +15090,720 @@
     }
 
     // ==========================================
+    // CUENTAS POR PAGAR (13/11): directo en Firebase (cxp_docs, cxp_pagos, cxp_config), en tiempo real. Google (CxP.gs) solo guarda la
+    // foto de la factura en Drive, manda los avisos de Telegram y crea "por revisar" lo que entra por el almacén.
+    // Roles: Almacén registra la factura recibida (Entradas y salidas) · Administración (cxp_admin) revisa, pone condiciones, préstamos,
+    // aprueba y anula · Tesorería (cxp) ve lo aprobado y paga. La deuda se lleva en $; se paga en Bs a la tasa BCV de la fecha del pago.
+    // ==========================================
+    const CXP_FORMAS = [['transferencia', 'Transferencia en Bs', 'Bs'], ['pagomovil', 'Pago móvil', 'Bs'], ['efectivo_bs', 'Efectivo en Bs', 'Bs'],
+                        ['efectivo_usd', 'Efectivo en $', '$'], ['zelle', 'Zelle', '$'], ['otro_usd', 'Otra forma en $', '$']];
+    const CXP_TABS = [['agenda', 'Agenda de pagos'], ['revisar', 'Por revisar'], ['prestamos', 'Préstamos'], ['pagos', 'Pagos hechos'], ['proveedores', 'Proveedores']];
+    let cxp = { tab: 'agenda', docs: [], cargado: false, error: '', off: null, empresa: null, pagos: null, pagosCargando: false, pDesde: '', pHasta: '', buscar: '', provs: null };
+    const cxpAdmin = () => !!esPrincipal || permisos.includes('cxp_admin');
+    const cxpR = n => Math.round((Number(n) || 0) * 100) / 100;
+    const cxpHoy = () => fechaLocalHoy();
+    const cxpSumar = (iso, n) => { const p = String(iso).split('-').map(Number); return new Date(Date.UTC(p[0], p[1] - 1, p[2] + n)).toISOString().slice(0, 10); };
+    const cxpDias = (a, b) => Math.round((Date.UTC(...b.split('-').map((x, i) => i === 1 ? x - 1 : +x)) - Date.UTC(...a.split('-').map((x, i) => i === 1 ? x - 1 : +x))) / 864e5);
+    const cxpTasa = f => { const t = tasaBCVdel(f || cxpHoy()); return t ? t[1] : 0; };
+    const cxpUsd = n => '$ ' + fmt(n);
+    const cxpF = iso => iso ? iso.slice(8, 10) + '/' + iso.slice(5, 7) + '/' + iso.slice(2, 4) : '—';
+    const cxpEmpresa = () => Object.assign({}, ALM_EMPRESA, cxp.empresa || {});
+    // El mismo id que arma Google (CxP.gs, cxpIdFactura): la misma factura del mismo proveedor nunca queda dos veces
+    function cxpIdFactura(provId, prov, doc) {
+        const l = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+        const p = l(provId) || l(prov).slice(0, 30), n = l(doc).replace(/^0+(?=.)/, '');
+        return p && n ? ('f_' + p + '_' + n).slice(0, 120) : '';
+    }
+    const cxpSaldo = d => Math.max(0, cxpR((Number(d.totalUsd) || 0) - (Number(d.pagado) || 0)));
+    // Descuento por pronto pago si se paga COMPLETA en fechaPago: el mejor de los que todavía aplican
+    function cxpDescuento(d, fechaPago) {
+        const base = d.fechaFactura || d.fechaRecibida;
+        if (!base || d.tipo === 'prestamo' || !(d.descuentos || []).length) return null;
+        const dias = cxpDias(base, fechaPago || cxpHoy());
+        const ops = d.descuentos.filter(x => dias <= Number(x.dias)).map(x => ({ dias: Number(x.dias), pct: Number(x.pct) || 0, monto: Number(x.monto) || 0, hasta: cxpSumar(base, Number(x.dias)),
+            usd: Math.min(cxpSaldo(d), cxpR(Number(x.monto) || (Number(d.totalUsd) || 0) * (Number(x.pct) || 0) / 100)) })).filter(x => x.usd > 0);
+        return ops.sort((a, b) => b.usd - a.usd)[0] || null;
+    }
+    // Lo que hay que pagar: cada factura aprobada con saldo y, de cada préstamo, cada cuota sin pagar
+    function cxpRenglones() {
+        const hoy = cxpHoy(), l = [];
+        cxp.docs.filter(d => d.estado === 'aprobada').forEach(d => {
+            if (d.tipo === 'prestamo') (d.cuotas || []).forEach(c => { if (!c.pagada) l.push({ d, cuota: c.n, quien: (d.banco || d.proveedor) + ' · préstamo', doc: (d.documento ? d.documento + ' · ' : '') + 'cuota ' + c.n + ' de ' + d.cuotas.length,
+                desde: d.fechaFactura, vence: c.vence, saldo: cxpR((Number(c.total) || 0) - (Number(c.pagado) || 0)) }); });
+            else { const s = cxpSaldo(d); if (s > 0.004) l.push({ d, quien: d.proveedor, doc: d.documento, desde: d.fechaFactura, vence: d.vence || d.fechaFactura, saldo: s, desc: cxpDescuento(d, hoy) }); }
+        });
+        return l.map(x => Object.assign(x, { dias: cxpDias(hoy, x.vence) })).sort((a, b) => a.vence.localeCompare(b.vence) || String(a.desde).localeCompare(String(b.desde)));
+    }
+    const cxpEstadoChip = dias => dias < 0 ? `<span class="chip st-falta" title="Vencida">Vencida hace ${-dias} d</span>` : dias === 0 ? '<span class="chip st-sobra">Vence hoy</span>'
+        : dias <= 7 ? `<span class="chip st-amar">En ${dias} d</span>` : `<span class="chip st-ok">En ${dias} d</span>`;
+
+    // ---------- Datos en vivo ----------
+    async function cxpEscuchar() {
+        if (cxp.off || !clave) return;
+        cxp.off = 'iniciando'; cxp.error = '';
+        try {
+            const { db, lib } = await FB.listo(), fs = lib.fs;
+            const err = e => { cxp.error = e.code === 'permission-denied' ? 'Firebase no le da permiso. Pulse Actualizar; si sigue, revise que su clave tenga Cuentas por pagar.' + (FB.problemaReglas && FB.problemaReglas() ? ' ' + FB.problemaReglas() : '') : 'Firebase: ' + (e.code || e.message); cxp.cargado = true; cxpDetener(); cxpPintar(); };
+            const offs = [fs.onSnapshot(fs.query(fs.collection(db, 'cxp_docs'), fs.where('abierta', '==', true)), s => {
+                cxp.docs = s.docs.map(x => Object.assign({ id: x.id }, x.data())); cxp.cargado = true; cxp.error = '';
+                if (vistaActual === 'cxp') cxpPintar();
+            }, err), fs.onSnapshot(fs.doc(db, 'cxp_config', 'empresa'), s => { cxp.empresa = s.exists() ? s.data() : null; }, () => {})];
+            cxp.off = () => offs.forEach(o => { try { o(); } catch (e) {} });
+        } catch (e) { cxp.off = null; cxp.error = e.message; cxp.cargado = true; cxpPintar(); }
+    }
+    function cxpDetener() { if (typeof cxp.off === 'function') cxp.off(); cxp.off = null; }
+    function cxpIniciar() {
+        if (!cxpAdmin() && cxp.tab === 'revisar') cxp.tab = 'agenda';
+        cxpPintar(); cxpEscuchar();
+        cargarTasasBCV().then(() => { if (vistaActual === 'cxp') cxpPintar(); });
+        if (!cxp.provs) cxpCargarProveedores();
+    }
+    // Proveedores del almacén (para elegir al registrar a mano); si no se pueden leer, los de las facturas
+    async function cxpCargarProveedores() {
+        cxp.provs = [];
+        try { const h = await FBH.leer('ALM PROVEEDORES'); cxp.provs = h.valores.filter(r => String(r[1] || '').trim()).map(r => ({ id: String(r[0]).trim(), nombre: String(r[1]).trim(), rif: String(r[2] || '').trim() })); } catch (e) {}
+    }
+    const cxpDb = async () => { const { db, lib } = await FB.listo(); return { db, fs: lib.fs }; };
+
+    // ---------- Pantalla ----------
+    function cxpPintar() {
+        const out = document.getElementById('cxpContenido'); if (!out) return;
+        if (!cxp.cargado && !cxp.error) { out.innerHTML = cargandoHTML('Cargando cuentas por pagar...'); return; }
+        const admin = cxpAdmin(), hoy = cxpHoy(), ren = cxpRenglones(), rev = cxp.docs.filter(d => d.estado === 'por_revisar');
+        const suma = l => cxpR(l.reduce((s, x) => s + x.saldo, 0)), venc = ren.filter(x => x.dias < 0), semana = ren.filter(x => x.dias >= 0 && x.dias <= 7);
+        const ahorro = cxpR(ren.reduce((s, x) => s + (x.desc ? x.desc.usd : 0), 0)), tasa = cxpTasa(hoy);
+        const kpi = (t, v, sub, cls) => `<div class="kpi ${cls || ''}"><div class="k-label">${t}</div><div class="k-value">${v}</div>${sub ? `<div class="k-label">${sub}</div>` : ''}</div>`;
+        const tabs = CXP_TABS.filter(([t]) => t !== 'revisar' || admin).map(([t, n]) => `<button type="button" class="tab${cxp.tab === t ? ' active' : ''}" onclick="cxpModo('${t}')">${n}${t === 'revisar' && rev.length ? ` <span class="chip st-amar">${rev.length}</span>` : ''}</button>`).join('');
+        const acciones = `<div class="req-acciones" style="justify-content:flex-start;flex-wrap:wrap;margin:0 0 .6rem;max-width:100%">
+            ${admin ? `<button type="button" class="btn-ghost btn-mini" onclick="cxpRevisar('')">＋ Factura</button><button type="button" class="btn-ghost btn-mini" onclick="cxpPrestamo()">＋ Préstamo</button>` : ''}
+            <button type="button" class="btn-ghost btn-mini" onclick="cxpExcel(this)">${ico('descargar')}Excel</button>
+            ${admin ? `<button type="button" class="btn-ghost btn-mini" onclick="cxpAvisar(this, 'dia')" title="Manda ya al grupo Administración Plaza Valencia lo de hoy y lo vencido">${ico('avisar')}Avisar hoy</button>
+                       <button type="button" class="btn-ghost btn-mini" onclick="cxpAvisar(this, 'semana')" title="Manda ya el resumen de la semana">${ico('avisar')}Avisar semana</button>
+                       <button type="button" class="btn-ghost btn-mini" onclick="cxpEmpresaEditar()">Datos de la empresa</button>` : ''}</div>`;
+        const cab = (cxp.error ? `<div class="banner error" style="display:block">${esc(cxp.error)} <button type="button" class="btn-ghost btn-mini" onclick="cxpDetener();cxpEscuchar()">Reintentar</button></div>` : '') +
+            `<div class="kpis">${kpi('Por pagar', cxpUsd(suma(ren)), tasa ? '≈ ' + fmtBs(suma(ren) * tasa) + ' hoy' : ren.length + ' pago(s)')}
+             ${kpi('Vencido', cxpUsd(suma(venc)), venc.length + ' pago(s)', venc.length ? 'bad' : 'ok')}
+             ${kpi('Próximos 7 días', cxpUsd(suma(semana)), semana.length + ' pago(s)', semana.length ? 'amar' : '')}
+             ${ahorro ? kpi('Ahorro por pronto pago', cxpUsd(ahorro), 'si se paga a tiempo', 'ok') : ''}
+             ${admin ? kpi('Por revisar', String(rev.length), 'facturas recibidas', rev.length ? 'amar' : '') : ''}</div>
+            <div class="modo-tabs" role="tablist" style="margin:.4rem 0 .5rem">${tabs}</div>${acciones}`;
+        const cuerpo = cxp.tab === 'revisar' ? cxpVistaRevisar(rev) : cxp.tab === 'prestamos' ? cxpVistaPrestamos() : cxp.tab === 'pagos' ? cxpVistaPagos()
+                     : cxp.tab === 'proveedores' ? cxpVistaProveedores(ren) : cxpVistaAgenda(ren);
+        pintarConservando(out, cab + cuerpo);
+        if (cxp.tab === 'pagos' && !cxp.pagos && !cxp.pagosCargando) cxpCargarPagos();
+    }
+    function cxpModo(t) { cxp.tab = t; cxpPintar(); window.scrollTo({ top: 0 }); }
+    function cxpBuscar(v) { cxp.buscar = v; cxpPintar(); }
+    const cxpNorm = v => String(v || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
+    const cxpCoincide = (...t) => { const b = cxpNorm(cxp.buscar || ''); return !b || cxpNorm(t.join(' ')).includes(b); };
+    const cxpBuscador = ph => `<div class="filters" style="grid-template-columns:minmax(0,22rem)"><div><label for="cxpBus">Buscar</label><input id="cxpBus" type="search" placeholder="${ph}" value="${esc(cxp.buscar)}" oninput="cxpBuscar(this.value)"></div></div>`;
+
+    function cxpVistaAgenda(ren) {
+        // De cada préstamo solo la próxima cuota (y las vencidas o de los próximos 7 días); el plan completo está en Préstamos
+        const primera = {}; ren.forEach(x => { if (x.cuota && !(x.d.id in primera)) primera[x.d.id] = x.cuota; });
+        const l = ren.filter(x => (!x.cuota || x.dias <= 7 || primera[x.d.id] === x.cuota) && cxpCoincide(x.quien, x.doc)), tasa = cxpTasa();
+        if (!cxp.docs.length && !cxp.error) return '<div class="empty">No hay nada por pagar. Las facturas que registra el almacén (o Administración) aparecen aquí al aprobarlas.</div>';
+        const grupos = [['Vencidas', x => x.dias < 0], ['Hoy', x => x.dias === 0], ['Próximos 7 días', x => x.dias > 0 && x.dias <= 7], ['Más adelante', x => x.dias > 7]];
+        return cxpBuscador('Proveedor, banco o N° de factura') + grupos.map(([t, f]) => {
+            const g = l.filter(f); if (!g.length) return '';
+            return `<h4 class="per-sub">${t} <small class="nota" style="display:inline">· ${g.length} · ${cxpUsd(cxpR(g.reduce((s, x) => s + x.saldo, 0)))}</small></h4>
+            <div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Proveedor</th><th class="izq">Documento</th><th class="izq">Factura</th><th class="izq">Vence</th><th>Saldo $</th><th>≈ Bs hoy</th><th class="izq">Pronto pago</th><th></th></tr></thead><tbody>${g.map(x => `
+                <tr><td class="izq"><b>${esc(x.quien)}</b></td><td class="izq">${esc(x.doc || '—')}</td><td class="izq">${cxpF(x.desde)}</td>
+                <td class="izq">${cxpF(x.vence)}<br>${cxpEstadoChip(x.dias)}</td><td style="white-space:nowrap"><b>${cxpUsd(x.saldo)}</b></td><td style="white-space:nowrap">${tasa ? fmtBs(x.saldo * tasa) : '—'}</td>
+                <td class="izq">${x.desc ? `<span class="chip st-ok" title="Si se paga completa antes del ${fechaBonita(x.desc.hasta)}">Ahorra ${cxpUsd(x.desc.usd)}</span><br><small>hasta el ${cxpF(x.desc.hasta)}</small>` : ''}</td>
+                <td><div class="req-acciones" style="margin:0;flex-wrap:nowrap"><button type="button" class="btn-primary btn-mini" onclick="cxpPagar('${x.d.id}', ${x.cuota || 0})">Pagar</button><button type="button" class="btn-ghost btn-mini" onclick="cxpVer('${x.d.id}')">Ver</button></div></td></tr>`).join('')}
+            </tbody></table></div>`;
+        }).join('') || '<div class="empty">Nada coincide con la búsqueda.</div>';
+    }
+    function cxpVistaRevisar(rev) {
+        if (!rev.length) return '<div class="empty">No hay facturas por revisar. Cuando el almacén registre una (o entre una compra), aparece aquí para completar lo fiscal y las condiciones de pago.</div>';
+        return `<div class="nota">Complete la parte fiscal (base, IVA y retención), los días de crédito y los descuentos por pronto pago, y apruebe: pasa a la Agenda de pagos.</div>
+        <div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Recibida</th><th class="izq">Proveedor</th><th class="izq">Documento</th><th>Monto bruto</th><th class="izq">Origen</th><th class="izq">Foto</th><th></th></tr></thead><tbody>${rev.sort((a, b) => String(a.fechaRecibida).localeCompare(String(b.fechaRecibida))).map(d => `
+            <tr><td class="izq">${cxpF(d.fechaRecibida || d.fechaFactura)}<br><small>${esc(d.creadoPor || '')}</small></td><td class="izq"><b>${esc(d.proveedor)}</b></td><td class="izq">${esc(d.documento)}${d.fiscal ? ' <span class="chip st-info">Fiscal</span>' : ''}</td>
+            <td>${d.moneda === 'Bs' ? fmtBs(d.montoBruto) : cxpUsd(d.montoBruto)}</td><td class="izq"><small>${esc(d.origen === 'compra' ? 'Compra con foto' : d.origen === 'ingreso' ? 'Operación de inventario' : d.origen === 'almacen' ? 'Registrada por el almacén' : 'Administración')}${d.ref ? ' · ' + esc(d.ref) : ''}</small></td>
+            <td class="izq">${(d.fotos || []).map((u, i) => `<a href="${esc(u)}" target="_blank" rel="noopener">${ico('imagen')}${(d.fotos || []).length > 1 ? i + 1 : 'Ver'}</a>`).join(' ') || '<span class="nota">Sin foto</span>'}</td>
+            <td><button type="button" class="btn-primary btn-mini" onclick="cxpRevisar('${d.id}')">Revisar</button></td></tr>`).join('')}</tbody></table></div>`;
+    }
+    function cxpVistaPrestamos() {
+        const l = cxp.docs.filter(d => d.tipo === 'prestamo' && d.estado !== 'anulada');
+        if (!l.length) return `<div class="empty">No hay préstamos abiertos.${cxpAdmin() ? ' Use "＋ Préstamo" para registrar uno: se arman sus cuotas y cada una aparece en la Agenda de pagos.' : ''}</div>`;
+        return `<div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Banco</th><th class="izq">N°</th><th>Capital $</th><th>Tasa anual</th><th>Cuotas</th><th>Saldo $</th><th class="izq">Próxima cuota</th><th></th></tr></thead><tbody>${l.map(d => {
+            const pend = (d.cuotas || []).filter(c => !c.pagada), prox = pend[0];
+            return `<tr><td class="izq"><b>${esc(d.banco || d.proveedor)}</b></td><td class="izq">${esc(d.documento || '—')}</td><td>${cxpUsd(d.capital)}</td><td>${fmt(d.tasaAnual)} %</td>
+                <td>${(d.cuotas || []).length - pend.length} de ${(d.cuotas || []).length}</td><td><b>${cxpUsd(cxpSaldo(d))}</b></td>
+                <td class="izq">${prox ? cxpF(prox.vence) + ' · ' + cxpUsd(cxpR(prox.total - (prox.pagado || 0))) + '<br>' + cxpEstadoChip(cxpDias(cxpHoy(), prox.vence)) : '—'}</td>
+                <td><button type="button" class="btn-ghost btn-mini" onclick="cxpVer('${d.id}')">Ver</button></td></tr>`; }).join('')}</tbody></table></div>`;
+    }
+    function cxpVistaProveedores(ren) {
+        const m = new Map();
+        ren.forEach(x => { const k = x.quien; const p = m.get(k) || (m.set(k, { quien: k, n: 0, saldo: 0, venc: 0, prox: '' }), m.get(k));
+            p.n++; p.saldo = cxpR(p.saldo + x.saldo); if (x.dias < 0) p.venc = cxpR(p.venc + x.saldo); if (!p.prox || x.vence < p.prox) p.prox = x.vence; });
+        const l = [...m.values()].filter(p => cxpCoincide(p.quien)).sort((a, b) => b.venc - a.venc || b.saldo - a.saldo);
+        return cxpBuscador('Proveedor o banco') + (l.length ? `<div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Proveedor</th><th>Pendientes</th><th>Saldo $</th><th>Vencido $</th><th class="izq">Próximo vencimiento</th><th></th></tr></thead><tbody>${l.map(p => `
+            <tr><td class="izq"><b>${esc(p.quien)}</b></td><td>${p.n}</td><td><b>${cxpUsd(p.saldo)}</b></td><td>${p.venc ? `<span style="color:var(--bad)">${cxpUsd(p.venc)}</span>` : '—'}</td><td class="izq">${cxpF(p.prox)}</td>
+            <td><button type="button" class="btn-ghost btn-mini" data-p="${esc(p.quien)}" onclick="cxpEstadoCuenta(this.dataset.p)">Estado de cuenta</button></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">No hay saldos pendientes con proveedores.</div>');
+    }
+
+    // ---------- Pagos hechos (por período, a pedido) ----------
+    async function cxpCargarPagos() {
+        if (!cxp.pDesde) { const h = cxpHoy(); cxp.pDesde = h.slice(0, 8) + '01'; cxp.pHasta = h; }
+        cxp.pagosCargando = true;
+        try {
+            const { db, fs } = await cxpDb();
+            const s = await fs.getDocs(fs.query(fs.collection(db, 'cxp_pagos'), fs.where('fecha', '>=', cxp.pDesde), fs.where('fecha', '<=', cxp.pHasta)));
+            cxp.pagos = s.docs.map(x => Object.assign({ id: x.id }, x.data())).sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)) || String(b.registro).localeCompare(String(a.registro)));
+        } catch (e) { cxp.pagos = []; mostrarBanner('No se pudieron leer los pagos: ' + (e.code || e.message), 'error'); }
+        cxp.pagosCargando = false;
+        if (vistaActual === 'cxp' && cxp.tab === 'pagos') cxpPintar();
+    }
+    function cxpPagosRango(campo, v) { cxp[campo] = v; cxp.pagos = null; cxpPintar(); }
+    function cxpVistaPagos() {
+        const filtros = `<div class="filters"><div><label for="cxpPD">Desde</label><input id="cxpPD" type="date" value="${esc(cxp.pDesde)}" onchange="cxpPagosRango('pDesde', this.value)"></div>
+            <div><label for="cxpPH">Hasta</label><input id="cxpPH" type="date" value="${esc(cxp.pHasta)}" onchange="cxpPagosRango('pHasta', this.value)"></div>
+            <div><label for="cxpBus">Buscar</label><input id="cxpBus" type="search" placeholder="Proveedor, factura o referencia" value="${esc(cxp.buscar)}" oninput="cxpBuscar(this.value)"></div></div>`;
+        if (!cxp.pagos) return filtros + cargandoHTML('Cargando pagos...');
+        const l = cxp.pagos.filter(p => cxpCoincide(p.proveedor, p.documento, p.referencia)), vivos = l.filter(p => !p.anulado);
+        return filtros + (l.length ? `<div class="kpis"><div class="kpi"><div class="k-label">Pagado en el período</div><div class="k-value">${cxpUsd(cxpR(vivos.reduce((s, p) => s + (p.pagadoUsd || 0), 0)))}</div><div class="k-label">${vivos.length} pago(s)</div></div>
+            <div class="kpi ok"><div class="k-label">Ahorrado por pronto pago</div><div class="k-value">${cxpUsd(cxpR(vivos.reduce((s, p) => s + (p.descuentoUsd || 0), 0)))}</div></div></div>
+            <div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Fecha</th><th class="izq">Proveedor</th><th class="izq">Documento</th><th class="izq">Forma</th><th>Pagado</th><th>Tasa</th><th>Abonado a la deuda $</th><th class="izq">Referencia</th><th></th></tr></thead><tbody>${l.map(p => `
+                <tr${p.anulado ? ' class="fila-eliminada"' : ''}><td class="izq">${cxpF(p.fecha)}${p.anulado ? '<br><span class="chip st-falta" title="' + esc((p.anuladoPor || '') + ' · ' + (p.motivo || '')) + '">Anulado</span>' : ''}</td><td class="izq"><b>${esc(p.proveedor)}</b></td>
+                <td class="izq">${esc(p.documento || '')}${p.cuota ? ' · cuota ' + p.cuota : ''}</td><td class="izq">${esc((CXP_FORMAS.find(f => f[0] === p.forma) || [, p.forma])[1])}</td>
+                <td><span class="efe-cifra">${p.moneda === 'Bs' ? fmtBs(p.montoMoneda) : cxpUsd(p.montoMoneda)}</span></td><td>${p.moneda === 'Bs' ? fmt(p.tasa) : '—'}</td>
+                <td>${cxpUsd(p.aplicadoUsd)}${p.descuentoUsd ? `<br><small>con ${cxpUsd(p.descuentoUsd)} de descuento</small>` : ''}</td><td class="izq">${esc(p.referencia || '')}<br><small>${esc(p.quien || '')}</small></td>
+                <td><div class="req-acciones" style="margin:0;flex-wrap:nowrap"><button type="button" class="btn-ghost btn-mini" onclick="cxpImprimirPago('${p.id}')">${ico('imprimir')}Comprobante</button>
+                    ${cxpAdmin() && !p.anulado ? `<button type="button" class="btn-ghost btn-mini" onclick="cxpAnularPago('${p.id}')">Anular</button>` : ''}</div></td></tr>`).join('')}</tbody></table></div>`
+            : '<div class="empty">No hay pagos en estas fechas.</div>');
+    }
+
+    // ---------- Ver una factura o préstamo ----------
+    async function cxpVer(id) {
+        let d = cxp.docs.find(x => x.id === id);
+        try { const { db, fs } = await cxpDb(); if (!d) { const s = await fs.getDoc(fs.doc(db, 'cxp_docs', id)); d = s.exists() ? Object.assign({ id }, s.data()) : null; }
+              if (!d) return mostrarBanner('Ese documento ya no está.', 'error');
+              const ps = await fs.getDocs(fs.query(fs.collection(db, 'cxp_pagos'), fs.where('docId', '==', id)));
+              d = Object.assign({}, d, { _pagos: ps.docs.map(x => Object.assign({ id: x.id }, x.data())).sort((a, b) => String(a.fecha).localeCompare(String(b.fecha))) }); }
+        catch (e) { return mostrarBanner('No se pudo abrir: ' + (e.code || e.message), 'error'); }
+        const admin = cxpAdmin(), saldo = cxpSaldo(d), fila = (k, v) => v === '' || v == null ? '' : `<tr><td class="izq">${k}</td><td class="izq"><b>${v}</b></td></tr>`;
+        const mon = v => d.moneda === 'Bs' ? fmtBs(v) : cxpUsd(v);
+        const fiscal = d.fiscal ? fila('Base imponible', mon(d.base || 0)) + fila('Exento', d.exento ? mon(d.exento) : '') + fila('IVA (16 %)', mon(d.iva || 0)) +
+            fila('Retención de IVA', d.retPct ? d.retPct + ' % · ' + mon(d.retIva || 0) + (d.numRet ? ' · comprobante ' + esc(d.numRet) : '') : 'No') : '';
+        const cuotas = d.tipo === 'prestamo' ? `<h4 class="per-sub">Cuotas</h4><div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th>N°</th><th class="izq">Vence</th><th>Capital</th><th>Interés</th><th>Cuota</th><th>Pagado</th><th></th></tr></thead><tbody>${(d.cuotas || []).map(c => `
+            <tr><td>${c.n}</td><td class="izq">${cxpF(c.vence)}</td><td>${cxpUsd(c.capital)}</td><td>${cxpUsd(c.interes)}</td><td><b>${cxpUsd(c.total)}</b></td><td>${c.pagada ? '<span class="chip st-ok">Pagada</span>' : c.pagado ? cxpUsd(c.pagado) : '—'}</td>
+            <td>${!c.pagada && d.estado === 'aprobada' ? `<button type="button" class="btn-primary btn-mini" onclick="almCerrar();cxpPagar('${d.id}', ${c.n})">Pagar</button>` : ''}</td></tr>`).join('')}</tbody></table></div>` : '';
+        const pagos = (d._pagos || []).length ? `<h4 class="per-sub">Pagos</h4><div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><tbody>${d._pagos.map(p => `
+            <tr${p.anulado ? ' class="fila-eliminada"' : ''}><td class="izq">${cxpF(p.fecha)}${p.anulado ? ' <span class="chip st-falta">Anulado</span>' : ''}</td><td class="izq">${esc((CXP_FORMAS.find(f => f[0] === p.forma) || [, p.forma])[1])}${p.cuota ? ' · cuota ' + p.cuota : ''}</td>
+            <td><span class="efe-cifra">${p.moneda === 'Bs' ? fmtBs(p.montoMoneda) : cxpUsd(p.montoMoneda)}</span></td><td>${cxpUsd(p.aplicadoUsd)}</td>
+            <td><button type="button" class="btn-ghost btn-mini" onclick="cxpImprimirPago('${p.id}')">${ico('imprimir')}</button></td></tr>`).join('')}</tbody></table></div>` : '';
+        const desc = (d.descuentos || []).map(x => `${x.pct ? x.pct + ' %' : cxpUsd(x.monto)} si se paga completa antes del ${cxpF(cxpSumar(d.fechaFactura || d.fechaRecibida, Number(x.dias)))} (${x.dias} días)`).join('<br>');
+        cxp._ver = d;
+        almVentana(`<div class="req-dlg alm-dlg-ancho"><h3>${d.tipo === 'prestamo' ? 'Préstamo · ' + esc(d.banco || d.proveedor) : esc(d.proveedor) + ' · factura ' + esc(d.documento)}</h3>
+            <div class="req-sub">${d.estado === 'por_revisar' ? '<span class="chip st-amar">Por revisar</span>' : d.estado === 'aprobada' ? '<span class="chip st-info">Por pagar</span>' : d.estado === 'pagada' ? '<span class="chip st-ok">Pagada</span>' : '<span class="chip st-falta">Anulada</span>'}
+                ${d.registro ? ' Registrada el ' + esc(d.registro) + ' por ' + esc(d.creadoPor || '') : ''}${d.revisadoPor ? ' · revisó ' + esc(d.revisadoPor) : ''}</div>
+            <div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><tbody>
+                ${fila('Proveedor', esc(d.proveedor) + (d.rif ? ' · ' + esc(d.rif) : ''))}${fila('Documento', esc(d.documento || '') + (d.control ? ' · control ' + esc(d.control) : ''))}
+                ${fila('Fecha de la factura', fechaBonita(d.fechaFactura))}${d.tipo !== 'prestamo' ? fila('Monto de la factura', mon(d.montoBruto || 0) + (d.moneda === 'Bs' && d.tasaFactura ? ' · tasa ' + fmt(d.tasaFactura) : '')) : fila('Capital', cxpUsd(d.capital) + ' · ' + fmt(d.tasaAnual) + ' % anual · ' + esc(d.sistema || ''))}
+                ${fiscal}${fila('Deuda', cxpUsd(d.totalUsd || 0))}${fila('Pagado', d.pagado ? cxpUsd(d.pagado) + (d.descontado ? ' (incluye ' + cxpUsd(d.descontado) + ' de descuento)' : '') : '')}
+                ${fila('Saldo', '<span style="font-size:1.1rem">' + cxpUsd(saldo) + '</span>')}${d.tipo !== 'prestamo' ? fila('Vence', d.vence ? fechaBonita(d.vence) + ' (' + (d.credito || 0) + ' días de crédito)' : '') : ''}
+                ${fila('Pronto pago', desc)}${fila('Nota', esc(d.nota || ''))}${fila('Foto', (d.fotos || []).map((u, i) => `<a href="${esc(u)}" target="_blank" rel="noopener">${ico('imagen')}Foto ${i + 1}</a>`).join(' '))}
+                ${d.anulada ? fila('Anulada', esc(d.anulada.quien + ' · ' + d.anulada.cuando + ' · ' + d.anulada.motivo)) : ''}
+            </tbody></table></div>${cuotas}${pagos}
+            <div class="req-acciones" style="justify-content:flex-end">
+                ${admin && d.estado !== 'anulada' && !(d.pagado > 0) ? `<button type="button" class="btn-ghost" onclick="cxpAnular('${d.id}')">Anular</button>` : ''}
+                ${d.retIva > 0 && d.numRet ? `<button type="button" class="btn-ghost" onclick="cxpImprimirRetencion()">${ico('imprimir')}Comprobante de retención</button>` : ''}
+                ${admin && d.tipo !== 'prestamo' && d.estado !== 'anulada' && d.estado !== 'pagada' ? `<button type="button" class="btn-ghost" onclick="almCerrar();cxpRevisar('${d.id}')">${d.estado === 'por_revisar' ? 'Revisar' : 'Cambiar condiciones'}</button>` : ''}
+                ${d.estado === 'aprobada' && saldo > 0 && d.tipo !== 'prestamo' ? `<button type="button" class="btn-primary" onclick="almCerrar();cxpPagar('${d.id}', 0)">Pagar</button>` : ''}
+                <button type="button" class="btn-ghost" onclick="almCerrar()">Cerrar</button></div></div>`);
+    }
+
+    // ---------- Revisar / registrar a mano (Administración) ----------
+    let cxpRev = null;
+    async function cxpRevisar(id) {
+        const d = id ? cxp.docs.find(x => x.id === id) : null;
+        if (id && !d) return mostrarBanner('Esa factura ya no está abierta.', 'error');
+        if (!cxp.provs) await cxpCargarProveedores();
+        const ff = (d && d.fechaFactura) || cxpHoy();
+        cxpRev = d ? JSON.parse(JSON.stringify(d)) : { tipo: 'factura', estado: 'por_revisar', moneda: 'Bs', montoBruto: 0, fiscal: true, fechaFactura: ff, fechaRecibida: cxpHoy(), fotos: [], origen: 'admin', pagado: 0 };
+        const r = cxpRev;
+        if (r.base == null && r.fiscal && r.montoBruto) { r.base = cxpR(r.montoBruto / 1.16); r.iva = cxpR(r.montoBruto - r.base); }
+        if (r.retPct == null) r.retPct = r.fiscal ? 75 : 0;
+        if (!r.tasaFactura) r.tasaFactura = cxpTasa(r.fechaFactura) || cxpTasa();
+        if (r.credito == null) r.credito = 0;
+        r.descuentos = r.descuentos || [];
+        cxpRevPintar(true);
+    }
+    // Lo que se debe: total de la factura menos la retención de IVA; en $ (si la factura es en Bs, a la tasa BCV de su fecha)
+    function cxpRevCalcular(r) {
+        r.iva = r.fiscal ? cxpR(r.iva) : 0;
+        r.retIva = r.fiscal ? cxpR(r.iva * (Number(r.retPct) || 0) / 100) : 0;
+        const neto = cxpR((Number(r.montoBruto) || 0) - r.retIva);
+        r.totalUsd = r.moneda === 'Bs' ? (r.tasaFactura > 0 ? cxpR(neto / r.tasaFactura) : 0) : neto;
+        r.vence = cxpSumar(r.fechaFactura || cxpHoy(), Number(r.credito) || 0);
+        return neto;
+    }
+    function cxpRevPintar(nuevo) {
+        const r = cxpRev, neto = cxpRevCalcular(r), mon = v => r.moneda === 'Bs' ? fmtBs(v) : cxpUsd(v);
+        const provs = (cxp.provs || []).map(p => `<option value="${esc(p.nombre)}">${esc(p.rif || '')}</option>`).join('');
+        const html = `<div class="req-dlg alm-dlg-ancho"><h3>${r.id ? 'Revisar factura' : 'Registrar factura'}</h3>
+            <div class="req-sub">${r.id ? 'Registrada por ' + esc(r.creadoPor || '') + (r.registro ? ' el ' + esc(r.registro) : '') + ((r.fotos || []).length ? ' · ' + r.fotos.map((u, i) => `<a href="${esc(u)}" target="_blank" rel="noopener">${ico('imagen')}foto ${i + 1}</a>`).join(' ') : ' · sin foto') : 'Factura de proveedor cargada por Administración.'}</div>
+            <div class="filters">
+                <div><label for="crProv">Proveedor</label><input id="crProv" list="crProvL" value="${esc(r.proveedor || '')}" oninput="cxpRevCampo('proveedor', this.value)"><datalist id="crProvL">${provs}</datalist></div>
+                <div><label for="crRif">RIF</label><input id="crRif" value="${esc(r.rif || '')}" oninput="cxpRevCampo('rif', this.value)" placeholder="J-12345678-9"></div>
+                <div><label for="crDoc">N° de factura</label><input id="crDoc" value="${esc(r.documento || '')}" oninput="cxpRevCampo('documento', this.value)" ${r.id ? 'disabled title="Para cambiar el número, anúlela y regístrela de nuevo"' : ''}></div>
+                <div><label for="crCtl">N° de control</label><input id="crCtl" value="${esc(r.control || '')}" oninput="cxpRevCampo('control', this.value)"></div>
+                <div><label for="crFF">Fecha de la factura</label><input id="crFF" type="date" value="${esc(r.fechaFactura || '')}" onchange="cxpRevCampo('fechaFactura', this.value, true)"></div>
+                <div><label for="crMon">Moneda de la factura</label><select id="crMon" onchange="cxpRevCampo('moneda', this.value, true)"><option value="Bs" ${r.moneda === 'Bs' ? 'selected' : ''}>Bolívares</option><option value="$" ${r.moneda === '$' ? 'selected' : ''}>Dólares</option></select></div>
+                <div><label for="crMonto">Total de la factura (${r.moneda})</label><input id="crMonto" type="number" step="0.01" min="0" value="${r.montoBruto || ''}" onchange="cxpRevCampo('montoBruto', this.value, true)"></div>
+                ${r.moneda === 'Bs' ? `<div><label for="crTasa">Tasa BCV de la factura</label><input id="crTasa" type="number" step="0.0001" min="0" value="${r.tasaFactura || ''}" onchange="cxpRevCampo('tasaFactura', this.value, true)"></div>` : ''}
+            </div>
+            <label class="interruptor" style="margin:.4rem 0"><input type="checkbox" ${r.fiscal ? 'checked' : ''} onchange="cxpRevCampo('fiscal', this.checked, true)"><span class="sw-pista"></span> Factura fiscal (con IVA)</label>
+            ${r.fiscal ? `<div class="filters">
+                <div><label for="crBase">Base imponible</label><input id="crBase" type="number" step="0.01" min="0" value="${r.base || ''}" onchange="cxpRevCampo('base', this.value, true)"></div>
+                <div><label for="crExe">Exento</label><input id="crExe" type="number" step="0.01" min="0" value="${r.exento || ''}" onchange="cxpRevCampo('exento', this.value, true)"></div>
+                <div><label for="crIva">IVA (16 %)</label><input id="crIva" type="number" step="0.01" min="0" value="${r.iva || ''}" onchange="cxpRevCampo('iva', this.value, true)"></div>
+                <div><label for="crRet">Retención de IVA</label><select id="crRet" onchange="cxpRevCampo('retPct', this.value, true)">${[0, 75, 100].map(p => `<option value="${p}" ${Number(r.retPct) === p ? 'selected' : ''}>${p ? p + ' %' : 'Sin retención'}</option>`).join('')}</select></div>
+            </div>` : ''}
+            <h4 class="per-sub">Condiciones de pago</h4>
+            <div class="filters">
+                <div><label for="crCred">Días de crédito</label><input id="crCred" type="number" step="1" min="0" value="${r.credito || 0}" onchange="cxpRevCampo('credito', this.value, true)"></div>
+                <div><label>&nbsp;</label><div class="req-acciones" style="margin:0">${[0, 7, 15, 30, 45].map(n => `<button type="button" class="btn-ghost btn-mini${Number(r.credito) === n ? ' activo' : ''}" onclick="cxpRevCampo('credito', ${n}, true)">${n ? n + ' d' : 'Contado'}</button>`).join('')}</div></div>
+                <div><label>Vence</label><div style="padding:.45rem 0"><b>${fechaBonita(r.vence)}</b></div></div>
+            </div>
+            <div class="nota" style="margin:.2rem 0 .4rem">Descuentos por pronto pago: si se paga completa dentro de esos días desde la fecha de la factura (el mejor que aplique; por % del total o un monto fijo en $).</div>
+            ${r.descuentos.map((x, i) => `<div class="filters" style="align-items:end">
+                <div><label for="crDd${i}">Pagando dentro de (días)</label><input id="crDd${i}" type="number" step="1" min="0" value="${x.dias ?? ''}" onchange="cxpRevDesc(${i}, 'dias', this.value)"></div>
+                <div><label for="crDp${i}">Descuento %</label><input id="crDp${i}" type="number" step="0.01" min="0" max="100" value="${x.pct || ''}" onchange="cxpRevDesc(${i}, 'pct', this.value)"></div>
+                <div><label for="crDm${i}">o monto fijo $</label><input id="crDm${i}" type="number" step="0.01" min="0" value="${x.monto || ''}" onchange="cxpRevDesc(${i}, 'monto', this.value)"></div>
+                <div><button type="button" class="btn-ghost btn-mini" onclick="cxpRevDesc(${i}, null)">Quitar</button></div></div>`).join('')}
+            ${r.descuentos.length < 4 ? `<button type="button" class="btn-ghost btn-mini" onclick="cxpRevDesc(-1)">＋ Descuento por pronto pago</button>` : ''}
+            <div class="filters" style="margin-top:.6rem"><div style="grid-column:1/-1"><label for="crNota">Nota</label><input id="crNota" value="${esc(r.nota || '')}" oninput="cxpRevCampo('nota', this.value)" maxlength="200"></div></div>
+            <div class="kpis" style="margin-top:.6rem">
+                <div class="kpi"><div class="k-label">Total factura</div><div class="k-value" style="font-size:1.1rem">${mon(r.montoBruto || 0)}</div></div>
+                ${r.retIva ? `<div class="kpi"><div class="k-label">Retención IVA ${r.retPct} %</div><div class="k-value" style="font-size:1.1rem">− ${mon(r.retIva)}</div><div class="k-label">se entera al SENIAT</div></div>` : ''}
+                <div class="kpi amar"><div class="k-label">Deuda con el proveedor</div><div class="k-value" style="font-size:1.1rem">${cxpUsd(r.totalUsd)}</div><div class="k-label">${r.moneda === 'Bs' ? fmtBs(neto) + ' a tasa ' + fmt(r.tasaFactura || 0) : 'en $'}</div></div></div>
+            <div class="login-error" id="crErr"></div>
+            <div class="req-acciones" style="justify-content:flex-end">
+                <button type="button" class="btn-ghost" onclick="almCerrar()">Cancelar</button>
+                <button type="button" class="btn-ghost" onclick="cxpRevGuardar(this, false)">Guardar sin aprobar</button>
+                <button type="button" class="btn-primary" onclick="cxpRevGuardar(this, true)">${r.estado === 'aprobada' ? 'Guardar cambios' : 'Aprobar para pagar'}</button></div></div>`;
+        const f = document.querySelector('.req-dlg-fondo:not(.hidden) .req-dlg');
+        if (!nuevo && f && f.parentElement) pintarVentana(f.parentElement, html); else almVentana(html);
+    }
+    function cxpRevCampo(k, v, repintar) {
+        const r = cxpRev; if (!r) return;
+        const n = ['montoBruto', 'tasaFactura', 'base', 'exento', 'iva', 'retPct', 'credito'].includes(k);
+        r[k] = n ? (Number(v) || 0) : v;
+        if (k === 'fechaFactura') r.tasaFactura = cxpTasa(v) || r.tasaFactura;
+        if (k === 'base') r.iva = cxpR(r.base * 0.16);
+        if (k === 'montoBruto' && r.fiscal) { r.base = cxpR((r.montoBruto - (r.exento || 0)) / 1.16); r.iva = cxpR(r.montoBruto - (r.exento || 0) - r.base); }
+        if (k === 'exento' && r.fiscal) { r.base = cxpR((r.montoBruto - r.exento) / 1.16); r.iva = cxpR(r.montoBruto - r.exento - r.base); }
+        if (k === 'fiscal') { if (v && !r.retPct) r.retPct = 75; if (v && !r.base) { r.base = cxpR((r.montoBruto || 0) / 1.16); r.iva = cxpR((r.montoBruto || 0) - r.base); } }
+        if (k === 'proveedor') { const p = (cxp.provs || []).find(x => cxpNorm(x.nombre) === cxpNorm(v)); if (p) { r.proveedorId = p.id; if (!r.rif) { r.rif = p.rif; const e = document.getElementById('crRif'); if (e) e.value = p.rif; } } else r.proveedorId = r.proveedorId && r.id ? r.proveedorId : ''; }
+        if (repintar) cxpRevPintar();
+    }
+    function cxpRevDesc(i, k, v) {
+        const r = cxpRev;
+        if (i < 0) r.descuentos.push({ dias: 7, pct: 2, monto: 0 });
+        else if (k === null) r.descuentos.splice(i, 1);
+        else { r.descuentos[i][k] = Number(v) || 0; if (k === 'pct' && r.descuentos[i].pct) r.descuentos[i].monto = 0; if (k === 'monto' && r.descuentos[i].monto) r.descuentos[i].pct = 0; }
+        cxpRevPintar();
+    }
+    async function cxpRevGuardar(btn, aprobar) {
+        const r = cxpRev, err = document.getElementById('crErr'); err.textContent = '';
+        cxpRevCalcular(r);
+        const falta = !String(r.proveedor || '').trim() ? 'Escriba el proveedor.' : !String(r.documento || '').trim() ? 'Escriba el N° de la factura.' : !(r.montoBruto > 0) ? 'Escriba el total de la factura.'
+            : r.moneda === 'Bs' && !(r.tasaFactura > 0) ? 'Falta la tasa BCV de la fecha de la factura.' : r.fiscal && r.iva > r.montoBruto ? 'El IVA no puede ser mayor que el total.'
+            : r.descuentos.some(x => !(x.dias >= 0) || (!x.pct && !x.monto)) ? 'Cada descuento necesita sus días y un % o un monto.' : '';
+        if (falta) { err.textContent = falta; return; }
+        btnCargando(btn, 'Guardando...');
+        try {
+            const { db, fs } = await cxpDb(), quien = nombreUsuario, ahora = cxpHoy() + ' ' + new Date().toTimeString().slice(0, 5);
+            const id = r.id || cxpIdFactura(r.proveedorId, r.proveedor, r.documento);
+            if (!id) throw new Error('Proveedor o número no válidos.');
+            const datos = { tipo: 'factura', proveedorId: r.proveedorId || '', proveedor: String(r.proveedor).trim(), rif: String(r.rif || '').trim(), documento: String(r.documento).trim(), control: String(r.control || '').trim(),
+                fechaFactura: r.fechaFactura, fechaRecibida: r.fechaRecibida || cxpHoy(), moneda: r.moneda, montoBruto: cxpR(r.montoBruto), tasaFactura: Number(r.tasaFactura) || cxpTasa(r.fechaFactura) || 0,   // también en $: el comprobante de retención va en Bs
+                fiscal: !!r.fiscal, base: r.fiscal ? cxpR(r.base) : 0, exento: r.fiscal ? cxpR(r.exento) : 0, iva: r.iva, retPct: r.fiscal ? Number(r.retPct) : 0, retIva: r.retIva,
+                totalUsd: r.totalUsd, credito: Number(r.credito) || 0, vence: r.vence, descuentos: r.descuentos.map(x => ({ dias: Number(x.dias), pct: Number(x.pct) || 0, monto: Number(x.monto) || 0 })),
+                nota: String(r.nota || '').slice(0, 200), revisadoPor: quien, revisado: ahora };
+            if (aprobar) Object.assign(datos, { estado: 'aprobada', abierta: true });
+            await fs.runTransaction(db, async tx => {
+                const ref = fs.doc(db, 'cxp_docs', id), s = await tx.get(ref);
+                if (!r.id && s.exists()) throw new Error('Esa factura de ese proveedor ya está registrada.');
+                if (r.id && (!s.exists() || s.data().estado === 'anulada' || s.data().estado === 'pagada')) throw new Error('La factura cambió mientras tanto (pagada o anulada). Ciérrela y vuelva a abrirla.');
+                if (r.id && Number(s.data().pagado) > 0 && Math.abs((s.data().totalUsd || 0) - datos.totalUsd) > 0.004 && datos.totalUsd < Number(s.data().pagado)) throw new Error('Ya tiene pagos por más de la deuda nueva: revise los montos.');
+                // Comprobante de retención: número AAAAMM + 8 dígitos, al aprobar (uno por factura)
+                const ya = s.exists() ? s.data() : {};
+                if (aprobar && datos.retIva > 0 && !ya.numRet) {
+                    const sr = fs.doc(db, 'cxp_config', 'secuencias'), sq = await tx.get(sr), per = cxpHoy().replace(/-/g, '').slice(0, 6), q = sq.exists() ? sq.data() : {};
+                    const n = q.retPeriodo === per ? (Number(q.retN) || 0) + 1 : 1;
+                    tx.set(sr, { retPeriodo: per, retN: n }, { merge: true });
+                    Object.assign(datos, { numRet: per + String(n).padStart(8, '0'), fechaRet: cxpHoy() });
+                }
+                if (s.exists()) tx.update(ref, datos);
+                else tx.set(ref, Object.assign(datos, { estado: aprobar ? 'aprobada' : 'por_revisar', abierta: true, pagado: 0, fotos: [], origen: 'admin', creadoPor: quien, creado: fs.serverTimestamp(), registro: ahora }));
+            });
+            almCerrar();
+            mostrarBanner(aprobar ? `Factura ${datos.documento} de ${datos.proveedor} aprobada: pasa a la Agenda de pagos (vence el ${fechaBonita(datos.vence)}).` : 'Guardada (todavía por revisar).', 'ok');
+        } catch (e) { err.textContent = e.code === 'permission-denied' ? 'Firebase no le da permiso (necesita Administración de Cuentas por pagar).' : e.message; btn.disabled = false; btn.textContent = aprobar ? 'Aprobar para pagar' : 'Guardar sin aprobar'; }
+    }
+    async function cxpAnular(id) {
+        const d = cxp.docs.find(x => x.id === id) || cxp._ver;
+        const motivo = prompt('Motivo para anular ' + (d.tipo === 'prestamo' ? 'el préstamo' : 'la factura ' + d.documento) + ' de ' + (d.banco || d.proveedor) + ':');
+        if (!motivo || !motivo.trim()) return;
+        try {
+            const { db, fs } = await cxpDb();
+            await fs.runTransaction(db, async tx => {
+                const ref = fs.doc(db, 'cxp_docs', id), s = await tx.get(ref);
+                if (!s.exists() || Number(s.data().pagado) > 0) throw new Error('Tiene pagos: anule primero los pagos.');
+                tx.update(ref, { estado: 'anulada', abierta: false, anulada: { quien: nombreUsuario, cuando: cxpHoy() + ' ' + new Date().toTimeString().slice(0, 5), motivo: motivo.trim().slice(0, 200) } });
+            });
+            almCerrar(); mostrarBanner('Anulada. Queda como constancia (no se borra).', 'ok');
+        } catch (e) { mostrarBanner('No se pudo anular: ' + (e.code === 'permission-denied' ? 'sin permiso' : e.message), 'error'); }
+    }
+
+    // ---------- Préstamos ----------
+    let cxpPre = null;
+    function cxpPrestamo() {
+        cxpPre = { banco: '', documento: '', fecha: cxpHoy(), capital: 0, tasaAnual: 0, meses: 12, primera: cxpSumarMes(cxpHoy(), 1), sistema: 'Cuota fija', nota: '' };
+        cxpPrePintar(true);
+    }
+    function cxpSumarMes(iso, n) { const [a, m, d] = iso.split('-').map(Number), f = new Date(Date.UTC(a, m - 1 + n, 1)), ult = new Date(Date.UTC(f.getUTCFullYear(), f.getUTCMonth() + 1, 0)).getUTCDate();
+        return new Date(Date.UTC(f.getUTCFullYear(), f.getUTCMonth(), Math.min(d, ult))).toISOString().slice(0, 10); }
+    // Cuotas: francés (cuota fija), alemán (capital fijo) o todo al vencimiento (intereses cada mes y el capital en la última)
+    function cxpCuotas(p) {
+        const n = Math.max(1, Math.round(p.meses)), i = (Number(p.tasaAnual) || 0) / 1200, l = [];
+        let saldo = Number(p.capital) || 0;
+        const fija = i ? saldo * i / (1 - Math.pow(1 + i, -n)) : saldo / n;
+        for (let k = 1; k <= n; k++) {
+            const interes = cxpR(saldo * i);
+            let capital = p.sistema === 'Capital fijo' ? cxpR((Number(p.capital) || 0) / n) : p.sistema === 'Al vencimiento' ? (k === n ? cxpR(saldo) : 0) : cxpR(fija - saldo * i);
+            if (k === n) capital = cxpR(saldo);
+            saldo = cxpR(saldo - capital);
+            l.push({ n: k, vence: cxpSumarMes(p.primera, k - 1), capital, interes, total: cxpR(capital + interes), pagado: 0, pagada: false });
+        }
+        return l;
+    }
+    function cxpPrePintar(nuevo) {
+        const p = cxpPre, c = p.capital > 0 && p.meses > 0 ? cxpCuotas(p) : [];
+        const html = `<div class="req-dlg alm-dlg-ancho"><h3>Registrar préstamo bancario</h3><div class="req-sub">Cada cuota aparece en la Agenda de pagos en su fecha (deuda en $).</div>
+            <div class="filters">
+                <div><label for="cpBanco">Banco</label><input id="cpBanco" value="${esc(p.banco)}" oninput="cxpPre.banco=this.value"></div>
+                <div><label for="cpDoc">N° del préstamo</label><input id="cpDoc" value="${esc(p.documento)}" oninput="cxpPre.documento=this.value"></div>
+                <div><label for="cpFecha">Fecha del desembolso</label><input id="cpFecha" type="date" value="${p.fecha}" onchange="cxpPre.fecha=this.value"></div>
+                <div><label for="cpCap">Capital $</label><input id="cpCap" type="number" step="0.01" min="0" value="${p.capital || ''}" onchange="cxpPre.capital=Number(this.value)||0;cxpPrePintar()"></div>
+                <div><label for="cpTasa">Tasa de interés anual %</label><input id="cpTasa" type="number" step="0.01" min="0" value="${p.tasaAnual || ''}" onchange="cxpPre.tasaAnual=Number(this.value)||0;cxpPrePintar()"></div>
+                <div><label for="cpMeses">Cuotas (meses)</label><input id="cpMeses" type="number" step="1" min="1" max="120" value="${p.meses}" onchange="cxpPre.meses=Math.max(1,Number(this.value)||1);cxpPrePintar()"></div>
+                <div><label for="cpPrim">Primera cuota</label><input id="cpPrim" type="date" value="${p.primera}" onchange="cxpPre.primera=this.value;cxpPrePintar()"></div>
+                <div><label for="cpSis">Sistema</label><select id="cpSis" onchange="cxpPre.sistema=this.value;cxpPrePintar()">${['Cuota fija', 'Capital fijo', 'Al vencimiento'].map(s => `<option ${p.sistema === s ? 'selected' : ''}>${s}</option>`).join('')}</select></div>
+            </div>
+            ${c.length ? `<div class="tabla-wrap" style="max-height:16rem;overflow:auto"><table class="req-tabla" data-sin-paginar><thead><tr><th>N°</th><th class="izq">Vence</th><th>Capital</th><th>Interés</th><th>Cuota</th></tr></thead><tbody>${c.map(x => `<tr><td>${x.n}</td><td class="izq">${cxpF(x.vence)}</td><td>${cxpUsd(x.capital)}</td><td>${cxpUsd(x.interes)}</td><td><b>${cxpUsd(x.total)}</b></td></tr>`).join('')}
+                <tr class="alm-fila-total"><td></td><td class="izq">Total</td><td>${cxpUsd(cxpR(c.reduce((s, x) => s + x.capital, 0)))}</td><td>${cxpUsd(cxpR(c.reduce((s, x) => s + x.interes, 0)))}</td><td><b>${cxpUsd(cxpR(c.reduce((s, x) => s + x.total, 0)))}</b></td></tr></tbody></table></div>` : '<div class="nota">Escriba el capital, la tasa y las cuotas para ver el plan de pagos.</div>'}
+            <div class="login-error" id="cpErr"></div>
+            <div class="req-acciones" style="justify-content:flex-end"><button type="button" class="btn-ghost" onclick="almCerrar()">Cancelar</button><button type="button" class="btn-primary" onclick="cxpPreGuardar(this)">Registrar préstamo</button></div></div>`;
+        const f = document.querySelector('.req-dlg-fondo:not(.hidden) .req-dlg');
+        if (!nuevo && f && f.parentElement) pintarVentana(f.parentElement, html); else almVentana(html);
+    }
+    async function cxpPreGuardar(btn) {
+        const p = cxpPre, err = document.getElementById('cpErr');
+        if (!p.banco.trim() || !(p.capital > 0) || !(p.meses >= 1) || !p.primera) { err.textContent = 'Escriba el banco, el capital, las cuotas y la fecha de la primera cuota.'; return; }
+        btnCargando(btn, 'Guardando...');
+        try {
+            const { db, fs } = await cxpDb(), cuotas = cxpCuotas(p), id = 'p_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+            await fs.setDoc(fs.doc(db, 'cxp_docs', id), { tipo: 'prestamo', estado: 'aprobada', abierta: true, proveedor: p.banco.trim(), banco: p.banco.trim(), documento: p.documento.trim(), fechaFactura: p.fecha,
+                capital: cxpR(p.capital), tasaAnual: Number(p.tasaAnual) || 0, sistema: p.sistema, cuotas, totalUsd: cxpR(cuotas.reduce((s, x) => s + x.total, 0)), vence: cuotas[0].vence,
+                moneda: '$', nota: '', pagado: 0, origen: 'admin', creadoPor: nombreUsuario, creado: fs.serverTimestamp(), registro: cxpHoy() + ' ' + new Date().toTimeString().slice(0, 5) });
+            almCerrar(); mostrarBanner(`Préstamo de ${p.banco} registrado: ${cuotas.length} cuota(s).`, 'ok');
+        } catch (e) { err.textContent = e.code === 'permission-denied' ? 'Firebase no le da permiso (necesita Administración de Cuentas por pagar).' : e.message; btn.disabled = false; btn.textContent = 'Registrar préstamo'; }
+    }
+
+    // ---------- Pagar (Tesorería) ----------
+    let cxpPag = null;
+    function cxpPagar(id, cuota) {
+        const d = cxp.docs.find(x => x.id === id);
+        if (!d || d.estado !== 'aprobada') return mostrarBanner('Ese documento ya no está por pagar.', 'error');
+        const c = cuota ? (d.cuotas || []).find(x => x.n === cuota) : null;
+        const saldo = c ? cxpR(c.total - (c.pagado || 0)) : cxpSaldo(d);
+        cxpPag = { id, cuota: cuota || 0, fecha: cxpHoy(), forma: 'transferencia', monto: saldo, completo: true, referencia: '', banco: '', nota: '' };
+        cxpPagPintar(true);
+    }
+    function cxpPagCalc() {
+        const p = cxpPag, d = cxp.docs.find(x => x.id === p.id) || {}, c = p.cuota ? (d.cuotas || []).find(x => x.n === p.cuota) : null;
+        const saldo = c ? cxpR(c.total - (c.pagado || 0)) : cxpSaldo(d);
+        const aplicado = p.completo ? saldo : Math.min(saldo, cxpR(p.monto));
+        const desc = !c && p.completo ? cxpDescuento(d, p.fecha) : null;
+        const descuento = desc ? Math.min(desc.usd, aplicado) : 0, pagadoUsd = cxpR(aplicado - descuento);
+        const forma = CXP_FORMAS.find(f => f[0] === p.forma) || CXP_FORMAS[0], tasa = forma[2] === 'Bs' ? cxpTasa(p.fecha) : 0;
+        return { d, c, saldo, aplicado, desc, descuento, pagadoUsd, forma, tasa, montoMoneda: forma[2] === 'Bs' ? cxpR(pagadoUsd * tasa) : pagadoUsd };
+    }
+    function cxpPagPintar(nuevo) {
+        const p = cxpPag, k = cxpPagCalc(), d = k.d;
+        const html = `<div class="req-dlg"><h3>Pagar · ${esc(d.banco || d.proveedor)}</h3>
+            <div class="req-sub">${esc(d.documento || '')}${k.c ? ' · cuota ' + k.c.n + ' de ' + d.cuotas.length + ' (vence ' + fechaBonita(k.c.vence) + ')' : ' · vence ' + fechaBonita(d.vence)} · saldo <b>${cxpUsd(k.saldo)}</b></div>
+            <div class="filters">
+                <div><label for="cgFecha">Fecha del pago</label><input id="cgFecha" type="date" value="${p.fecha}" max="${cxpHoy()}" onchange="cxpPag.fecha=this.value;cxpPagPintar()"></div>
+                <div><label for="cgForma">Forma de pago</label><select id="cgForma" onchange="cxpPag.forma=this.value;cxpPagPintar()">${CXP_FORMAS.map(f => `<option value="${f[0]}" ${p.forma === f[0] ? 'selected' : ''}>${f[1]}</option>`).join('')}</select></div>
+                <div><label for="cgCual">Cuánto</label><select id="cgCual" onchange="cxpPag.completo=this.value==='1';cxpPagPintar()"><option value="1" ${p.completo ? 'selected' : ''}>Todo el saldo</option><option value="0" ${p.completo ? '' : 'selected'}>Un abono</option></select></div>
+                ${p.completo ? '' : `<div><label for="cgMonto">Abono $</label><input id="cgMonto" type="number" step="0.01" min="0.01" max="${k.saldo}" value="${p.monto || ''}" onchange="cxpPag.monto=Number(this.value)||0;cxpPagPintar()"></div>`}
+                <div><label for="cgRef">Referencia</label><input id="cgRef" value="${esc(p.referencia)}" oninput="cxpPag.referencia=this.value" maxlength="40"></div>
+                <div><label for="cgBanco">Banco o cuenta de origen</label><input id="cgBanco" value="${esc(p.banco)}" oninput="cxpPag.banco=this.value" maxlength="60"></div>
+            </div>
+            <div class="kpis">
+                ${k.descuento ? `<div class="kpi ok"><div class="k-label">Descuento por pronto pago</div><div class="k-value" style="font-size:1.1rem">− ${cxpUsd(k.descuento)}</div><div class="k-label">${k.desc.pct ? k.desc.pct + ' %' : 'monto fijo'} · pagando antes del ${cxpF(k.desc.hasta)}</div></div>` : ''}
+                <div class="kpi amar"><div class="k-label">A pagar</div><div class="k-value" style="font-size:1.2rem">${k.forma[2] === 'Bs' ? fmtBs(k.montoMoneda) : cxpUsd(k.montoMoneda)}</div>
+                    <div class="k-label">${k.forma[2] === 'Bs' ? (k.tasa ? cxpUsd(k.pagadoUsd) + ' · tasa BCV del ' + cxpF(p.fecha) + ': ' + fmt(k.tasa) : 'No hay tasa BCV de esa fecha') : 'en $'}</div></div>
+                <div class="kpi"><div class="k-label">Queda debiendo</div><div class="k-value" style="font-size:1.1rem">${cxpUsd(cxpR(k.saldo - k.aplicado))}</div></div></div>
+            <div class="filters"><div style="grid-column:1/-1"><label for="cgNota">Nota</label><input id="cgNota" value="${esc(p.nota)}" oninput="cxpPag.nota=this.value" maxlength="200"></div></div>
+            <div class="login-error" id="cgErr"></div>
+            <div class="req-acciones" style="justify-content:flex-end"><button type="button" class="btn-ghost" onclick="almCerrar()">Cancelar</button><button type="button" class="btn-primary" onclick="cxpPagGuardar(this)">Registrar pago</button></div></div>`;
+        const f = document.querySelector('.req-dlg-fondo:not(.hidden) .req-dlg');
+        if (!nuevo && f && f.parentElement) pintarVentana(f.parentElement, html); else almVentana(html);
+    }
+    async function cxpPagGuardar(btn) {
+        const p = cxpPag, k = cxpPagCalc(), err = document.getElementById('cgErr');
+        if (!(k.aplicado > 0)) { err.textContent = 'Escriba cuánto se paga.'; return; }
+        if (k.forma[2] === 'Bs' && !(k.tasa > 0)) { err.textContent = 'No hay tasa BCV de esa fecha: elija otra fecha o actualice las tasas.'; return; }
+        if (p.fecha > cxpHoy()) { err.textContent = 'La fecha del pago no puede ser futura.'; return; }
+        btnCargando(btn, 'Registrando...');
+        try {
+            const { db, fs } = await cxpDb(), quien = nombreUsuario, pid = 'pg_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+            await fs.runTransaction(db, async tx => {
+                const ref = fs.doc(db, 'cxp_docs', p.id), s = await tx.get(ref);
+                if (!s.exists() || s.data().estado !== 'aprobada') throw new Error('Ese documento ya no está por pagar (lo cambió otra persona).');
+                const d = s.data(), cuotas = d.cuotas ? d.cuotas.map(x => Object.assign({}, x)) : null;
+                let saldo;
+                if (p.cuota) { const c = cuotas.find(x => x.n === p.cuota); if (!c || c.pagada) throw new Error('Esa cuota ya está pagada.'); saldo = cxpR(c.total - (c.pagado || 0));
+                               if (k.aplicado > saldo + 0.004) throw new Error('El abono es mayor que lo que falta de la cuota.'); c.pagado = cxpR((c.pagado || 0) + k.aplicado); c.pagada = c.pagado >= c.total - 0.004; }
+                else { saldo = Math.max(0, cxpR((d.totalUsd || 0) - (d.pagado || 0))); if (k.aplicado > saldo + 0.004) throw new Error('El pago es mayor que el saldo (alguien pagó mientras tanto).'); }
+                const pagado = cxpR((Number(d.pagado) || 0) + k.aplicado), cerrada = pagado >= (Number(d.totalUsd) || 0) - 0.004;
+                const cambio = { pagado, descontado: cxpR((Number(d.descontado) || 0) + k.descuento), abierta: !cerrada, estado: cerrada ? 'pagada' : 'aprobada', ultimoPago: p.fecha, actualizado: cxpHoy() + ' ' + new Date().toTimeString().slice(0, 5) };
+                if (cuotas) { cambio.cuotas = cuotas; const prox = cuotas.find(x => !x.pagada); cambio.vence = prox ? prox.vence : d.vence; }
+                tx.update(ref, cambio);
+                tx.set(fs.doc(db, 'cxp_pagos', pid), { docId: p.id, tipo: d.tipo, proveedor: d.banco || d.proveedor, rif: d.rif || '', documento: d.documento || '', cuota: p.cuota || 0, fecha: p.fecha,
+                    forma: p.forma, moneda: k.forma[2], tasa: k.tasa, montoMoneda: k.montoMoneda, pagadoUsd: k.pagadoUsd, aplicadoUsd: k.aplicado, descuentoUsd: k.descuento,
+                    saldoAntes: saldo, referencia: p.referencia.trim(), banco: p.banco.trim(), nota: p.nota.trim(), quien, uid: (await FB.listo()).auth.currentUser.uid, creado: fs.serverTimestamp(),
+                    registro: cxpHoy() + ' ' + new Date().toTimeString().slice(0, 5), anulado: false });
+            });
+            cxp.pagos = null;
+            almVentana(`<div class="req-dlg"><h3>Pago registrado</h3><div class="req-sub">${esc(k.d.banco || k.d.proveedor)} · ${k.forma[2] === 'Bs' ? fmtBs(k.montoMoneda) : cxpUsd(k.montoMoneda)}${k.descuento ? ' · ahorró ' + cxpUsd(k.descuento) : ''}</div>
+                <div class="req-acciones" style="justify-content:flex-end"><button type="button" class="btn-ghost" onclick="almCerrar()">Cerrar</button><button type="button" class="btn-primary" onclick="cxpImprimirPago('${pid}')">${ico('imprimir')}Imprimir comprobante</button></div></div>`);
+        } catch (e) { err.textContent = e.code === 'permission-denied' ? 'Firebase no le da permiso para pagar (necesita Tesorería de Cuentas por pagar).' : e.message; btn.disabled = false; btn.textContent = 'Registrar pago'; }
+    }
+    async function cxpAnularPago(pid) {
+        const motivo = prompt('Motivo para anular este pago (la deuda vuelve a quedar pendiente):');
+        if (!motivo || !motivo.trim()) return;
+        try {
+            const { db, fs } = await cxpDb();
+            await fs.runTransaction(db, async tx => {
+                const pr = fs.doc(db, 'cxp_pagos', pid), ps = await tx.get(pr); if (!ps.exists() || ps.data().anulado) throw new Error('Ese pago ya está anulado.');
+                const p = ps.data(), ref = fs.doc(db, 'cxp_docs', p.docId), s = await tx.get(ref), d = s.data(), cambio = { pagado: Math.max(0, cxpR((d.pagado || 0) - p.aplicadoUsd)), descontado: Math.max(0, cxpR((d.descontado || 0) - (p.descuentoUsd || 0))), abierta: true, estado: 'aprobada' };
+                if (p.cuota && d.cuotas) { cambio.cuotas = d.cuotas.map(c => c.n === p.cuota ? Object.assign({}, c, { pagado: Math.max(0, cxpR((c.pagado || 0) - p.aplicadoUsd)), pagada: false }) : c); cambio.vence = cambio.cuotas.find(c => !c.pagada).vence; }
+                tx.update(ref, cambio);
+                tx.update(pr, { anulado: true, anuladoPor: nombreUsuario, anuladoEn: cxpHoy() + ' ' + new Date().toTimeString().slice(0, 5), motivo: motivo.trim().slice(0, 200) });
+            });
+            cxp.pagos = null; cxpPintar(); mostrarBanner('Pago anulado: la deuda volvió a quedar pendiente.', 'ok');
+        } catch (e) { mostrarBanner('No se pudo anular: ' + (e.code === 'permission-denied' ? 'sin permiso (solo Administración)' : e.message), 'error'); }
+    }
+
+    // ---------- Estado de cuenta de un proveedor (todo lo suyo, también lo pagado) ----------
+    async function cxpEstadoCuenta(prov) {
+        try {
+            const { db, fs } = await cxpDb();
+            const [ds, ps] = await Promise.all([fs.getDocs(fs.query(fs.collection(db, 'cxp_docs'), fs.where('proveedor', '==', prov))), fs.getDocs(fs.query(fs.collection(db, 'cxp_pagos'), fs.where('proveedor', '==', prov)))]);
+            const docs = ds.docs.map(x => Object.assign({ id: x.id }, x.data())).filter(d => d.estado !== 'anulada').sort((a, b) => String(a.fechaFactura).localeCompare(String(b.fechaFactura)));
+            const pagos = ps.docs.map(x => x.data()).filter(p => !p.anulado).sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)));
+            cxp._ec = { prov, docs, pagos };
+            const saldo = cxpR(docs.reduce((s, d) => s + cxpSaldo(d), 0));
+            almVentana(`<div class="req-dlg alm-dlg-ancho"><h3>Estado de cuenta · ${esc(prov)}</h3><div class="req-sub">${docs.length} documento(s) · ${pagos.length} pago(s) · saldo <b>${cxpUsd(saldo)}</b></div>
+                <div class="tabla-wrap" style="max-height:22rem;overflow:auto"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Fecha</th><th class="izq">Movimiento</th><th>Debe $</th><th>Pagó $</th></tr></thead><tbody>
+                ${[...docs.map(d => ({ f: d.fechaFactura, t: (d.tipo === 'prestamo' ? 'Préstamo ' : 'Factura ') + (d.documento || ''), debe: d.totalUsd || 0, haber: 0 })),
+                   ...pagos.map(p => ({ f: p.fecha, t: 'Pago ' + ((CXP_FORMAS.find(f => f[0] === p.forma) || [, p.forma])[1]) + (p.documento ? ' · ' + p.documento : '') + (p.referencia ? ' · ref. ' + p.referencia : '') + (p.descuentoUsd ? ' (desc. ' + cxpUsd(p.descuentoUsd) + ')' : ''), debe: 0, haber: p.aplicadoUsd || 0 }))]
+                  .sort((a, b) => String(a.f).localeCompare(String(b.f))).map(m => `<tr><td class="izq">${cxpF(m.f)}</td><td class="izq">${esc(m.t)}</td><td>${m.debe ? cxpUsd(m.debe) : ''}</td><td>${m.haber ? cxpUsd(m.haber) : ''}</td></tr>`).join('')}
+                <tr class="alm-fila-total"><td></td><td class="izq">Saldo</td><td colspan="2"><b>${cxpUsd(saldo)}</b></td></tr></tbody></table></div>
+                <div class="req-acciones" style="justify-content:flex-end"><button type="button" class="btn-ghost" onclick="cxpExcelEstado()">${ico('descargar')}Excel</button><button type="button" class="btn-ghost" onclick="cxpImprimirEstado()">${ico('imprimir')}Imprimir</button><button type="button" class="btn-primary" onclick="almCerrar()">Cerrar</button></div></div>`);
+        } catch (e) { mostrarBanner('No se pudo armar el estado de cuenta: ' + (e.code || e.message), 'error'); }
+    }
+
+    // ---------- Imprimir (media carta) ----------
+    function cxpDocHTML(titulo, cuerpo) {
+        const e = cxpEmpresa();
+        return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(titulo)}</title><style>@page{size:5.5in 8.5in;margin:8mm}body{font:10pt Arial,sans-serif;color:#111;margin:0}
+            h1{font-size:13pt;margin:0 0 2px}h2{font-size:11pt;margin:10px 0 4px}.emp{font-size:8.5pt;color:#333}.cab{display:flex;justify-content:space-between;gap:10px;border-bottom:1.5px solid #111;padding-bottom:6px;margin-bottom:8px}
+            table{width:100%;border-collapse:collapse;margin:4px 0}td,th{border:1px solid #999;padding:3px 5px;font-size:9pt;text-align:right}th{background:#eee}.i{text-align:left}.tot td{font-weight:bold;background:#f3f3f3}
+            .firmas{display:flex;justify-content:space-between;gap:20px;margin-top:38px}.firmas div{flex:1;border-top:1px solid #111;text-align:center;padding-top:3px;font-size:8.5pt}.nota{font-size:8pt;color:#444;margin-top:6px}</style></head>
+            <body><div class="cab"><div><h1>${esc(e.nombre)}</h1><div class="emp">RIF ${esc(e.rif)}<br>${esc(e.direccion || '')}${e.telefono ? '<br>Tel. ' + esc(e.telefono) : ''}</div></div><div style="text-align:right"><h1>${esc(titulo)}</h1></div></div>${cuerpo}</body></html>`;
+    }
+    function cxpImprimirHTML(html) {
+        let fr = document.getElementById('cxpImprimeMarco'); if (fr) fr.remove();
+        fr = document.createElement('iframe'); fr.id = 'cxpImprimeMarco'; fr.setAttribute('aria-hidden', 'true');
+        fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+        document.body.appendChild(fr);
+        const w = fr.contentWindow; w.document.open(); w.document.write(mediaCarta(html)); w.document.close();
+        setTimeout(() => { try { w.focus(); w.print(); } catch (e) { mostrarBanner('No se pudo abrir la impresión: ' + e.message, 'error'); } }, 200);
+    }
+    async function cxpImprimirPago(pid) {
+        try {
+            const { db, fs } = await cxpDb(), ps = await fs.getDoc(fs.doc(db, 'cxp_pagos', pid));
+            if (!ps.exists()) return mostrarBanner('No encontré ese pago.', 'error');
+            const p = ps.data(), ds = await fs.getDoc(fs.doc(db, 'cxp_docs', p.docId)), d = ds.exists() ? ds.data() : {};
+            const forma = (CXP_FORMAS.find(f => f[0] === p.forma) || [, p.forma])[1], mon = v => d.moneda === 'Bs' ? fmtBs(v) : cxpUsd(v);
+            const fiscal = d.fiscal && d.tipo !== 'prestamo' ? `<tr><td class="i">Base imponible</td><td>${mon(d.base || 0)}</td></tr><tr><td class="i">IVA 16 %</td><td>${mon(d.iva || 0)}</td></tr>
+                ${d.retIva ? `<tr><td class="i">Retención de IVA ${d.retPct} %${d.numRet ? ' (comprobante ' + esc(d.numRet) + ')' : ''}</td><td>− ${mon(d.retIva)}</td></tr>` : ''}` : '';
+            cxpImprimirHTML(cxpDocHTML('Comprobante de pago', `
+                <table><tbody><tr><td class="i">N°</td><td>${esc(pid.toUpperCase())}</td><td class="i">Fecha del pago</td><td>${fechaBonita(p.fecha)}</td></tr>
+                <tr><td class="i">Beneficiario</td><td colspan="3" class="i"><b>${esc(p.proveedor)}</b>${p.rif ? ' · RIF ' + esc(p.rif) : ''}</td></tr></tbody></table>
+                <h2>${d.tipo === 'prestamo' ? 'Préstamo' : 'Factura que se paga'}</h2>
+                <table><tbody><tr><td class="i">${d.tipo === 'prestamo' ? 'Préstamo N°' : 'Factura N°'}</td><td>${esc(p.documento || '—')}${p.cuota ? ' · cuota ' + p.cuota : ''}${d.control ? ' · control ' + esc(d.control) : ''}</td></tr>
+                ${d.tipo !== 'prestamo' ? `<tr><td class="i">Fecha de la factura</td><td>${fechaBonita(d.fechaFactura)}</td></tr><tr><td class="i">Total de la factura</td><td>${mon(d.montoBruto || 0)}</td></tr>${fiscal}` : ''}
+                <tr><td class="i">Deuda en $</td><td>${cxpUsd(d.totalUsd || 0)}</td></tr><tr><td class="i">Saldo antes de este pago</td><td>${cxpUsd(p.saldoAntes || 0)}</td></tr></tbody></table>
+                <h2>Pago</h2>
+                <table><tbody><tr><td class="i">Forma de pago</td><td>${esc(forma)}${p.banco ? ' · ' + esc(p.banco) : ''}${p.referencia ? ' · ref. ' + esc(p.referencia) : ''}</td></tr>
+                <tr><td class="i">Abonado a la deuda</td><td>${cxpUsd(p.aplicadoUsd)}</td></tr>
+                ${p.descuentoUsd ? `<tr><td class="i">Descuento por pronto pago</td><td>− ${cxpUsd(p.descuentoUsd)}</td></tr>` : ''}
+                <tr><td class="i">Pagado en $</td><td>${cxpUsd(p.pagadoUsd)}</td></tr>
+                ${p.moneda === 'Bs' ? `<tr><td class="i">Tasa BCV del ${fechaBonita(p.fecha)}</td><td>${fmt(p.tasa)}</td></tr>` : ''}
+                <tr class="tot"><td class="i">MONTO PAGADO</td><td>${p.moneda === 'Bs' ? fmtBs(p.montoMoneda) : cxpUsd(p.montoMoneda)}</td></tr>
+                <tr><td class="i">Saldo después del pago</td><td>${cxpUsd(Math.max(0, cxpR((p.saldoAntes || 0) - (p.aplicadoUsd || 0))))}</td></tr></tbody></table>
+                ${p.nota ? `<div class="nota">Nota: ${esc(p.nota)}</div>` : ''}${p.anulado ? `<h2 style="color:#b91c1c">PAGO ANULADO · ${esc(p.motivo || '')}</h2>` : ''}
+                <div class="nota">Registró: ${esc(p.quien || '')} · ${esc(p.registro || '')}</div>
+                <div class="firmas"><div>Entregado por</div><div>Recibido por (nombre, C.I. y firma)</div></div>`));
+        } catch (e) { mostrarBanner('No se pudo imprimir: ' + (e.code || e.message), 'error'); }
+    }
+    // Comprobante de retención de IVA (Providencia SNAT/2015/0049): montos en Bs (si la factura es en $, a la tasa BCV de su fecha)
+    function cxpImprimirRetencion() {
+        const d = cxp._ver; if (!d) return;
+        const e = cxpEmpresa(), k = d.moneda === 'Bs' ? 1 : (d.tasaFactura || cxpTasa(d.fechaFactura) || 0), bs = v => fmt(cxpR((v || 0) * k));
+        cxpImprimirHTML(cxpDocHTML('Comprobante de retención del IVA', `
+            <table><tbody><tr><td class="i">N° de comprobante</td><td><b>${esc(d.numRet)}</b></td><td class="i">Fecha de emisión</td><td>${fechaBonita(d.fechaRet || d.revisado || cxpHoy())}</td></tr>
+            <tr><td class="i">Período fiscal</td><td>Año ${esc(String(d.numRet).slice(0, 4))} · Mes ${esc(String(d.numRet).slice(4, 6))}</td><td class="i">Agente de retención</td><td>${esc(e.nombre)} · ${esc(e.rif)}</td></tr>
+            <tr><td class="i">Sujeto retenido</td><td colspan="3" class="i"><b>${esc(d.proveedor)}</b> · RIF ${esc(d.rif || '—')}</td></tr></tbody></table>
+            <table><thead><tr><th class="i">Fecha factura</th><th class="i">N° factura</th><th class="i">N° control</th><th>Total con IVA</th><th>Exento</th><th>Base imponible</th><th>%</th><th>IVA</th><th>IVA retenido</th></tr></thead>
+            <tbody><tr><td class="i">${cxpF(d.fechaFactura)}</td><td class="i">${esc(d.documento)}</td><td class="i">${esc(d.control || '')}</td><td>${bs(d.montoBruto)}</td><td>${bs(d.exento)}</td><td>${bs(d.base)}</td><td>16</td><td>${bs(d.iva)}</td><td><b>${bs(d.retIva)}</b></td></tr></tbody></table>
+            <div class="nota">Montos en bolívares${d.moneda !== 'Bs' ? ' (factura en $, a la tasa BCV ' + fmt(k) + ' de su fecha)' : ''}. Retención del ${d.retPct} % del impuesto.</div>
+            <div class="firmas"><div>Agente de retención (firma y sello)</div><div>Sujeto retenido (fecha de entrega)</div></div>`));
+    }
+    function cxpImprimirEstado() {
+        const ec = cxp._ec; if (!ec) return;
+        const filas = [...ec.docs.map(d => ({ f: d.fechaFactura, t: (d.tipo === 'prestamo' ? 'Préstamo ' : 'Factura ') + (d.documento || ''), debe: d.totalUsd || 0, haber: 0 })),
+                       ...ec.pagos.map(p => ({ f: p.fecha, t: 'Pago ' + (p.documento ? p.documento : '') + (p.referencia ? ' · ref. ' + p.referencia : ''), debe: 0, haber: p.aplicadoUsd || 0 }))].sort((a, b) => String(a.f).localeCompare(String(b.f)));
+        let s = 0;
+        cxpImprimirHTML(cxpDocHTML('Estado de cuenta', `<table><tbody><tr><td class="i">Proveedor</td><td class="i"><b>${esc(ec.prov)}</b></td><td class="i">Fecha</td><td>${fechaBonita(cxpHoy())}</td></tr></tbody></table>
+            <table><thead><tr><th class="i">Fecha</th><th class="i">Movimiento</th><th>Debe $</th><th>Pagó $</th><th>Saldo $</th></tr></thead><tbody>${filas.map(m => { s = cxpR(s + m.debe - m.haber); return `<tr><td class="i">${cxpF(m.f)}</td><td class="i">${esc(m.t)}</td><td>${m.debe ? fmt(m.debe) : ''}</td><td>${m.haber ? fmt(m.haber) : ''}</td><td>${fmt(s)}</td></tr>`; }).join('')}
+            <tr class="tot"><td></td><td class="i">SALDO</td><td colspan="3">${cxpUsd(s)}</td></tr></tbody></table>`));
+    }
+
+    // ---------- Excel ----------
+    async function cxpLibro(nombre, hojas) {   // hojas: [[nombre, títulos, filas, columnasDeTexto]]
+        const X = await libXLSX(), wb = X.utils.book_new();
+        hojas.forEach(([n, tit, filas]) => {
+            const ws = X.utils.aoa_to_sheet([tit.map(t => t.toUpperCase())].concat(filas), { cellDates: true });
+            ws['!autofilter'] = { ref: X.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: filas.length, c: tit.length - 1 } }) };
+            ws['!cols'] = tit.map(t => ({ wch: Math.max(10, t.length + 2) }));
+            X.utils.book_append_sheet(wb, ws, n.slice(0, 31));
+        });
+        X.writeFile(wb, nombre);
+    }
+    const cxpFechaX = iso => iso ? new Date(iso + 'T12:00:00') : '';
+    async function cxpExcel(btn) {
+        btnCargando(btn, 'Preparando...');
+        try {
+            const ren = cxpRenglones(), hoy = cxpHoy();
+            const filas = ren.map(x => [String(x.quien), String(x.doc || ''), cxpFechaX(x.desde), cxpFechaX(x.vence), x.dias, x.saldo, x.desc ? x.desc.usd : 0, x.dias < 0 ? 'Vencida' : x.dias === 0 ? 'Hoy' : 'Por vencer']);
+            filas.push(['TOTAL', '', '', '', '', cxpR(ren.reduce((s, x) => s + x.saldo, 0)), cxpR(ren.reduce((s, x) => s + (x.desc ? x.desc.usd : 0), 0)), '']);
+            const hojas = [['Por pagar', ['Proveedor', 'Documento', 'Fecha factura', 'Vence', 'Días', 'Saldo $', 'Ahorro pronto pago $', 'Estado'], filas]];
+            const facturas = cxp.docs.filter(d => d.tipo !== 'prestamo').map(d => [String(d.proveedor), String(d.rif || ''), String(d.documento), String(d.control || ''), cxpFechaX(d.fechaFactura), d.moneda, d.montoBruto || 0,
+                d.fiscal ? d.base || 0 : 0, d.fiscal ? d.iva || 0 : 0, d.retPct || 0, d.retIva || 0, String(d.numRet || ''), d.totalUsd || 0, d.pagado || 0, cxpSaldo(d), cxpFechaX(d.vence), d.estado === 'por_revisar' ? 'Por revisar' : 'Por pagar']);
+            facturas.push(['TOTAL', '', '', '', '', '', '', '', '', '', '', '', cxpR(cxp.docs.filter(d => d.tipo !== 'prestamo').reduce((s, d) => s + (d.totalUsd || 0), 0)), '', cxpR(cxp.docs.filter(d => d.tipo !== 'prestamo').reduce((s, d) => s + cxpSaldo(d), 0)), '', '']);
+            hojas.push(['Facturas abiertas', ['Proveedor', 'RIF', 'Factura', 'Control', 'Fecha', 'Moneda', 'Total factura', 'Base imponible', 'IVA', 'Retención %', 'IVA retenido', 'Comprobante retención', 'Deuda $', 'Pagado $', 'Saldo $', 'Vence', 'Estado'], facturas]);
+            if (cxp.pagos && cxp.pagos.length) {
+                const pg = cxp.pagos.map(p => [cxpFechaX(p.fecha), String(p.proveedor), String(p.documento || ''), (CXP_FORMAS.find(f => f[0] === p.forma) || [, p.forma])[1], p.moneda, p.montoMoneda, p.tasa || '', p.aplicadoUsd, p.descuentoUsd || 0, String(p.referencia || ''), String(p.quien || ''), p.anulado ? 'Anulado' : '']);
+                pg.push(['TOTAL', '', '', '', '', '', '', cxpR(cxp.pagos.filter(p => !p.anulado).reduce((s, p) => s + p.aplicadoUsd, 0)), cxpR(cxp.pagos.filter(p => !p.anulado).reduce((s, p) => s + (p.descuentoUsd || 0), 0)), '', '', '']);
+                hojas.push(['Pagos ' + cxp.pDesde + ' a ' + cxp.pHasta, ['Fecha', 'Proveedor', 'Documento', 'Forma', 'Moneda', 'Monto', 'Tasa', 'Abonado $', 'Descuento $', 'Referencia', 'Registró', 'Anulado'], pg]);
+            }
+            await cxpLibro('Cuentas por pagar ' + hoy + '.xlsx', hojas);
+        } catch (e) { mostrarBanner('No se pudo armar el Excel: ' + e.message, 'error'); }
+        btn.disabled = false; btn.innerHTML = ico('descargar') + 'Excel';
+    }
+    async function cxpExcelEstado() {
+        const ec = cxp._ec; if (!ec) return;
+        const filas = [...ec.docs.map(d => [cxpFechaX(d.fechaFactura), (d.tipo === 'prestamo' ? 'Préstamo ' : 'Factura ') + (d.documento || ''), d.totalUsd || 0, 0]),
+                       ...ec.pagos.map(p => [cxpFechaX(p.fecha), 'Pago ' + (p.documento || '') + (p.referencia ? ' ref. ' + p.referencia : ''), 0, p.aplicadoUsd || 0])].sort((a, b) => a[0] - b[0]);
+        filas.push(['TOTAL', '', cxpR(filas.reduce((s, f) => s + f[2], 0)), cxpR(filas.reduce((s, f) => s + f[3], 0))]);
+        await cxpLibro('Estado de cuenta ' + ec.prov + '.xlsx', [['Estado de cuenta', ['Fecha', 'Movimiento', 'Debe $', 'Pagó $'], filas]]);
+    }
+
+    // ---------- Avisos a mano y datos de la empresa ----------
+    async function cxpAvisar(btn, tipo) {
+        const txt = btn.innerHTML; btnCargando(btn, 'Enviando...');
+        try { const r = await llamarApi({ action: 'cxp_avisar', tipo }); mostrarBanner(r.enviado && r.enviado.length ? 'Enviado al grupo "Administración Plaza Valencia": ' + r.enviado.join(', ') + '.' : 'No había nada que avisar.', 'ok'); }
+        catch (e) { mostrarBanner('No se pudo enviar: ' + e.message, 'error'); }
+        btn.disabled = false; btn.innerHTML = txt;
+    }
+    function cxpEmpresaEditar() {
+        const e = cxpEmpresa();
+        almVentana(`<div class="req-dlg"><h3>Datos de la empresa</h3><div class="req-sub">Salen en los comprobantes de pago y de retención de IVA.</div>
+            <div class="filters"><div style="grid-column:1/-1"><label for="ceNom">Razón social</label><input id="ceNom" value="${esc(e.nombre)}"></div><div><label for="ceRif">RIF</label><input id="ceRif" value="${esc(e.rif)}"></div>
+            <div><label for="ceTel">Teléfono</label><input id="ceTel" value="${esc(e.telefono || '')}"></div><div style="grid-column:1/-1"><label for="ceDir">Dirección fiscal</label><input id="ceDir" value="${esc(e.direccion || '')}"></div></div>
+            <div class="req-acciones" style="justify-content:flex-end"><button type="button" class="btn-ghost" onclick="almCerrar()">Cancelar</button><button type="button" class="btn-primary" onclick="cxpEmpresaGuardar(this)">Guardar</button></div></div>`);
+    }
+    async function cxpEmpresaGuardar(btn) {
+        btnCargando(btn, 'Guardando...');
+        try { const { db, fs } = await cxpDb(); await fs.setDoc(fs.doc(db, 'cxp_config', 'empresa'), { nombre: document.getElementById('ceNom').value.trim(), rif: document.getElementById('ceRif').value.trim(), telefono: document.getElementById('ceTel').value.trim(), direccion: document.getElementById('ceDir').value.trim() });
+              almCerrar(); mostrarBanner('Datos de la empresa guardados.', 'ok'); }
+        catch (e) { mostrarBanner('No se pudo guardar: ' + (e.code || e.message), 'error'); btn.disabled = false; btn.textContent = 'Guardar'; }
+    }
+
+    // ---------- ALMACÉN: registrar la factura recibida (solo inserta; no ve deudas) ----------
+    let cxpReg = { proveedorId: '', documento: '', fechaFactura: '', moneda: 'Bs', monto: '', fiscal: true, foto: '', nota: '', hechas: [] };
+    function cxpRegVista() {
+        const r = cxpReg, provs = (almDatos && almDatos.proveedores || []).slice().sort((a, b) => a.nombre.localeCompare(b.nombre));
+        return `<div class="grafico-card" style="max-width:640px"><h3 style="margin-top:0">Registrar factura recibida</h3>
+            <div class="nota">Al recibir la mercancía: foto de la factura física, proveedor, número y monto. Pasa a Cuentas por pagar y Administración completa lo demás. (La compra con foto ya lo hace sola.)</div>
+            <div class="filters">
+                <div style="grid-column:1/-1"><label for="rgProv">Proveedor</label><select id="rgProv" onchange="cxpReg.proveedorId=this.value"><option value="">Elija el proveedor</option>${provs.map(p => `<option value="${esc(p.id)}" ${r.proveedorId === p.id ? 'selected' : ''}>${esc(p.nombre)}${p.rif ? ' · ' + esc(p.rif) : ''}</option>`).join('')}</select></div>
+                <div><label for="rgDoc">N° de factura o documento</label><input id="rgDoc" value="${esc(r.documento)}" oninput="cxpReg.documento=this.value" maxlength="40"></div>
+                <div><label for="rgFecha">Fecha de la factura</label><input id="rgFecha" type="date" value="${esc(r.fechaFactura || cxpHoy())}" max="${cxpHoy()}" onchange="cxpReg.fechaFactura=this.value"></div>
+                <div><label for="rgMon">Moneda</label><select id="rgMon" onchange="cxpReg.moneda=this.value"><option value="Bs" ${r.moneda === 'Bs' ? 'selected' : ''}>Bolívares</option><option value="$" ${r.moneda === '$' ? 'selected' : ''}>Dólares</option></select></div>
+                <div><label for="rgMonto">Monto bruto (total de la factura)</label><input id="rgMonto" type="number" step="0.01" min="0" value="${esc(r.monto)}" onchange="cxpReg.monto=this.value"></div>
+            </div>
+            <label class="interruptor" style="margin:.4rem 0"><input type="checkbox" ${r.fiscal ? 'checked' : ''} onchange="cxpReg.fiscal=this.checked"><span class="sw-pista"></span> Es factura fiscal (con IVA)</label>
+            <div style="display:flex;gap:.8rem;align-items:center;flex-wrap:wrap;margin:.6rem 0">
+                <label class="btn-ghost" style="cursor:pointer">${ico('camara')}${r.foto ? 'Cambiar foto' : 'Tomar foto de la factura'}<input type="file" accept="image/*" capture="environment" style="display:none" onchange="cxpRegFoto(this.files[0])"></label>
+                ${r.foto ? `<img src="${r.foto}" alt="Foto de la factura" style="max-height:90px;border-radius:6px;border:1px solid var(--border)">` : '<span class="nota">La foto es obligatoria.</span>'}</div>
+            <div class="filters"><div style="grid-column:1/-1"><label for="rgNota">Nota (opcional)</label><input id="rgNota" value="${esc(r.nota)}" oninput="cxpReg.nota=this.value" maxlength="200"></div></div>
+            <div class="login-error" id="rgErr"></div>
+            <div class="req-acciones" style="justify-content:flex-end"><button type="button" class="btn-primary" onclick="cxpRegGuardar(this)">Registrar factura</button></div>
+            ${r.hechas.length ? `<h4 class="per-sub">Registradas en este equipo hoy</h4><ul style="margin:.2rem 0 0 1rem">${r.hechas.map(h => `<li>${esc(h)}</li>`).join('')}</ul>` : ''}</div>`;
+    }
+    async function cxpRegFoto(f) {
+        if (!f) return;
+        try { cxpReg.foto = await cmpComprimir(f); } catch (e) { mostrarBanner(e.message, 'error'); }
+        almPintar();
+    }
+    async function cxpRegGuardar(btn) {
+        const r = cxpReg, err = document.getElementById('rgErr'), prov = (almDatos && almDatos.proveedores || []).find(p => p.id === r.proveedorId);
+        const monto = Number(r.monto) || 0;
+        err.textContent = !prov ? 'Elija el proveedor.' : !String(r.documento).trim() ? 'Escriba el N° de la factura.' : !(monto > 0) ? 'Escriba el monto de la factura.' : !r.foto ? 'Tome la foto de la factura.' : '';
+        if (err.textContent) return;
+        btnCargando(btn, 'Registrando...');
+        try {
+            const id = cxpIdFactura(prov.id, prov.nombre, r.documento);
+            const up = await llamarApi({ action: 'cxp_foto', proveedor: prov.nombre, documento: r.documento, foto: { nombre: 'factura.jpg', tipo: 'image/jpeg', base64: r.foto.split(',')[1] } });
+            const { db, fs } = await cxpDb(), ahora = cxpHoy() + ' ' + new Date().toTimeString().slice(0, 5);
+            const datos = { tipo: 'factura', estado: 'por_revisar', abierta: true, proveedorId: prov.id, proveedor: prov.nombre, rif: prov.rif || '', documento: String(r.documento).trim(),
+                fechaFactura: r.fechaFactura || cxpHoy(), fechaRecibida: cxpHoy(), moneda: r.moneda, montoBruto: cxpR(monto), fiscal: !!r.fiscal, fotos: [up.url], origen: 'almacen', ref: '',
+                nota: String(r.nota || '').trim().slice(0, 200), creadoPor: nombreUsuario, creado: fs.serverTimestamp(), registro: ahora, pagado: 0 };
+            if (cxpAdmin()) await fs.runTransaction(db, async tx => { const ref = fs.doc(db, 'cxp_docs', id); if ((await tx.get(ref)).exists()) throw new Error('YA'); tx.set(ref, datos); });
+            else await fs.setDoc(fs.doc(db, 'cxp_docs', id), datos);   // el almacén no puede leer: si ya existía, Firebase no deja (no la pisa)
+            r.hechas.unshift(prov.nombre + ' · ' + datos.documento + ' · ' + (r.moneda === 'Bs' ? fmtBs(monto) : cxpUsd(monto)));
+            Object.assign(r, { documento: '', monto: '', foto: '', nota: '', fechaFactura: '' });
+            mostrarBanner('Factura registrada: pasa a Cuentas por pagar.', 'ok');
+            almPintar();
+        } catch (e) {
+            err.textContent = e.message === 'YA' || e.code === 'permission-denied' ? 'Esa factura de ese proveedor ya estaba registrada (o su clave no tiene permiso para registrar facturas).' : e.message;
+            btn.disabled = false; btn.textContent = 'Registrar factura';
+        }
+    }
+
+    // ==========================================
     // ALMACÉN (Almacen.gs): Productos e inventario · Entradas y salidas (facturar, ingresar mercancía, notas emitidas, ingresos).
     // Todo con el teclado: código + Enter (pesado: pide el peso; por unidad: 1, o 3*CÓDIGO), Espacio totaliza, F2 busca,
     // F3 descuento, F6 guarda la venta en espera, F7 la trae, Supr quita el renglón marcado, Esc limpia el código.
@@ -14693,11 +15814,12 @@
     let almDatos = null, almVista = '', almTab = '', almNotas = null, almIngresos = null;
     let almVenta = { items: [], sel: -1, descuento: 0, claveDesc: '', claveStock: '', ultimo: '' };
     let almIng = { operacion: '', proveedorId: '', documento: '', clienteId: '', nota: '', items: [], sel: -1, listo: false, ultimo: '' };
-    const ALM_TABS = { precios: [['ordenes', 'Por actualizar'], ['completas', 'Historial'], ['remoto', 'Cargar en tiendas']], inventario: [['productos', 'Productos'], ['seguimiento', 'Seguimiento de producto']], facturar: [['facturar', 'Facturar'], ['notas', 'Notas emitidas']], movalmacen: [['compra', 'Compra con foto'], ['ingresar', 'Operaciones de inventario'], ['notas', 'Notas emitidas'], ['ingresos', 'Historial de operaciones'], ['tiendas', 'Inversión por tienda']], reportes: [['reportes', 'Reportes de tiendas']] };
+    const ALM_TABS = { precios: [['ordenes', 'Por actualizar'], ['completas', 'Historial'], ['remoto', 'Cargar en tiendas']], inventario: [['productos', 'Productos'], ['seguimiento', 'Seguimiento de producto']], facturar: [['facturar', 'Facturar'], ['notas', 'Notas emitidas']], movalmacen: [['compra', 'Compra con foto'], ['ingresar', 'Operaciones de inventario'], ['cxpfactura', 'Registrar factura recibida'], ['notas', 'Notas emitidas'], ['ingresos', 'Historial de operaciones'], ['tiendas', 'Inversión por tienda']], reportes: [['reportes', 'Reportes de tiendas']] };
     // Entradas y salidas: al entrar se elige la operación en cuadros (como los módulos); dentro, "‹ Entradas y salidas" vuelve a los cuadros
     const ALM_OPERACIONES = {
         compra: ['Foto de la factura del proveedor: se lee sola, se calcula el precio y se reparte a las tiendas.', '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>'],
         ingresar: ['Compra, ingreso sin factura, devolución, ajuste o descuento de inventario.', '<path d="M4 8h13l-3-3M20 16H7l3 3"/>'],
+        cxpfactura: ['Foto de la factura física, proveedor, N° y monto: pasa a Cuentas por pagar para que Administración la revise.', '<path d="M6 3h9l3 3v15H6z"/><path d="M15 3v3h3M9 11h6M9 15h4"/>'],
         notas: ['Notas de entrega emitidas: ver, imprimir, verificar e ingresar en BigSoft.', '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/>'],
         ingresos: ['Todas las operaciones de inventario hechas, con su detalle.', '<circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2"/>'],
         tiendas: ['Gastos de cada tienda más la mercancía que recibió del almacén, por semana.', '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>']
@@ -14781,6 +15903,7 @@
         if (almTab === 'compra') { cmpPintarCompra(out); return; }   // la compra se dibuja aparte: sus campos se actualizan uno a uno
         if (almTab === 'ordenes' || almTab === 'completas') { pintarConservando(out, cmpOrdenesVista()); if (!cmpOrd || (cmpOrd.ver !== (almTab === 'completas' ? 'historial' : 'pendientes') && !cmpOrd.cargando)) cmpCargarOrdenes(); return; }
         if (almTab === 'remoto') { pintarConservando(out, bspVista()); return; }   // cargar los precios en el BigSoft de una tienda desde aquí
+        if (almTab === 'cxpfactura') { pintarConservando(out, cxpRegVista()); return; }   // (13/11) factura recibida -> Cuentas por pagar
         pintarConservando(out, (almVista === 'movalmacen' ? almPendientesHTML() : '') + (almTab === 'productos' ? almProductosVista() : almTab === 'facturar' ? almFacturarVista() : almTab === 'ingresar' ? almIngresarVista()
                               : almTab === 'seguimiento' ? almSeguimientoVista() : almTab === 'notas' ? almNotasVista() : almTab === 'tiendas' ? almTiendasVista() : almIngresosVista()));
         if (almTab === 'notas' && !almNotas) almCargarNotas();
@@ -16984,9 +18107,9 @@ Reglas:
             </div>
             ${completas ? '' : `<div class="cmp-resumen"><span>Por definir precio: <b style="color:var(--amar-txt)">${cmpOrd.porDefinir || 0}</b></span><span>Por actualizar: <b>${cmpOrd.porActualizar || 0}</b></span>${f.tienda ? `<span>Pendientes en ${esc(f.tienda)}: <b>${l.length}</b></span>` : ''}
                 ${permisos.some(x => x === 'precios' || x === 'inventario') ? `<button type="button" class="btn-primary btn-mini cmp-imp" onclick="cmpNuevaOrdenDlg()" title="Cargar un precio nuevo aunque no haya llegado mercancía">＋ Cambio de precio sin compra</button>` : ''}
-                ${tg && conPrecio.length ? `<button type="button" class="btn-ghost btn-mini cmp-imp" onclick="cmpEnviarTelegram(this)" title="Detal, mayor y gran mayor al grupo de Telegram &quot;Control de depósito&quot;, en la moneda elegida arriba">${ico('avisar')}Enviar a Telegram ${selV.length ? '(' + selV.length + ' elegido' + (selV.length === 1 ? '' : 's') + ')' : '(todos)'}</button>` : ''}
+                ${tg && conPrecio.length ? `<button type="button" class="btn-ghost btn-mini cmp-imp" onclick="cmpEnviarTelegram(this)" title="Detal, mayor y gran mayor al grupo de Telegram &quot;Equipo de información&quot; (verifican los precios en la caja de cada tienda), en la moneda elegida arriba">${ico('avisar')}Enviar a Telegram ${selV.length ? '(' + selV.length + ' elegido' + (selV.length === 1 ? '' : 's') + ')' : '(todos)'}</button>` : ''}
                 ${l.length ? `<button type="button" class="btn-ghost btn-mini cmp-imp" onclick="cmpImprimirPendientes()">${ico('imprimir')}Imprimir ${f.tienda ? 'lo de ' + esc(f.tienda) : 'la lista'}</button>` : ''}</div>`}
-            ${completas && tg && conPrecio.length ? `<div class="cmp-resumen"><span>Para reenviar precios de estas fechas: elija con la casilla (o ninguno = todos los vigentes de la lista).</span><button type="button" class="btn-ghost btn-mini cmp-imp" onclick="cmpEnviarTelegram(this)" title="Detal, mayor y gran mayor al grupo de Telegram &quot;Control de depósito&quot;, en la moneda elegida arriba">${ico('avisar')}Enviar a Telegram ${selV.length ? '(' + selV.length + ' elegido' + (selV.length === 1 ? '' : 's') + ')' : '(' + conPrecio.length + ')'}</button></div>` : ''}
+            ${completas && tg && conPrecio.length ? `<div class="cmp-resumen"><span>Para reenviar precios de estas fechas: elija con la casilla (o ninguno = todos los vigentes de la lista).</span><button type="button" class="btn-ghost btn-mini cmp-imp" onclick="cmpEnviarTelegram(this)" title="Detal, mayor y gran mayor al grupo de Telegram &quot;Equipo de información&quot; (verifican los precios en la caja de cada tienda), en la moneda elegida arriba">${ico('avisar')}Enviar a Telegram ${selV.length ? '(' + selV.length + ' elegido' + (selV.length === 1 ? '' : 's') + ')' : '(' + conPrecio.length + ')'}</button></div>` : ''}
             ${completas ? `<div class="nota" style="margin-top:0">${l.length} cambio(s) de precio${cmpOrdF.bus ? ' de "' + esc(cmpOrdF.bus) + '"' : ''} entre el ${fechaBonita(cmpHistF.desde)} y el ${fechaBonita(cmpHistF.hasta)}, del más nuevo al más viejo (también los que después se reemplazaron por otro precio).</div>` : ''}
             ${!l.length ? `<div class="empty">${completas ? 'No hubo cambios de precio con esos filtros.' : 'No hay nada pendiente con estos filtros.'}</div>` : `<div class="tabla-wrap"><table class="req-tabla cmp-otabla" data-sin-paginar><thead><tr>
                 ${tg ? `<th class="cmp-sel"><input type="checkbox" title="Elegir todos para enviar a Telegram" aria-label="Elegir todos" ${conPrecio.length && selV.length === conPrecio.length ? 'checked' : ''} onchange="cmpTgTodos(this.checked)"></th>` : ''}<th class="izq">Producto</th><th>Costo ${etiqueta}</th><th>Detal ${etiqueta}</th>${conMayor ? `<th>Mayor ${etiqueta}</th>` : ''}
@@ -16997,7 +18120,7 @@ Reglas:
     // "Wander Daniel Paredes" -> "Wander D."; "2026-10-26 14:32" -> "26/10 · 2:32 p. m."
     const cmpNombreCorto = n => { const p = String(n || '').replace(/\s*\(.*\)\s*$/, '').trim().split(/\s+/); return p.length > 1 ? p[0] + ' ' + p[1].charAt(0) + '.' : p[0] || ''; };
     const cmpCuandoCorto = en => { const m = /^(\d{4})-(\d{2})-(\d{2})(?:\s+(\d{2}:\d{2}))?/.exec(String(en || '')); return m ? `${m[3]}/${m[2]}${m[4] ? ' · ' + horaAmPm(m[4]) : ''}` : String(en || ''); };
-    // (11/11) Enviar precios por Telegram al grupo "Control de depósito": los elegidos con la casilla, o todos los de la lista con precio
+    // (11/11) Enviar precios por Telegram (desde el 13/11 al grupo "Equipo de información"): los elegidos con la casilla, o todos los de la lista con precio
     const cmpSelTg = new Set();
     const cmpTgPuede = () => permisos.some(x => x === 'precios' || x === 'inventario');   // también en Historial (reenviar precios de una fecha)
     const cmpTgSirve = o => (o.detal > 0 || o.mayor > 0 || o.gran > 0) && !/^Reemplazada/.test(o.estado);   // los reemplazados ya no valen
@@ -17010,11 +18133,11 @@ Reglas:
         const moneda = cmpPV.modo === 'bs' ? 'bs' : cmpPV.modo === 'desc' ? 'div' : 'usd', tasa = cmpTasa();
         if (moneda === 'bs' && !(tasa > 0)) { mostrarBanner('Escriba la tasa para enviar los precios en Bs.', 'warn'); return; }
         const en = moneda === 'bs' ? 'en Bs (tasa ' + fmt(tasa) + ')' : moneda === 'div' ? 'en $ con ' + String(cmpDesc()).replace('.', ',') + ' % de descuento' : 'en $ BCV';
-        if (!confirm('Se enviarán ' + lista.length + ' precio' + (lista.length === 1 ? '' : 's') + ' (detal, mayor y gran mayor) ' + en + ' al grupo de Telegram "Control de depósito".\n\n¿Enviar?')) return;
+        if (!confirm('Se enviarán ' + lista.length + ' precio' + (lista.length === 1 ? '' : 's') + ' (detal, mayor y gran mayor) ' + en + ' al grupo de Telegram "Equipo de información".\n\n¿Enviar?')) return;
         btnCargando(btn, 'Enviando...');
         try {
             const r = await llamarApi({ action: 'cmp_avisar_lista', ids: lista.map(o => o.id), moneda, tasa });
-            mostrarBanner('Enviado al grupo "Control de depósito": ' + r.enviados + ' producto' + (r.enviados === 1 ? '' : 's') + (r.mensajes > 1 ? ' en ' + r.mensajes + ' mensajes' : '') + '.', 'ok');
+            mostrarBanner('Enviado al grupo "Equipo de información": ' + r.enviados + ' producto' + (r.enviados === 1 ? '' : 's') + (r.mensajes > 1 ? ' en ' + r.mensajes + ' mensajes' : '') + '.', 'ok');
             cmpSelTg.clear();
         } catch (e) { mostrarBanner('No se envió: ' + e.message, 'error'); }
         almPintar();
@@ -17404,14 +18527,14 @@ Reglas:
             </div>
             <div class="nota">Precio = costo ÷ (1 − margen), redondeado al centavo (o terminado en 7 / ,99 con la terminación psicológica). Al mayor (solo charcutería) sobre el costo de la factura, sin merma. Si cambia el precio y alguna tienda ya lo había actualizado, se le quita la marca para que lo cambie de nuevo. Si corrige el costo, cambia también en el almacén (queda registrado quién y el de antes).</div>
             <div class="login-error" id="cmpKError"></div>
-            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0">${o.detal > 0 || o.mayor > 0 ? `<button type="button" class="btn-ghost" style="margin-right:auto" onclick="cmpAvisarOrden('${esc(o.id)}', this)" title="Envía el precio de esta orden al grupo de Telegram &quot;Control de depósito&quot;">${ico('avisar')}Avisar por Telegram</button>` : ''}<button type="button" class="btn-ghost" onclick="almCerrar()">Cancelar</button><button type="submit" class="btn-primary" id="cmpBtnK">Guardar precio</button></div></form>`);
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0">${o.detal > 0 || o.mayor > 0 ? `<button type="button" class="btn-ghost" style="margin-right:auto" onclick="cmpAvisarOrden('${esc(o.id)}', this)" title="Envía el precio de esta orden al grupo de Telegram &quot;Equipo de información&quot;">${ico('avisar')}Avisar por Telegram</button>` : ''}<button type="button" class="btn-ghost" onclick="almCerrar()">Cancelar</button><button type="submit" class="btn-primary" id="cmpBtnK">Guardar precio</button></div></form>`);
     }
     async function cmpAvisarOrden(id, btn) {
-        if (!confirm('¿Enviar el precio de esta orden al grupo "Control de depósito"?')) return;
+        if (!confirm('¿Enviar el precio de esta orden al grupo "Equipo de información"?')) return;
         btnCargando(btn, 'Enviando...');
         try {
             const r = await llamarApi({ action: 'cmp_orden_avisar', id });
-            if (r.telegram && r.telegram.ok) mostrarBanner('Aviso enviado al grupo "Control de depósito".', 'ok');
+            if (r.telegram && r.telegram.ok) mostrarBanner('Aviso enviado al grupo "Equipo de información".', 'ok');
             else mostrarBanner('Telegram no aceptó el aviso: ' + ((r.telegram || {}).error || 'sin respuesta'), 'error');
         } catch (e) { mostrarBanner(e.message, 'error'); }
         btn.disabled = false; btn.innerHTML = ico('avisar') + 'Avisar por Telegram';
@@ -17427,7 +18550,7 @@ Reglas:
                 <datalist id="cmpNProdL">${ps.map(p => `<option value="${esc(p.codigo + ' · ' + p.descripcion)}">`).join('')}</datalist></div>
             <div id="cmpNCalc"></div>
             <div><label for="cmpNMotivo">Motivo (opcional)</label><input id="cmpNMotivo" maxlength="150" placeholder="Ej.: subió el proveedor, oferta..."></div>
-            <label class="interruptor" style="margin:.6rem 0"><input type="checkbox" id="cmpNAvisar" checked><span class="sw-pista"></span> Enviar aviso al grupo de Telegram "Control de depósito"</label>
+            <label class="interruptor" style="margin:.6rem 0"><input type="checkbox" id="cmpNAvisar" checked><span class="sw-pista"></span> Enviar aviso al grupo de Telegram "Equipo de información"</label>
             <div class="login-error" id="cmpKError"></div>
             <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-ghost" onclick="almCerrar()">Cancelar</button><button type="submit" class="btn-primary" id="cmpBtnK" disabled>Guardar precio</button></div></form>`);
     }
@@ -17467,7 +18590,7 @@ Reglas:
                 const r = await llamarApi({ action: 'cmp_orden_nueva', codigo: k.codigo, costo: k.costo, merma: k.merma, detal: k.detal, mayor: k.mayor, gran: k.gran || 0, motivo, avisar, ver: cmpOrd.ver });
                 cmpUsarOrdenes(r);
                 if (avisar && r.telegram && !r.telegram.ok) mostrarBanner(`Precio de ${nombre} guardado (${r.orden}), pero Telegram no aceptó el aviso: ${r.telegram.error}. Puede reenviarlo desde la orden.`, 'warn');
-                else mostrarBanner(`Precio de ${nombre} guardado (${r.orden})${avisar ? ' y avisado al grupo "Control de depósito"' : ''}. Queda por actualizar en las tiendas.`, 'ok');
+                else mostrarBanner(`Precio de ${nombre} guardado (${r.orden})${avisar ? ' y avisado al grupo "Equipo de información"' : ''}. Queda por actualizar en las tiendas.`, 'ok');
                 almCargar();   // los márgenes nuevos quedan para la próxima sugerencia
             } catch (e) {
                 mostrarBanner(`El precio de ${nombre} NO se guardó: ${e.message}. Vuelva a cargarlo (detal $ ${fmt(k.detal)}${k.mayor > 0 ? ', mayor $ ' + fmt(k.mayor) : ''}).`, 'error');
@@ -20164,7 +21287,15 @@ Reglas:
     // ==========================================
     // Disponible = ingresos recibidos (F / H tildadas) + egresos (siempre, son negativos)
     // Por llegar = ingresos sin tildar
-    let efeDatos = { filas: [], cajaChica: [] };
+    let efeDatos = { filas: [], cajaChica: [], eliminados: [] };
+    // (13/11) Lo eliminado del flujo general se queda guardado (eliminado = { cuando, quien, motivo }): sale de todos los cálculos
+    // (efeDatos.filas) y solo se muestra en el historial, tachado (efeDatos.eliminados)
+    function efeSeparar(filas, eliminadosAparte) {
+        const vivos = [], elim = (eliminadosAparte || []).slice();
+        (filas || []).forEach(f => (f && f.eliminado ? elim : vivos).push(f));
+        const vistos = new Set(); return { vivos, elim: elim.filter(f => !vistos.has(f.id) && vistos.add(f.id)) };
+    }
+    const efeChipElim = f => { const e = f.eliminado || {}; return `<span class="chip st-falta efe-atraso" title="Eliminado el ${esc(e.cuando || '')} por ${esc(e.quien || '')}${e.motivo ? ' · Motivo: ' + esc(e.motivo) : ''}. No cuenta en nada; queda como constancia.">Eliminado</span>`; };
     let efeModoActual = 'resumen';
     let efeCajaTipoActual = 'GASTO';
     const fmtBs = v => 'Bs ' + fmt(v), fmtUsd = v => '$ ' + fmt(v);
@@ -20297,7 +21428,9 @@ Reglas:
                             bs: moneda === 'Bs' ? -(d.monto || 0) : 0, bsOk: false, usd: moneda === '$' ? -(d.monto || 0) : 0, usdOk: false, tipo: 'TRASPASO' }));
             }
         });
-        efeDatos = { filas: b.filas || efeDatos.filas ? filas : efeDatos.filas, cajaChica: caja, responsablesCaja: efeDatos.responsablesCaja || [] };
+        const sep = efeSeparar(b.filas || efeDatos.filas ? filas : efeDatos.filas, b.filas ? [] : efeDatos.eliminados);
+        const sepC = efeSeparar(caja, b.caja ? [] : efeDatos.cajaEliminados);
+        efeDatos = { filas: sep.vivos, eliminados: sep.elim, cajaChica: sepC.vivos, cajaEliminados: sepC.elim, responsablesCaja: efeDatos.responsablesCaja || [] };
     }
     // Un movimiento mío que Apps Script rechazó: se avisa una vez
     function efeFbAvisarErrores() {
@@ -20420,17 +21553,19 @@ Reglas:
         const p = (async () => {
             if (soloCaja) {
                 const r = await llamarApi({ action: 'cc_listar' });
-                efeDatos = { filas: efeDatos.filas, cajaChica: r.cajaChica || [], responsablesCaja: r.responsablesCaja || efeDatos.responsablesCaja || [] };
+                const sepC = efeSeparar(r.cajaChica || [], r.cajaEliminados);
+                efeDatos = { filas: efeDatos.filas, eliminados: efeDatos.eliminados || [], cajaChica: sepC.vivos, cajaEliminados: sepC.elim, responsablesCaja: r.responsablesCaja || efeDatos.responsablesCaja || [] };
                 if (!efeCargado) efeCargado = 'caja';
                 efeFbVer(r);
-                if (typeof efeFbOff === 'function') { efeFbBase.caja = efeDatos.cajaChica; efeFbMezclar(); }
+                if (typeof efeFbOff === 'function') { efeFbBase.caja = sepC.vivos.concat(sepC.elim); efeFbMezclar(); }
             } else {
                 const r = await llamarApi({ action: 'efe_listar', fresco: efeFresco });   // "Actualizar" = leer la hoja, no la memoria
                 efeFresco = false;
-                efeDatos = { filas: r.filas || [], cajaChica: r.cajaChica || [], responsablesCaja: r.responsablesCaja || [] };
+                const sep = efeSeparar(r.filas || [], r.eliminados), sepC = efeSeparar(r.cajaChica || [], r.cajaEliminados);
+                efeDatos = { filas: sep.vivos, eliminados: sep.elim, cajaChica: sepC.vivos, cajaEliminados: sepC.elim, responsablesCaja: r.responsablesCaja || [] };
                 efeCargado = 'completo';
                 efeFbVer(r);
-                if (typeof efeFbOff === 'function') { efeFbBase.filas = efeDatos.filas; efeFbBase.caja = efeDatos.cajaChica; efeFbMezclar(); }
+                if (typeof efeFbOff === 'function') { efeFbBase.filas = efeDatos.filas.concat(efeDatos.eliminados); efeFbBase.caja = sepC.vivos.concat(sepC.elim); efeFbMezclar(); }
             }
             efeCargadoEn = Date.now();
         })();
@@ -20623,11 +21758,13 @@ Reglas:
     async function efeUsarRespuesta(r) {
         if (r && r.efectivo) {
             const e = r.efectivo;
-            efeDatos = { filas: e.filas || efeDatos.filas, cajaChica: e.cajaChica || [], responsablesCaja: e.responsablesCaja || efeDatos.responsablesCaja || [] };
+            const sep = e.filas ? efeSeparar(e.filas, e.eliminados) : { vivos: efeDatos.filas, elim: efeDatos.eliminados || [] };
+            const sepC = efeSeparar(e.cajaChica || [], e.cajaEliminados);
+            efeDatos = { filas: sep.vivos, eliminados: sep.elim, cajaChica: sepC.vivos, cajaEliminados: sepC.elim, responsablesCaja: e.responsablesCaja || efeDatos.responsablesCaja || [] };
             efeCargadoEn = Date.now();
             efeFbVer(e);
             // Escuchando Firebase: lo de la hoja es la base y la bandeja se sigue mostrando encima
-            if (typeof efeFbOff === 'function') { efeFbBase.filas = e.filas || efeFbBase.filas; efeFbBase.caja = e.cajaChica || efeFbBase.caja; efeFbMezclar(); }
+            if (typeof efeFbOff === 'function') { efeFbBase.filas = e.filas ? sep.vivos.concat(sep.elim) : efeFbBase.filas; efeFbBase.caja = e.cajaChica ? sepC.vivos.concat(sepC.elim) : efeFbBase.caja; efeFbMezclar(); }
             await efeCargar(true);
         } else await efeCargar();
     }
@@ -20651,6 +21788,11 @@ Reglas:
             // En el orden en que se registraron (la hoja agrega cada movimiento al final): lo último registrado arriba
             .sort((a, b) => b.fila - a.fila);
         const t = efeTotales(lista);
+        // (13/11) Lo eliminado del flujo: se ve en su lugar, tachado (no suma en nada). Con el filtro de estado no se muestra.
+        const elimVer = fe || fy === 'ATRASO' ? [] : (efeDatos.eliminados || []).filter(f => (!f.fecha || enRango(f.fecha) || (efeRegistro(f) && enRango(efeRegistro(f).slice(0, 10)))) &&
+                (!ft || (ft === '__EGRESO' ? f.tipo === 'EGRESO' : f.tienda === ft)) && (!fy || f.tipo === fy));
+        const ver = lista.concat(elimVer).sort((a, b) => b.fila - a.fila);
+        const chipElim = f => { const e = f.eliminado || {}; return `<span class="chip st-falta efe-atraso" title="Eliminado del flujo el ${esc(e.cuando || '')} por ${esc(e.quien || '')}${e.motivo ? ' · Motivo: ' + esc(e.motivo) : ''}. No suma en nada; queda como constancia.">Eliminado</span>`; };
         const kpi = (titulo, bs, usd) => `<div class="kpi"><div class="k-label">${titulo}</div><div class="k-value" style="font-size:1.15rem">${fmtBs(bs)}</div><div class="k-label">${fmtUsd(usd)}</div></div>`;
         document.getElementById('efeHKpis').innerHTML = kpi('Ingresos (enviados por las cajas)', t.ingBs, t.ingUsd) +
             kpi('Recibidos', t.ingBs - t.pendBs, t.ingUsd - t.pendUsd) + kpi('Por llegar', t.pendBs, t.pendUsd) + kpi('Egresos (gastos de oficina)', -t.egrBs, -t.egrUsd) + kpi('Traspasos a caja chica', -t.trasBs, -t.trasUsd) +
@@ -20675,29 +21817,29 @@ Reglas:
             const quien = m ? m[1] : p.slice(et.length + 1).trim();
             return `<span class="cmp-marca-q efe-firma" title="${f.tipo === 'INGRESO' ? 'Recibió' : 'Registró'}: ${esc(p.slice(et.length + 1).trim())}">
                 <small><b>${esc(cmpNombreCorto(quien))}</b>${m ? esc(cmpCuandoCorto(m[2])) : ''}</small></span>`; };
-        document.getElementById('efeHTabla').innerHTML = lista.length ? `<table data-sin-paginar><thead><tr><th class="izq">Fecha</th><th class="izq">Concepto</th>
+        document.getElementById('efeHTabla').innerHTML = ver.length ? `<table data-sin-paginar><thead><tr><th class="izq">Fecha</th><th class="izq">Concepto</th>
             <th class="izq">Responsable</th><th class="izq">Turno</th><th>Bs</th><th>$</th><th class="efe-c" title="Foto">Foto</th><th class="efe-c" title="Verificación (solo gastos de oficina)">Verif.</th><th></th></tr></thead><tbody>` +
-            lista.slice(0, efeHLimite).map(f => `<tr class="${f.tipo === 'EGRESO' ? 'fila-egreso' : f.tipo === 'TRASPASO' ? 'fila-traspaso' : f.tipo === 'EXTERNO' ? 'fila-externo' : ''}"><td class="izq">${efeFecha(f.fecha)}${efeAtraso(f)}${efePendChip(f)}${chipRep(f)}</td>
+            ver.slice(0, efeHLimite).map(f => `<tr class="${f.tipo === 'EGRESO' ? 'fila-egreso' : f.tipo === 'TRASPASO' ? 'fila-traspaso' : f.tipo === 'EXTERNO' ? 'fila-externo' : ''}${f.eliminado ? ' fila-eliminada' : ''}"><td class="izq">${efeFecha(f.fecha)}${f.eliminado ? chipElim(f) : efeAtraso(f) + efePendChip(f) + chipRep(f)}</td>
                 <td class="izq efe-gris">${f.tipo === 'TRASPASO' ? esc(f.turno || 'Traspaso a caja chica') : f.tipo === 'EGRESO' ? esc(f.turno || (f.etiqueta && f.etiqueta !== 'EGRESO' ? f.etiqueta : 'Egreso manual')) : f.tipo === 'EXTERNO' ? esc(f.turno) : esc(f.tienda || 'Ingreso manual')}</td><td class="izq efe-gris">${efeCorto(f.cajero)}</td>
                 <td class="izq efe-gris"><span title="${esc(f.tipo === 'INGRESO' ? f.turno : '')}">${f.tipo !== 'INGRESO' ? '' : turnoCorto(f.turno)}</span></td>
                 <td class="${f.bs < 0 ? 'monto-neg' : ''}">${f.bs ? efeMontoUsd('Bs', f.bs, f.fecha, punto(f, 'bs')) : efeSinEnvio(f) ? `<span class="efe-cifra"><span title="Caja sin envío">Bs 0</span>${punto(f, 'bs')}</span>` : ''}${f.bsOk || f.tipo !== 'INGRESO' ? firma(f, 'bs') : ''}</td>
                 <td class="${f.usd < 0 ? 'monto-neg' : ''}">${f.usd ? `<span class="efe-cifra">${fmtUsd(f.usd)}${punto(f, 'usd')}</span>` : ''}${f.usdOk || f.tipo !== 'INGRESO' ? firma(f, 'usd') : ''}</td>
                 <td class="efe-c">${efeFoto(f.foto)}</td>
-                <td class="efe-c">${efeEstadoVerif(f)}</td>
-                <td class="efe-c">${borrarFila(f)}</td></tr>`).join('') +
+                <td class="efe-c">${f.eliminado ? '' : efeEstadoVerif(f)}</td>
+                <td class="efe-c">${f.eliminado ? '' : borrarFila(f)}</td></tr>`).join('') +
             '</tbody></table>' : '<div class="empty">No hay movimientos con estos filtros.</div>';
         // Paginador (los totales de arriba siempre son de todo lo filtrado)
-        const mostrados = Math.min(efeHLimite, lista.length);
-        const opciones = PAG_OPCIONES.filter(n => n < lista.length);
-        document.getElementById('efeHMas').innerHTML = lista.length > EFE_PAGINA ? `
-            <span>Mostrando <b>${mostrados}</b> de <b>${lista.length}</b> movimientos (los últimos registrados)</span>
-            ${mostrados < lista.length ? `<button type="button" class="btn-ghost btn-mini" onclick="efeVerMas(${efeHLimite + EFE_PAGINA})">Ver ${Math.min(EFE_PAGINA, lista.length - mostrados)} más</button>` : ''}
+        const mostrados = Math.min(efeHLimite, ver.length);
+        const opciones = PAG_OPCIONES.filter(n => n < ver.length);
+        document.getElementById('efeHMas').innerHTML = ver.length > EFE_PAGINA ? `
+            <span>Mostrando <b>${mostrados}</b> de <b>${ver.length}</b> movimientos (los últimos registrados)</span>
+            ${mostrados < ver.length ? `<button type="button" class="btn-ghost btn-mini" onclick="efeVerMas(${efeHLimite + EFE_PAGINA})">Ver ${Math.min(EFE_PAGINA, ver.length - mostrados)} más</button>` : ''}
             ${mostrados > EFE_PAGINA ? `<button type="button" class="btn-ghost btn-mini" onclick="efeVerMas(${Math.max(EFE_PAGINA, mostrados - EFE_PAGINA)})">Ver menos</button>` : ''}
             <label class="pag-cuantos">Mostrar
                 <select onchange="efeVerMas(this.value === 'todos' ? 'todos' : Number(this.value))">
                     ${opciones.map(n => `<option value="${n}" ${efeHLimite === n ? 'selected' : ''}>${n}</option>`).join('')}
-                    <option value="todos" ${efeHLimite >= lista.length ? 'selected' : ''}>Todos (${lista.length})</option>
-                    ${!opciones.includes(efeHLimite) && efeHLimite < lista.length ? `<option selected>${efeHLimite}</option>` : ''}
+                    <option value="todos" ${efeHLimite >= ver.length ? 'selected' : ''}>Todos (${ver.length})</option>
+                    ${!opciones.includes(efeHLimite) && efeHLimite < ver.length ? `<option selected>${efeHLimite}</option>` : ''}
                 </select></label>` : '';
     }
 
@@ -20729,22 +21871,23 @@ Reglas:
     }
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && efeModalAccion) efeCerrarModal(); });
 
+    const EFE_ELIM_NOTA = '\nNo se borra: queda en el historial como "Eliminado" (con quién, cuándo y el motivo) y se avisa al grupo de Telegram "Administración Plaza Valencia".';
     function efeEliminar(fila) {
         const f = efeDatos.filas.find(x => x.fila === fila);
         if (!f) return;
         const concepto = f.turno || f.etiqueta || 'Egreso manual';
         const montos = [f.bs ? fmtBs(Math.abs(f.bs)) : '', f.usd ? fmtUsd(Math.abs(f.usd)) : ''].filter(Boolean).join(' y ');
-        const caja = /^Recarga caja chica:/i.test(f.turno) ? '\nEs una recarga de caja chica: también se quitará de la caja chica.' : '';
+        const caja = /^Recarga caja chica:/i.test(f.turno) ? '\nEs una recarga de caja chica: en la caja chica también queda como eliminada.' : '';
         if (f.tipo === 'INGRESO') {
             if (!efeRepetidos().has(f.fila)) return mostrarBanner('Solo se puede eliminar un envío de caja que está repetido.', 'warn');
             if (efeYaRecibido(f)) return mostrarBanner('Ese envío ya está marcado como recibido. Elimine el otro (el que está por llegar), o apague "recibido" primero.', 'warn');
             return efeAbrirModal({ tipo: 'eliminar', f }, 'Eliminar envío repetido',
-                `${f.tienda} · ${f.turno} · ${f.cajero} · ${montos} (${fechaBonita(f.fecha)})\nHay otro envío igual. Se quitará solo este; el otro se queda. La caja en Cuadre de caja no cambia.`, false);
+                `${f.tienda} · ${f.turno} · ${f.cajero} · ${montos} (${fechaBonita(f.fecha)})\nHay otro envío igual. Este deja de contar; el otro se queda. La caja en Cuadre de caja no cambia.${EFE_ELIM_NOTA}`, false);
         }
         if (f.tipo === 'EXTERNO') return efeAbrirModal({ tipo: 'eliminar', f }, 'Eliminar dinero externo',
-            `${concepto} · ${montos} (${fechaBonita(f.fecha)})\nSe borrará la fila de FLUJO DE EFECTIVO y el monto saldrá del disponible.`, false);
+            `${concepto} · ${montos} (${fechaBonita(f.fecha)})\nDeja de contar en el flujo y el monto saldrá del disponible.${EFE_ELIM_NOTA}`, false);
         return efeAbrirModal({ tipo: 'eliminar', f }, 'Eliminar gasto',
-            `${concepto} · ${montos} (${fechaBonita(f.fecha)})\nSe borrará la fila de FLUJO DE EFECTIVO y el monto volverá al disponible.${caja}`, false);
+            `${concepto} · ${montos} (${fechaBonita(f.fecha)})\nDeja de contar en el flujo y el monto volverá al disponible.${caja}${EFE_ELIM_NOTA}`, false);
     }
 
     function efeEliminarCaja(fila) {
@@ -20753,8 +21896,9 @@ Reglas:
         const recarga = m.tipo === 'RECARGA';
         efeAbrirModal({ tipo: 'eliminarCaja', m }, recarga ? 'Eliminar recarga externa de caja chica' : 'Eliminar gasto de caja chica',
             `${m.concepto} · ${fmtCaja(m.moneda, m.monto)} (${fechaBonita(m.fecha)})\n` +
-            (recarga ? 'Se borrará de la hoja CAJA CHICA y el monto saldrá del saldo de la caja chica.' : 'Se borrará de la hoja CAJA CHICA y el monto volverá al saldo de la caja chica.') +
-            (m.comprobante ? '\nLa foto se queda en Drive; su enlace queda anotado en BD VALIDACIONES.' : ''), false);
+            (recarga ? 'Deja de contar y el monto saldrá del saldo de la caja chica.' : 'Deja de contar y el monto volverá al saldo de la caja chica.') +
+            (m.comprobante ? '\nLa foto se queda en Drive.' : '') +
+            '\nNo se borra: queda en la caja chica como "Eliminado" (con quién, cuándo y el motivo) y se avisa al grupo de Telegram "Administración Plaza Valencia".', false);
     }
 
     function efeAbrirModificar(fila) {
@@ -21051,16 +22195,18 @@ Reglas:
         const lista = efeDatos.cajaChica.slice().sort((a, b) => a.fila - b.fila)
             .map(m => { if (m.pendiente !== 'error') saldos[m.moneda] = centimos((saldos[m.moneda] || 0) + (m.tipo === 'RECARGA' ? m.monto : -m.monto)); return Object.assign({ saldo: saldos[m.moneda] }, m); })
             .filter(m => !fm || m.moneda === fm).reverse();
-        const borrable = m => !m.pendiente && (m.tipo === 'GASTO' || (m.tipo === 'RECARGA' && m.origen === 'externo'));
-        document.getElementById('efeCTabla').innerHTML = lista.length ? `<table><thead><tr><th class="izq">Fecha</th><th class="izq">Tipo</th><th class="izq">Concepto</th>
+        // (13/11) Lo eliminado de la caja chica: en su lugar, gris y tachado, sin saldo (no cuenta)
+        const ver = lista.concat((efeDatos.cajaEliminados || []).filter(m => !fm || m.moneda === fm)).sort((a, b) => b.fila - a.fila);
+        const borrable = m => !m.pendiente && !m.eliminado && (m.tipo === 'GASTO' || (m.tipo === 'RECARGA' && m.origen === 'externo'));
+        document.getElementById('efeCTabla').innerHTML = ver.length ? `<table><thead><tr><th class="izq">Fecha</th><th class="izq">Tipo</th><th class="izq">Concepto</th>
             <th class="izq">Responsable</th><th>Monto</th><th>Saldo</th><th class="efe-c" title="Comprobante">Comp.</th><th class="efe-c" title="Verificado">Verif.</th><th></th></tr></thead><tbody>` +
-            lista.map(m => `<tr class="${m.tipo === 'GASTO' && !m.verificado ? 'cc-sinverificar' : ''}"><td class="izq">${efeFecha(m.fecha)}${efeAtraso(m)}${efePendChip(m)}</td>
+            ver.map(m => `<tr class="${m.eliminado ? 'fila-eliminada' : m.tipo === 'GASTO' && !m.verificado ? 'cc-sinverificar' : ''}"><td class="izq">${efeFecha(m.fecha)}${m.eliminado ? efeChipElim(m) : efeAtraso(m) + efePendChip(m)}</td>
                 <td class="izq"><span class="chip ${m.tipo === 'RECARGA' ? (m.origen === 'externo' ? 'st-info' : 'st-ok') : 'st-falta'}" title="${m.tipo === 'RECARGA' ? (m.origen === 'externo' ? 'Recarga externa (no afecta el flujo general)' : 'Recarga desde el flujo general') : 'Gasto'}">${m.tipo === 'RECARGA' ? 'Recarga' : 'Gasto'}</span></td>
                 <td class="izq efe-gris">${esc(m.concepto)}</td><td class="izq efe-gris">${efeCorto(m.responsable)}</td>
                 <td class="${m.tipo === 'GASTO' ? 'monto-neg' : ''}">${m.tipo === 'GASTO' ? '−' : '+'}${efeMontoUsd(m.moneda, m.monto, m.fecha)}</td>
-                <td>${efeMonto(m.moneda, m.saldo)}</td>
+                <td>${m.eliminado ? '—' : efeMonto(m.moneda, m.saldo)}</td>
                 <td class="efe-c">${efeFoto(m.comprobante) || (m.tipo === 'GASTO' ? '<span class="efe-falta" title="Sin comprobante">—</span>' : '')}</td>
-                <td class="efe-c">${m.tipo !== 'GASTO' || m.pendiente ? '' : efeSwVerif(m.verificado, `efeVerificarCaja(${m.fila})`, `efeDesverificar('caja', ${m.fila})`)}</td>
+                <td class="efe-c">${m.tipo !== 'GASTO' || m.pendiente || m.eliminado ? '' : efeSwVerif(m.verificado, `efeVerificarCaja(${m.fila})`, `efeDesverificar('caja', ${m.fila})`)}</td>
                 <td class="efe-c">${borrable(m) ? efeBorrar(`efeEliminarCaja(${m.fila})`, 'Eliminar (pide clave de administrador)') : ''}</td></tr>`).join('') +
             '</tbody></table>' : '<div class="empty">Todavía no hay movimientos de caja chica. Empiece con una recarga.</div>';
     }
