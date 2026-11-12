@@ -1271,6 +1271,49 @@
         @media (max-width: 640px) { .alm-pc-fila { grid-template-columns: 1fr; } .alm-pc-acc { justify-content: flex-start; } }
         /* Compra con foto y precios en tiendas */
         .cmp-fotos { display: flex; flex-wrap: wrap; gap: .6rem; margin: .8rem 0; }
+        /* Lectura de la factura (11/11): la foto con una línea que la recorre y, al lado, los pasos */
+        /* Tiempos › Firebase (11/11): qué está en Firebase y qué en la hoja */
+        .fb-estado { margin: .6rem 0 .9rem; padding-bottom: .9rem; border-bottom: 1px solid var(--border); }
+        .fb-tit-tiempos { margin: 0 0 .1rem; color: var(--title); font-size: 1rem; }
+        .fb-cab { display: flex; flex-wrap: wrap; align-items: baseline; gap: .3rem .8rem; margin-bottom: .6rem; }
+        .fb-cab h4 { margin: 0; color: var(--title); font-size: 1rem; }
+        .fb-res { color: var(--text-muted); font-size: .88rem; }
+        .fb-res b { color: var(--text-main); }
+        .fb-indicadores { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: .5rem; margin-bottom: .6rem; }
+        .fb-ind { display: flex; flex-direction: column; gap: .2rem; padding: .55rem .7rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--list-bg); }
+        .fb-ind > span:first-child { font-size: .78rem; color: var(--text-muted); }
+        .fb-ind b { font-size: 1.05rem; color: var(--text-main); font-variant-numeric: tabular-nums; }
+        .fb-ind b small { font-weight: 400; color: var(--text-muted); font-size: .78rem; }
+        .fb-ind .btn-mini { align-self: flex-start; }
+        .fb-barra { height: 6px; border-radius: 999px; background: var(--border); overflow: hidden; }
+        .fb-barra i { display: block; height: 100%; background: var(--ok); border-radius: 999px; }
+        .fb-barra i.alto { background: var(--warn); }
+        .fb-tabla td small { display: block; color: var(--text-muted); font-size: .74rem; line-height: 1.3; max-width: 260px; }
+        .fb-tabla .fb-acc { white-space: nowrap; text-align: right; }
+        .fb-tabla .fb-acc .btn-mini + .btn-mini { margin-left: .3rem; }
+        .cmp-fotos[hidden], .cmp-foto-acc[hidden] { display: none !important; }   /* mientras lee: solo el escáner */
+        .cmp-escaner { display: flex; flex-wrap: wrap; gap: 1rem 1.4rem; align-items: flex-start; margin: .8rem 0; }
+        .cmp-escaner-foto { position: relative; width: 220px; max-width: 100%; height: 280px; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); background: var(--list-bg); box-shadow: var(--shadow); }
+        .cmp-escaner-foto img { width: 100%; height: 100%; object-fit: cover; object-position: top; filter: saturate(.6); }
+        .cmp-escaner-linea { position: absolute; left: 0; right: 0; top: 0; height: 3px; background: var(--primary); box-shadow: 0 0 14px 4px color-mix(in srgb, var(--primary) 45%, transparent); animation: cmpEscanea 2.6s ease-in-out infinite alternate; }
+        .cmp-escaner-foto::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--primary) 10%, transparent)); pointer-events: none; }
+        @keyframes cmpEscanea { from { top: 0; } to { top: calc(100% - 3px); } }
+        .cmp-escaner-pag { position: absolute; left: 8px; bottom: 8px; padding: .15rem .5rem; border-radius: 999px; font-size: .75rem; background: var(--card-bg); color: var(--text-main); border: 1px solid var(--border); }
+        .cmp-escaner-lado { flex: 1 1 240px; min-width: 0; }
+        .cmp-escaner-tit { font-weight: 600; color: var(--title); margin-bottom: .5rem; }
+        .cmp-escaner-tit b { font-variant-numeric: tabular-nums; color: var(--text-muted); font-weight: 600; margin-left: .3rem; }
+        .cmp-escaner-pasos { list-style: none; margin: 0; padding: 0; display: grid; gap: .35rem; }
+        .cmp-escaner-pasos li { display: flex; align-items: center; gap: .55rem; color: var(--text-muted); font-size: .92rem; }
+        .cmp-escaner-pasos li.hecho { color: var(--text-main); }
+        .cmp-escaner-pasos li.actual { color: var(--title); font-weight: 600; }
+        .cmp-escaner-pasos li.aviso { color: var(--warn); }
+        .cmp-paso-ic { flex: 0 0 1.2rem; height: 1.2rem; border-radius: 50%; border: 1.5px solid var(--border); display: inline-flex; align-items: center; justify-content: center; font-size: .72rem; font-weight: 700; }
+        .cmp-escaner-pasos li.hecho .cmp-paso-ic { border-color: var(--ok); color: var(--ok); background: var(--ok-bg); }
+        .cmp-escaner-pasos li.actual .cmp-paso-ic { border-color: var(--primary); border-top-color: transparent; animation: cmpGira .8s linear infinite; }
+        .cmp-escaner-pasos li.aviso .cmp-paso-ic { border-color: var(--warn); }
+        @keyframes cmpGira { to { transform: rotate(360deg); } }
+        @media (prefers-reduced-motion: reduce) { .cmp-escaner-linea, .cmp-escaner-pasos li.actual .cmp-paso-ic { animation: none; } .cmp-escaner-linea { top: 50%; } }
+        @media (max-width: 520px) { .cmp-escaner-foto { width: 100%; height: 220px; } }
         .cmp-foto { position: relative; width: 96px; height: 120px; border-radius: 10px; overflow: hidden; border: 1px solid var(--border); background: var(--list-bg); }
         .cmp-foto img { width: 100%; height: 100%; object-fit: cover; }
         .cmp-foto button { position: absolute; top: 4px; right: 4px; border: 0; border-radius: 50%; width: 24px; height: 24px; background: rgba(0,0,0,.6); color: #fff; cursor: pointer; }
@@ -1321,8 +1364,11 @@
         .cmp-marca small { color: var(--text-muted); display: block; font-size: .74rem; }
         .cmp-marca .btn-mini { white-space: nowrap; }
         .cmp-otabla td, .cmp-otabla th { vertical-align: top; }
-        .cmp-otabla td:first-child { min-width: 220px; }
+        .cmp-otabla td:first-child:not(.cmp-sel), .cmp-otabla td.cmp-sel + td { min-width: 220px; }
+        .cmp-otabla .cmp-sel { width: 2rem; min-width: 0; text-align: center; padding-left: .3rem; padding-right: .3rem; }   /* casilla para enviar a Telegram */
+        .cmp-otabla .cmp-sel input { width: 1.05rem; height: 1.05rem; accent-color: var(--primary); cursor: pointer; }
         .cmp-otabla td small { display: block; color: var(--text-muted); font-size: .74rem; line-height: 1.3; }
+        .cmp-otabla td small.cmp-fin { color: var(--text-main); border-left: 2px solid var(--border); padding-left: .4rem; margin-top: .2rem; }
         .cmp-otabla td small.sube { color: var(--danger); } .cmp-otabla td small.baja { color: var(--verde-txt); }
         .cmp-otabla tr.cmp-definir td:first-child { box-shadow: inset 3px 0 0 var(--amar, #eab308); }
         .cmp-oth { text-align: center; min-width: 118px; }
@@ -3256,7 +3302,7 @@
         if (TIEMPOS.length > 60) TIEMPOS.pop();
     }
     // Solo lectura: si la respuesta de Google no llega, se reintenta una vez sola (no cambia nada en la hoja)
-    const SOLO_LECTURA = /^(login|fb_token|fb_prueba|list|cuadre_detalle|cuadre_detalle_lote|mov_listar|cuentas_listar|conc_listar|efe_listar|cc_listar|req_datos|req_ventas|req_historial|asis_hoy|asis_listar|asisg_listar|per_listar|cxc_deudas|nom_historial|nom_autorizar|nom_ajustes|hor_datos|alm_datos|alm_notas|alm_ingresos|alm_kardex|alm_seguimiento|alm_tiendas|alm_existencias|alm_espera_listar|cmp_compras|cmp_ordenes|cmp_enlazar|cmp_borradores|cmp_borrador|pnom_listar|ping|cambios|pendientes|enlinea|marca_estado)$/;
+    const SOLO_LECTURA = /^(nom_semana|login|fb_token|fb_prueba|list|cuadre_detalle|cuadre_detalle_lote|mov_listar|cuentas_listar|conc_listar|efe_listar|cc_listar|req_datos|req_ventas|req_historial|asis_hoy|asis_listar|asisg_listar|per_listar|cxc_deudas|nom_historial|nom_autorizar|nom_ajustes|hor_datos|alm_datos|alm_notas|alm_ingresos|alm_kardex|alm_seguimiento|alm_tiendas|alm_existencias|alm_espera_listar|cmp_compras|cmp_ordenes|cmp_enlazar|cmp_borradores|cmp_borrador|pnom_listar|ping|cambios|pendientes|enlinea|marca_estado)$/;
     // Guardados sin repetir: cada cambio lleva un "idem". Si no llegó la respuesta y se vuelve a pulsar el MISMO cambio,
     // se manda el mismo idem y Google responde "ya estaba registrado" en vez de guardarlo otra vez.
     const idemPendientes = new Map();   // contenido del cambio -> idem del intento sin respuesta
@@ -3307,6 +3353,7 @@
         function areas(a) {
             a = String(a);
             if (/^(alm|cmp)_/.test(a)) return ['alm', 'per'];
+            if (a === 'nom_semana') return ['per', 'asis'];   // la nómina de la semana lee también la asistencia
             if (/^(per_|cxc_|nom_|pnom_|hor_)/.test(a)) return ['per'];
             if (/^(efe_|cc_)/.test(a)) return ['efe'];
             if (/^(list$|save$|cuadre_|conc_|mov_|cuentas_)/.test(a)) return ['cuadre', 'efe'];
@@ -3601,14 +3648,64 @@
             else out.innerHTML = '<div class="banner warn" style="display:block">La hoja vuelve a ser el lugar oficial del efectivo (quedó con todo lo de Firebase).</div>';
             if (que !== 'hoja') { efeFbDetener(); efeFbVerdad = que === 'activar'; efeFbActivo = true; if (/^(efectivo|cajachica)$/.test(vistaActual)) efeActualizar(); }
         } catch (e) { out.innerHTML = `<div class="banner error" style="display:block">${esc(e.message)}</div>`; }
-        finally { btn.disabled = false; btn.textContent = texto; }
+        finally { if (document.getElementById('fbEstado')) setTimeout(fbEstadoCargar, 0); btn.disabled = false; btn.textContent = texto; }
     }
     // Hojas enteras en Firebase (08/11): Validar pagos = flujo general + movimientos del banco + validaciones.
     // "Pasar a Firebase" copia las hojas y Firebase pasa a ser el dato oficial; la hoja de Google queda como copia.
     const FB_GRUPOS = { pagos: ['Validar pagos', 'el flujo general (lo que mandan las fichas), los movimientos del banco y las validaciones'],
                         cuadre: ['El Cuadre de caja', 'los cuadres de caja (lo que mandan las fichas y los montos del sistema) y los comentarios de cada caja'],
                         nomina: ['Gastos, créditos y Cuentas por cobrar', 'los gastos y créditos que mandan las fichas (BD NOMINA) y las cuentas por cobrar del panel (BD CXC)'],
-                        asistencia: ['La asistencia', 'la asistencia de los locales (ficha y carnet) y la de la oficina'] };
+                        asistencia: ['La asistencia', 'la asistencia de los locales (ficha y carnet) y la de la oficina'],
+                        personal: ['Personal', 'trabajadores, perfiles, clientes, cambios de trabajador, horarios de trabajo y frases', 'Personal (trabajadores, perfiles, clientes, horarios)'],
+                        pagosnomina: ['La nómina', 'las nóminas cerradas con sus pagos y los ajustes de la semana', 'Nómina (cierres, pagos y ajustes)'],
+                        almacen: ['El almacén', 'productos, movimientos, notas, ingresos, clientes y proveedores del almacén y las notas en espera', 'Almacén (productos, movimientos, notas, ingresos)'],
+                        compras: ['Compras y precios', 'las compras, los precios, las órdenes de precio, las equivalencias de proveedores y las compras en curso', 'Compras y precios (compras, precios, órdenes)'] };
+    // Filas de Tiempos de los grupos de la etapa 6 (el tercer texto de FB_GRUPOS es el título de la fila)
+    const fbFilasGrupos = () => ['personal', 'pagosnomina', 'almacen', 'compras'].map(g => `<div class="req-acciones" style="justify-content:flex-end;margin:.4rem 0 0"><span class="nota" style="margin:0 auto 0 0">${FB_GRUPOS[g][2]}:</span>`
+        + [['estado', 'Ver estado'], ['activar', 'Pasar a Firebase'], ['copiar', 'Copiar a la hoja ahora'], ['volver', 'Volver a la hoja']].map(([q, txt]) => `<button type="button" class="btn-ghost" onclick="fbHojas(this, '${q}', '${g}')">${txt}</button>`).join('') + '</div>').join('');
+    // ---- Tabla de Tiempos (11/11): qué se guarda en Firebase y qué en la hoja de Google, con el botón que corresponde en cada fila ----
+    // El resumen no gasta lecturas de Firebase (lo dice Apps Script de sus propiedades); el detalle por hoja, con "Detalle".
+    const FB_ORDEN = [['efectivo', 'Control de efectivo y caja chica'], ['pagos', 'Validar pagos'], ['cuadre', 'Cuadre de caja'], ['nomina', 'Gastos y créditos de la ficha · Cuentas por cobrar'],
+                      ['asistencia', 'Asistencia'], ['personal', 'Personal'], ['pagosnomina', 'Nómina'], ['almacen', 'Almacén'], ['compras', 'Compras y precios']];
+    let fbEstadoDatos = null;
+    async function fbEstadoCargar() {
+        const el = document.getElementById('fbEstado'); if (!el) return;
+        if (!fbEstadoDatos) el.innerHTML = cargandoHTML('Revisando qué está en Firebase...');
+        try { fbEstadoDatos = await DATOS.aGoogle(() => llamarApi({ action: 'fb_hojas', que: 'resumen' })); }
+        catch (e) { el.innerHTML = /todavía no tiene esta función|Acción no válida|desconocido/i.test(e.message) ? '<div class="nota">Publique la versión nueva de Apps Script para ver aquí qué está en Firebase.</div>' : `<div class="banner error" style="display:block">${esc(e.message)}</div>`; return; }
+        fbEstadoPintar();
+    }
+    function fbEstadoPintar() {
+        const el = document.getElementById('fbEstado'), r = fbEstadoDatos; if (!el || !r) return;
+        const ef = r.efectivo || {}, g = r.grupos || {};
+        const chip = (si, txt) => `<span class="chip ${si ? 'st-ok' : 'st-pend'}">${txt}</span>`;
+        const filas = FB_ORDEN.map(([id, nombre]) => {
+            if (id === 'efectivo') {
+                const estado = ef.oficial ? chip(true, 'En Firebase') : ef.espejo ? `<span class="chip st-info">Hoja + copia en Firebase</span>` : chip(false, 'En la hoja de Google');
+                const acc = ef.oficial ? `<button type="button" class="btn-ghost btn-mini" onclick="fbVerdad(this, 'hoja')">Copiar a la hoja</button><button type="button" class="btn-ghost btn-mini" onclick="fbVerdad(this, 'volver')">Volver a la hoja</button>`
+                    : ef.espejo ? `<button type="button" class="btn-primary btn-mini" onclick="fbVerdad(this, 'activar')">Pasar a Firebase</button><button type="button" class="btn-ghost btn-mini" onclick="fbEfectivo(this, false)">Quitar la copia</button>`
+                    : `<button type="button" class="btn-primary btn-mini" onclick="fbEfectivo(this, true)">Activar copia en Firebase</button>`;
+                return { si: !!ef.oficial, html: `<tr><td class="izq"><b>${nombre}</b><small>efectivo enviado, gastos, por llegar y caja chica</small></td><td class="izq">${estado}</td><td class="fb-acc">${acc}</td></tr>` };
+            }
+            const x = g[id]; if (!x) return null;
+            const desc = (FB_GRUPOS[id] || [])[1] || '';
+            const acc = x.activo ? `<button type="button" class="btn-ghost btn-mini" onclick="fbHojas(this, 'estado', '${id}')">Detalle</button><button type="button" class="btn-ghost btn-mini" onclick="fbHojas(this, 'volver', '${id}')">Volver a la hoja</button>`
+                : `<button type="button" class="btn-primary btn-mini" onclick="fbHojas(this, 'activar', '${id}')">Pasar a Firebase</button>`;
+            return { si: x.activo, html: `<tr><td class="izq"><b>${nombre}</b><small>${esc(desc)}</small></td><td class="izq">${chip(x.activo, x.activo ? 'En Firebase' : 'En la hoja de Google')}</td><td class="fb-acc">${acc}</td></tr>` };
+        }).filter(Boolean);
+        const n = filas.filter(f => f.si).length, faltan = FB_ORDEN.filter(([id]) => !(id === 'efectivo' ? ef.oficial : (g[id] || {}).activo)).map(x => x[1]);
+        const lect = Number(r.lecturasHoy) || 0, pct = Math.min(100, lect / 500);
+        const rev = r.revision && r.revision.firebase;
+        const revHace = r.revision && r.revision.ultima ? Math.max(0, Math.round((Date.now() - r.revision.ultima) / 60000)) : null;
+        el.innerHTML = `<div class="fb-cab"><h4>Firebase</h4><span class="fb-res"><b>${n} de ${filas.length}</b> módulos ya se guardan en Firebase${faltan.length ? ` · faltan: ${esc(faltan.join(', '))}` : ' · todos'}</span></div>
+            <div class="fb-indicadores">
+                <div class="fb-ind"><span>Lecturas de Firebase hoy</span><b>${fmtNum(lect)} <small>de 50.000</small></b><span class="fb-barra"><i style="width:${pct}%" class="${pct > 70 ? 'alto' : ''}"></i></span></div>
+                <div class="fb-ind"><span>Revisión automática (cada 5 min)</span><b>${rev ? (revHace != null ? `Activa · corrió hace ${revHace} min` : 'Activa · todavía no corre (el ping hace el trabajo de fondo)') : 'No activa (el trabajo de fondo lo hace el ping de los paneles)'}</b>${rev ? '' : '<button type="button" class="btn-primary btn-mini" onclick="fbRevision(this)">Activar</button>'}</div>
+            </div>
+            <div class="tabla-wrap"><table class="req-tabla fb-tabla" data-sin-paginar><thead><tr><th class="izq">Módulo</th><th class="izq">Dónde se guarda</th><th></th></tr></thead><tbody>${filas.map(f => f.html).join('')}</tbody></table></div>
+            <div class="req-acciones" style="justify-content:flex-end;margin:.5rem 0 0"><button type="button" class="btn-ghost btn-mini" onclick="fbHojas(this, 'copiar', 'pagos')">Copiar todo a la hoja ahora</button><button type="button" class="btn-ghost btn-mini" onclick="fbProbar(this)">Probar Firebase</button><button type="button" class="btn-ghost btn-mini" onclick="fbEstadoDatos=null;fbEstadoCargar()">Actualizar</button></div>
+            <div class="nota">"En Firebase": lo que se guarda en ese módulo vive en Firebase y la hoja de Google se llena sola como copia (lo que se cambie a mano en la hoja ya no cuenta). "Volver a la hoja" copia todo a Google antes de cambiar.</div>`;
+    }
     async function fbHojas(btn, que, grupo) {
         grupo = grupo || 'pagos';
         const out = document.getElementById('fbPruebaRes'), texto = btn.textContent, [nombreG, queG] = FB_GRUPOS[grupo];
@@ -3625,10 +3722,10 @@
                 const g = (r.grupos || {})[grupo] || {};
                 out.innerHTML = `<div class="banner ${g.activo ? 'ok' : 'warn'}" style="display:block">${g.activo ? nombreG + ' se guarda en Firebase.' : nombreG + ' todavía se guarda en la hoja de Google.'}
                     ${Object.keys(g.hojas || {}).map(k => { const h = g.hojas[k]; return `<br>${esc(k)}: ${h.error ? esc(h.error) : `${fmtNum(h.filas)} fila${h.filas === 1 ? '' : 's'} · ${fmtNum(h.porCopiar)} por copiar a la hoja`}`; }).join('')}
-                    <br>Revisión automática cada 5 min: <b>${r.revision && r.revision.firebase ? 'activa' : 'NO activa'}</b>.</div>`;
+                    <br>Revisión automática cada 5 min: <b>${r.revision && r.revision.firebase ? 'activa' : 'NO activa'}</b>.${r.lecturasHoy != null ? `<br>Lecturas de Firebase hoy (aprox.): <b>${fmtNum(r.lecturasHoy)}</b> de 50.000 que permite el plan gratis.` : ''}</div>`;
             }
         } catch (e) { out.innerHTML = `<div class="banner error" style="display:block">${esc(e.message)}</div>`; }
-        finally { btn.disabled = false; btn.textContent = texto; }
+        finally { if (document.getElementById('fbEstado')) setTimeout(fbEstadoCargar, 0); btn.disabled = false; btn.textContent = texto; }
     }
     // Revisión automática de Firebase cada 5 minutos (la bandeja y la copia a la hoja aunque nadie tenga el panel abierto)
     async function fbRevision(btn) {
@@ -3638,7 +3735,7 @@
             out.innerHTML = r.firebase ? '<div class="banner ok" style="display:block">Revisión automática activa: cada 5 minutos Google pasa lo que quede en la bandeja y pone al día la copia en la hoja, aunque nadie tenga el panel abierto.</div>'
                                        : `<div class="banner error" style="display:block">No se pudo activar${r.error ? ': ' + esc(r.error) : ''}.</div>`;
         } catch (e) { out.innerHTML = `<div class="banner error" style="display:block">${esc(e.message)}</div>`; }
-        finally { btn.disabled = false; btn.textContent = texto; }
+        finally { if (document.getElementById('fbEstado')) setTimeout(fbEstadoCargar, 0); btn.disabled = false; btn.textContent = texto; }
     }
     // Activar / desactivar el espejo de Efectivo y Caja chica en Firebase (administradores, en Tiempos)
     async function fbEfectivo(btn, activar) {
@@ -3649,7 +3746,7 @@
                                      : '<div class="banner warn" style="display:block">Espejo de Firebase desactivado: Efectivo vuelve a leer solo de la hoja.</div>';
             efeFbActivo = !!r.activo; if (!r.activo) efeFbDetener(); else efeFbIniciar();
         } catch (e) { out.innerHTML = `<div class="banner error" style="display:block">${esc(e.message)}</div>`; }
-        finally { btn.disabled = false; btn.textContent = activar ? 'Activar Efectivo en Firebase' : 'Desactivar'; }
+        finally { if (document.getElementById('fbEstado')) setTimeout(fbEstadoCargar, 0); btn.disabled = false; btn.textContent = activar ? 'Activar Efectivo en Firebase' : 'Desactivar'; }
     }
     async function fbProbar(btn) {
         const out = document.getElementById('fbPruebaRes'); btn.disabled = true; btnCargando(btn, 'Probando...');
@@ -3673,13 +3770,15 @@
         }
         const s = v => v == null ? '—' : (v / 1000).toFixed(1) + ' s';
         fondo.innerHTML = `<div class="req-dlg" style="width:min(640px,100%)"><h3>Tiempos de respuesta</h3>
+            ${esPrincipal ? '<div id="fbEstado" class="fb-estado"></div><h4 class="fb-tit-tiempos">Últimos pedidos a Google</h4>' : ''}
             <div class="req-sub">Últimos pedidos a Google. "En Google" es lo que tarda el script; el resto es internet y la espera de Google.</div>
-            <div class="tabla-wrap" style="max-height:60vh;overflow:auto;margin-top:.75rem">${TIEMPOS.length ? `<table><thead><tr><th class="izq">Hora</th><th class="izq">Acción</th><th>Total</th><th>En Google</th></tr></thead><tbody>
+            <div class="tabla-wrap" style="max-height:${esPrincipal ? 40 : 60}vh;overflow:auto;margin-top:.75rem">${TIEMPOS.length ? `<table><thead><tr><th class="izq">Hora</th><th class="izq">Acción</th><th>Total</th><th>En Google</th></tr></thead><tbody>
             ${TIEMPOS.map(t => `<tr><td class="izq">${t.hora}</td><td class="izq">${esc(NOMBRE_ACCION[t.accion] || t.accion)}${t.ok ? '' : ' <span class="chip st-falta">error</span>'}${t.pasos ? '<small title="Partes del trabajo de Google, en milisegundos">' + esc(t.pasos) + '</small>' : ''}</td>
                 <td><b>${s(t.total)}</b></td><td>${s(t.servidor)}</td></tr>`).join('')}</tbody></table>` : '<div class="empty">Todavía no hay pedidos.</div>'}</div>
             <div id="fbPruebaRes" style="margin-top:.6rem"></div>
-            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0">${esPrincipal ? '<button type="button" class="btn-ghost" onclick="fbProbar(this)">Probar Firebase</button><button type="button" class="btn-ghost" onclick="fbEfectivo(this, true)">Activar Efectivo en Firebase</button><button type="button" class="btn-ghost" onclick="fbEfectivo(this, false)">Desactivar</button></div><div class="req-acciones" style="justify-content:flex-end;margin:.4rem 0 0"><span class="nota" style="margin:0 auto 0 0">Dato oficial del efectivo:</span><button type="button" class="btn-ghost" onclick="fbVerdad(this, \'activar\')">Hacer oficial Firebase</button><button type="button" class="btn-ghost" onclick="fbVerdad(this, \'hoja\')">Copiar a la hoja ahora</button><button type="button" class="btn-ghost" onclick="fbVerdad(this, \'volver\')">Volver a la hoja</button></div><div class="req-acciones" style="justify-content:flex-end;margin:.4rem 0 0"><span class="nota" style="margin:0 auto 0 0">Validar pagos (flujo general, banco y validaciones):</span><button type="button" class="btn-ghost" onclick="fbHojas(this, \'estado\')">Ver estado</button><button type="button" class="btn-ghost" onclick="fbHojas(this, \'activar\')">Pasar a Firebase</button><button type="button" class="btn-ghost" onclick="fbHojas(this, \'copiar\')">Copiar a la hoja ahora</button><button type="button" class="btn-ghost" onclick="fbHojas(this, \'volver\')">Volver a la hoja</button></div><div class="req-acciones" style="justify-content:flex-end;margin:.4rem 0 0"><span class="nota" style="margin:0 auto 0 0">Cuadre de caja (cuadres y comentarios):</span><button type="button" class="btn-ghost" onclick="fbHojas(this, \'estado\', \'cuadre\')">Ver estado</button><button type="button" class="btn-ghost" onclick="fbHojas(this, \'activar\', \'cuadre\')">Pasar a Firebase</button><button type="button" class="btn-ghost" onclick="fbHojas(this, \'copiar\', \'cuadre\')">Copiar a la hoja ahora</button><button type="button" class="btn-ghost" onclick="fbHojas(this, \'volver\', \'cuadre\')">Volver a la hoja</button></div><div class="req-acciones" style="justify-content:flex-end;margin:.4rem 0 0"><span class="nota" style="margin:0 auto 0 0">Gastos, créditos y Cuentas por cobrar (BD NOMINA y BD CXC):</span><button type="button" class="btn-ghost" onclick="fbHojas(this, \'estado\', \'nomina\')">Ver estado</button><button type="button" class="btn-ghost" onclick="fbHojas(this, \'activar\', \'nomina\')">Pasar a Firebase</button><button type="button" class="btn-ghost" onclick="fbHojas(this, \'copiar\', \'nomina\')">Copiar a la hoja ahora</button><button type="button" class="btn-ghost" onclick="fbHojas(this, \'volver\', \'nomina\')">Volver a la hoja</button></div><div class="req-acciones" style="justify-content:flex-end;margin:.4rem 0 0"><span class="nota" style="margin:0 auto 0 0">Asistencia (locales y oficina):</span><button type="button" class="btn-ghost" onclick="fbHojas(this, \'estado\', \'asistencia\')">Ver estado</button><button type="button" class="btn-ghost" onclick="fbHojas(this, \'activar\', \'asistencia\')">Pasar a Firebase</button><button type="button" class="btn-ghost" onclick="fbHojas(this, \'copiar\', \'asistencia\')">Copiar a la hoja ahora</button><button type="button" class="btn-ghost" onclick="fbHojas(this, \'volver\', \'asistencia\')">Volver a la hoja</button></div><div class="req-acciones" style="justify-content:flex-end;margin:.4rem 0 0"><span class="nota" style="margin:0 auto 0 0">Pasar la bandeja y copiar a la hoja aunque nadie tenga el panel abierto:</span><button type="button" class="btn-ghost" onclick="fbRevision(this)">Activar revisión automática</button>' : ''}<button type="button" class="btn-primary" onclick="document.getElementById('dlgTiempos').classList.add('hidden')">Cerrar</button></div></div>`;
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-primary" onclick="document.getElementById('dlgTiempos').classList.add('hidden')">Cerrar</button></div></div>`;
         fondo.classList.remove('hidden');
+        if (esPrincipal) fbEstadoCargar();   // qué está en Firebase y qué en la hoja (11/11)
     }
 
     // ==========================================
@@ -3772,7 +3871,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-11.5';
+    const VERSION_SERVIDOR = '2026-11-12.2';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -3841,6 +3940,7 @@
             if (avisosSeguridad.principalDeFabrica) mostrarBanner('La clave principal es la de fábrica. Cámbiela ya en Claves y permisos › Clave principal (mínimo 6 caracteres).', 'error');
             else if (avisosSeguridad.claveCorta) mostrarBanner('Su clave tiene menos de 6 caracteres y es fácil de adivinar. ' + (esPrincipal ? 'Cámbiela en Claves y permisos.' : 'Pida a un administrador que le asigne una más larga.'), 'warn');
             setTimeout(precargarModulos, 300);   // en segundo plano: los datos de cada módulo con permiso
+            setTimeout(vivoFbIniciar, 1500);     // avisos al instante de lo que cambian otros equipos (Firebase)
             avisarScriptViejo();
             huellaMenuPintar();
             return true;
@@ -4039,7 +4139,7 @@
         if (clave && WEB_APP_URL && typeof mensaje !== 'string') llamarApiReal({ action: 'ping', salir: true, vista: '', disp: DISPOSITIVO }, performance.now()).catch(() => {});   // deja de figurar como conectado
         clave = null;
         permisos = [];
-        nombreUsuario = ''; esPrincipal = false; olvidarClavesAdmin(); DATOS.salir(); FB.salir(); efeFbOff = null; efeFbActivo = false; efeFbRoto = ''; efeFbLlego = false;
+        nombreUsuario = ''; esPrincipal = false; olvidarClavesAdmin(); DATOS.salir(); vivoFbDetener(); FB.salir(); efeFbOff = null; efeFbActivo = false; efeFbRoto = ''; efeFbLlego = false;
         filas = []; borradores = {}; seleccion = null; cargadoDesde = null; cuadreIniciado = false;
         // Al salir se borra todo lo guardado en memoria (otra persona puede entrar con menos permisos)
         efeDatos = { filas: [], cajaChica: [] }; efeCargado = null; efeCargadoEn = 0; precargadoDesde = null; Object.keys(pagMemoria).forEach(k => delete pagMemoria[k]);
@@ -4201,11 +4301,39 @@
         const a = document.activeElement;
         return !(a && /^(INPUT|TEXTAREA)$/.test(a.tagName) && a.type !== 'search' && a.value);    // un campo a medio llenar
     }
+    // Avisos al instante (12/11): el servidor deja en Firebase (vivo/versiones) la hora del último cambio de cada área y este
+    // panel la escucha. Con eso no hace falta preguntar a Google: cada 3 s se compara con lo ya visto (sin red) y solo si cambió el
+    // área del módulo abierto se relee. Si Firebase no responde, vuelve a preguntar a Google cada 30 s como antes.
+    let vivoFbOff = null, vivoFbVer = null, vivoUltimaGoogle = 0, vivoPendVer = '';
+    const vivoFbSano = () => !!(vivoFbOff && vivoFbVer);
+    async function vivoFbIniciar() {
+        if (vivoFbOff || !clave || typeof FB === 'undefined') return;
+        vivoFbOff = 'iniciando';
+        try {
+            const off = await FB.escuchar(['vivo'], d => {
+                const doc = (d.vivo || []).find(x => x._id === 'versiones');
+                if (!doc) return;
+                const ver = {}; AREAS_VIVO.forEach(k => { if (doc[k]) ver[k] = String(doc[k]); });
+                vivoFbVer = ver;
+                setTimeout(vivoRevisar, 50);
+                // Campanita: si cambió algún área, se vuelve a contar (el servidor solo recalcula esa área)
+                const firma = AREAS_VIVO.map(k => ver[k] || '').join('|');
+                if (vivoPendVer && firma !== vivoPendVer && typeof pendRevisar === 'function') setTimeout(() => pendRevisar(true), 1500);
+                vivoPendVer = firma;
+            }, e => { console.log('Avisos al instante: ' + (e && (e.code || e.message))); vivoFbDetener(); });
+            if (vivoFbOff === 'iniciando') vivoFbOff = off; else off();   // se cerró la sesión mientras entraba
+        } catch (e) { vivoFbOff = null; }
+    }
+    function vivoFbDetener() { if (typeof vivoFbOff === 'function') try { vivoFbOff(); } catch (e) {} vivoFbOff = null; vivoFbVer = null; vivoPendVer = ''; }
+    const AREAS_VIVO = ['cuadre', 'efe', 'per', 'alm', 'req', 'asis', 'otros'];
     async function vivoRevisar() {
         if (vivoOcupado || !vivoPuede()) return;
+        const sano = vivoFbSano();
+        if (!sano && Date.now() - vivoUltimaGoogle < VIVO_CADA - 500) return;   // sin Firebase: a Google cada 30 s
         vivoOcupado = true;
         try {
-            const r = await llamarApi({ action: 'cambios' }), vista = vistaActual, areas = VISTA_AREAS[vista] || [];
+            if (!sano) vivoUltimaGoogle = Date.now();
+            const r = sano ? { ver: vivoFbVer } : await llamarApi({ action: 'cambios' }), vista = vistaActual, areas = VISTA_AREAS[vista] || [];
             const nuevas = areas.filter(k => r.ver[k] && r.ver[k] !== '0' && r.ver[k] > (verConocida[k] || '0'));
             // Las áreas que no son de este módulo solo se anotan si nunca se habían visto (se leerán al abrir su módulo)
             Object.keys(r.ver).forEach(k => { if (!verConocida[k]) verConocida[k] = r.ver[k]; });
@@ -4217,7 +4345,7 @@
     }
     window.addEventListener('input', () => { vivoTecleo = Date.now(); }, true);
     window.addEventListener('keydown', () => { vivoTecleo = Date.now(); }, true);
-    setInterval(vivoRevisar, VIVO_CADA);
+    setInterval(vivoRevisar, 3000);   // con Firebase solo compara (sin red); sin Firebase, va a Google cada 30 s
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') setTimeout(vivoRevisar, 800); });   // al volver a la pestaña
 
     async function actualizarModulo() {
@@ -10201,7 +10329,11 @@
     }
     function nomTraer(sem) {
         if (!nomCache[sem]) nomCache[sem] = (async () => {
-            const [asis, deu, cer, hor, aju] = await Promise.all([llamarApi({ action: 'asisg_listar', desde: sem, hasta: sumarDias(sem, 6) }), llamarApi({ action: 'cxc_deudas' }),
+            // (11/11) Un solo pedido con todo (nom_semana). Si Google todavía tiene la versión anterior (sin esa función), los 5 de antes.
+            let todo = null;
+            try { todo = await llamarApi({ action: 'nom_semana', semana: sem }); }
+            catch (e) { if (!/todavía no tiene esta función|Acción no válida/.test(e.message || '')) throw e; }
+            const [asis, deu, cer, hor, aju] = todo ? [todo.asis || {}, { deudas: todo.deudas }, { pagos: todo.cerradas }, { horarios: todo.horario }, { ajustes: todo.ajustes }] : await Promise.all([llamarApi({ action: 'asisg_listar', desde: sem, hasta: sumarDias(sem, 6) }), llamarApi({ action: 'cxc_deudas' }),
                                                         llamarApi({ action: 'nom_historial', desde: sem, hasta: sem }),
                                                         llamarApi({ action: 'hor_datos', semana: sem }).catch(() => ({ horarios: [] })),   // el horario guardado de la semana (si hay)
                                                         llamarApi({ action: 'nom_ajustes', semana: sem }).catch(() => ({ ajustes: null }))]);   // bonos, extras y gastos excluidos guardados
@@ -12108,7 +12240,8 @@
     }
     const perDeudasDe = (x, quien) => quien === 'gastos' ? x.tipoPersona === 'Gasto de tienda'
         // Clientes: solo clientes (de los locales y del almacén). Un nombre sin registrar viene de la ficha (crédito a un trabajador): va con los trabajadores
-        : quien === 'trabajadores' ? (x.tipoPersona === 'Trabajador' || x.tipoPersona === 'Sin registrar') : (x.tipoPersona === 'Cliente' || x.tipoPersona === 'Almacén');
+        : quien === 'trabajadores' ? (x.tipoPersona === 'Trabajador' || x.tipoPersona === 'Sin registrar') : quien === 'proveedores' ? x.tipoPersona === 'Proveedor'
+        : (x.tipoPersona === 'Cliente' || x.tipoPersona === 'Almacén');
     function perDeudas() {
         if (!perDeudasPend) { if (!perDeudasCargandoHist) setTimeout(perCargarDeudas, 0); return cargandoHTML('Cargando deudas de BD NOMINA...'); }
         // Histórico listo para esas fechas, o (mientras llega) lo pendiente
@@ -12137,7 +12270,7 @@
                 ${histListo ? `<div class="kpi ok"><div class="k-label">Pagado (${fechaBonita(perDeudasDatos.desde)} al ${fechaBonita(perDeudasDatos.hasta)})</div><div class="k-value">${perUsd(suma(pag, 'usd'))}</div><div class="k-label">Bs ${fmt(suma(pag, 'bs'))} · ${pag.length}</div></div>` : ''}
             </div>`;
         const controles = `<div class="per-deudas-ctrl">
-                ${seg('quien', perDeudasQuien, [['trabajadores', 'Trabajadores'], ['clientes', 'Clientes'], ['gastos', 'Gastos de tienda']])}
+                ${seg('quien', perDeudasQuien, [['trabajadores', 'Trabajadores'], ['clientes', 'Clientes'], ['proveedores', 'Proveedores'], ['gastos', 'Gastos de tienda']])}
                 ${seg('vista', perDeudasVista, [['lista', 'Lista'], ['grafico', 'Gráfico']])}
                 ${gastos ? (perDeudasHist ? seg('estado', perDeudasEstado, [['', 'Todo'], ['pendiente', 'Pendiente'], ['pagado', 'Pagado']]) : '')
                          : seg('estado', perDeudasEstado, [['', 'Todo'], ['vencido', 'Vencido'], ['vigente', 'Vigente']].concat(perDeudasHist ? [['pagado', 'Pagado']] : []))}
@@ -12163,7 +12296,7 @@
         const pend = lista.filter(x => x.estado === 'vencido' || x.estado === 'vigente');
         if (!pend.length) return '';
         hoy = hoy || fechaLocalHoy();
-        const quien = perDeudasQuien === 'clientes' ? 'clientes' : 'trabajadores';
+        const quienT = ({ clientes: 'Clientes', proveedores: 'Proveedores' })[perDeudasQuien] || 'Trabajadores';
         const venc = pend.filter(x => x.estado === 'vencido'), vig = pend.filter(x => x.estado === 'vigente');
         const suma = arr => arr.reduce((s, x) => s + x.usd, 0), tV = suma(venc), tG = suma(vig), tot = tV + tG || 1;
         const pct = v => Math.round(v / tot * 100);
@@ -12174,7 +12307,7 @@
         const barras = (titulo, gs, clase) => `<div class="per-res-col"><div class="per-res-tit">${titulo}</div>${gs.map(g => `
             <div class="per-res-fila" title="${esc(g.n)}: ${perUsd(g.usd)} en ${g.c} deuda(s)"><span>${g.n}</span>
                 <span class="per-res-pista"><i class="${clase}" style="width:${(g.usd / max * 100).toFixed(1)}%"></i></span><b>${g.usd ? perUsd(g.usd) : '—'}</b></div>`).join('')}</div>`;
-        return `<div class="grafico-card per-res"><div class="grafico-head"><h3>Vencido vs vigente · ${quien === 'clientes' ? 'Clientes' : 'Trabajadores'} <small class="nota" style="margin:0">en $</small></h3>
+        return `<div class="grafico-card per-res"><div class="grafico-head"><h3>Vencido vs vigente · ${quienT} <small class="nota" style="margin:0">en $</small></h3>
                 <div class="leyenda"><span class="ley-item"><i style="background:var(--bad)"></i>Vencido</span><span class="ley-item"><i style="background:var(--c1)"></i>Vigente</span></div></div>
             <div class="per-res-split">
                 ${tV ? `<button type="button" class="venc" style="flex:${tV}" title="Vencido: ${perUsd(tV)} en ${venc.length} deuda(s) · tocar para ver solo lo vencido" onclick="perDeudasModo('estado', '${perDeudasEstado === 'vencido' ? '' : 'vencido'}')"><b>${perUsd(tV)}</b><small>vencido · ${pct(tV)} %</small></button>` : ''}
@@ -12764,21 +12897,23 @@
     // ---------- Clientes ----------
     function perClientes() {
         const lista = perDatos.clientes.filter(c => perPasa(c.nombre, c.id, c.cedula, c.telefono));
-        const nCli = perDatos.clientes.filter(c => c.tipo === 'Cliente').length, nAlm = perDatos.clientes.filter(c => c.tipo === 'Almacén').length, nTra = perDatos.clientes.length - nCli - nAlm;
+        const nCli = perDatos.clientes.filter(c => c.tipo === 'Cliente').length, nAlm = perDatos.clientes.filter(c => c.tipo === 'Almacén').length, nTra = perDatos.clientes.filter(c => c.tipo === 'Trabajador').length;
+        const nProv = perDatos.clientes.filter(c => c.tipo === 'Proveedor').length;
         return `<div class="kpis">
                 <div class="kpi"><div class="k-label">Clientes</div><div class="k-value">${nCli}</div></div>
                 <div class="kpi"><div class="k-label">Trabajadores (clientes automáticos)</div><div class="k-value">${nTra}</div></div>
                 ${nAlm ? `<div class="kpi"><div class="k-label">Clientes del almacén</div><div class="k-value">${nAlm}</div></div>` : ''}
+                ${nProv ? `<div class="kpi"><div class="k-label">Proveedores del almacén</div><div class="k-value">${nProv}</div></div>` : ''}
             </div>
             <div class="req-acciones" style="margin-top:0"><button type="button" class="btn-primary" onclick="perEditarCliente('')">+ Nuevo cliente</button></div>
             ${lista.length ? `<div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">ID</th><th class="izq">Nombre</th><th class="izq">Tipo</th><th class="izq">Teléfono</th><th class="izq">RIF / Cédula</th><th class="izq">Notas</th><th></th></tr></thead><tbody>
             ${lista.map(c => `<tr><td class="izq"><small>${esc(c.id)}</small></td><td class="izq"><b>${esc(c.nombre)}</b></td>
-                <td class="izq"><span class="chip ${c.tipo === 'Trabajador' ? 'st-info' : c.tipo === 'Almacén' ? 'st-ok' : 'st-pend'}">${c.tipo}</span></td><td class="izq">${esc(c.telefono) || '—'}</td>
+                <td class="izq"><span class="chip ${c.tipo === 'Trabajador' ? 'st-info' : c.tipo === 'Almacén' ? 'st-ok' : c.tipo === 'Proveedor' ? 'st-amar' : 'st-pend'}">${c.tipo}</span></td><td class="izq">${esc(c.telefono) || '—'}</td>
                 <td class="izq">${esc(c.cedula) || '—'}</td><td class="izq"><small>${esc(c.notas)}</small></td>
-                <td class="alm-acc">${c.tipo === 'Cliente' ? `<button type="button" class="btn-ghost btn-mini" onclick="perEditarCliente('${esc(c.id)}')">Modificar</button>` : c.tipo === 'Almacén' ? '<small>en Almacén</small>' : '<small>en Nómina</small>'}
-                    ${c.tipo !== 'Trabajador' ? `<button type="button" class="btn-ghost btn-mini btn-peligro" style="color:var(--danger)" onclick="perEliminarCliente('${esc(c.id)}')">Eliminar</button>` : ''}</td></tr>`).join('')}
+                <td class="alm-acc">${c.tipo === 'Cliente' ? `<button type="button" class="btn-ghost btn-mini" onclick="perEditarCliente('${esc(c.id)}')">Modificar</button>` : c.tipo === 'Almacén' || c.tipo === 'Proveedor' ? '<small>en Almacén</small>' : '<small>en Nómina</small>'}
+                    ${c.tipo === 'Cliente' || c.tipo === 'Almacén' ? `<button type="button" class="btn-ghost btn-mini btn-peligro" style="color:var(--danger)" onclick="perEliminarCliente('${esc(c.id)}')">Eliminar</button>` : ''}</td></tr>`).join('')}
             </tbody></table></div>` : '<div class="empty">No hay clientes con ese nombre.</div>'}
-            <div class="nota">Para registrar un abono o una deuda, el cliente debe estar registrado aquí. Los trabajadores entran solos (se modifican en Talento humano › Trabajadores).</div>`;
+            <div class="nota">Para registrar un abono o una deuda, el cliente debe estar registrado aquí. Los trabajadores entran solos (se modifican en Talento humano › Trabajadores) y también los proveedores del almacén (se registran en Almacén › Proveedores), para anotarles devoluciones u otras deudas.</div>`;
     }
     function perEditarCliente(id) {
         const c = id ? perDatos.clientes.find(x => x.id === id) : {};
@@ -14626,11 +14761,11 @@ Reglas:
         return `<div class="grafico-card">
                 <h3 style="margin-top:0">Compra con foto de la factura</h3>
                 <div class="nota" style="margin-top:0">Tome la foto derecha, completa y con buena luz. Si la factura tiene varias páginas, una foto por página (hasta 4). Gemini lee proveedor, productos, cantidades y costos; usted revisa todo antes de guardar.</div>
-                <div class="cmp-fotos">${cmp.fotos.map((f, i) => `<div class="cmp-foto"><img src="${f}" alt="Página ${i + 1}"><button type="button" title="Quitar" onclick="cmp.fotos.splice(${i},1);almPintar()">✕</button></div>`).join('')}
+                ${cmp.leyendo ? cmpEscanerHTML() : ''}<div class="cmp-fotos" ${cmp.leyendo ? 'hidden' : ''}>${cmp.fotos.map((f, i) => `<div class="cmp-foto"><img src="${f}" alt="Página ${i + 1}"><button type="button" title="Quitar" onclick="cmp.fotos.splice(${i},1);almPintar()">✕</button></div>`).join('')}
                     ${cmp.fotos.length < 4 ? `<label class="cmp-agregar">${ico('camara', 28)}<span>${cmp.fotos.length ? 'Tomar otra página' : 'Tomar foto'}</span><input type="file" accept="image/*" capture="environment" hidden onchange="cmpAgregarFotos(this.files); this.value=''"></label>
                         <label class="cmp-agregar">${ico('imagen', 28)}<span>${cmp.fotos.length ? 'Elegir otra foto' : 'Elegir foto ya tomada'}</span><input type="file" accept="image/*" multiple hidden onchange="cmpAgregarFotos(this.files); this.value=''"></label>` : ''}</div>
                 <div class="login-error" id="cmpError"></div>
-                <div class="req-acciones cmp-foto-acc" style="margin-bottom:0"><button type="button" class="btn-ghost" onclick="cmpSinFoto()">Escribir sin foto</button>
+                <div class="req-acciones cmp-foto-acc" style="margin-bottom:0" ${cmp.leyendo ? 'hidden' : ''}><button type="button" class="btn-ghost" onclick="cmpSinFoto()">Escribir sin foto</button>
                     <button type="button" class="btn-ghost" onclick="cmp.modoTexto=true;cmpPintarCompra(document.getElementById('almContenido'), true)">Pegar texto de otra IA</button>
                     <button type="button" class="btn-primary" id="cmpBtnLeer" onclick="cmpLeer()" ${cmp.fotos.length && !cmp.leyendo ? '' : 'disabled'}>${cmp.leyendo ? 'Leyendo la factura...' : 'Leer factura'}</button></div>
             </div>
@@ -14787,22 +14922,65 @@ Reglas:
     }
     // Leer: con reloj en el botón y un límite de 2 minutos; cualquier error (también al armar la tabla) se muestra
     let cmpFotosPromesa = null;   // subida de las fotos a Drive en curso (después de leer)
+    // ---- Mientras Gemini lee (11/11): la foto con una línea que la recorre y los pasos de la lectura ----
+    // Gemini no avisa por dónde va (responde todo junto al final): los pasos avanzan con el tiempo típico de una lectura, y el último
+    // se queda "en curso" hasta que llega la respuesta. Si la conexión se corta, se reintenta solo una vez con las mismas fotos.
+    const CMP_PASOS_LECTURA = [[0, 'Enviando la foto a Google'], [3, 'Leyendo el proveedor y el RIF'], [7, 'Leyendo el número y la fecha de la factura'],
+        [11, 'Leyendo los productos'], [18, 'Leyendo cantidades y costos'], [26, 'Calculando el IVA y el total'], [33, 'Buscando los productos en el catálogo']];
+    let cmpEsc = { desde: 0, reintento: false, pagina: 0 };
+    function cmpEscanerHTML() {
+        const n = cmp.fotos.length, i = cmpEsc.pagina % Math.max(1, n);
+        return `<div class="cmp-escaner" role="status" aria-live="polite">
+            <div class="cmp-escaner-foto"><img id="cmpEscImg" src="${cmp.fotos[i] || ''}" alt="Factura que se está leyendo"><span class="cmp-escaner-linea"></span>
+                ${n > 1 ? `<span class="cmp-escaner-pag" id="cmpEscPag">Página ${i + 1} de ${n}</span>` : ''}</div>
+            <div class="cmp-escaner-lado"><div class="cmp-escaner-tit">Leyendo la factura <b id="cmpEscSeg">${Math.round((Date.now() - cmpEsc.desde) / 1000)} s</b></div>
+                <ul class="cmp-escaner-pasos" id="cmpEscPasos">${cmpPasosHTML()}</ul></div></div>`;
+    }
+    function cmpPasosHTML() {
+        const s = (Date.now() - cmpEsc.desde) / 1000, ult = CMP_PASOS_LECTURA.filter(p => s >= p[0]).length - 1;
+        return CMP_PASOS_LECTURA.map((p, i) => `<li class="${i < ult ? 'hecho' : i === ult ? 'actual' : ''}"><span class="cmp-paso-ic">${i < ult ? '✓' : ''}</span>${p[1]}${i === ult ? '...' : ''}</li>`).join('')
+            + (cmpEsc.reintento ? '<li class="aviso"><span class="cmp-paso-ic">!</span>Se cortó la conexión: reintentando (no hace falta tomar la foto otra vez)...</li>'
+                : s > 45 ? '<li class="aviso"><span class="cmp-paso-ic">!</span>Gemini está tardando más de lo normal: espere un poco más...</li>' : '');
+    }
+    function cmpEscanerTic() {
+        if (!cmp.leyendo) return;
+        const seg = document.getElementById('cmpEscSeg'), pasos = document.getElementById('cmpEscPasos');
+        if (seg) seg.textContent = Math.round((Date.now() - cmpEsc.desde) / 1000) + ' s';
+        if (pasos) pasos.innerHTML = cmpPasosHTML();
+        // Varias páginas: se va mostrando cada una
+        const n = cmp.fotos.length, img = document.getElementById('cmpEscImg');
+        if (n > 1 && img && Math.floor((Date.now() - cmpEsc.desde) / 4000) % n !== cmpEsc.pagina % n) {
+            cmpEsc.pagina = Math.floor((Date.now() - cmpEsc.desde) / 4000) % n; img.src = cmp.fotos[cmpEsc.pagina];
+            const pg = document.getElementById('cmpEscPag'); if (pg) pg.textContent = `Página ${cmpEsc.pagina + 1} de ${n}`;
+        }
+    }
     async function cmpLeer() {
         if (!cmp.fotos.length || cmp.leyendo) return;
-        const out = () => document.getElementById('almContenido'), desde = Date.now();
+        const out = () => document.getElementById('almContenido');
+        cmpEsc = { desde: Date.now(), reintento: false, pagina: 0 };
         cmp.leyendo = true; cmpPintarCompra(out(), true);
-        const reloj = setInterval(() => { const b = document.getElementById('cmpBtnLeer'); if (b && cmp.leyendo) b.textContent = `Leyendo la factura... ${Math.round((Date.now() - desde) / 1000)} s`; }, 1000);
+        const reloj = setInterval(cmpEscanerTic, 1000);
         try {
             const imagenes = cmp.fotos.slice();
-            const r = await Promise.race([llamarApi({ action: 'cmp_leer', imagenes, fotosAparte: true }),
+            const leer = () => Promise.race([llamarApi({ action: 'cmp_leer', imagenes, fotosAparte: true }),
                 new Promise((_, mal) => setTimeout(() => mal(new Error('Gemini tardó más de 2 minutos sin responder. Vuelva a intentar; si se repite, recorte la foto a solo la factura.')), 120000))]);
+            let r;
+            // Leer no guarda nada: si la conexión se corta (Google no llegó a responder), se vuelve a pedir una vez, solo
+            try { r = await leer(); }
+            catch (e) {
+                if (!e.sinRespuesta || navigator.onLine === false) throw e;
+                cmpEsc.reintento = true; cmpEscanerTic();
+                await new Promise(ok => setTimeout(ok, 1500));
+                try { r = await leer(); }
+                catch (e2) { if (e2.sinRespuesta) throw new Error('Se perdió la conexión con Google mientras leía la factura (se intentó 2 veces). Revise el internet y pulse "Leer factura" otra vez: las fotos siguen aquí.'); throw e2; }
+            }
             cmp.leyendo = false;
             cmpUsarLectura(r);
             if (r.segundos) cmpAvanceEstadoPintar(`Factura leída en ${String(r.segundos).replace('.', ',')} s` + (r.modelo ? ` · ${r.modelo}` : ''));
             // Las fotos a Drive, en segundo plano (la lectura ya no las espera). Guardar la compra espera a que terminen.
             if (!(r.fotos || []).length) cmpFotosPromesa = llamarApi({ action: 'cmp_fotos', imagenes, proveedor: (r.proveedorLeido || {}).nombre || '', factura: r.factura || '' })
-                .then(x => { if (cmp.paso === 'revisar' && x.fotos && x.fotos.length) { cmp.enlaces = x.fotos; cmpAvanceProgramar(); } })
-                .catch(e => console.warn('Fotos de la factura sin guardar en Drive: ' + e.message))
+                .then(x => { if (cmp.paso === 'revisar' && x.fotos && x.fotos.length) { cmp.enlaces = x.fotos; cmpAvanceProgramar(); } return x.fotos || []; })
+                .catch(e => { console.warn('Fotos de la factura sin guardar en Drive: ' + e.message); return []; })
                 .finally(() => { cmpFotosPromesa = null; });
         } catch (e) {
             cmp.leyendo = false; cmp.paso = 'foto';
@@ -15085,7 +15263,11 @@ Reglas:
         if (!confirm(`${alAlmacen ? alAlmacen + ' producto(s) con código entran al almacén. ' : ''}${notas.length ? 'Se emite una nota a: ' + notas.join(', ') + ' (se envían solas a Telegram).' : 'No se reparte nada a las tiendas: no se emiten notas ni se envía nada a Telegram.'}` + (sinPrecio ? `\n${sinPrecio} producto(s) sin precio al detal: quedan "por definir precio".` : '') + '\n\n¿Guardar la compra?')) return;
         const btn = document.getElementById('cmpBtnGuardar'); btnCargando(btn, 'Guardando...');
         clearTimeout(cmpAvanceEspera);
-        if (cmpFotosPromesa) { btn.textContent = 'Guardando las fotos...'; await cmpFotosPromesa; btn.textContent = 'Guardando...'; }   // que la compra lleve sus fotos
+        // (11/11) Ya no se espera a que las fotos terminen de subir a Drive: la compra se guarda enseguida y las fotos se le agregan al
+        // terminar (cmp_fotos_compra). Mientras tanto, el botón dice por dónde va (por el tiempo típico de cada parte).
+        const fotosEnCamino = cmpFotosPromesa, desdeG = Date.now(), tiendasN = CMP_TIENDAS.filter(t => lineas.some(l => Number(l.dist[t]) > 0)).length;
+        const pasosG = [[0, 'Guardando: entrada al almacén'], [4, tiendasN ? 'Guardando: notas a ' + tiendasN + ' tienda' + (tiendasN === 1 ? '' : 's') : 'Guardando: existencia'], [4 + 3 * Math.max(1, tiendasN), 'Guardando: precios y órdenes'], [8 + 3 * Math.max(1, tiendasN), 'Guardando: registrando la compra']];
+        const relojG = setInterval(() => { const s = (Date.now() - desdeG) / 1000, p = pasosG.filter(x => s >= x[0]).pop(); if (btn.disabled) btnCargando(btn, p[1] + '... ' + Math.round(s) + ' s'); }, 1000);
         while (cmpAvanceEnviando) await new Promise(r => setTimeout(r, 200));   // que termine el guardado del avance (si no, podría volver a crearla en curso)
         // Un mismo identificador para esta compra en cada intento: si Google tardó y dio error pero sí la guardó, el reintento NO la
         // repite (05/11: una factura entró dos veces). Además Google no acepta la misma factura del mismo proveedor dos veces.
@@ -15102,7 +15284,7 @@ Reglas:
                 if (!/^FACTURA_REPETIDA/.test(e.message || '')) throw e;
                 const txt = e.message.replace(/^FACTURA_REPETIDA:\s*/, '');
                 if (!confirm(txt + '\n\nSi es la MISMA factura, pulse Cancelar (ya está guardada; véala en Compras recientes).\nSi es OTRA factura distinta con el mismo número, pulse Aceptar para registrarla.')) {
-                    err.textContent = txt; btn.disabled = false; btn.textContent = 'Guardar compra y emitir notas'; cmpCompras = null; return;
+                    clearInterval(relojG); err.textContent = txt; btn.disabled = false; btn.textContent = 'Guardar compra y emitir notas'; cmpCompras = null; return;
                 }
                 cmp.idemGuardar = nuevoIdem();
                 r = await llamarApi(Object.assign({}, pedido, { idem: cmp.idemGuardar, repetidaOk: true }));
@@ -15120,6 +15302,9 @@ Reglas:
                 });
             });
             almNotas = null; almIngresos = null; almTiendas = null; cmpCompras = null; cmpOrd = null;
+            clearInterval(relojG);
+            // Las fotos que todavía subían: se agregan a la compra cuando terminen (sin hacer esperar a nadie)
+            if (fotosEnCamino && r.compra && !(pedido.fotos || []).length) fotosEnCamino.then(fotos => { if (fotos && fotos.length) llamarApi({ action: 'cmp_fotos_compra', compra: r.compra, fotos }).then(() => { cmpCompras = null; }).catch(e => console.warn('Fotos sin agregar a la compra ' + r.compra + ': ' + e.message)); });
             Object.assign(cmp, { paso: 'listo', resultado: r, fotos: [], borradorId: null, borradorVer: '', idemGuardar: null });
             cmpAvanceEstado = '';   // "Compras en curso" se vuelve a leer con las compras (cmpCompras = null)
             cmpPintarCompra(document.getElementById('almContenido'), true);
@@ -15133,6 +15318,7 @@ Reglas:
                     .finally(() => { r.libroPendiente = false; cmpCompras = null; repintar(); });
             }
         } catch (e) {
+            clearInterval(relojG);
             err.textContent = e.message + (e.sinRespuesta ? ' Puede pulsar Guardar otra vez: si ya se había guardado, NO se repite.' : '');
             btn.disabled = false; btn.textContent = 'Guardar compra y emitir notas';
         }
@@ -15217,7 +15403,8 @@ Reglas:
         if (!cmpOrd || !cmpOrd.ordenes) return cargandoHTML('Cargando órdenes...');
         if (cmpOrd.error) return `<div class="banner error">${esc(cmpOrd.error)}</div>`;
         const f = cmpOrdF, completas = almTab === 'completas', l = cmpOrdFiltradas();
-        const tiendas = f.tienda ? [f.tienda] : CMP_TIENDAS, conMayor = l.some(o => o.mayor > 0 || o.categoria === 'Charcutería');
+        const tiendas = f.tienda ? [f.tienda] : CMP_TIENDAS, conMayor = l.some(o => o.mayor > 0 || o.gran > 0 || o.categoria === 'Charcutería');
+        const tg = cmpTgPuede(completas), conPrecio = l.filter(cmpTgSirve), selV = conPrecio.filter(o => cmpSelTg.has(o.id));
         const etiqueta = cmpPV.modo === 'bs' ? 'Bs' : cmpPV.modo === 'desc' ? `$ −${String(cmpDesc()).replace('.', ',')} %` : '$ BCV';
         const modos = [['bs', 'Bs'], ['usd', '$ BCV'], ['desc', `$ −${String(cmpDesc()).replace('.', ',')} %`]];
         return `<div class="filters alm-filtros">
@@ -15234,18 +15421,54 @@ Reglas:
             </div>
             ${completas ? '' : `<div class="cmp-resumen"><span>Por definir precio: <b style="color:var(--amar-txt)">${cmpOrd.porDefinir || 0}</b></span><span>Por actualizar: <b>${cmpOrd.porActualizar || 0}</b></span>${f.tienda ? `<span>Pendientes en ${esc(f.tienda)}: <b>${l.length}</b></span>` : ''}
                 ${permisos.some(x => x === 'precios' || x === 'inventario') ? `<button type="button" class="btn-primary btn-mini cmp-imp" onclick="cmpNuevaOrdenDlg()" title="Cargar un precio nuevo aunque no haya llegado mercancía">＋ Cambio de precio sin compra</button>` : ''}
+                ${tg && conPrecio.length ? `<button type="button" class="btn-ghost btn-mini cmp-imp" onclick="cmpEnviarTelegram(this)" title="Detal, mayor y gran mayor al grupo de Telegram &quot;Control de depósito&quot;, en la moneda elegida arriba">${ico('avisar')}Enviar a Telegram ${selV.length ? '(' + selV.length + ' elegido' + (selV.length === 1 ? '' : 's') + ')' : '(todos)'}</button>` : ''}
                 ${l.length ? `<button type="button" class="btn-ghost btn-mini cmp-imp" onclick="cmpImprimirPendientes()">${ico('imprimir')}Imprimir ${f.tienda ? 'lo de ' + esc(f.tienda) : 'la lista'}</button>` : ''}</div>`}
+            ${completas && tg && conPrecio.length ? `<div class="cmp-resumen"><span>Para reenviar precios de estas fechas: elija con la casilla (o ninguno = todos los vigentes de la lista).</span><button type="button" class="btn-ghost btn-mini cmp-imp" onclick="cmpEnviarTelegram(this)" title="Detal, mayor y gran mayor al grupo de Telegram &quot;Control de depósito&quot;, en la moneda elegida arriba">${ico('avisar')}Enviar a Telegram ${selV.length ? '(' + selV.length + ' elegido' + (selV.length === 1 ? '' : 's') + ')' : '(' + conPrecio.length + ')'}</button></div>` : ''}
             ${completas ? `<div class="nota" style="margin-top:0">${l.length} cambio(s) de precio${cmpOrdF.bus ? ' de "' + esc(cmpOrdF.bus) + '"' : ''} entre el ${fechaBonita(cmpHistF.desde)} y el ${fechaBonita(cmpHistF.hasta)}, del más nuevo al más viejo (también los que después se reemplazaron por otro precio).</div>` : ''}
             ${!l.length ? `<div class="empty">${completas ? 'No hubo cambios de precio con esos filtros.' : 'No hay nada pendiente con estos filtros.'}</div>` : `<div class="tabla-wrap"><table class="req-tabla cmp-otabla" data-sin-paginar><thead><tr>
-                <th class="izq">Producto</th><th>Costo ${etiqueta}</th><th>Detal ${etiqueta}</th>${conMayor ? `<th>Mayor ${etiqueta}</th>` : ''}
+                ${tg ? `<th class="cmp-sel"><input type="checkbox" title="Elegir todos para enviar a Telegram" aria-label="Elegir todos" ${conPrecio.length && selV.length === conPrecio.length ? 'checked' : ''} onchange="cmpTgTodos(this.checked)"></th>` : ''}<th class="izq">Producto</th><th>Costo ${etiqueta}</th><th>Detal ${etiqueta}</th>${conMayor ? `<th>Mayor ${etiqueta}</th>` : ''}
                 ${tiendas.map(t => `<th class="cmp-oth">${esc(CMP_SIGLA[t])}<small>${esc(t)}</small>${completas ? '' : `<button type="button" class="cmp-todo" title="Marcar con precio actualizado todo lo pendiente de ${esc(t)} en esta lista" onclick="cmpMarcarTienda('${esc(t)}')">✓ todo</button>`}</th>`).join('')}
-                </tr></thead><tbody>${l.map(o => cmpOrdenFila(o, tiendas, completas, conMayor)).join('')}</tbody></table></div>`}
+                </tr></thead><tbody>${l.map(o => cmpOrdenFila(o, tiendas, completas, conMayor, tg)).join('')}</tbody></table></div>`}
             <div class="nota">Un clic en <b>Ingresó</b> o <b>Precio</b> lo marca a su nombre con la hora (y el "cómo" elegido arriba). Un clic en uno marcado muestra quién y cómo, y permite quitarlo. Los precios "$ −${String(cmpDesc()).replace('.', ',')} %" son los que se cargan en el sistema de la tienda para pago en divisas.</div>`;
     }
     // "Wander Daniel Paredes" -> "Wander D."; "2026-10-26 14:32" -> "26/10 · 2:32 p. m."
     const cmpNombreCorto = n => { const p = String(n || '').replace(/\s*\(.*\)\s*$/, '').trim().split(/\s+/); return p.length > 1 ? p[0] + ' ' + p[1].charAt(0) + '.' : p[0] || ''; };
     const cmpCuandoCorto = en => { const m = /^(\d{4})-(\d{2})-(\d{2})(?:\s+(\d{2}:\d{2}))?/.exec(String(en || '')); return m ? `${m[3]}/${m[2]}${m[4] ? ' · ' + horaAmPm(m[4]) : ''}` : String(en || ''); };
-    function cmpOrdenFila(o, tiendas, completas, conMayor) {
+    // (11/11) Enviar precios por Telegram al grupo "Control de depósito": los elegidos con la casilla, o todos los de la lista con precio
+    const cmpSelTg = new Set();
+    const cmpTgPuede = () => permisos.some(x => x === 'precios' || x === 'inventario');   // también en Historial (reenviar precios de una fecha)
+    const cmpTgSirve = o => (o.detal > 0 || o.mayor > 0 || o.gran > 0) && !/^Reemplazada/.test(o.estado);   // los reemplazados ya no valen
+    function cmpTgElegir(id, si) { if (si) cmpSelTg.add(id); else cmpSelTg.delete(id); almPintar(); }
+    function cmpTgTodos(si) { cmpOrdFiltradas().filter(cmpTgSirve).forEach(o => si ? cmpSelTg.add(o.id) : cmpSelTg.delete(o.id)); almPintar(); }
+    async function cmpEnviarTelegram(btn) {
+        const conPrecio = cmpOrdFiltradas().filter(cmpTgSirve), elegidos = conPrecio.filter(o => cmpSelTg.has(o.id));
+        const lista = elegidos.length ? elegidos : conPrecio;
+        if (!lista.length) { mostrarBanner('No hay productos con precio definido en esta lista.', 'warn'); return; }
+        const moneda = cmpPV.modo === 'bs' ? 'bs' : cmpPV.modo === 'desc' ? 'div' : 'usd', tasa = cmpTasa();
+        if (moneda === 'bs' && !(tasa > 0)) { mostrarBanner('Escriba la tasa para enviar los precios en Bs.', 'warn'); return; }
+        const en = moneda === 'bs' ? 'en Bs (tasa ' + fmt(tasa) + ')' : moneda === 'div' ? 'en $ con ' + String(cmpDesc()).replace('.', ',') + ' % de descuento' : 'en $ BCV';
+        if (!confirm('Se enviarán ' + lista.length + ' precio' + (lista.length === 1 ? '' : 's') + ' (detal, mayor y gran mayor) ' + en + ' al grupo de Telegram "Control de depósito".\n\n¿Enviar?')) return;
+        btnCargando(btn, 'Enviando...');
+        try {
+            const r = await llamarApi({ action: 'cmp_avisar_lista', ids: lista.map(o => o.id), moneda, tasa });
+            mostrarBanner('Enviado al grupo "Control de depósito": ' + r.enviados + ' producto' + (r.enviados === 1 ? '' : 's') + (r.mensajes > 1 ? ' en ' + r.mensajes + ' mensajes' : '') + '.', 'ok');
+            cmpSelTg.clear();
+        } catch (e) { mostrarBanner('No se envió: ' + e.message, 'error'); }
+        almPintar();
+    }
+    // (11/11) Historial: por qué dejó de valer un precio y quién lo hizo (lo manda el servidor en o.fin)
+    function cmpFinChip(o) {
+        const f = o.fin || {};
+        return f.tipo === 'anulada' ? ` <span class="chip st-falta">Compra ${esc(f.compra || '')} anulada</span>` : ` <span class="chip st-pend">Reemplazado${f.id ? ' por ' + esc(f.id) : ''}</span>`;
+    }
+    function cmpFinDetalle(o) {
+        const f = o.fin; if (!f) return '';
+        if (f.tipo === 'anulada') return `<small class="cmp-fin">Anuló <b>${esc(cmpNombreCorto(f.quien) || '—')}</b>${f.cuando ? ' · ' + esc(cmpCuandoCorto(f.cuando)) : ''}${f.motivo ? ' · motivo: ' + esc(f.motivo) : ''}</small>`;
+        const [q, cu] = String(f.definidoPor || '').split(' · ');
+        const precio = [f.detal > 0 ? 'detal ' + cmpMon(f.detal) : '', f.mayor > 0 ? 'mayor ' + cmpMon(f.mayor) : '', f.gran > 0 ? 'gran mayor ' + cmpMon(f.gran) : ''].filter(Boolean).join(' · ');
+        return `<small class="cmp-fin">Lo reemplazó ${f.origen ? '<b>' + esc(f.origen) + '</b>' : 'otra orden'}${q ? ' · precio de <b>' + esc(cmpNombreCorto(q)) + '</b>' : f.creadaPor ? ' · <b>' + esc(cmpNombreCorto(f.creadaPor)) + '</b>' : ''}${cu ? ' · ' + esc(cmpCuandoCorto(cu)) : f.fecha ? ' · ' + esc(cmpCuandoCorto(f.fecha)) : ''}${precio ? ' · nuevo: ' + precio : ''}</small>`;
+    }
+    function cmpOrdenFila(o, tiendas, completas, conMayor, tg) {
         const definir = o.estado === 'Por definir precio', puedePrecio = !completas && permisos.some(x => x === 'precios' || x === 'inventario');
         const flecha = (a, b) => !a || !b || Math.abs(a - b) < 0.005 ? '' : `<small class="${b > a ? 'sube' : 'baja'}">${b > a ? '▲' : '▼'} ${fmt(Math.abs(b / a - 1) * 100)} %</small>`;
         const boton = (t, k) => {
@@ -15260,14 +15483,17 @@ Reglas:
             return `<button type="button" class="cmp-bt" onclick="cmpMarcarRapido('${esc(o.id)}','${esc(t)}','${k}')">${txt}</button>`;
         };
         const una = tiendas.length === 1 ? (o.dist[tiendas[0]] || {}) : null;
+        const conPrecio = cmpTgSirve(o);
         return `<tr class="${definir ? 'cmp-definir' : ''}">
-            <td class="izq">${una ? (una.cant > 0 ? `<span class="cmp-cant">${almCant(una.cant, o.tipo)} ${almUnidad(o.tipo)}</span>` : '<span class="cmp-cant sin">solo precio</span>') : ''}<b>${esc(o.descripcion)}</b>${definir ? ' <span class="chip st-sobra">Por definir precio</span>' : ''}${completas && o.estado && o.estado !== 'Completa' ? ` <span class="chip ${/^Reemplazada/.test(o.estado) ? 'st-pend' : 'st-info'}">${/^Reemplazada/.test(o.estado) ? 'Reemplazado por otro precio' : esc(o.estado)}</span>` : ''}
+            ${tg ? `<td class="cmp-sel">${conPrecio ? `<input type="checkbox" aria-label="Elegir ${esc(o.descripcion)} para Telegram" ${cmpSelTg.has(o.id) ? 'checked' : ''} onchange="cmpTgElegir('${esc(o.id)}', this.checked)">` : ''}</td>` : ''}
+            <td class="izq">${una ? (una.cant > 0 ? `<span class="cmp-cant">${almCant(una.cant, o.tipo)} ${almUnidad(o.tipo)}</span>` : '<span class="cmp-cant sin">solo precio</span>') : ''}<b>${esc(o.descripcion)}</b>${definir ? ' <span class="chip st-sobra">Por definir precio</span>' : ''}${completas && o.estado && o.estado !== 'Completa' ? (/^Reemplazada/.test(o.estado) ? cmpFinChip(o) : ` <span class="chip st-info">${esc(o.estado)}</span>`) : ''}
                 <small>${o.codigo ? esc(o.codigo) : 'sin código'} · ${esc(o.categoria)} · ${esc(o.proveedor || o.origen)} · ${esc(String(o.fecha).slice(0, 10))}</small>
                 ${completas && o.definidoPor ? (() => { const [q, cu] = String(o.definidoPor).split(' · '); return `<small>Precio definido por <b>${esc(cmpNombreCorto(q))}</b>${cu ? ' · ' + esc(cmpCuandoCorto(cu)) : ''}</small>`; })() : ''}
+                ${completas ? cmpFinDetalle(o) : ''}
                 ${puedePrecio ? `<button type="button" class="cmp-link" onclick="cmpPrecioDlg('${esc(o.id)}')">${definir ? 'Definir precio' : 'Cambiar precio'}</button>` : ''}</td>
             <td><b>${cmpMon(o.costo)}</b>${flecha(o.costoAnt, o.costo)}</td>
             <td><b>${cmpMon(o.detal)}</b>${o.detalAnt ? `<small>antes ${cmpMon(o.detalAnt)}</small>` : ''}</td>
-            ${conMayor ? `<td>${o.mayor ? `<b>${cmpMon(o.mayor)}</b>${o.mayorAnt ? `<small>antes ${cmpMon(o.mayorAnt)}</small>` : ''}` : '<small>—</small>'}</td>` : ''}
+            ${conMayor ? `<td>${o.mayor ? `<b>${cmpMon(o.mayor)}</b>${o.mayorAnt ? `<small>antes ${cmpMon(o.mayorAnt)}</small>` : ''}` : '<small>—</small>'}${o.gran > 0 ? `<small>Gran mayor <b>${cmpMon(o.gran)}</b></small>` : ''}</td>` : ''}
             ${tiendas.map(t => { const d = o.dist[t] || {}; return `<td class="cmp-otd"><div class="cmp-bts">${d.cant > 0 ? boton(t, 'ingresado') : ''}${boton(t, 'actualizado')}</div>${d.cant > 0 ? `<small>${almCant(d.cant, o.tipo)} ${almUnidad(o.tipo)}${d.nota ? ' · NE ' + esc(d.nota) : ''}</small>` : ''}</td>`; }).join('')}
         </tr>`;
     }
@@ -15592,14 +15818,14 @@ Reglas:
         const p = almProducto(o.codigo) || (!o.codigo ? { codigo: '', descripcion: o.descripcion, categoria: o.categoria, tipo: o.tipo, iva: 'Exento', libre: true } : null);
         const s = p ? cmpSugerir(p, o.costo) : null;
         cmpCalc = { id, prod: p, codigo: o.codigo, costo: o.costo, merma: o.detal ? o.merma : (s ? s.merma : 0), libre: !!o.detal || !!(s && s.libre),
-                    detal: o.detal || (s ? s.detal : 0), mayor: o.mayor || (s ? s.mayor : 0), margenDetal: 0, margenMayor: 0 };
+                    detal: o.detal || (s ? s.detal : 0), mayor: o.mayor || (s ? s.mayor : 0), gran: o.gran || 0, margenDetal: 0, margenMayor: 0 };
         const cr = cmpCalc.costo * (1 + cmpCalc.merma / 100);
         cmpCalc.margenDetal = cmpCalc.detal > 0 ? cmpR2((1 - cr / cmpCalc.detal) * 100) : 0;
         cmpCalc.margenMayor = cmpCalc.mayor > 0 ? cmpR2((1 - cmpCalc.costo / cmpCalc.mayor) * 100) : 0;
         const n = c => `<input type="number" step="0.01" min="0" id="cmpK_${c}" value="${cmpCalc[c] ? cmpCalc[c] : ''}" oninput="cmpCalcEntrada('${c}', this.value)">`;
         almVentana(`<form class="req-dlg" onsubmit="cmpGuardarPrecio(event)">
             <h3>Precio en tiendas · ${esc(o.descripcion)}</h3>
-            <div class="req-sub">${esc(o.codigo)} · ${esc(o.categoria)} · costo $ ${fmt(o.costo)}${o.costoAnt ? ' (antes $ ' + fmt(o.costoAnt) + ')' : ''}${o.detalAnt ? ' · detal antes $ ' + fmt(o.detalAnt) : ''}${o.mayorAnt ? ' · mayor antes $ ' + fmt(o.mayorAnt) : ''}</div>
+            <div class="req-sub">${esc(o.codigo)} · ${esc(o.categoria)} · costo $ ${fmt(o.costo)}${o.costoAnt ? ' (antes $ ' + fmt(o.costoAnt) + ')' : ''}${o.detalAnt ? ' · detal antes $ ' + fmt(o.detalAnt) : ''}${o.mayorAnt ? ' · mayor antes $ ' + fmt(o.mayorAnt) : ''}${o.granAnt ? ' · gran mayor antes $ ' + fmt(o.granAnt) : ''}</div>
             ${s ? `<div class="nota cmp-regla" style="margin-top:.4rem">Sugerencia: ${esc(s.regla)}</div>` : ''}
             <label class="interruptor" style="margin:.5rem 0"><input type="checkbox" ${cmpPsicoActivo ? 'checked' : ''} onchange="cmpPsicoActivo=this.checked; try{localStorage.setItem('cmp_psico', this.checked?'1':'0')}catch(e){}; cmpCalcEntrada('margenDetal', cmpCalc.margenDetal)"><span class="sw-pista"></span> Terminación psicológica (7 · ,99)</label>
             <div class="per-grid">
@@ -15611,6 +15837,7 @@ Reglas:
                 <div><label for="cmpK_detal">Precio al detal $</label>${n('detal')}</div>
                 ${cmpVendeMayor(p) || o.mayor ? `<div><label for="cmpK_margenMayor">Margen mayor %</label>${n('margenMayor')}</div>
                 <div><label for="cmpK_mayor">Precio al mayor $</label>${n('mayor')}</div>` : ''}
+                <div><label for="cmpK_gran">Precio gran mayor $ <small>(Precio B)</small></label><input type="number" step="0.01" min="0" id="cmpK_gran" value="${cmpCalc.gran || ''}" oninput="cmpCalc.gran = Number(this.value) || 0"></div>
             </div>
             <div class="nota">Precio = costo ÷ (1 − margen), redondeado al centavo (o terminado en 7 / ,99 con la terminación psicológica). Al mayor (solo charcutería) sobre el costo de la factura, sin merma. Si cambia el precio y alguna tienda ya lo había actualizado, se le quita la marca para que lo cambie de nuevo. Si corrige el costo, cambia también en el almacén (queda registrado quién y el de antes).</div>
             <div class="login-error" id="cmpKError"></div>
@@ -15646,7 +15873,7 @@ Reglas:
         if (!p) { if (cmpCalc) { cmpCalc = null; caja.innerHTML = ''; } btn.disabled = true; return; }
         if (cmpCalc && cmpCalc.codigo === p.codigo) return;
         const ant = (almDatos.precios || {})[p.codigo] || {}, costo = p.costo || ant.costo || 0, s = cmpSugerir(p, costo);
-        cmpCalc = { id: null, prod: p, codigo: p.codigo, costo, merma: ant.merma || 0, libre: true, detal: ant.detal || (s ? s.detal : 0), mayor: ant.mayor || (s ? s.mayor : 0), margenDetal: 0, margenMayor: 0 };
+        cmpCalc = { id: null, prod: p, codigo: p.codigo, costo, merma: ant.merma || 0, libre: true, detal: ant.detal || (s ? s.detal : 0), mayor: ant.mayor || (s ? s.mayor : 0), gran: ant.gran || 0, margenDetal: 0, margenMayor: 0 };
         const cr = costo * (1 + cmpCalc.merma / 100);
         cmpCalc.margenDetal = cmpCalc.detal > 0 ? cmpR2((1 - cr / cmpCalc.detal) * 100) : 0;
         cmpCalc.margenMayor = cmpCalc.mayor > 0 ? cmpR2((1 - costo / cmpCalc.mayor) * 100) : 0;
@@ -15660,6 +15887,7 @@ Reglas:
                 <div><label for="cmpK_detal">Precio al detal $</label>${n('detal')}</div>
                 ${cmpVendeMayor(p) || cmpCalc.mayor ? `<div><label for="cmpK_margenMayor">Margen mayor %</label>${n('margenMayor')}</div>
                 <div><label for="cmpK_mayor">Precio al mayor $</label>${n('mayor')}</div>` : ''}
+                <div><label for="cmpK_gran">Precio gran mayor $ <small>(Precio B)</small></label><input type="number" step="0.01" min="0" id="cmpK_gran" value="${cmpCalc.gran || ''}" oninput="cmpCalc.gran = Number(this.value) || 0"></div>
             </div>`;
         btn.disabled = false;
     }
@@ -15673,7 +15901,7 @@ Reglas:
         almCerrar();
         almEnSegundoPlano(async () => {
             try {
-                const r = await llamarApi({ action: 'cmp_orden_nueva', codigo: k.codigo, costo: k.costo, merma: k.merma, detal: k.detal, mayor: k.mayor, motivo, avisar, ver: cmpOrd.ver });
+                const r = await llamarApi({ action: 'cmp_orden_nueva', codigo: k.codigo, costo: k.costo, merma: k.merma, detal: k.detal, mayor: k.mayor, gran: k.gran || 0, motivo, avisar, ver: cmpOrd.ver });
                 cmpUsarOrdenes(r);
                 if (avisar && r.telegram && !r.telegram.ok) mostrarBanner(`Precio de ${nombre} guardado (${r.orden}), pero Telegram no aceptó el aviso: ${r.telegram.error}. Puede reenviarlo desde la orden.`, 'warn');
                 else mostrarBanner(`Precio de ${nombre} guardado (${r.orden})${avisar ? ' y avisado al grupo "Control de depósito"' : ''}. Queda por actualizar en las tiendas.`, 'ok');
@@ -15712,11 +15940,11 @@ Reglas:
         if (!(k.detal > 0) && !(k.mayor > 0)) { err.textContent = 'Escriba el precio al detal o al mayor.'; return; }
         if (!(k.costo >= 0)) { err.textContent = 'Costo no válido.'; return; }
         const o = (cmpOrd.ordenes || []).find(x => x.id === k.id), antes = o ? Object.assign({}, o) : null;
-        if (o) Object.assign(o, { detal: k.detal, mayor: k.mayor, merma: k.merma, costo: k.costo, estado: o.estado === 'Por definir precio' ? 'Por actualizar' : o.estado });
+        if (o) Object.assign(o, { detal: k.detal, mayor: k.mayor, gran: k.gran || 0, merma: k.merma, costo: k.costo, estado: o.estado === 'Por definir precio' ? 'Por actualizar' : o.estado });
         almCerrar(); almPintar();
         almEnSegundoPlano(async () => {
             try {
-                const r = await llamarApi({ action: 'cmp_orden_precio', id: k.id, merma: k.merma, detal: k.detal, mayor: k.mayor, costo: k.costo, ver: cmpOrd.ver });
+                const r = await llamarApi({ action: 'cmp_orden_precio', id: k.id, merma: k.merma, detal: k.detal, mayor: k.mayor, gran: k.gran || 0, costo: k.costo, ver: cmpOrd.ver });
                 cmpUsarOrdenes(r);
                 mostrarBanner(`Precio guardado: ${o ? o.descripcion : k.codigo}.`, 'ok');
                 almCargar();   // los márgenes nuevos (y el costo, si cambió) quedan para la próxima sugerencia
@@ -19532,6 +19760,7 @@ Reglas:
                 clave = s.clave; permisos = normalizarPermisos(s.permisos); nombreUsuario = s.nombre || ''; esPrincipal = !!s.principal;
                 irA('menu'); setTimeout(refrescarSesion, 200); huellaMenuPintar();
                 DATOS.iniciar(llaveUsuario()).then(() => setTimeout(precargarModulos, 100));   // primero lo guardado en el equipo
+                setTimeout(vivoFbIniciar, 1500);   // avisos al instante (Firebase)
                 return;
             }
         } catch (e) {}
