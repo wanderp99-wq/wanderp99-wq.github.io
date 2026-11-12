@@ -3980,6 +3980,7 @@
             } catch (e) { nomRes = { sem, error: e.message }; }
         } finally { btn.disabled = false; btn.textContent = 'Comparar Nómina (Firebase directo)'; }
         const bien = res.every(r => !r.err && !r.dif) && nomRes && !nomRes.error && nomRes.partes.every(p => p.igual);
+        let directa = false; try { directa = !!((await FBH.doc('config/nomina')) || {}).directa; } catch (e) {}
         let fondo = document.getElementById('fbhDlg');
         if (!fondo) { fondo = document.createElement('div'); fondo.id = 'fbhDlg'; fondo.className = 'req-dlg-fondo'; document.body.appendChild(fondo); }
         fondo.onclick = e => { if (e.target === fondo) fondo.classList.add('hidden'); };
@@ -3992,8 +3993,22 @@
             ${nomRes ? `<h3 style="margin-top:1rem">Nómina de la semana del ${fechaBonita(nomRes.sem)}: calculada en el panel vs. Google</h3>
                 ${nomRes.error ? `<div class="banner error" style="display:block">${esc(nomRes.error)}</div>` : `<div class="req-sub">Leer de Firebase ${(nomRes.leer / 1000).toFixed(2).replace('.', ',')} s · calcular ${(nomRes.calcular / 1000).toFixed(2).replace('.', ',')} s (por Google tarda 5 a 6 s)</div>
                 <div class="tabla-wrap"><table class="req-tabla"><tbody>${nomRes.partes.map(p => `<tr><td class="izq">${esc(p.parte)}</td><td class="izq">${p.igual ? `<span class="chip st-ok">Igual</span> <small>${p.n}</small>` : `<span class="chip st-sobra">Distinto</span><small>${esc(p.detalle)}</small>`}</td></tr>`).join('')}</tbody></table></div>`}` : ''}
+            <div class="fb-ind" style="margin-top:1rem"><span>Usar Firebase en la Nómina (calculada en el panel, en vivo)</span><b>${directa ? 'Encendido' : 'Apagado (se pide a Google)'}</b>
+                ${directa ? '<button type="button" class="btn-ghost btn-mini" onclick="fbhDirecta(this, false)">Apagar (volver a Google)</button>'
+                          : `<button type="button" class="btn-primary btn-mini" onclick="fbhDirecta(this, true)" ${bien ? '' : 'title="Hay diferencias: revíselas antes de encenderlo"'}>Encender</button>`}</div>
             <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-ghost" onclick="fbhPublicar(this)">Publicar config y trabajadores ahora</button><button type="button" class="btn-primary" onclick="document.getElementById('fbhDlg').classList.add('hidden')">Cerrar</button></div></div>`;
         fondo.classList.remove('hidden');
+    }
+    // Interruptor "Usar Firebase en la Nómina": llega a todos los paneles por config/nomina (al encenderlo, cada uno empieza a escucharla)
+    async function fbhDirecta(btn, activar) {
+        if (activar && !confirm('¿Encender la Nómina con Firebase? Se calculará en cada panel con los datos de Firebase, en vivo. Se puede apagar aquí mismo en cualquier momento.')) return;
+        btnCargando(btn, activar ? 'Encendiendo...' : 'Apagando...');
+        try {
+            await DATOS.aGoogle(() => llamarApi({ action: 'fb_nomina_directa', activar }));
+            nomVivoDirecta = null; NOMVIVO.reiniciar(); Object.keys(nomCache).forEach(k => delete nomCache[k]); nomDatos = null;
+            mostrarBanner(activar ? 'Nómina con Firebase encendida: se calcula en el panel y se actualiza en vivo.' : 'Nómina con Firebase apagada: vuelve a pedirse a Google.', 'ok');
+            document.getElementById('fbhDlg').classList.add('hidden');
+        } catch (e) { mostrarBanner('No se pudo cambiar: ' + e.message, 'error'); btn.disabled = false; }
     }
     async function fbhPublicar(btn) {
         btnCargando(btn, 'Publicando...');
@@ -4224,7 +4239,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-12.6';
+    const VERSION_SERVIDOR = '2026-11-12.8';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -4492,7 +4507,7 @@
         if (clave && WEB_APP_URL && typeof mensaje !== 'string') llamarApiReal({ action: 'ping', salir: true, vista: '', disp: DISPOSITIVO }, performance.now()).catch(() => {});   // deja de figurar como conectado
         clave = null;
         permisos = [];
-        nombreUsuario = ''; esPrincipal = false; olvidarClavesAdmin(); DATOS.salir(); vivoFbDetener(); FB.salir(); efeFbOff = null; efeFbActivo = false; efeFbRoto = ''; efeFbLlego = false;
+        nombreUsuario = ''; esPrincipal = false; olvidarClavesAdmin(); DATOS.salir(); vivoFbDetener(); NOMVIVO.reiniciar(); nomVivoDirecta = null; nomVivoAvisado = false; nomVivoRotoHora = 0; FB.salir(); efeFbOff = null; efeFbActivo = false; efeFbRoto = ''; efeFbLlego = false;
         filas = []; borradores = {}; seleccion = null; cargadoDesde = null; cuadreIniciado = false;
         // Al salir se borra todo lo guardado en memoria (otra persona puede entrar con menos permisos)
         efeDatos = { filas: [], cajaChica: [] }; efeCargado = null; efeCargadoEn = 0; precargadoDesde = null; Object.keys(pagMemoria).forEach(k => delete pagMemoria[k]);
@@ -10675,6 +10690,89 @@
     // Se guardó algo de asistencia o de personal en CUALQUIER módulo (p. ej. un turno agregado en Gestión de asistencia): la nómina
     // que estaba en memoria ya no sirve. Antes se quedaba con la de antes y el turno nuevo no aparecía hasta salir y entrar.
     // (Si el cambio se hizo desde la misma Nómina, ella ya se vuelve a calcular sola.)
+    // ---------- Nómina en vivo desde Firebase (12/11, etapa 3) ----------
+    // Se escuchan las 12 hojas que usa la nómina + config/nomina + vista/trabajadores. Cada cambio (otro equipo cerró una nómina,
+    // marcó un carnet, registró un abono) llega solo y la semana abierta se vuelve a calcular aquí (milisegundos).
+    // Las escuchas se apagan 2 minutos después de salir de la Nómina. Cada cambio de otro equipo cuesta 1 lectura por documento.
+    const NOMVIVO = (() => {
+        let quitar = [], estado = 'apagado', error = '', aviso = null, alCambiar = null, version = 0;
+        const H = {}; let cfg = null, trab = null;
+        const completo = () => !!(cfg && trab && NOMFB.HOJAS.every(n => H[n]));
+        function avisar() { if (!completo()) return; clearTimeout(aviso); aviso = setTimeout(() => { version++; if (alCambiar) alCambiar(); }, 250); }
+        async function iniciar(cb) {
+            if (cb) alCambiar = cb;
+            if (estado === 'escuchando' || estado === 'iniciando') return;
+            estado = 'iniciando'; error = '';
+            try {
+                const { db, lib } = await FB.listo();
+                // Si una escucha falla, lo que llegó antes ya no se actualiza: se olvida (la nómina vuelve a pedirse a Google)
+                const fallo = e => { error = (e && (e.code || e.message)) || 'sin respuesta'; detener(); olvidar(); estado = 'roto'; Object.keys(nomCache).forEach(k => delete nomCache[k]); };
+                NOMFB.HOJAS.forEach(n => quitar.push(lib.fs.onSnapshot(lib.fs.collection(db, FBH_HOJAS[n][0]), s => { H[n] = FBH.armar(n, s.docs); avisar(); }, fallo)));
+                quitar.push(lib.fs.onSnapshot(lib.fs.doc(db, 'config', 'nomina'), s => { cfg = s.exists() ? JSON.parse(s.data().datos || 'null') : null; avisar(); }, fallo));
+                quitar.push(lib.fs.onSnapshot(lib.fs.doc(db, 'vista', 'trabajadores'), s => { trab = s.exists() ? JSON.parse(s.data().datos || 'null') : null; avisar(); }, fallo));
+                if (estado === 'iniciando') estado = 'escuchando';
+            } catch (e) { error = e.message; estado = 'roto'; }
+        }
+        // Al apagar las escuchas también se olvida lo recibido: sin escucha, esos datos ya no se ponen al día
+        function olvidar() { NOMFB.HOJAS.forEach(n => { delete H[n]; }); cfg = null; trab = null; }
+        function detener() { quitar.forEach(q => { try { q(); } catch (e) {} }); quitar = []; olvidar(); if (estado !== 'roto') estado = 'apagado'; }
+        // Espera a que lleguen todas las hojas (como mucho 12 s; si no, la nómina se pide a Google)
+        async function esperar() {
+            const desde = Date.now();
+            while (!completo()) {
+                if (estado === 'roto') throw new Error('Firebase no respondió: ' + error);
+                if (Date.now() - desde > 12000) throw new Error('Firebase tardó más de 12 s en mandar la nómina');
+                await new Promise(r => setTimeout(r, 120));
+            }
+        }
+        const reiniciar = () => { detener(); estado = 'apagado'; error = ''; };   // (el reintento tras una falla lo maneja nomVivoActiva)
+        return { iniciar, detener, esperar, reiniciar, completo, calcular: sem => NOMFB.calcular(sem, H, cfg, trab), directa: () => !!(cfg && cfg.directa),
+                 estado: () => estado, error: () => error, version: () => version };
+    })();
+    // ¿Está encendido "Usar Firebase en la Nómina"? Se lee config/nomina una vez (y cada 5 minutos): 1 lectura. Apagado no se escucha nada.
+    let nomVivoDirecta = null, nomVivoDirectaHora = 0, nomVivoUltimaVista = 0, nomVivoAvisado = false, nomVivoRotoHora = 0;
+    async function nomVivoActiva() {
+        if (!clave || !permisos.includes('nomina') || typeof FB === 'undefined') return false;
+        // Firebase falló: 2 minutos por Google y después se vuelve a intentar
+        if (NOMVIVO.estado() === 'roto') { if (!nomVivoRotoHora) nomVivoRotoHora = Date.now(); if (Date.now() - nomVivoRotoHora < 120000) return false; NOMVIVO.reiniciar(); nomVivoRotoHora = 0; nomVivoAvisado = false; }
+        if (NOMVIVO.completo()) return NOMVIVO.directa();
+        if (nomVivoDirecta === null || Date.now() - nomVivoDirectaHora > 300000) {
+            // Si no se puede leer (reglas todavía viejas, sin internet), se toma como apagado por 5 minutos y la nómina va por Google
+            let c = null;
+            try { c = await FBH.doc('config/nomina'); } catch (e) { console.log('Nómina con Firebase: no se pudo leer config/nomina (' + (e.code || e.message) + ')'); }
+            nomVivoDirecta = !!(c && c.directa); nomVivoDirectaHora = Date.now();
+        }
+        return nomVivoDirecta;
+    }
+    async function nomVivoTraer(sem) {
+        if (!(await nomVivoActiva())) return null;
+        nomVivoUltimaVista = Date.now();
+        await NOMVIVO.iniciar(nomVivoCambio);
+        await NOMVIVO.esperar();
+        if (!NOMVIVO.directa()) { NOMVIVO.detener(); nomVivoDirecta = false; return null; }   // lo apagaron mientras tanto
+        const t0 = performance.now(), r = NOMVIVO.calcular(sem);
+        anotarTiempo('nom_semana (Firebase)', Math.round(performance.now() - t0), 0, true);
+        r.__vivo = true;
+        return r;
+    }
+    function nomVivoFallo(e) {
+        console.log('Nómina con Firebase: ' + e.message + ' (se pide a Google)');
+        if (esPrincipal && !nomVivoAvisado) { nomVivoAvisado = true; mostrarBanner('La Nómina no pudo leerse de Firebase (' + e.message + '). Mientras tanto se pide a Google.', 'warn'); }
+    }
+    // Llegó un cambio de Firebase: la semana abierta se recalcula (sin molestar si se está escribiendo o hay una ventana abierta)
+    function nomVivoCambio() {
+        Object.keys(nomCache).forEach(k => delete nomCache[k]);
+        if (vistaActual !== 'nomina') return;
+        nomVivoUltimaVista = Date.now();
+        const intentar = () => { if (vistaActual !== 'nomina') return; if (nomCargando || !vivoPuede()) { setTimeout(intentar, 2000); return; } nomCargar(); };
+        intentar();
+    }
+    // Fuera de la Nómina, las escuchas se apagan a los 2 minutos (no gastan lecturas de Firebase)
+    setInterval(() => {
+        if (vistaActual === 'nomina') { nomVivoUltimaVista = Date.now(); return; }
+        if (NOMVIVO.estado() === 'escuchando' && Date.now() - nomVivoUltimaVista > 120000) NOMVIVO.detener();
+    }, 30000);
+
     function nomOlvidarMemoria(areas) {
         if (!areas.some(a => a === 'asis' || a === 'per')) return;
         Object.keys(nomCache).forEach(k => delete nomCache[k]);
@@ -10684,8 +10782,14 @@
         if (!nomCache[sem]) nomCache[sem] = (async () => {
             // (11/11) Un solo pedido con todo (nom_semana). Si Google todavía tiene la versión anterior (sin esa función), los 5 de antes.
             let todo = null;
-            try { todo = await llamarApi({ action: 'nom_semana', semana: sem }); }
-            catch (e) { if (!/todavía no tiene esta función|Acción no válida/.test(e.message || '')) throw e; }
+            // (12/11, etapa 3) Con "Usar Firebase en la Nómina" encendido: calculada aquí con Firebase, en vivo y sin pedirle nada a Google.
+            // Si Firebase no responde o falta algo, se sigue por Google como siempre.
+            try { todo = await nomVivoTraer(sem); }
+            catch (e) { nomVivoFallo(e); todo = null; }
+            if (!todo) {
+                try { todo = await llamarApi({ action: 'nom_semana', semana: sem }); }
+                catch (e) { if (!/todavía no tiene esta función|Acción no válida/.test(e.message || '')) throw e; }
+            }
             const [asis, deu, cer, hor, aju] = todo ? [todo.asis || {}, { deudas: todo.deudas }, { pagos: todo.cerradas }, { horarios: todo.horario }, { ajustes: todo.ajustes }] : await Promise.all([llamarApi({ action: 'asisg_listar', desde: sem, hasta: sumarDias(sem, 6) }), llamarApi({ action: 'cxc_deudas' }),
                                                         llamarApi({ action: 'nom_historial', desde: sem, hasta: sem }),
                                                         llamarApi({ action: 'hor_datos', semana: sem }).catch(() => ({ horarios: [] })),   // el horario guardado de la semana (si hay)
@@ -10694,7 +10798,8 @@
             if (asis.propios) PUNT_PROPIOS = asis.propios;
             if (asis.toleranciaMin) PUNT_TOLERANCIA = Number(asis.toleranciaMin) || 5;
             return { semana: sem, locales: asis.locales || [], oficina: asis.oficina || [], departamentos: asis.departamentos || [], deptoDe: asis.deptoDe || {},
-                     deudas: deu.deudas || [], cerradas: cer.pagos || [], horario: hor.horarios || [], ajustes: aju.ajustes || null, leido: Date.now() };
+                     deudas: deu.deudas || [], cerradas: cer.pagos || [], horario: hor.horarios || [], ajustes: aju.ajustes || null, leido: Date.now(),
+                     vivo: !!(todo && todo.__vivo) };   // calculada con Firebase en vivo: se pone al día sola
         })().catch(e => { delete nomCache[sem]; throw e; });   // si falla, se vuelve a intentar al entrar
         return nomCache[sem];
     }
@@ -10703,7 +10808,7 @@
         nomCargando = true;
         try {
             const d = await nomTraer(sem);
-            if (d.ajustes && !d.ajUsados && Date.now() - d.leido > 30000)   // precargada hace rato: los ajustes pudo cambiarlos otra persona
+            if (!d.vivo && d.ajustes && !d.ajUsados && Date.now() - d.leido > 30000)   // precargada hace rato: los ajustes pudo cambiarlos otra persona (con Firebase en vivo ya llegan solos)
                 try { d.ajustes = (await llamarApi({ action: 'nom_ajustes', semana: sem })).ajustes || d.ajustes; } catch (e) {}
             nomAjUsar(d);
             if (sem === nomSemana) nomDatos = d;   // si se cambió de semana mientras tanto, al repintar se carga la nueva
