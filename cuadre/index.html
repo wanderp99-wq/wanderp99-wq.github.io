@@ -455,6 +455,25 @@
         const nuevoIdem = () => (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2);
         const dos = n => String(n).padStart(2, '0');
         const ahoraLocal = () => { const d = new Date(); return `${d.getFullYear()}-${dos(d.getMonth() + 1)}-${dos(d.getDate())} ${dos(d.getHours())}:${dos(d.getMinutes())}`; };
+        // Hora de referencia (12/11): cada vez que el servidor dice su hora (Firebase al marcar, Google cada 2 minutos) se anota junto a
+        // un contador del navegador que NO cambia aunque muevan la hora del equipo. Sin internet, la hora real = la del servidor + lo contado.
+        // Si se recarga la página sin internet se pierde la referencia: la marca va con la hora del equipo y queda señalada.
+        let ref = null;
+        const enCaracas = ms => { const p = {}; new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Caracas', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+                                      .formatToParts(new Date(ms)).forEach(x => { p[x.type] = x.value; }); return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}`; };
+        function horaServidor(ms) {
+            const v = typeof ms === 'string' ? Date.parse(ms) : Number(ms); if (!v || isNaN(v)) return;
+            if (ref && v < ref.servidor + (performance.now() - ref.perf) - 120000) return;   // una respuesta vieja (repetida desde la memoria de Google) no atrasa la referencia
+            ref = { servidor: v, perf: performance.now(), local: Date.now() };
+        }
+        function momento() {
+            const local = Date.now(), relojLocal = ahoraLocal();
+            if (!ref) return { texto: relojLocal, sinReferencia: true, relojLocal };
+            const contado = performance.now() - ref.perf, deriva = Math.round(((local - ref.local) - contado) / 60000);
+            // deriva < 0: atrasaron el reloj (vale lo contado). deriva > 0: lo adelantaron o el equipo se suspendió (el contador pudo pararse): reloj corregido con la diferencia conocida
+            return { texto: enCaracas(deriva > 0 ? ref.servidor + (local - ref.local) : ref.servidor + contado), deriva, relojLocal };
+        }
+        const ahora = () => momento().texto;
         const esc = t => String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
         const pedir = r => new Promise((ok, mal) => { r.onsuccess = () => ok(r.result); r.onerror = () => mal(r.error); });
         function abrir() {
@@ -487,8 +506,9 @@
         }
         // Guarda un registro para enviarlo después. cuerpo: lo mismo que se iba a mandar (sin la clave del panel)
         async function agregar({ tipo, desc, cuerpo, conClave = false, idem, extra = {} }) {
-            const x = { idem: idem || nuevoIdem(), tipo, desc, conClave, usuario: conClave ? cfg.usuario() : '', creado: Date.now(), marcadoEn: ahoraLocal(), estado: 'pendiente', error: '', intentos: 0, extra };
-            x.cuerpo = Object.assign({}, cuerpo, { idem: x.idem, sinConexion: true, marcadoEn: x.marcadoEn });
+            const x = { idem: idem || nuevoIdem(), tipo, desc, conClave, usuario: conClave ? cfg.usuario() : '', creado: Date.now(), marcadoEn: '', estado: 'pendiente', error: '', intentos: 0, extra };
+            const mo = momento(); x.marcadoEn = mo.texto;   // hora real (con la referencia del servidor) y la que mostraba el reloj del equipo
+            x.cuerpo = Object.assign({}, cuerpo, { idem: x.idem, sinConexion: true, marcadoEn: x.marcadoEn, relojLocal: mo.relojLocal, relojDeriva: mo.deriva == null ? null : mo.deriva, sinReferencia: !!mo.sinReferencia });
             delete x.cuerpo.clave;
             await poner(x); pintar();
             return x;
@@ -566,7 +586,7 @@
         window.addEventListener('online', () => setTimeout(enviar, 800));
         document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') enviar(); });
         setInterval(enviar, 30000);
-        return { nuevoIdem, agregar, enviar, lista, sinInternet, reintentar, descartar, abrirItem, configurar, aviso, ahoraLocal };
+        return { nuevoIdem, agregar, enviar, lista, sinInternet, reintentar, descartar, abrirItem, configurar, aviso, ahoraLocal, ahora, momento, horaServidor };
     })();
 </script>
 <script>
@@ -1637,7 +1657,9 @@
         document.getElementById('mfLocal').textContent = local;
         const pinta = () => { const d = new Date(); document.getElementById('mfReloj').textContent = d.toLocaleTimeString('es-VE', { hour: 'numeric', minute: '2-digit' });
                               document.getElementById('mfFecha').textContent = d.toLocaleDateString('es-VE', { weekday: 'long', day: 'numeric', month: 'long' }); };
-        pinta(); clearInterval(mfRelojId); mfRelojId = setInterval(pinta, 15000);
+        // Cada 2 minutos se pide la hora a Google (referencia para las marcas sin internet) y se revisa que el equipo siga autorizado
+        let vueltas = 0; const sincronizar = () => { if (document.hidden) return; mfApi({ action: 'marca_estado', equipo: mfEquipos()[local] }).then(r => COLA.horaServidor(r && r.ahora)).catch(() => {}); };
+        pinta(); sincronizar(); clearInterval(mfRelojId); mfRelojId = setInterval(() => { pinta(); if (++vueltas % 8 === 0) sincronizar(); }, 15000);
         mfResultado(null); mfEnfocar();
     }
     async function mfAutorizarEquipo(ev) {
@@ -1683,6 +1705,7 @@
             if (!r.ok) return null;
             const j = await r.json(), ts = ((((j.writeResults || [])[0] || {}).transformResults) || [])[0];
             const d = new Date((ts && ts.timestampValue) || j.commitTime || Date.now());
+            if ((ts && ts.timestampValue) || j.commitTime) COLA.horaServidor(d.getTime());   // referencia de hora para las marcas sin internet
             return isNaN(d) ? null : d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Caracas' });
         } catch (e) { return null; }
     }
@@ -1700,7 +1723,7 @@
         const datos = Object.assign({ action: 'marca_registrar', equipo: token, codigo, idem }, hora ? { bandeja: true } : {}, paso ? { paso } : {}, bandejaId ? { bandejaId } : {});
         try {
             const r = await mfApi(datos);
-            mfAprender(codigo, r);
+            mfAprender(codigo, r); COLA.horaServidor(r && r.ahora);
             if (mfActual !== mio) return;   // ya pasó otro carnet: no se tapa su pantalla
             if (r.elegirPaso) {
                 const bid = hora ? idem : (bandejaId || '');
@@ -1711,7 +1734,7 @@
             if (hora) { if (mfActual === mio) { if (e.sinRespuesta) recibida(true); else mfResultado({ error: e.message }); } return; }   // ya está en Firebase: se pasa sola
             // Sin internet: la marca queda guardada con la hora de este equipo y se envía sola al volver la conexión
             if (e.sinRespuesta && await COLA.sinInternet()) {
-                const hora = COLA.ahoraLocal().slice(11);
+                const hora = COLA.ahora().slice(11);
                 await COLA.agregar({ tipo: 'marca', desc: `Marca con carnet · ${mfLocalActual} · ${hora}`, cuerpo: datos, idem, extra: { local: mfLocalActual } });
                 mfResultado({ pendiente: true, hora });
                 return;

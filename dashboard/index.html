@@ -1780,6 +1780,25 @@
         const nuevoIdem = () => (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2);
         const dos = n => String(n).padStart(2, '0');
         const ahoraLocal = () => { const d = new Date(); return `${d.getFullYear()}-${dos(d.getMonth() + 1)}-${dos(d.getDate())} ${dos(d.getHours())}:${dos(d.getMinutes())}`; };
+        // Hora de referencia (12/11): cada vez que el servidor dice su hora (Firebase al marcar, Google cada 2 minutos) se anota junto a
+        // un contador del navegador que NO cambia aunque muevan la hora del equipo. Sin internet, la hora real = la del servidor + lo contado.
+        // Si se recarga la página sin internet se pierde la referencia: la marca va con la hora del equipo y queda señalada.
+        let ref = null;
+        const enCaracas = ms => { const p = {}; new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Caracas', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+                                      .formatToParts(new Date(ms)).forEach(x => { p[x.type] = x.value; }); return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}`; };
+        function horaServidor(ms) {
+            const v = typeof ms === 'string' ? Date.parse(ms) : Number(ms); if (!v || isNaN(v)) return;
+            if (ref && v < ref.servidor + (performance.now() - ref.perf) - 120000) return;   // una respuesta vieja (repetida desde la memoria de Google) no atrasa la referencia
+            ref = { servidor: v, perf: performance.now(), local: Date.now() };
+        }
+        function momento() {
+            const local = Date.now(), relojLocal = ahoraLocal();
+            if (!ref) return { texto: relojLocal, sinReferencia: true, relojLocal };
+            const contado = performance.now() - ref.perf, deriva = Math.round(((local - ref.local) - contado) / 60000);
+            // deriva < 0: atrasaron el reloj (vale lo contado). deriva > 0: lo adelantaron o el equipo se suspendió (el contador pudo pararse): reloj corregido con la diferencia conocida
+            return { texto: enCaracas(deriva > 0 ? ref.servidor + (local - ref.local) : ref.servidor + contado), deriva, relojLocal };
+        }
+        const ahora = () => momento().texto;
         const esc = t => String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
         const pedir = r => new Promise((ok, mal) => { r.onsuccess = () => ok(r.result); r.onerror = () => mal(r.error); });
         function abrir() {
@@ -1812,8 +1831,9 @@
         }
         // Guarda un registro para enviarlo después. cuerpo: lo mismo que se iba a mandar (sin la clave del panel)
         async function agregar({ tipo, desc, cuerpo, conClave = false, idem, extra = {} }) {
-            const x = { idem: idem || nuevoIdem(), tipo, desc, conClave, usuario: conClave ? cfg.usuario() : '', creado: Date.now(), marcadoEn: ahoraLocal(), estado: 'pendiente', error: '', intentos: 0, extra };
-            x.cuerpo = Object.assign({}, cuerpo, { idem: x.idem, sinConexion: true, marcadoEn: x.marcadoEn });
+            const x = { idem: idem || nuevoIdem(), tipo, desc, conClave, usuario: conClave ? cfg.usuario() : '', creado: Date.now(), marcadoEn: '', estado: 'pendiente', error: '', intentos: 0, extra };
+            const mo = momento(); x.marcadoEn = mo.texto;   // hora real (con la referencia del servidor) y la que mostraba el reloj del equipo
+            x.cuerpo = Object.assign({}, cuerpo, { idem: x.idem, sinConexion: true, marcadoEn: x.marcadoEn, relojLocal: mo.relojLocal, relojDeriva: mo.deriva == null ? null : mo.deriva, sinReferencia: !!mo.sinReferencia });
             delete x.cuerpo.clave;
             await poner(x); pintar();
             return x;
@@ -1891,7 +1911,7 @@
         window.addEventListener('online', () => setTimeout(enviar, 800));
         document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') enviar(); });
         setInterval(enviar, 30000);
-        return { nuevoIdem, agregar, enviar, lista, sinInternet, reintentar, descartar, abrirItem, configurar, aviso, ahoraLocal };
+        return { nuevoIdem, agregar, enviar, lista, sinInternet, reintentar, descartar, abrirItem, configurar, aviso, ahoraLocal, ahora, momento, horaServidor };
     })();
 </script>
 <script>
@@ -3490,9 +3510,9 @@
             if (llaveIdem && e.sinRespuesta && !NO_COLA.test(payload.action) && await COLA.sinInternet()) {
                 idemPendientes.delete(llaveIdem);
                 const marca = /^marca_/.test(payload.action);
-                await COLA.agregar({ tipo: marca ? 'marca' : 'panel', desc: (marca ? 'Marca con carnet' : (NOMBRE_ACCION[payload.action] || 'Cambio en ' + (TITULOS[vistaActual] || vistaActual))) + ' · ' + COLA.ahoraLocal().slice(11),
+                await COLA.agregar({ tipo: marca ? 'marca' : 'panel', desc: (marca ? 'Marca con carnet' : (NOMBRE_ACCION[payload.action] || 'Cambio en ' + (TITULOS[vistaActual] || vistaActual))) + ' · ' + COLA.ahora().slice(11),
                                      cuerpo: payload, conClave: !marca, idem: payload.idem });
-                if (marca) return { ok: true, pendiente: true, hora: COLA.ahoraLocal().slice(11) };   // el equipo de marcaje muestra "guardada sin conexión"
+                if (marca) return { ok: true, pendiente: true, hora: COLA.ahora().slice(11) };   // el equipo de marcaje muestra "guardada sin conexión"
                 const err = new Error('Sin conexión a internet: quedó guardado en este equipo y se enviará solo cuando vuelva la conexión. No lo repita.');
                 err.enCola = true; throw err;
             }
@@ -4068,6 +4088,9 @@
         el.innerHTML = `<div class="fb-cab"><h4>Firebase</h4><span class="fb-res"><b>${n} de ${filas.length}</b> módulos ya se guardan en Firebase${faltan.length ? ` · faltan: ${esc(faltan.join(', '))}` : ' · todos'}</span></div>
             <div class="fb-indicadores">
                 <div class="fb-ind"><span>Lecturas de Firebase hoy</span><b>${fmtNum(lect)} <small>de 50.000</small></b><span class="fb-barra"><i style="width:${pct}%" class="${pct > 70 ? 'alto' : ''}"></i></span></div>
+                ${(() => { const u = (r.revision && r.revision.llamadas) || null; if (!u) return ''; const p = Math.min(100, u.total / 200);
+                    return `<div class="fb-ind"><span>Llamadas a internet de Google hoy</span><b>${fmtNum(u.total)} <small>de unas 20.000</small></b><span class="fb-barra"><i style="width:${p}%" class="${p > 70 ? 'alto' : ''}"></i></span>
+                        ${u.porOrigen.length ? `<small>${u.porOrigen.slice(0, 6).map(([o, n]) => `${esc(o)} ${fmtNum(n)}`).join(' · ')}</small>` : ''}</div>`; })()}
                 <div class="fb-ind"><span>Revisión automática (cada 5 min)</span><b>${rev ? (revHace != null ? `Activa · corrió hace ${revHace} min` : 'Activa · todavía no corre (el ping hace el trabajo de fondo)') : 'No activa (el trabajo de fondo lo hace el ping de los paneles)'}</b>${rev ? '' : '<button type="button" class="btn-primary btn-mini" onclick="fbRevision(this)">Activar</button>'}</div>
             </div>
             <div class="tabla-wrap"><table class="req-tabla fb-tabla" data-sin-paginar><thead><tr><th class="izq">Módulo</th><th class="izq">Dónde se guarda</th><th></th></tr></thead><tbody>${filas.map(f => f.html).join('')}</tbody></table></div>
@@ -4239,7 +4262,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-12.8';
+    const VERSION_SERVIDOR = '2026-11-12.12';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -13955,7 +13978,7 @@
     function almPedirPeso(p) {
         const tasa = almTasa();
         almVentana(`<form class="req-dlg alm-peso" onsubmit="event.preventDefault(); almPesoListo('${esc(p.codigo).replace(/'/g, '&#39;')}')">
-            <h3>${esc(p.descripcion)}</h3><div class="req-sub">${esc(p.codigo)} · $ ${fmt(p.precio)} el kg${tasa ? ' · Bs ' + fmt(p.precio * tasa) : ''}${almVeExist() && p.existencia != null ? ` · existencia ${almCant(p.existencia, 'Pesado')} kg` : ''}</div>
+            <h3>${esc(p.descripcion)}</h3><div class="req-sub">${esc(p.codigo)} · $ ${fmt(p.precio)} el kg${tasa ? ' · Bs ' + fmt(p.precio * tasa) : ''}${almVeExistFac() && p.existencia != null ? ` · existencia ${almCant(p.existencia, 'Pesado')} kg` : ''}</div>
             <label for="almPeso">Peso en gramos</label><input type="number" id="almPeso" step="1" min="0" required autofocus placeholder="Ej.: 520">
             <div class="alm-peso-total" id="almPesoTotal"></div>
             <div class="login-error" id="almPesoError"></div>
@@ -13976,7 +13999,7 @@
     async function almAgregarVenta(p, cantidad) {
         const enVenta = almVenta.items.filter(x => x.codigo === p.codigo).reduce((s, x) => s + x.cantidad, 0);
         let sinExistencia = false;
-        if (almVeExist() && p.existencia != null && enVenta + cantidad > p.existencia + 0.0005) {
+        if (almVeExistFac() && p.existencia != null && enVenta + cantidad > p.existencia + 0.0005) {
             if (!almVenta.claveStock) {
                 const c = await efePedirClave('Sin existencia suficiente', `${p.descripcion}: hay ${almCant(p.existencia, p.tipo)} ${almUnidad(p.tipo)} y la venta lleva ${almCant(enVenta + cantidad, p.tipo)}. Para facturarlo sin existencia, un administrador debe autorizarlo.`);
                 if (!c) { almEnfocar(); return; }
@@ -14664,7 +14687,10 @@
     // ¿Esta sesión ve el inventario? Administradores, Productos e inventario, Entradas y salidas o el interruptor "Ver existencia"
     // (Claves y permisos). Si no, Facturar no muestra existencia ni la revisa: el servidor tampoco la envía.
     function almVeExist() { return !!esPrincipal || ['verexistencia', 'inventario', 'movalmacen'].some(x => permisos.includes(x)); }
-    const almExistTxt = p => almVeExist() && p.existencia != null ? ` · ${almCant(p.existencia, p.tipo)} ${almUnidad(p.tipo)}` : '';
+    // (12/11) Al FACTURAR la existencia solo la ve (y la exige) un administrador o quien tenga "Ver existencia del almacén". Los demás,
+    // aunque tengan Entradas y salidas o Productos, facturan sin verla y sin bloqueo (el renglón queda marcado para revisar).
+    function almVeExistFac() { return !!esPrincipal || permisos.includes('verexistencia'); }
+    const almExistTxt = p => (almTab === 'facturar' ? almVeExistFac() : almVeExist()) && p.existencia != null ? ` · ${almCant(p.existencia, p.tipo)} ${almUnidad(p.tipo)}` : '';
 
     // ---------- Notas emitidas y operaciones de inventario ----------
     // Al entrar: las últimas 100 (precargadas). También por fechas, cliente o tienda, estado y búsqueda; se exportan a Excel tal como se ven.
@@ -14696,11 +14722,21 @@
         else { almOpsF.estado = estado; if (almOpsF.modo !== 'ultimas') { almOpsF.modo = 'ultimas'; almIngresos = null; } }
         almModo(tab);
     }
+    // (12/11) Desde / Hasta siempre a la vista: elegir una fecha pasa solo a "Por fechas" (la otra se completa: 30 días atrás / hoy)
+    function almFiltroFecha(tipo, campo, v) {
+        const f = tipo === 'almOpsF' ? almOpsF : almNotasF;
+        if (f.modo !== 'fechas') { f.modo = 'fechas'; f.desde = f.desde || sumarDias(fechaLocalHoy(), -30); f.hasta = f.hasta || fechaLocalHoy(); }
+        if (!v) v = campo === 'desde' ? sumarDias(fechaLocalHoy(), -30) : fechaLocalHoy();   // borró la fecha
+        f[campo] = v;
+        if (f.desde > f.hasta) { if (campo === 'desde') f.hasta = f.desde; else f.desde = f.hasta; }
+        if (tipo === 'almOpsF') almIngresos = null; else almNotas = null;
+        almPintar();
+    }
     function almFiltrosHTML(f, recargar, extra, tipo) {
         return `<div class="filters alm-filtros alm-filtros-${tipo}">
             <div><label for="almFMod">Mostrar</label><select id="almFMod" onchange="${tipo}.modo=this.value;${recargar}"><option value="ultimas"${f.modo === 'ultimas' ? ' selected' : ''}>Últimas 100</option><option value="fechas"${f.modo === 'fechas' ? ' selected' : ''}>Por fechas</option></select></div>
-            ${f.modo === 'fechas' ? `<div><label for="almDesde">Desde</label><input type="date" id="almDesde" value="${f.desde || sumarDias(fechaLocalHoy(), -30)}" onchange="${tipo}.desde=this.value;${recargar}"></div>
-                <div><label for="almHasta">Hasta</label><input type="date" id="almHasta" value="${f.hasta || fechaLocalHoy()}" onchange="${tipo}.hasta=this.value;${recargar}"></div>` : ''}
+            <div><label for="almDesde">Desde</label><input type="date" id="almDesde" max="${fechaLocalHoy()}" value="${f.modo === 'fechas' ? f.desde || sumarDias(fechaLocalHoy(), -30) : ''}" onchange="almFiltroFecha('${tipo}','desde',this.value)"></div>
+            <div><label for="almHasta">Hasta</label><input type="date" id="almHasta" max="${fechaLocalHoy()}" value="${f.modo === 'fechas' ? f.hasta || fechaLocalHoy() : ''}" onchange="almFiltroFecha('${tipo}','hasta',this.value)"></div>
             ${extra}
             <div><label for="almListaBus">Buscar</label><input type="search" id="almListaBus" autocomplete="off" placeholder="N°, nombre, documento..." oninput="almPintar()" value="${esc((document.getElementById('almListaBus') || {}).value || '')}"></div></div>`;
     }
@@ -17717,9 +17753,9 @@ Reglas:
         marcaResultado(null);
         marcaEnfocar();
         // Revisa que el equipo siga autorizado
-        llamarApi({ action: 'marca_estado', equipo: eq.token }).catch(e => marcaResultado({ error: e.message }));
+        llamarApi({ action: 'marca_estado', equipo: eq.token }).then(r => COLA.horaServidor(r && r.ahora)).catch(e => marcaResultado({ error: e.message }));
         clearInterval(marcaPingId);
-        marcaPingId = setInterval(() => { const e2 = marcaEquipo(); if (e2 && vistaActual === 'marcaje' && !document.hidden) llamarApi({ action: 'marca_estado', equipo: e2.token }).catch(() => {}); }, 120000);
+        marcaPingId = setInterval(() => { const e2 = marcaEquipo(); if (e2 && vistaActual === 'marcaje' && !document.hidden) llamarApi({ action: 'marca_estado', equipo: e2.token }).then(r => COLA.horaServidor(r && r.ahora)).catch(() => {}); }, 120000);
     }
     // El lector USB/Bluetooth "escribe" el código y un Enter: la casilla siempre tiene el foco
     function marcaEnfocar() { const i = document.getElementById('marcaCodigo'); if (i && vistaActual === 'marcaje' && !document.getElementById('marcaPasos').innerHTML) i.focus(); }
@@ -17780,6 +17816,7 @@ Reglas:
             if (!r.ok) return null;
             const j = await r.json(), ts = ((((j.writeResults || [])[0] || {}).transformResults) || [])[0];
             const d = new Date((ts && ts.timestampValue) || j.commitTime || Date.now());
+            if ((ts && ts.timestampValue) || j.commitTime) COLA.horaServidor(d.getTime());   // referencia de hora para las marcas sin internet
             return isNaN(d) ? null : d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Caracas' });
         } catch (e) { return null; }
     }
@@ -17801,7 +17838,7 @@ Reglas:
         try {
             const r = await llamarApi(Object.assign({ action: 'marca_registrar', equipo: eq.token, codigo, idem: id }, hora ? { bandeja: true } : {},
                                                     paso ? { paso } : {}, bandejaId ? { bandejaId } : {}));
-            marcaAprender(codigo, r);
+            marcaAprender(codigo, r); COLA.horaServidor(r && r.ahora);
             if (marcaActual !== mio) return;   // ya pasó otro carnet: no se tapa su pantalla
             if (r.pendiente && hora) recibida(true);
             else if (r.elegirPaso) marcaElegirPaso(codigo, r, hora ? id : (bandejaId || ''));
