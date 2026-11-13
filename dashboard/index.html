@@ -5525,6 +5525,57 @@
         } catch (e) { out.innerHTML = `<div class="banner error" style="display:block">${esc(e.message)}</div>`; }
         finally { if (document.getElementById('fbEstado')) setTimeout(fbEstadoCargar, 0); btn.disabled = false; btn.textContent = texto; }
     }
+    // ---------- (13/11) Utilidades de las tiendas: se actualizan solas (BigSoft.gs › paq_estado / paq_subir) ----------
+    // Se sube el .zip que arma "Armar paquete para tiendas.ps1"; el Avisador de cada tienda lo baja en el próximo minuto y se reinicia.
+    let paqDatos = null, paqMsg = '';
+    async function paqCargar() {
+        const el = document.getElementById('paqEstado'); if (!el) return;
+        if (!paqDatos) el.innerHTML = cargandoHTML('Cargando Utilidades de las tiendas');
+        try { paqDatos = await DATOS.aGoogle(() => llamarApi({ action: 'paq_estado' })); }
+        catch (e) { el.innerHTML = `<div class="fb-cab"><h4>Utilidades de las tiendas</h4></div><div class="banner error" style="display:block">${esc(e.message)}</div>`; return; }
+        paqPintar();
+    }
+    function paqHace(s) {
+        if (s == null) return 'sin noticias en 6 horas';
+        return s < 90 ? 'hace un momento' : s < 3600 ? `hace ${Math.round(s / 60)} min` : `hace ${Math.round(s / 3600)} h`;
+    }
+    function paqPintar() {
+        const el = document.getElementById('paqEstado'); if (!el || !paqDatos) return;
+        const p = paqDatos.paquete, tiendas = paqDatos.tiendas || [];
+        const al = tiendas.filter(t => p && t.version === p.version).length;
+        const fila = t => {
+            const chip = t.hace == null ? '<span class="chip st-pend">Apagada o sin avisador</span>'
+                : !t.version ? '<span class="chip st-falta">Anterior: copiar a mano una vez</span>'
+                : p && t.version === p.version ? '<span class="chip st-ok">Al día</span>'
+                : '<span class="chip st-amar">Actualizando</span>';
+            return `<tr><td class="izq">${esc(t.local)}</td><td class="izq">${t.version ? esc(t.version) : '—'}<small>${esc(paqHace(t.hace))}</small></td><td>${chip}</td></tr>`;
+        };
+        pintarConservando(el, `<div class="fb-cab"><h4>Utilidades de las tiendas</h4><span class="fb-res">${p ? `Publicada <b>${esc(p.version)}</b> · ${al} de ${tiendas.length} tiendas al día` : 'Todavía no se ha subido ningún paquete'}</span></div>
+            ${p ? `<div class="req-sub" style="margin-bottom:.5rem">Subida el ${esc(p.subido || '')} por ${esc(p.por || '')} · ${fmtNum(p.archivos || 0)} archivos · ${fmtNum(Math.round((p.tam || 0) / 1024))} KB</div>` : ''}
+            <div class="tabla-wrap"><table class="req-tabla fb-tabla" data-sin-paginar><thead><tr><th class="izq">Tienda</th><th class="izq">Versión de Utilidades</th><th></th></tr></thead><tbody>${tiendas.map(fila).join('')}</tbody></table></div>
+            ${paqMsg}
+            <div class="req-acciones" style="justify-content:flex-end;margin:.5rem 0 0">
+                <input type="file" id="paqArchivo" accept=".zip,application/zip" class="hidden" onchange="paqSubir(this)">
+                <button type="button" class="btn-ghost btn-mini" onclick="paqDatos=null;paqMsg='';paqCargar()">Actualizar</button>
+                <button type="button" class="btn-primary btn-mini" id="paqBtn" onclick="document.getElementById('paqArchivo').click()">${ico('subir')} Subir paquete nuevo (.zip)</button>
+            </div>
+            <div class="nota">Arme el paquete con "Armar paquete para tiendas.ps1" y suba "UTILIDADES para tiendas.zip". Cada tienda con el avisador encendido lo baja sola en uno o dos minutos y se reinicia; no toca su configuración. Las tiendas marcadas "Anterior" necesitan que se copie el paquete a mano una última vez.</div>`);
+    }
+    async function paqSubir(input) {
+        const archivo = input.files && input.files[0]; input.value = '';
+        if (!archivo) return;
+        const btn = document.getElementById('paqBtn');
+        if (!/\.zip$/i.test(archivo.name)) { paqMsg = '<div class="banner error" style="display:block">Elija el archivo .zip del paquete (UTILIDADES para tiendas.zip).</div>'; paqPintar(); return; }
+        if (archivo.size > 8 * 1024 * 1024) { paqMsg = '<div class="banner error" style="display:block">El archivo pesa más de 8 MB: no parece el paquete de Utilidades.</div>'; paqPintar(); return; }
+        if (btn) { btn.disabled = true; btnCargando(btn, 'Subiendo...'); }
+        try {
+            const zip = await new Promise((ok, mal) => { const l = new FileReader(); l.onload = () => ok(String(l.result).split(',')[1]); l.onerror = () => mal(new Error('No se pudo leer el archivo')); l.readAsDataURL(archivo); });
+            const r = await DATOS.aGoogle(() => llamarApi({ action: 'paq_subir', zip, idem: nuevoIdem() }));
+            paqDatos = r;
+            paqMsg = `<div class="banner ok" style="display:block">Listo: versión ${esc(r.paquete.version)} publicada. Las tiendas con el avisador encendido se actualizan solas en uno o dos minutos.</div>`;
+        } catch (e) { paqMsg = `<div class="banner error" style="display:block">${esc(e.message)}</div>`; }
+        paqPintar();
+    }
     // Revisión automática de Firebase cada 5 minutos (la bandeja y la copia a la hoja aunque nadie tenga el panel abierto)
     async function fbRevision(btn) {
         const out = document.getElementById('fbPruebaRes'), texto = btn.textContent; btn.disabled = true; btnCargando(btn, 'Activando...');
@@ -5568,7 +5619,7 @@
         }
         const s = v => v == null ? '—' : (v / 1000).toFixed(1) + ' s';
         fondo.innerHTML = `<div class="req-dlg" style="width:min(640px,100%)"><h3>Tiempos de respuesta</h3>
-            ${esPrincipal ? '<div id="fbEstado" class="fb-estado"></div><h4 class="fb-tit-tiempos">Últimos pedidos a Google</h4>' : ''}
+            ${esPrincipal ? '<div id="fbEstado" class="fb-estado"></div><div id="paqEstado" class="fb-estado"></div><h4 class="fb-tit-tiempos">Últimos pedidos a Google</h4>' : ''}
             <div class="req-sub">Últimos pedidos a Google. "En Google" es lo que tarda el script; el resto es internet y la espera de Google.</div>
             <div class="tabla-wrap" style="max-height:${esPrincipal ? 40 : 60}vh;overflow:auto;margin-top:.75rem">${TIEMPOS.length ? `<table><thead><tr><th class="izq">Hora</th><th class="izq">Acción</th><th>Total</th><th>En Google</th></tr></thead><tbody>
             ${TIEMPOS.map(t => `<tr><td class="izq">${t.hora}</td><td class="izq">${esc(NOMBRE_ACCION[t.accion] || t.accion)}${t.ok ? '' : ' <span class="chip st-falta">error</span>'}${t.pasos ? '<small title="Partes del trabajo de Google, en milisegundos">' + esc(t.pasos) + '</small>' : ''}</td>
@@ -5577,6 +5628,7 @@
             <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-primary" onclick="document.getElementById('dlgTiempos').classList.add('hidden')">Cerrar</button></div></div>`;
         fondo.classList.remove('hidden');
         if (esPrincipal) fbEstadoCargar();   // qué está en Firebase y qué en la hoja (11/11)
+        if (esPrincipal) paqCargar();        // versión de Utilidades en cada tienda (13/11)
     }
 
     // ==========================================
@@ -5592,7 +5644,8 @@
         detener: '<circle cx="12" cy="12" r="9"/><rect x="9" y="9" width="6" height="6" rx="1"/>',
         camara: '<path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/>',
         avisar: '<path d="M3 11v2a1 1 0 0 0 1 1h3l6 4V6L7 10H4a1 1 0 0 0-1 1z"/><path d="M17 9a4 4 0 0 1 0 6"/>',
-        campana: '<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/>'
+        campana: '<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
+        subir: '<path d="M12 21V9"/><path d="m7 14 5-5 5 5"/><path d="M4 4h16"/>',
     };
     const ico = (n, tam) => `<svg class="ico" ${tam ? `style="width:${tam}px;height:${tam}px"` : ''} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO_ACCION[n]}</svg>`;
     const ICONOS = {
@@ -5669,7 +5722,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-13.5';
+    const VERSION_SERVIDOR = '2026-11-13.7';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -15146,6 +15199,8 @@
             const err = e => { cxp.error = e.code === 'permission-denied' ? 'Firebase no le da permiso. Pulse Actualizar; si sigue, revise que su clave tenga Cuentas por pagar.' + (FB.problemaReglas && FB.problemaReglas() ? ' ' + FB.problemaReglas() : '') : 'Firebase: ' + (e.code || e.message); cxp.cargado = true; cxpDetener(); cxpPintar(); };
             const offs = [fs.onSnapshot(fs.query(fs.collection(db, 'cxp_docs'), fs.where('abierta', '==', true)), s => {
                 cxp.docs = s.docs.map(x => Object.assign({ id: x.id }, x.data())); cxp.cargado = true; cxp.error = '';
+                // (13/11) El N° del comprobante de retención se pone aparte, cuando Firebase ya confirmó la aprobación (aprobar no lo espera)
+                if (cxpAdmin()) s.docs.forEach(x => { const d = x.data(); if (!x.metadata.hasPendingWrites && d.estado === 'aprobada' && d.retIva > 0 && !d.numRet) cxpNumeroRetencion(x.id); });
                 if (vistaActual === 'cxp') cxpPintar();
             }, err), fs.onSnapshot(fs.doc(db, 'cxp_config', 'empresa'), s => { cxp.empresa = s.exists() ? s.data() : null; }, () => {})];
             cxp.off = () => offs.forEach(o => { try { o(); } catch (e) {} });
@@ -15425,25 +15480,46 @@
                 totalUsd: r.totalUsd, credito: Number(r.credito) || 0, vence: r.vence, descuentos: r.descuentos.map(x => ({ dias: Number(x.dias), pct: Number(x.pct) || 0, monto: Number(x.monto) || 0 })),
                 nota: String(r.nota || '').slice(0, 200), revisadoPor: quien, revisado: ahora };
             if (aprobar) Object.assign(datos, { estado: 'aprobada', abierta: true });
+            const ref = fs.doc(db, 'cxp_docs', id), ya = r.id ? cxp.docs.find(x => x.id === id) : null;
+            const listo = () => { almCerrar(); mostrarBanner(aprobar ? `Factura ${datos.documento} de ${datos.proveedor} aprobada: pasa a la Agenda de pagos (vence el ${fechaBonita(datos.vence)}).` : 'Guardada (todavía por revisar).', 'ok'); };
+            if (ya) {
+                // (13/11) Al instante: la factura ya está en la lista en vivo, así que se revisa con ella y se guarda sin esperar a Firebase
+                // (antes una transacción con 3 viajes de ida y vuelta: varios segundos en "Guardando..."). La lista cambia en el momento y, si
+                // Firebase lo rechaza, el cambio se deshace solo y sale el aviso. El N° de retención lo pone cxpNumeroRetencion después.
+                if (Number(ya.pagado) > 0 && datos.totalUsd < Number(ya.pagado) - 0.004) throw new Error('Ya tiene pagos por más de la deuda nueva: revise los montos.');
+                fs.updateDoc(ref, datos).catch(e => mostrarBanner(`No se guardó la factura ${datos.documento} de ${datos.proveedor}: ` + (e.code === 'permission-denied' ? 'Firebase no le da permiso (necesita Administración de Cuentas por pagar).' : (e.code || e.message)), 'error'));
+                return listo();
+            }
+            // Factura nueva (o que ya no está abierta): se confirma con Firebase que no esté registrada
             await fs.runTransaction(db, async tx => {
-                const ref = fs.doc(db, 'cxp_docs', id), s = await tx.get(ref);
+                const s = await tx.get(ref);
                 if (!r.id && s.exists()) throw new Error('Esa factura de ese proveedor ya está registrada.');
                 if (r.id && (!s.exists() || s.data().estado === 'anulada' || s.data().estado === 'pagada')) throw new Error('La factura cambió mientras tanto (pagada o anulada). Ciérrela y vuelva a abrirla.');
-                if (r.id && Number(s.data().pagado) > 0 && Math.abs((s.data().totalUsd || 0) - datos.totalUsd) > 0.004 && datos.totalUsd < Number(s.data().pagado)) throw new Error('Ya tiene pagos por más de la deuda nueva: revise los montos.');
-                // Comprobante de retención: número AAAAMM + 8 dígitos, al aprobar (uno por factura)
-                const ya = s.exists() ? s.data() : {};
-                if (aprobar && datos.retIva > 0 && !ya.numRet) {
-                    const sr = fs.doc(db, 'cxp_config', 'secuencias'), sq = await tx.get(sr), per = cxpHoy().replace(/-/g, '').slice(0, 6), q = sq.exists() ? sq.data() : {};
-                    const n = q.retPeriodo === per ? (Number(q.retN) || 0) + 1 : 1;
-                    tx.set(sr, { retPeriodo: per, retN: n }, { merge: true });
-                    Object.assign(datos, { numRet: per + String(n).padStart(8, '0'), fechaRet: cxpHoy() });
-                }
+                if (r.id && Number(s.data().pagado) > 0 && datos.totalUsd < Number(s.data().pagado) - 0.004) throw new Error('Ya tiene pagos por más de la deuda nueva: revise los montos.');
                 if (s.exists()) tx.update(ref, datos);
                 else tx.set(ref, Object.assign(datos, { estado: aprobar ? 'aprobada' : 'por_revisar', abierta: true, pagado: 0, fotos: [], origen: 'admin', creadoPor: quien, creado: fs.serverTimestamp(), registro: ahora }));
             });
-            almCerrar();
-            mostrarBanner(aprobar ? `Factura ${datos.documento} de ${datos.proveedor} aprobada: pasa a la Agenda de pagos (vence el ${fechaBonita(datos.vence)}).` : 'Guardada (todavía por revisar).', 'ok');
+            listo();
         } catch (e) { err.textContent = e.code === 'permission-denied' ? 'Firebase no le da permiso (necesita Administración de Cuentas por pagar).' : e.message; btn.disabled = false; btn.textContent = aprobar ? 'Aprobar para pagar' : 'Guardar sin aprobar'; }
+    }
+    // Comprobante de retención: número AAAAMM + 8 dígitos, uno por factura aprobada con retención. Va en su propia transacción, de fondo,
+    // cuando Firebase ya tiene la aprobación (lo llama la lista en vivo); si falla (sin internet) se intenta de nuevo con el próximo cambio.
+    const cxpRetEnCurso = new Set();
+    async function cxpNumeroRetencion(id) {
+        if (cxpRetEnCurso.has(id)) return;
+        cxpRetEnCurso.add(id);
+        try {
+            const { db, fs } = await cxpDb();
+            await fs.runTransaction(db, async tx => {
+                const ref = fs.doc(db, 'cxp_docs', id), s = await tx.get(ref), d = s.exists() ? s.data() : null;
+                if (!d || d.estado !== 'aprobada' || !(d.retIva > 0) || d.numRet) return;
+                const sr = fs.doc(db, 'cxp_config', 'secuencias'), sq = await tx.get(sr), per = cxpHoy().replace(/-/g, '').slice(0, 6), q = sq.exists() ? sq.data() : {};
+                const n = q.retPeriodo === per ? (Number(q.retN) || 0) + 1 : 1;
+                tx.set(sr, { retPeriodo: per, retN: n }, { merge: true });
+                tx.update(ref, { numRet: per + String(n).padStart(8, '0'), fechaRet: cxpHoy() });
+            });
+        } catch (e) { console.log('Retención ' + id + ': ' + (e.code || e.message)); }
+        finally { setTimeout(() => cxpRetEnCurso.delete(id), 30000); }
     }
     async function cxpAnular(id) {
         const d = cxp.docs.find(x => x.id === id) || cxp._ver;

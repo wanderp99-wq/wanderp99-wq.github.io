@@ -848,8 +848,10 @@
                 <input type="text" id="nroFicha" readonly placeholder="Se asigna al enviar">
             </div>
             <div class="form-group">
-                <label for="fecha">Fecha Automática</label>
+                <label for="fecha" id="fechaEtiqueta">Fecha Automática</label>
                 <input type="date" id="fecha" readonly required>
+                <button type="button" class="btn-reintentar" id="btnCambiarFecha" onclick="cambiarFecha()" title="Ficha de un día anterior (necesita la clave de administrador)">Cambiar fecha</button>
+                <small class="tasa-nota" id="fechaNota"></small>
             </div>
             <div class="form-group">
                 <label for="tasaBCV">Tasa BCV (automática)</label>
@@ -1110,6 +1112,55 @@
     const hoy = fechaLocalHoy();
     document.getElementById('fecha').value = hoy;
 
+    // (13/11) FICHA DE UN DÍA ANTERIOR (por ejemplo, se fue la luz y no se pudo enviar): con la clave de administrador se puede
+    // elegir otra fecha (nunca futura, hasta 31 días atrás). La clave se revisa al momento y otra vez en el servidor al enviar;
+    // la tasa BCV pasa a ser la de ese día y Administración recibe el aviso por Telegram.
+    let cambioFecha = null;
+    function sumarDias(iso, n) { const [a, m, d] = iso.split('-').map(Number), f = new Date(a, m - 1, d + n); return `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, '0')}-${String(f.getDate()).padStart(2, '0')}`; }
+    function quitarCambioFecha() {
+        const input = document.getElementById('fecha'), cambiada = input.value !== hoy;
+        cambioFecha = null;
+        input.value = hoy; input.readOnly = true; input.removeAttribute('min'); input.removeAttribute('max');
+        document.getElementById('fechaEtiqueta').textContent = 'Fecha Automática';
+        document.getElementById('btnCambiarFecha').textContent = 'Cambiar fecha';
+        document.getElementById('fechaNota').textContent = '';
+        if (cambiada) { cargarTasaBCV(); revisarAsistenciaFondo(); }
+    }
+    async function cambiarFecha() {
+        if (cambioFecha) { quitarCambioFecha(); return; }
+        const claveAdm = prompt("Para enviar una ficha de un día anterior escriba la clave de administrador:") || "";
+        if (!claveAdm) return;
+        const btn = document.getElementById('btnCambiarFecha');
+        btn.disabled = true; btn.textContent = 'Revisando la clave...';
+        try {
+            const resp = await fetch(URL_HOJA, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ consultaFicha: 'clave_admin', claveAdmin: claveAdm, equipo: fichaEquipo(), tienda: document.getElementById('tienda').value }) });
+            const r = JSON.parse(await resp.text());
+            if (!r || r.resultado !== 'exito') { alert((r && (r.detalle || r.error)) || 'La clave de administrador no es correcta.'); return; }
+        } catch (e) { alert('No se pudo revisar la clave: hace falta internet.'); return; }
+        finally { btn.disabled = false; btn.textContent = cambioFecha ? 'Volver a hoy' : 'Cambiar fecha'; }
+        const motivo = (prompt("Motivo (queda en el registro y se avisa a Administración):", "Se fue la luz y no se pudo enviar la ficha ese día") || "").trim();
+        if (!motivo) return;
+        cambioFecha = { claveAdmin: claveAdm, motivo: motivo.slice(0, 200) };
+        const input = document.getElementById('fecha');
+        input.readOnly = false; input.min = sumarDias(hoy, -31); input.max = hoy;
+        if (input.value === hoy) input.value = sumarDias(hoy, -1);   // casi siempre es la de ayer
+        document.getElementById('fechaEtiqueta').textContent = 'Fecha de la ficha (con clave)';
+        btn.textContent = 'Volver a hoy';
+        fechaCambiada();
+        input.focus(); try { input.showPicker(); } catch (e) {}
+    }
+    function fechaCambiada() {
+        const input = document.getElementById('fecha');
+        if (!cambioFecha) { input.value = hoy; return; }
+        if (!input.value || input.value > hoy || input.value < input.min) input.value = sumarDias(hoy, -1);
+        if (input.value === hoy) { quitarCambioFecha(); return; }
+        const [a, m, d] = input.value.split('-');
+        document.getElementById('fechaNota').textContent = `La ficha se enviará con fecha ${d}/${m}/${a} y la tasa BCV que tenía ese turno (en la tarde, la del día siguiente ya publicada). Administración recibirá el aviso.`;
+        cargarTasaBCV(); revisarAsistenciaFondo();
+    }
+    document.getElementById('fecha').addEventListener('change', fechaCambiada);
+
     // Listas de la ficha: las administra el panel (módulo "Listas de la ficha") y se guardan en Firebase (config/ficha).
     // Se usan las últimas que llegaron (guardadas en el equipo, sirven sin internet) y al abrir se traen las nuevas de Firebase.
     let listaBancos = ["R4", "BNC", "Bancrecer", "BDV"];
@@ -1169,9 +1220,10 @@
     }
     // true si Firebase la recibió (8 s como mucho: sin Firebase se sigue igual que antes)
     async function fichaAFirebase(payload) {
-        if (payload.sinMarcaje || !/^[A-Za-z0-9_-]{8,60}$/.test(payload.idem || '')) return false;
+        // Con clave de administrador (sin marcaje o fecha cambiada) va solo a Apps Script: la clave nunca se deja en Firebase
+        if (payload.sinMarcaje || payload.cambioFecha || !/^[A-Za-z0-9_-]{8,60}$/.test(payload.idem || '')) return false;
         const datos = Object.assign({}, payload);
-        ['equipo', 'idem', 'sinMarcaje', 'enFirebase'].forEach(k => delete datos[k]);
+        ['equipo', 'idem', 'sinMarcaje', 'cambioFecha', 'enFirebase'].forEach(k => delete datos[k]);
         const doc = { datos, estado: 'pendiente', creadoLocal: Date.now(), tienda: String(payload.tienda || ''), fecha: String(payload.fecha || ''),
                       turno: String(payload.turno || ''), cajero: String(payload.cajero || ''), equipo: String(payload.equipo || '') };
         try {
@@ -1801,14 +1853,20 @@
     // El BCV publica la tasa del próximo día hábil por adelantado (ej. el viernes ya publica la del lunes).
     // El historial de DolarApi incluye esa tasa con su fecha valor; se toma la de fecha más reciente.
     // Si el historial falla, se usa la tasa del día.
-    async function ultimaTasaPublicada() {
+    // hasta: ficha de un día anterior (fecha cambiada con clave). La tasa es la que la ficha habría tenido ese día (pedido del usuario, 13/11):
+    //   - turno Mañana: la vigente ese día (la de fecha valor más reciente hasta ese día)
+    //   - turno Tarde: la del día hábil siguiente, que el BCV ya publicó esa tarde (la primera con fecha valor después de ese día;
+    //     el viernes es la del lunes). Si todavía no hay ninguna, la vigente ese día.
+    async function ultimaTasaPublicada(hasta, tarde) {
         try {
             const r = await fetch('https://ve.dolarapi.com/v1/historicos/dolares/oficial', { cache: 'no-store' });
-            const lista = await r.json();
-            const ultima = lista.filter(x => Number(x.promedio) > 0 && /^\d{4}-\d{2}-\d{2}/.test(x.fecha))
-                                .sort((x, y) => x.fecha.localeCompare(y.fecha)).pop();
+            const lista = (await r.json()).filter(x => Number(x.promedio) > 0 && /^\d{4}-\d{2}-\d{2}/.test(x.fecha))
+                                           .sort((x, y) => x.fecha.localeCompare(y.fecha));
+            const siguiente = hasta && tarde ? lista.find(x => x.fecha.slice(0, 10) > hasta) : null;
+            const ultima = siguiente || lista.filter(x => !hasta || x.fecha.slice(0, 10) <= hasta).pop();
             if (ultima) return { tasa: Number(ultima.promedio), fecha: ultima.fecha.slice(0, 10) };
         } catch (e) {}
+        if (hasta) throw new Error('sin la tasa de ese día');   // la del día de hoy no sirve para una ficha anterior
         const r = await fetch('https://ve.dolarapi.com/v1/dolares/oficial', { cache: 'no-store' });
         const data = await r.json();
         if (!Number(data.promedio)) throw new Error('respuesta sin tasa');
@@ -1822,14 +1880,28 @@
         btnReintentar.classList.add('hidden');
         nota.className = 'tasa-nota';
         nota.textContent = 'Buscando la tasa BCV...';
+        const fichaFecha = document.getElementById('fecha').value, anterior = cambioFecha && fichaFecha && fichaFecha < hoy ? fichaFecha : '';
+        const tarde = document.getElementById('turno').value === 'Tarde';
         try {
-            const { tasa, fecha } = await ultimaTasaPublicada();
+            const { tasa, fecha } = await ultimaTasaPublicada(anterior, tarde);
+            if (anterior !== (cambioFecha && document.getElementById('fecha').value < hoy ? document.getElementById('fecha').value : '')) return;   // cambiaron la fecha mientras tanto
+            if (anterior && tarde !== (document.getElementById('turno').value === 'Tarde')) return;               // o el turno
             input.value = tasa.toFixed(2);
             const [a, m, d] = fecha.split('-');
             const dia = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'][new Date(+a, m - 1, +d, 12).getDay()];
-            nota.textContent = `Última tasa publicada por el BCV: vigente desde el ${dia} ${d}/${m}/${a} (automática).`;
-            try { localStorage.setItem('caja_ultima_tasa', input.value); } catch (e) {}
+            nota.textContent = anterior ? `Tasa BCV del turno ${tarde ? 'de la tarde' : 'de la mañana'} de ese día: vigente desde el ${dia} ${d}/${m}/${a} (automática).`
+                                        : `Última tasa publicada por el BCV: vigente desde el ${dia} ${d}/${m}/${a} (automática).`;
+            if (!anterior) try { localStorage.setItem('caja_ultima_tasa', input.value); } catch (e) {}
         } catch (e) {
+            if (anterior) {
+                // Ficha de un día anterior: sin la tasa de ese día no se envía (la guardada en el equipo es la de hoy)
+                input.value = '';
+                nota.className = 'tasa-nota error';
+                nota.textContent = 'No se pudo consultar la tasa BCV de ese día. Revise internet y presione "Reintentar".';
+                btnReintentar.classList.remove('hidden');
+                recalcularTodo();
+                return;
+            }
             // Sin internet o servicio caído: se usa la última tasa obtenida automáticamente en este equipo
             let ultima = null;
             try { ultima = localStorage.getItem('caja_ultima_tasa'); } catch (e2) {}
@@ -2087,6 +2159,8 @@
     // Al elegir el turno o el local: se revisa en segundo plano
     function revisarAsistenciaFondo() { pintarEstadoAsis(); consultarAsistencia().catch(() => {}); }
     document.getElementById('turno').addEventListener('change', revisarAsistenciaFondo);
+    // Ficha de un día anterior: la tasa depende del turno (mañana: la de ese día; tarde: la del día siguiente ya publicada)
+    document.getElementById('turno').addEventListener('change', () => { if (cambioFecha && document.getElementById('fecha').value < hoy) cargarTasaBCV(); });
     document.getElementById('fecha').addEventListener('change', revisarAsistenciaFondo);
     document.getElementById('cajero').addEventListener('change', () => { if (!document.getElementById('asisVentana').classList.contains('hidden')) document.getElementById('asisResp').textContent = datosAsis().cajero; });
 
@@ -2478,6 +2552,7 @@
                 // Control de asistencia del turno (vacío si ya estaba registrado por otra ficha)
                 asistencia: conCarnet() ? [] : asistencia,   // con carnet la asistencia ya está en la hoja
                 sinMarcaje,                                   // autorización de administrador si no se pudo marcar la asistencia
+                cambioFecha: cambioFecha && document.getElementById('fecha').value < hoy ? cambioFecha : null,   // ficha de un día anterior (clave de administrador)
                 asistenciaYaRegistrada: !asistencia.length && yaRegistrada()
             };
 
