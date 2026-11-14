@@ -986,6 +986,7 @@
         .nom-gas td { padding: .4rem .6rem; border-bottom: 1px solid var(--border); text-align: right; } .nom-gas td:nth-child(2) { text-align: center; } .nom-gas th:nth-child(2), .nom-gas th:nth-child(4), .nom-gas td:nth-child(4) { text-align: center; }
         .nom-gas .izq { text-align: left; } .nom-gas td small { display: block; color: var(--text-muted); } .nom-gas tr.nom-excl td { text-decoration: line-through; opacity: .55; }
         .nom-gas tfoot td { border-bottom: 0; font-weight: 700; } .nom-rojo { color: var(--bad); background: var(--bad-bg); }
+        .nom-gas .nom-gas-mod { white-space: nowrap; } @media (max-width: 600px) { .nom-gas .nom-gas-mod span { display: none; } .nom-gas td, .nom-gas th { padding: .4rem .35rem; } }
         /* ===== Interruptor y animaciones estilo iOS: el mismo bloque en el Dashboard y en la ficha =====
            Interruptor: <label class="interruptor"><input type="checkbox"><span class="sw-pista"></span> Texto</label>
            Al tocarlo, la perilla (una píldora blanca) se vuelve de cristal: crece, se ve la pista a través, se desliza y vuelve a ser blanca. */
@@ -4961,7 +4962,7 @@
                 const a = x.estado === 'pagado' ? 0 : Math.round((abonado[x.ref] || 0) * 100) / 100;
                 if (!a) return x;
                 const resta = Math.max(0, Math.round((x.usd - a) * 100) / 100);
-                return Object.assign(x, { usdTotal: x.usd, abonado: a, bs: x.usd ? Math.round(x.bs * resta / x.usd * 100) / 100 : x.bs, usd: resta });
+                return Object.assign(x, { usdTotal: x.usd, bsTotal: x.bs, abonado: a, bs: x.usd ? Math.round(x.bs * resta / x.usd * 100) / 100 : x.bs, usd: resta });
             };
             const venceAj = {};
             cxc.filter(m => m.tipo === 'VENCE').forEach(m => { if (/^\d{4}-\d{2}-\d{2}$/.test(m.vence)) venceAj[m.aplicado] = m.vence; });
@@ -5753,7 +5754,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-14.5';
+    const VERSION_SERVIDOR = '2026-11-14.6';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -12831,12 +12832,14 @@
                 <tfoot><tr><td class="nom-rojo">${perUsd(c.descontado)}</td><td colspan="3" class="izq">TOTAL descontado${nExcl ? ` · ${nExcl} excluido(s)` : ''}${c.movimiento ? ` · movimiento ${esc(c.movimiento)} en Cuentas por cobrar` : ''}</td></tr></tfoot></table>
                 ${nomDeudasTodas && nomDeudasTodas.cargando ? '<div class="nota">Cargando la fecha y la descripción de los gastos...</div>' : ''}`;
         } else {
-            gastos = n.deudas.length ? `<table class="nom-gas"><thead><tr><th>Monto $</th><th>Fecha</th><th class="izq">Descripción</th><th title="No descontarlo en esta nómina: queda pendiente en Cuentas por cobrar">Excluir</th></tr></thead><tbody>
+            gastos = (n.deudas.length ? `<table class="nom-gas"><thead><tr><th>Monto $</th><th>Fecha</th><th class="izq">Descripción</th><th></th><th title="No descontarlo en esta nómina: queda pendiente en Cuentas por cobrar">Excluir</th></tr></thead><tbody>
                 ${n.deudas.map(y => `<tr class="${n.excl.has(y.ref) ? 'nom-excl' : ''}"><td>${perUsd(y.usd)}</td><td>${fechaBonita(y.fecha).slice(0, 5)}</td>
-                    <td class="izq">${esc([y.local ? nomSigla(y.local) : '', y.tipo === 'DEUDA' ? '' : y.tipo, y.descripcion].filter(Boolean).join(' · '))}${y.abonado ? `<small>ya abonó ${perUsd(y.abonado)}</small>` : ''}${n.posterior.has(y.ref) ? `<small>${n.excl.has(y.ref) ? 'de después de esta semana: excluido solo' : 'de después de esta semana: incluido a mano'}</small>` : ''}</td>
+                    <td class="izq">${esc([y.local ? nomSigla(y.local) : '', y.tipo === 'DEUDA' ? '' : y.tipo, y.descripcion].filter(Boolean).join(' · '))}<small>${esc(y.num || '')}${y.ficha ? ' · ficha ' + esc(y.ficha) : ''}</small>${y.abonado ? `<small>ya abonó ${perUsd(y.abonado)}</small>` : ''}${n.posterior.has(y.ref) ? `<small>${n.excl.has(y.ref) ? 'de después de esta semana: excluido solo' : 'de después de esta semana: incluido a mano'}</small>` : ''}</td>
+                    <td><button type="button" class="btn-ghost btn-mini nom-gas-mod" title="Modificar este gasto (monto, descripción, vencimiento o descuento)" aria-label="Modificar" onclick="perCuentaAbrir('${esc(y.ref)}', 'nom')">✎<span> Modificar</span></button></td>
                     <td><label class="interruptor interruptor-solo" title="Excluir de esta nómina (queda pendiente en Cuentas por cobrar)"><input type="checkbox" ${n.excl.has(y.ref) ? 'checked' : ''} onchange="nomExcluir('${id}', '${esc(y.ref)}', this.checked, ${n.posterior.has(y.ref)})"><span class="sw-pista"></span></label></td></tr>`).join('')}
-                </tbody><tfoot><tr><td class="nom-rojo">${perUsd(n.aDebitar)}</td><td colspan="3" class="izq">TOTAL${n.excl.size ? ` · ${n.excl.size} excluido(s), quedan pendientes` : ''}</td></tr></tfoot></table>`
-                : '<div class="empty">No debe nada.</div>';
+                </tbody><tfoot><tr><td class="nom-rojo">${perUsd(n.aDebitar)}</td><td colspan="4" class="izq">TOTAL${n.excl.size ? ` · ${n.excl.size} excluido(s), quedan pendientes` : ''}</td></tr></tfoot></table>`
+                : '<div class="empty">No debe nada.</div>') +
+                `<div class="req-acciones" style="justify-content:flex-end;margin:.5rem 0 0"><button type="button" class="btn-ghost btn-mini" onclick="nomGastoAbrir('${id}')" title="Se registra como deuda en Cuentas por cobrar y se descuenta en esta nómina">＋ Agregar gasto</button></div>`;
         }
         // ---- Resumen ----
         const resumen = `<div class="kpis nom-res">
@@ -12920,6 +12923,68 @@
         } catch (e) {
             if (/clave/i.test(e.message)) nomAsisClave = '';
             if (err) err.textContent = e.message; if (btn) { btn.disabled = false; btn.textContent = 'Guardar'; }
+        }
+    }
+    // ---------- (14/11) Gastos del trabajador desde la Nómina: modificar (ventana de Cuentas por cobrar) y agregar ----------
+    // Lo que responde Google (las deudas al día) pasa a la nómina abierta y se vuelve a calcular lo que se descuenta
+    function nomGastosAlDia(r) {
+        if (r && r.deudas && nomDatos && !nomDatos.error) nomDatos.deudas = r.deudas;
+        delete nomCache[nomSemana]; nomDeudasTodas = null;
+        if (r) { perDeudasPend = r; perDeudasHistDatos = null; }
+        nomPintarDlg(); perPintar();
+    }
+    let nomGastoId = '';
+    function nomGastoAbrir(id) {
+        const t = perDatos && perDatos.trabajadores.find(x => x.id === id); if (!t) return;
+        nomGastoId = id;
+        const hoy = fechaLocalHoy(), finSem = sumarDias(nomSemana, 6), fecha = hoy < finSem ? hoy : finSem;
+        let f = document.getElementById('nomGastoDlg');
+        if (!f) { f = document.createElement('div'); f.id = 'nomGastoDlg'; f.className = 'req-dlg-fondo'; f.onclick = e => { if (e.target === f) f.classList.add('hidden'); }; }
+        document.body.appendChild(f);   // encima de la ventana de la Nómina
+        f.innerHTML = `<form class="req-dlg" onsubmit="nomGastoGuardar(event)">
+            <h3>Agregar gasto · ${esc(t.nombre)}</h3>
+            <div class="req-sub">Se registra como deuda en Cuentas por cobrar y se descuenta en esta nómina.</div>
+            <div class="per-reg">
+                <label>Fecha<input type="date" id="ngFecha" value="${fecha}" max="${hoy}" required></label>
+                <label>Moneda<select id="ngMoneda" onchange="document.getElementById('ngTasaL').classList.toggle('hidden', this.value !== 'Bs')"><option value="$">Dólares ($)</option><option value="Bs">Bolívares (Bs)</option></select></label>
+                <label>Monto<input type="number" id="ngMonto" min="0.01" step="0.01" required placeholder="0,00"></label>
+                <label id="ngTasaL" class="hidden">Tasa (Bs por $)<input type="number" id="ngTasa" min="0" step="0.0001" value="${nomTasa() || ''}"></label>
+                <label class="per-reg-ancho">Descripción<input id="ngDesc" maxlength="200" required placeholder="Ej. queso, pan, refresco..."></label>
+                <label class="per-reg-ancho">Foto de la factura (opcional)<input type="file" id="ngFoto" accept="image/*,application/pdf"></label>
+                <label>Clave de administrador<input type="password" id="ngClave" autocomplete="off" value="${esc(perClaveVerif)}" placeholder="sin foto, la clave es obligatoria"></label>
+                <div class="per-reg-ancho login-error" id="ngError"></div>
+            </div>
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-ghost" onclick="document.getElementById('nomGastoDlg').classList.add('hidden')">Cerrar</button><button type="submit" class="btn-primary" id="ngBtn">Agregar gasto</button></div>
+        </form>`;
+        f.classList.remove('hidden');
+        if (typeof claveAdminAuto === 'function') claveAdminAuto(f);
+        setTimeout(() => { const m = document.getElementById('ngMonto'); if (m) m.focus(); }, 50);
+    }
+    async function nomGastoGuardar(e) {
+        e.preventDefault();
+        const v = idc => { const el = document.getElementById(idc); return el ? el.value : ''; };
+        const err = document.getElementById('ngError'), btn = document.getElementById('ngBtn');
+        err.textContent = '';
+        const moneda = v('ngMoneda'), monto = Number(v('ngMonto')) || 0, tasa = Number(v('ngTasa')) || 0, desc = v('ngDesc').trim(), fecha = v('ngFecha');
+        const foto = (document.getElementById('ngFoto') || { files: [] }).files[0];
+        if (!(monto > 0)) { err.textContent = 'Escriba el monto.'; return; }
+        if (moneda === 'Bs' && !(tasa > 0)) { err.textContent = 'Escriba la tasa para pasar los Bs a $.'; return; }
+        if (!desc) { err.textContent = 'Escriba la descripción.'; return; }
+        if (!foto && !v('ngClave')) { err.textContent = 'Adjunte la foto de la factura o escriba la clave de administrador.'; return; }
+        btnCargando(btn, 'Guardando...');
+        try {
+            const comprobante = foto ? await efeLeerComprobante(foto) : null;
+            // Vence el viernes de la semana de la nómina (como los gastos de la ficha)
+            const finSem = sumarDias(nomSemana, 6), vence = fecha > finSem ? fecha : finSem;
+            const r = await llamarApi({ action: 'cxc_registrar', tipo: 'DEUDA', cuentaId: nomGastoId, local: '', fecha, moneda, monto, tasa: moneda === 'Bs' ? tasa : '',
+                                        descripcion: desc, comprobante, claveAdmin: foto ? '' : v('ngClave'), vence });
+            if (!foto) perClaveVerif = v('ngClave');
+            document.getElementById('nomGastoDlg').classList.add('hidden');
+            mostrarBanner(`Gasto agregado (${r.registrado}): quedó en Cuentas por cobrar y se descuenta en esta nómina.`, 'ok');
+            nomGastosAlDia(r);
+        } catch (x) {
+            if (/clave/i.test(x.message)) perClaveVerif = '';
+            err.textContent = x.message; btn.disabled = false; btn.textContent = 'Agregar gasto';
         }
     }
     const nomAsisVal = idc => { const el = document.getElementById(idc); return el ? el.value : ''; };
@@ -14416,15 +14481,21 @@
                  onerror="this.replaceWith(Object.assign(document.createElement('span'), { textContent: 'ver factura' }))"></a>`;
     }
     // ---------- Ventana de una cuenta: detalle, abonos/descuentos aplicados y cambios con clave de administrador ----------
-    function perCuentaAbrir(ref) {
-        const datos = (perDeudasHist && perDeudasHistDatos) ? perDeudasHistDatos : perDeudasPend;
-        const x = datos && datos.deudas.find(g => g.ref === ref);
+    // desde = 'nom': abierta desde la Nómina (lee las deudas de la semana y al guardar vuelve a pintar la nómina)
+    let perCuentaDesde = '';
+    function perCuentaAbrir(ref, desde) {
+        perCuentaDesde = desde === 'nom' ? 'nom' : '';
+        const datos = perCuentaDesde ? nomDatos : (perDeudasHist && perDeudasHistDatos) ? perDeudasHistDatos : perDeudasPend;
+        const x = datos && (datos.deudas || []).find(g => g.ref === ref);
         if (!x) return;
         const panel = ref[0] === 'X', gasto = x.tipoPersona === 'Gasto de tienda', pagada = x.estado === 'pagado';
+        // (14/11) Los de la ficha también se corrigen aquí: monto en la moneda del renglón (Bs; $ si es gasto en divisas)
+        const fichaUsd = !panel && /^DIV/i.test(x.tipo || ''), montoFicha = fichaUsd ? (x.usdTotal || x.usd) : (x.bsTotal != null ? x.bsTotal : x.bs);
         const total = x.usdTotal || x.usd, aplic = x.aplicaciones || [];
         const sumTipo = t => aplic.filter(a => a.tipo === t).reduce((s, a) => s + a.usd, 0);
         let fondo = document.getElementById('perCuentaDlg');
-        if (!fondo) { fondo = document.createElement('div'); fondo.id = 'perCuentaDlg'; fondo.className = 'req-dlg-fondo'; document.body.appendChild(fondo); }
+        if (!fondo) { fondo = document.createElement('div'); fondo.id = 'perCuentaDlg'; fondo.className = 'req-dlg-fondo'; }
+        document.body.appendChild(fondo);   // al final: queda encima de la ventana de la Nómina
         fondo.onclick = e => { if (e.target === fondo) fondo.classList.add('hidden'); };
         const fila = (k, v) => `<tr><td class="izq">${k}</td><td class="izq">${v}</td></tr>`;
         const dias = x.vence ? perDiasEntre(x.fecha, x.vence) : '';
@@ -14436,7 +14507,7 @@
                 ${fila('Tipo · local', esc([x.tipo, x.local, x.turno].filter(Boolean).join(' · ')))}
                 ${fila('Descripción', esc(x.descripcion || '—'))}
                 ${x.comprobante ? fila('Factura', perMiniatura(x.comprobante)) : ''}
-                ${fila('Monto', `<b>${perUsd(total)}</b>${x.moneda === 'Bs' ? ` (Bs ${fmt(x.monto)})` : ''}`)}
+                ${fila('Monto', `<b>${perUsd(total)}</b>${x.moneda === 'Bs' ? ` (Bs ${fmt(x.monto)})` : !panel && !fichaUsd && montoFicha ? ` (Bs ${fmt(montoFicha)})` : ''}`)}
                 ${sumTipo('ABONO') ? fila('Abonado', perUsd(sumTipo('ABONO'))) : ''}
                 ${sumTipo('DESCUENTO') ? fila('Descuentos', perUsd(sumTipo('DESCUENTO'))) : ''}
                 ${fila('Pendiente', `<b>${pagada ? '$ 0,00 (pagada)' : perUsd(x.usd)}</b>`)}
@@ -14453,7 +14524,9 @@
                 <label>Vence el<input type="date" id="pcVence" min="${x.fecha}" value="${x.vence || ''}" onchange="perCuentaVence('fecha', '${x.fecha}')"></label>`}
                 ${panel ? `<label>Monto (${esc(x.moneda || '$')})<input type="number" id="pcMonto" min="0.01" step="0.01" value="${x.monto}"></label>
                 <label class="per-reg-ancho">Descripción<input id="pcDesc" maxlength="200" value="${esc(x.descripcion || '')}"></label>`
-                       : '<div class="per-reg-ancho nota" style="margin:0">El monto y la descripción vienen de la ficha: se corrigen en Cuadre de caja.</div>'}
+                       : `<label>Monto (${fichaUsd ? '$' : 'Bs'})<input type="number" id="pcMonto" min="0.01" step="0.01" value="${montoFicha}"></label>
+                <label class="per-reg-ancho">Descripción<input id="pcDesc" maxlength="200" value="${esc(x.descripcion || '')}"></label>
+                <div class="per-reg-ancho nota" style="margin:0">Viene de la ficha${x.ficha ? ' ' + esc(x.ficha) : ''}: si cambia el monto, también se corrige el total de su caja en Cuadre de caja (queda un comentario en la caja).</div>`}
                 ${gasto ? '' : `<label>Descuento en $<input type="number" id="pcDescuento" min="0" max="${x.usd}" step="0.01" placeholder="0,00" oninput="perCuentaDescPct(${x.usd}, 'usd')"></label>
                 <label>o en %<input type="number" id="pcDescPct" min="0" max="100" step="0.01" placeholder="0" oninput="perCuentaDescPct(${x.usd}, 'pct')"></label>`}
                 <label class="per-reg-ancho">Motivo del cambio<input id="pcMotivo" maxlength="200" required placeholder="Ej. acuerdo con el cliente, error al registrar..."></label>
@@ -14495,7 +14568,7 @@
             perDeudasPend = r; perDeudasHistDatos = null;
             document.getElementById('perCuentaDlg').classList.add('hidden');
             mostrarBanner('Cuenta modificada: ' + r.cambios.join(' · ') + '.', 'ok');
-            perPintar();
+            if (perCuentaDesde === 'nom') nomGastosAlDia(r); else perPintar();
         } catch (err) { if (/clave/i.test(err.message)) perClaveVerif = ''; mostrarBanner('No se pudo modificar: ' + err.message, 'error'); btn.disabled = false; btn.textContent = 'Guardar cambios'; }
     }
 
