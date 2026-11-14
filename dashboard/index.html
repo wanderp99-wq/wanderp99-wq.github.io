@@ -2351,6 +2351,7 @@
                         <option value="">Todos los movimientos</option><option value="INGRESO">Solo ingresos</option><option value="EGRESO">Solo egresos (gastos de oficina)</option><option value="TRASPASO">Solo traspasos a caja chica</option><option value="EXTERNO">Solo dinero externo</option><option value="ATRASO">Solo registrados con atraso</option></select></div>
                     <div><label for="efeHEstado">Estado</label><select id="efeHEstado" onchange="efeFiltrarHistorial()">
                         <option value="">Todos</option><option value="ok">Recibido</option><option value="pend">Por llegar</option></select></div>
+                    <div><label for="efeHConcepto">Concepto</label><input type="search" id="efeHConcepto" list="efeHConceptos" placeholder="Ej. hielo, Salvador, Compras" autocomplete="off" oninput="clearTimeout(efeHConceptoT); efeHConceptoT = setTimeout(efeFiltrarHistorial, 250)"><datalist id="efeHConceptos"></datalist></div>
                 </div>
                 <div class="kpis" id="efeHKpis"></div>
                 <div class="tabla-wrap" id="efeHTabla"></div>
@@ -5722,7 +5723,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-13.7';
+    const VERSION_SERVIDOR = '2026-11-14.1';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -16625,10 +16626,16 @@
     // La opción de copia se recuerda en este equipo
     const almCopiaPref = () => { try { return localStorage.getItem('alm_copia') === '1'; } catch (e) { return false; } };
     function almCopiaGuardar(v) { try { localStorage.setItem('alm_copia', v ? '1' : '0'); } catch (e) {} }
-    // Tecla C en la pregunta de imprimir: marca o desmarca la copia
+    // Tecla C en la pregunta de imprimir: marca o desmarca la copia.
+    // (14/11) Solo con esa ventana ABIERTA y sin estar escribiendo en un campo: al cerrarla la ventana queda escondida (no se borra)
+    // y antes la casilla seguía en la página, así que toda "c" que se escribiera en el panel se perdía hasta recargar.
     window.addEventListener('keydown', e => {
-        const cp = document.getElementById('almQCopia');
-        if (cp && (e.key === 'c' || e.key === 'C') && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); cp.checked = !cp.checked; }
+        if ((e.key !== 'c' && e.key !== 'C') || e.ctrlKey || e.metaKey || e.altKey) return;
+        const cp = document.getElementById('almQCopia'), dlg = document.getElementById('almDlg');
+        if (!cp || !dlg || dlg.classList.contains('hidden') || !dlg.contains(cp)) return;
+        const t = e.target;
+        if (t && t !== cp && (t.isContentEditable || /^(TEXTAREA|SELECT)$/.test(t.tagName) || (t.tagName === 'INPUT' && !/^(checkbox|radio|button|submit)$/i.test(t.type)))) return;
+        e.preventDefault(); cp.checked = !cp.checked;
     }, true);
 
     // ---------- Ingresar mercancía: primero el tipo de operación, luego código + Enter + cantidad ----------
@@ -17037,6 +17044,7 @@
             ${anulada ? `<div class="banner error" style="display:block;margin-top:.6rem">${esc(n.anulacion)}</div>` : !permisos.includes('movalmacen') ? '' : `<div class="alm-marcas-fila" id="almMarcasNota" data-num="${esc(n.numero)}">${almMarcasHTML(n)}</div>`}
             <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0;flex-wrap:wrap">
                 ${anulada ? '' : `<button type="button" class="btn-eliminar" onclick="almAnular('${esc(n.numero)}')">Anular</button><button type="button" class="btn-ghost" onclick="almModificarNota('${esc(n.numero)}')">Modificar (clave)</button>`}
+                ${!anulada && n.condicion === 'Contado' && !n.cxc ? `<button type="button" class="btn-ghost" onclick="almACredito('${esc(n.numero)}')" title="El cliente no la pagó: queda como deuda en Cuentas por cobrar">Pasar a Cuentas por cobrar</button>` : ''}
                 ${!anulada && tienda && !n.ingresada ? `<button type="button" class="btn-primary" onclick="bsrAbrir('${esc(n.numero)}')" title="La PC de la tienda la ingresa en su BigSoft; aquí puede arreglar los renglones">Ingresar en BigSoft</button>` : ''}
                 ${esPrincipal ? `<button type="button" class="btn-ghost" onclick="almEnviarTelegram(almNotaDe('${esc(n.numero)}'))" title="Las notas se envían solas al guardarlas">Reenviar a Telegram</button>` : ''}
                 <button type="button" class="btn-ghost" onclick="almImprimir('nota', almNotaDe('${esc(n.numero)}'))">Imprimir</button><button type="button" class="btn-primary" onclick="almCerrar()" autofocus>Cerrar</button></div></div>`);
@@ -17067,6 +17075,42 @@
     }
     // Modificar una nota (clave): cantidades y precios; quitar o agregar renglones con su código
     let almMod = null;
+    // (13/11) Nota de contado que no se cobró → Cuentas por cobrar (deuda del cliente por el total, con días de crédito desde la fecha de la nota)
+    function almACredito(numero) {
+        const n = almNotaDe(numero); if (!n) return;
+        const cli = ((typeof almDatos !== 'undefined' && almDatos && almDatos.clientes) || []).find(c => c.id === n.clienteId);
+        const dias = cli && cli.dias > 0 ? Math.round(cli.dias) : 7;
+        almVentana(`<form class="req-dlg" onsubmit="almACreditoGuardar(event, '${esc(numero)}')"><h3>Pasar a Cuentas por cobrar</h3>
+            <div class="req-sub">Nota N° ${esc(n.numero)} · ${esc(n.cliente)} · $ ${fmt(n.total)}${n.totalBs ? ' (Bs ' + fmt(n.totalBs) + ')' : ''}. Queda a crédito y el total pasa a ser una deuda del cliente en Cuentas por cobrar. La mercancía no cambia.</div>
+            <div class="per-grid">
+                <div><label for="almCrDias">Días de crédito</label><input type="number" id="almCrDias" min="0" max="120" step="1" value="${dias}" required oninput="almACreditoVence('${esc(n.fecha)}')"></div>
+                <div><label>Vence</label><div class="k-value" style="font-size:1rem;padding:.55rem 0" id="almCrVence"></div></div>
+                <div class="per-ancho"><label for="almCrMot">Motivo</label><input type="text" id="almCrMot" maxlength="150" autocomplete="off" required placeholder="Ej. El cliente no pagó al retirar"></div>
+                <div class="per-ancho"><label for="almCrClave">Clave de administrador</label><input type="password" id="almCrClave" autocomplete="off" required></div>
+            </div>
+            <div class="login-error" id="almCrError"></div>
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-ghost" onclick="almVerNota('${esc(numero)}')">Volver</button><button type="submit" class="btn-primary" id="almCrBtn">Pasar a Cuentas por cobrar</button></div></form>`);
+        almACreditoVence(n.fecha);
+    }
+    function almACreditoVence(fecha) {
+        const el = document.getElementById('almCrVence'), dias = Math.round(Number(document.getElementById('almCrDias').value));
+        if (!el) return;
+        if (!(dias >= 0 && dias <= 120)) { el.textContent = '—'; return; }
+        const [a, m, d] = fecha.split('-').map(Number), f = new Date(a, m - 1, d + dias);
+        el.textContent = fechaBonita(`${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, '0')}-${String(f.getDate()).padStart(2, '0')}`);
+    }
+    async function almACreditoGuardar(ev, numero) {
+        ev.preventDefault();
+        const err = document.getElementById('almCrError'), btn = document.getElementById('almCrBtn');
+        btnCargando(btn, 'Guardando...');
+        try {
+            const r = await llamarApi({ action: 'alm_nota_credito', numero, diasCredito: Number(document.getElementById('almCrDias').value), motivo: document.getElementById('almCrMot').value.trim(), claveAdmin: document.getElementById('almCrClave').value });
+            almReemplazarNota(r.nota); if (r.pendientes) almDatos.pendientes = r.pendientes;
+            perDeudasPend = null;   // Cuentas por cobrar se vuelve a leer con la deuda nueva
+            mostrarBanner(`Nota ${r.nota.numero} pasada a Cuentas por cobrar (${r.cxc}): $ ${fmt(r.nota.total)}, vence ${fechaBonita(r.vence)}.`, 'ok');
+            almPintar(); almVerNota(r.nota.numero);
+        } catch (e) { err.textContent = e.message; btn.disabled = false; btn.textContent = 'Pasar a Cuentas por cobrar'; }
+    }
     function almModificarNota(numero) {
         const n = almNotaDe(numero); if (!n) return;
         almMod = { numero, totalAnt: n.total, modsAnt: n.modificaciones || '', items: n.detalle.map(x => ({ codigo: x.codigo, descripcion: x.descripcion, tipo: x.tipo, cantidad: x.cantidad, precio: x.precio })) };
@@ -21849,16 +21893,29 @@ Reglas:
     const EFE_PAGINA = 6;
     let efeHLimite = EFE_PAGINA;
     function efeFiltrarHistorial() { efeHLimite = EFE_PAGINA; efeRenderHistorial(); }
+    // (13/11) Filtro por Concepto: lo mismo que se ve en la columna (tienda en los envíos de las cajas; el concepto en gastos,
+    // traspasos y dinero externo). Busca por partes del texto, sin importar mayúsculas ni tildes.
+    let efeHConceptoT = 0;
+    const efeConceptoDe = f => f.tipo === 'TRASPASO' ? (f.turno || 'Traspaso a caja chica') : f.tipo === 'EGRESO' ? (f.turno || (f.etiqueta && f.etiqueta !== 'EGRESO' ? f.etiqueta : 'Egreso manual'))
+        : f.tipo === 'EXTERNO' ? (f.turno || '') : (f.tienda || 'Ingreso manual');
+    const efeSinTildes = t => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
     function efeVerMas(n) { efeHLimite = n === 'todos' ? Infinity : Number(n) || EFE_PAGINA; efeRenderHistorial(); }
 
     function efeRenderHistorial() {
         const desde = document.getElementById('efeHDesde').value, hasta = document.getElementById('efeHHasta').value;
         const ft = document.getElementById('efeHTienda').value, fy = document.getElementById('efeHTipo').value, fe = document.getElementById('efeHEstado').value;
+        const fcEl = document.getElementById('efeHConcepto'), fcPartes = efeSinTildes(fcEl ? fcEl.value : '').split(/\s+/).filter(Boolean);
+        const conConcepto = f => !fcPartes.length || (t => fcPartes.every(p => t.indexOf(p) !== -1))(efeSinTildes(efeConceptoDe(f)));
+        // Sugerencias del campo Concepto: los conceptos de gastos, traspasos y dinero externo (sin repetir, los más recientes primero)
+        const dl = document.getElementById('efeHConceptos');
+        if (dl) { const vistos = new Set(), ops = [];
+            efeDatos.filas.slice().sort((a, b) => b.fila - a.fila).forEach(f => { if (f.tipo === 'INGRESO') return; const c = String(efeConceptoDe(f)).trim(), k = efeSinTildes(c); if (c && !vistos.has(k) && ops.length < 200) { vistos.add(k); ops.push(c); } });
+            const html = ops.map(c => `<option value="${esc(c)}">`).join(''); if (dl.innerHTML !== html) dl.innerHTML = html; }
         // Las filas sin fecha (cargadas a mano en la hoja) se muestran siempre, para que no se pierdan. Entra también lo que se
         // REGISTRÓ en el periodo aunque tenga una fecha vieja (un gasto "de hace un año" metido hoy sale hoy, no se esconde).
         const enRango = x => (!desde || x >= desde) && (!hasta || x <= hasta);
         const lista = efeDatos.filas.filter(f => (!f.fecha || enRango(f.fecha) || (efeRegistro(f) && enRango(efeRegistro(f).slice(0, 10)))) &&
-                (!ft || (ft === '__EGRESO' ? f.tipo === 'EGRESO' : f.tienda === ft)) && (!fy || (fy === 'ATRASO' ? efeDiasAtraso(f) >= 2 : f.tipo === fy)) &&
+                (!ft || (ft === '__EGRESO' ? f.tipo === 'EGRESO' : f.tienda === ft)) && (!fy || (fy === 'ATRASO' ? efeDiasAtraso(f) >= 2 : f.tipo === fy)) && conConcepto(f) &&
                 (!fe || (f.tipo === 'INGRESO' && (efeSinEnvio(f) ? (fe === 'ok' ? f.bsOk : !f.bsOk)
                     : fe === 'ok' ? (f.bs <= 0 || f.bsOk) && (f.usd <= 0 || f.usdOk) : (f.bs > 0 && !f.bsOk) || (f.usd > 0 && !f.usdOk)))))
             // En el orden en que se registraron (la hoja agrega cada movimiento al final): lo último registrado arriba
@@ -21866,7 +21923,7 @@ Reglas:
         const t = efeTotales(lista);
         // (13/11) Lo eliminado del flujo: se ve en su lugar, tachado (no suma en nada). Con el filtro de estado no se muestra.
         const elimVer = fe || fy === 'ATRASO' ? [] : (efeDatos.eliminados || []).filter(f => (!f.fecha || enRango(f.fecha) || (efeRegistro(f) && enRango(efeRegistro(f).slice(0, 10)))) &&
-                (!ft || (ft === '__EGRESO' ? f.tipo === 'EGRESO' : f.tienda === ft)) && (!fy || f.tipo === fy));
+                (!ft || (ft === '__EGRESO' ? f.tipo === 'EGRESO' : f.tienda === ft)) && (!fy || f.tipo === fy) && conConcepto(f));
         const ver = lista.concat(elimVer).sort((a, b) => b.fila - a.fila);
         const chipElim = f => { const e = f.eliminado || {}; return `<span class="chip st-falta efe-atraso" title="Eliminado del flujo el ${esc(e.cuando || '')} por ${esc(e.quien || '')}${e.motivo ? ' · Motivo: ' + esc(e.motivo) : ''}. No suma en nada; queda como constancia.">Eliminado</span>`; };
         const kpi = (titulo, bs, usd) => `<div class="kpi"><div class="k-label">${titulo}</div><div class="k-value" style="font-size:1.15rem">${fmtBs(bs)}</div><div class="k-label">${fmtUsd(usd)}</div></div>`;
@@ -21896,7 +21953,7 @@ Reglas:
         document.getElementById('efeHTabla').innerHTML = ver.length ? `<table data-sin-paginar><thead><tr><th class="izq">Fecha</th><th class="izq">Concepto</th>
             <th class="izq">Responsable</th><th class="izq">Turno</th><th>Bs</th><th>$</th><th class="efe-c" title="Foto">Foto</th><th class="efe-c" title="Verificación (solo gastos de oficina)">Verif.</th><th></th></tr></thead><tbody>` +
             ver.slice(0, efeHLimite).map(f => `<tr class="${f.tipo === 'EGRESO' ? 'fila-egreso' : f.tipo === 'TRASPASO' ? 'fila-traspaso' : f.tipo === 'EXTERNO' ? 'fila-externo' : ''}${f.eliminado ? ' fila-eliminada' : ''}"><td class="izq">${efeFecha(f.fecha)}${f.eliminado ? chipElim(f) : efeAtraso(f) + efePendChip(f) + chipRep(f)}</td>
-                <td class="izq efe-gris">${f.tipo === 'TRASPASO' ? esc(f.turno || 'Traspaso a caja chica') : f.tipo === 'EGRESO' ? esc(f.turno || (f.etiqueta && f.etiqueta !== 'EGRESO' ? f.etiqueta : 'Egreso manual')) : f.tipo === 'EXTERNO' ? esc(f.turno) : esc(f.tienda || 'Ingreso manual')}</td><td class="izq efe-gris">${efeCorto(f.cajero)}</td>
+                <td class="izq efe-gris">${esc(efeConceptoDe(f))}</td><td class="izq efe-gris">${efeCorto(f.cajero)}</td>
                 <td class="izq efe-gris"><span title="${esc(f.tipo === 'INGRESO' ? f.turno : '')}">${f.tipo !== 'INGRESO' ? '' : turnoCorto(f.turno)}</span></td>
                 <td class="${f.bs < 0 ? 'monto-neg' : ''}">${f.bs ? efeMontoUsd('Bs', f.bs, f.fecha, punto(f, 'bs')) : efeSinEnvio(f) ? `<span class="efe-cifra"><span title="Caja sin envío">Bs 0</span>${punto(f, 'bs')}</span>` : ''}${f.bsOk || f.tipo !== 'INGRESO' ? firma(f, 'bs') : ''}</td>
                 <td class="${f.usd < 0 ? 'monto-neg' : ''}">${f.usd ? `<span class="efe-cifra">${fmtUsd(f.usd)}${punto(f, 'usd')}</span>` : ''}${f.usdOk || f.tipo !== 'INGRESO' ? firma(f, 'usd') : ''}</td>
