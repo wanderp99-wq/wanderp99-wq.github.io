@@ -3492,7 +3492,13 @@
     async function llamarApiPedido(payload) {
         // (12/11) Lecturas del almacén con "Usar Firebase en el Almacén" encendido: se responden aquí con lo de Firebase (sin Google)
         if (ALMVIVO_ACC.test(payload.action) && !almVivoSaltar) { const r = await almVivoResponder(payload); if (r) return r; }
-        if (CAJAVIVO_ACC.test(payload.action) && !cajaVivoSaltar) { const r = await cajaVivoResponder(payload); if (r) return r; }
+        vivoMotivo = '';
+        if (CAJAVIVO_ACC.test(payload.action)) {
+            if (cajaVivoSaltar) vivoMotivo = 'comparar';
+            else { const r = await cajaVivoResponder(payload); if (r) return r; }
+            // (14/11) Va a Google: se le dice por qué (Tiempos lo muestra en "Llamadas a internet de Google hoy")
+            payload = Object.assign({}, payload, { porGoogle: vivoMotivo || 'sin motivo' });
+        }
         if (PERVIVO_ACC.test(payload.action) && !perVivoSaltar) { const r = await perVivoResponder(payload); if (r) return r; }
         if (REQVIVO_ACC.test(payload.action)) { const r = await reqDirecto.responder(payload); if (r) return r; }
         if (FACTVIVO_ACC.test(payload.action)) { const r = await factDirecto.responder(payload); if (r) return r; }
@@ -4423,7 +4429,7 @@
         return { iniciar, detener, reiniciar, esperar, completo, cfg: () => cfg || {}, responder: p => CAJAFB.responder(p, H),
                  tiene: n => lista.includes(n), lista: () => lista.slice(), estado: () => estado, error: () => error, tocar: () => { usado = Date.now(); }, usado: () => usado };
     })();
-    let cajaVivoCfg = null, cajaVivoCfgHora = 0, cajaVivoRotoHora = 0, cajaVivoAvisado = false, cajaVivoSaltar = 0;
+    let cajaVivoCfg = null, cajaVivoCfgHora = 0, cajaVivoRotoHora = 0, cajaVivoAvisado = false, cajaVivoSaltar = 0, vivoMotivo = '';
     // ¿Encendido? Apagado: config/caja se lee una vez cada 5 minutos (1 lectura) y no se escucha nada
     async function cajaVivoConfig() {
         if (!clave || typeof FB === 'undefined') return null;
@@ -4442,30 +4448,36 @@
     }
     // Lecturas de Cuadre / Validar pagos / Conciliación respondidas aquí con lo de Firebase. null = que siga por Google como siempre.
     async function cajaVivoResponder(p) {
-        if (cajaVivoSaltar || !CAJAVIVO_ACC.test(p.action) || !cajaVivoPermite(p.action)) return null;
+        // (14/11) vivoMotivo: por qué esta lectura se pidió a Google (se manda a Google y Tiempos lo muestra junto a las llamadas)
+        if (cajaVivoSaltar) { vivoMotivo = 'comparar'; return null; }
+        if (!CAJAVIVO_ACC.test(p.action)) return null;
+        if (!cajaVivoPermite(p.action)) { vivoMotivo = 'sin permiso'; return null; }
         try {
             const cfg = await cajaVivoConfig();
-            if (!cfg || !cfg.directa) return null;
+            if (!cfg) { vivoMotivo = CAJAVIVO.estado() === 'roto' ? 'Firebase falló hace poco' : 'sin sesión de Firebase'; return null; }
+            if (!cfg.directa) { vivoMotivo = 'apagado'; return null; }
             const necesita = CAJAVIVO_HOJAS_DE[p.action], hojas = cajaVivoHojas(cfg.grupos);
-            if (!necesita.every(n => hojas.includes(n))) return null;   // alguna hoja todavía está en Google
+            if (!necesita.every(n => hojas.includes(n))) { vivoMotivo = 'hoja en Google'; return null; }   // alguna hoja todavía está en Google
             CAJAVIVO.tocar();
             const t0 = performance.now();
             if (CAJAVIVO.estado() === 'escuchando' && !necesita.every(n => CAJAVIVO.tiene(n))) CAJAVIVO.detener();   // cambiaron los permisos o los grupos
             await CAJAVIVO.iniciar(hojas);
             await CAJAVIVO.esperar(12000);
             const c = CAJAVIVO.cfg();
-            if (!c.directa) { CAJAVIVO.detener(); cajaVivoCfg = c; return null; }   // lo apagaron mientras tanto
-            if (!necesita.every(n => (c.grupos || []).includes(CAJAVIVO_GRUPO_DE[n]))) return null;
+            if (!c.directa) { CAJAVIVO.detener(); cajaVivoCfg = c; vivoMotivo = 'apagado'; return null; }   // lo apagaron mientras tanto
+            if (!necesita.every(n => (c.grupos || []).includes(CAJAVIVO_GRUPO_DE[n]))) { vivoMotivo = 'hoja en Google'; return null; }
             // Firebase ya tiene el último cambio que este panel conoce (el detalle también usa BD NOMINA, que cambia con Personal)
             const areas = /^cuadre_detalle/.test(p.action) ? ['cuadre', 'per'] : ['cuadre'], desde = Date.now();
             while (!(vivoFbSano() && areas.every(a => !verConocida[a] || Number(vivoFbVer[a] || 0) >= Number(verConocida[a])))) {
-                if (Date.now() - desde > 3000) { console.log('Cuadre con Firebase: todavía no llega el último cambio (se pide a Google)'); return null; }
+                if (Date.now() - desde > 3000) { vivoMotivo = vivoFbSano() ? 'sin el último cambio' : 'sin avisos al instante'; console.log('Cuadre con Firebase: ' + vivoMotivo + ' (se pide a Google)'); return null; }
                 await new Promise(r => setTimeout(r, 100));
             }
             const r = CAJAVIVO.responder(p);
             if (r) anotarTiempo(p.action + ' (Firebase)', Math.round(performance.now() - t0), 0, true);
+            else vivoMotivo = 'no se pudo calcular';
             return r;
         } catch (e) {
+            vivoMotivo = /tardó/.test(e.message) ? 'Firebase tardó' : 'Firebase falló';
             console.log('Cuadre con Firebase: ' + e.message + ' (se pide a Google)');
             if (esPrincipal && !cajaVivoAvisado) { cajaVivoAvisado = true; mostrarBanner('Cuadre y Validar pagos no pudieron leerse de Firebase (' + e.message + '). Mientras tanto se pide a Google.', 'warn'); }
             return null;
@@ -5499,10 +5511,12 @@
                 ${(() => { const u = (r.revision && r.revision.llamadas) || null; if (!u) return ''; const p = Math.min(100, u.total / 200);
                     return `<div class="fb-ind"><span>Llamadas a internet de Google hoy</span><b>${fmtNum(u.total)} <small>de unas 20.000</small></b><span class="fb-barra"><i style="width:${p}%" class="${p > 70 ? 'alto' : ''}"></i></span>
                         ${u.porOrigen.length ? `<small>${u.porOrigen.slice(0, 6).map(([o, n]) => `${esc(o)} ${fmtNum(n)}`).join(' · ')}</small>` : ''}</div>`; })()}
-                <div class="fb-ind"><span>Revisión automática (cada 5 min)</span><b>${rev ? (revHace != null ? `Activa · corrió hace ${revHace} min` : 'Activa · todavía no corre (el ping hace el trabajo de fondo)') : 'No activa (el trabajo de fondo lo hace el ping de los paneles)'}</b>${rev ? '' : '<button type="button" class="btn-primary btn-mini" onclick="fbRevision(this)">Activar</button>'}</div>
+                ${r.revision && r.revision.manual
+                    ? `<div class="fb-ind"><span>Revisión (fichas, marcas, copia a la hoja, avisos)</span><b>Manual · ${revHace != null ? `última hace ${revHace} min` : 'todavía no se ha hecho'}</b><small>Se hace al pulsar "Actualizar" (abajo). No corre sola para no gastar la cuota de Google.</small><button type="button" class="btn-ghost btn-mini" onclick="fbRevision(this, true)">Volver a cada 5 min</button></div>`
+                    : `<div class="fb-ind"><span>Revisión automática (cada 5 min)</span><b>${rev ? (revHace != null ? `Activa · corrió hace ${revHace} min` : 'Activa · todavía no corre') : 'No activa'}</b><button type="button" class="btn-ghost btn-mini" onclick="fbRevision(this, false)">Pasar a manual</button></div>`}
             </div>
             <div class="tabla-wrap"><table class="req-tabla fb-tabla" data-sin-paginar><thead><tr><th class="izq">Módulo</th><th class="izq">Dónde se guarda</th><th></th></tr></thead><tbody>${filas.map(f => f.html).join('')}</tbody></table></div>
-            <div class="req-acciones" style="justify-content:flex-end;margin:.5rem 0 0"><button type="button" class="btn-ghost btn-mini" onclick="fbHojas(this, 'copiar', 'pagos')">Copiar todo a la hoja ahora</button><button type="button" class="btn-ghost btn-mini" onclick="fbProbar(this)">Probar Firebase</button><button type="button" class="btn-ghost btn-mini" onclick="fbhComparar(this)">Comparar Nómina (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="almfbComparar(this)">Comparar Almacén y compras (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="cajafbComparar(this)">Comparar Cuadre y Validar pagos (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="perfbComparar(this)">Comparar Cuentas por cobrar, asistencia y horarios (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="reqfactComparar(this)">Comparar Requerimientos y Facturar (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="fbEstadoDatos=null;fbEstadoCargar()">Actualizar</button></div>
+            <div class="req-acciones" style="justify-content:flex-end;margin:.5rem 0 0"><button type="button" class="btn-ghost btn-mini" onclick="fbHojas(this, 'copiar', 'pagos')">Copiar todo a la hoja ahora</button><button type="button" class="btn-ghost btn-mini" onclick="fbProbar(this)">Probar Firebase</button><button type="button" class="btn-ghost btn-mini" onclick="fbhComparar(this)">Comparar Nómina (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="almfbComparar(this)">Comparar Almacén y compras (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="cajafbComparar(this)">Comparar Cuadre y Validar pagos (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="perfbComparar(this)">Comparar Cuentas por cobrar, asistencia y horarios (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="reqfactComparar(this)">Comparar Requerimientos y Facturar (Firebase directo)</button><button type="button" class="btn-primary btn-mini" onclick="fbRevisarAhora(this)">Actualizar</button></div>
             <div class="nota">"En Firebase": lo que se guarda en ese módulo vive en Firebase y la hoja de Google se llena sola como copia (lo que se cambie a mano en la hoja ya no cuenta). "Volver a la hoja" copia todo a Google antes de cambiar.</div>`;
     }
     async function fbHojas(btn, que, grupo) {
@@ -5577,15 +5591,31 @@
         } catch (e) { paqMsg = `<div class="banner error" style="display:block">${esc(e.message)}</div>`; }
         paqPintar();
     }
-    // Revisión automática de Firebase cada 5 minutos (la bandeja y la copia a la hoja aunque nadie tenga el panel abierto)
-    async function fbRevision(btn) {
-        const out = document.getElementById('fbPruebaRes'), texto = btn.textContent; btn.disabled = true; btnCargando(btn, 'Activando...');
+    // Revisión de Firebase: manual (al pulsar Actualizar, lo normal desde el 14/11) o automática cada 5 minutos
+    async function fbRevision(btn, automatica) {
+        if (automatica && !confirm('La revisión volverá a correr sola cada 5 minutos (la general y la de asistencia). Gasta unas 1.000 llamadas de Google al día. ¿Continuar?')) return;
+        const out = document.getElementById('fbPruebaRes'), texto = btn.textContent; btn.disabled = true; btnCargando(btn, automatica ? 'Activando...' : 'Cambiando...');
         try {
-            const r = await DATOS.aGoogle(() => llamarApi({ action: 'fb_revision', instalar: true }));
-            out.innerHTML = r.firebase ? '<div class="banner ok" style="display:block">Revisión automática activa: cada 5 minutos Google pasa lo que quede en la bandeja y pone al día la copia en la hoja, aunque nadie tenga el panel abierto.</div>'
-                                       : `<div class="banner error" style="display:block">No se pudo activar${r.error ? ': ' + esc(r.error) : ''}.</div>`;
+            const r = await DATOS.aGoogle(() => llamarApi(automatica ? { action: 'fb_revision', instalar: true } : { action: 'fb_revision', manual: true }));
+            out.innerHTML = automatica
+                ? (r.firebase ? '<div class="banner ok" style="display:block">Revisión automática activa: cada 5 minutos Google pasa lo que quede en la bandeja, pone al día la copia en la hoja y revisa la asistencia.</div>'
+                              : `<div class="banner error" style="display:block">No se pudo activar${r.error ? ': ' + esc(r.error) : ''}.</div>`)
+                : '<div class="banner ok" style="display:block">Revisión manual: ya no corre sola. Pulse "Actualizar" cuando quiera hacerla.</div>';
         } catch (e) { out.innerHTML = `<div class="banner error" style="display:block">${esc(e.message)}</div>`; }
         finally { if (document.getElementById('fbEstado')) setTimeout(fbEstadoCargar, 0); btn.disabled = false; btn.textContent = texto; }
+    }
+    // (14/11) "Actualizar": hace la revisión ahora (fichas y marcas que quedaron en Firebase, copia a la hoja, lo de las tiendas,
+    // la campanita, avisos de asistencia y de cuentas por pagar) y vuelve a leer el estado
+    async function fbRevisarAhora(btn) {
+        const out = document.getElementById('fbPruebaRes'), texto = btn.textContent; btn.disabled = true; btnCargando(btn, 'Revisando...');
+        try {
+            const r = await DATOS.aGoogle(() => llamarApi({ action: 'fb_revisar_ahora' }));
+            const a = r.asistencia || {}, avisos = (a.enviados || []).filter(x => !x.error).length;
+            const asis = a.error ? 'Asistencia: ' + esc(a.error) : a.revisado ? `Asistencia revisada${avisos ? ` · ${avisos} aviso${avisos === 1 ? '' : 's'} enviado${avisos === 1 ? '' : 's'}` : ' · sin avisos'}` : `Asistencia: ${esc(a.motivo || 'no se revisó')}`;
+            const pasos = (Array.isArray(r.hecho) ? r.hecho : []).filter(p => !/^(hoja |filas |caja )/.test(p));
+            out.innerHTML = `<div class="banner ok" style="display:block">Revisión hecha en ${fmtNum(Math.round((r.ms || 0) / 100) / 10)} s.${pasos.length ? ' ' + esc(pasos.join(' · ')) + '.' : ''}<br>${asis}.</div>`;
+        } catch (e) { out.innerHTML = `<div class="banner error" style="display:block">${esc(e.message)}</div>`; }
+        finally { btn.disabled = false; btn.textContent = texto; fbEstadoDatos = null; if (document.getElementById('fbEstado')) fbEstadoCargar(); }
     }
     // Activar / desactivar el espejo de Efectivo y Caja chica en Firebase (administradores, en Tiempos)
     async function fbEfectivo(btn, activar) {
@@ -5723,7 +5753,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-14.3';
+    const VERSION_SERVIDOR = '2026-11-14.5';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
