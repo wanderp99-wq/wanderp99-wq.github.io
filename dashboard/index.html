@@ -6275,11 +6275,12 @@
         }).filter(Boolean);
         const otros = r.otros || {};
         [['cxp', 'Cuentas por pagar', 'facturas de proveedores, préstamos y pagos', 'cfCxpAbrir'], ['vx', 'Venta express', 'productos, tickets y cierres de las cajas', 'cfVxAbrir'],
-         ['facturar', 'Facturar (quien solo factura)', 'catálogo sin existencia ni costo, últimas notas y ventas en espera', 'cfFacturarAbrir']].forEach(([k, nombre, desc, fn]) => {
+         ['facturar', 'Facturar (quien solo factura)', 'catálogo sin existencia ni costo, últimas notas y ventas en espera', 'cfFacturarAbrir'],
+         ['ficha', 'Ficha de cuadre', 'número de ficha al instante, cuadre, flujo general, gastos y créditos, asistencia y efectivo enviado', 'cfFichaAbrir']].forEach(([k, nombre, desc, fn]) => {
             if (!(k in otros)) return;
-            const antes = k === 'facturar' ? '<span class="chip st-pend">Lee de Google</span>' : '<span class="chip st-info">En Firebase</span>';
+            const antes = k === 'facturar' || k === 'ficha' ? '<span class="chip st-pend">' + (k === 'ficha' ? 'La procesa Google' : 'Lee de Google') + '</span>' : '<span class="chip st-info">En Firebase</span>';
             filas.push({ si: !!otros[k], cf: !!otros[k], html: `<tr><td class="izq"><b>${nombre}</b><small>${desc}</small></td><td class="izq">${otros[k] ? chipCF : antes}</td>
-                <td class="fb-acc"><button type="button" class="${otros[k] ? 'btn-ghost' : 'btn-primary'} btn-mini" onclick="${fn}(this)">${otros[k] ? (k === 'facturar' ? 'Volver a Google' : 'Detalle') : 'Pasar al servidor nuevo'}</button></td></tr>` });
+                <td class="fb-acc"><button type="button" class="${otros[k] ? 'btn-ghost' : 'btn-primary'} btn-mini" onclick="${fn}(this)">${otros[k] ? (k === 'facturar' || k === 'ficha' ? 'Volver a Google' : 'Detalle') : 'Pasar al servidor nuevo'}</button></td></tr>` });
         });
         const nCF = filas.filter(f => f.cf).length;
         const n = filas.filter(f => f.si).length, faltan = FB_ORDEN.filter(([id]) => !(id === 'efectivo' ? (ef.oficial || ef.cf) : ((g[id] || {}).activo || (g[id] || {}).cf))).map(x => x[1]);
@@ -6314,7 +6315,11 @@
             ${error ? `<div class="banner error" style="display:block">${esc(error)}</div>` : `
             <div class="req-sub">El sistema lee los avisos de Bancrecer en el correo <b>${esc(e.cuenta || '')}</b> cada 5 minutos (y al momento cuando una ficha pregunta por uno que no aparece).
                 ${e.ultimo ? 'Última lectura: ' + esc(e.ultimo.cuando) + '.' : 'Todavía no se ha leído.'}</div>
-            ${e.lectura ? `<div class="banner ok" style="display:block">Leído ahora: ${fmtNum(e.lectura.revisados || 0)} correo(s) revisado(s), ${fmtNum(e.lectura.nuevos || 0)} pago(s) nuevo(s).</div>` : ''}
+            ${e.lectura ? `<div class="banner ${e.lectura.revisados ? 'ok' : 'warn'}" style="display:block">Leído ahora: ${fmtNum(e.lectura.revisados || 0)} correo(s) con el asunto "Pago Móvil recibido", ${fmtNum(e.lectura.nuevos || 0)} pago(s) nuevo(s).${e.lectura.revisados ? '' : ' No llegó ningún aviso de los últimos días a este correo.'}</div>
+                ${(e.lectura.detalle || []).length ? `<div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Llegó</th><th class="izq">De</th><th class="izq">Qué pasó</th></tr></thead><tbody>
+                ${e.lectura.detalle.map(x => `<tr><td class="izq">${esc(x.fecha)}</td><td class="izq">${esc(x.de)}</td><td class="izq">${/^leído/.test(x.estado) ? `<span class="chip st-ok">${esc(x.estado)}</span>`
+                    : /no autorizado/.test(x.estado) ? `<span class="chip st-falta">Remitente no autorizado</span> <button type="button" class="btn-ghost btn-mini" data-c="${esc(x.de)}" onclick="bcrAbrir(this, { remitentes: [...(document.getElementById('bcrRem').value || '').split(','), this.dataset.c].join(','), leer: true })">Autorizar y leer</button>`
+                    : `<span class="chip st-falta">${esc(x.estado)}</span>`}</td></tr>`).join('')}</tbody></table></div>` : ''}` : ''}
             <div class="filters"><div style="grid-column:1/-1"><label for="bcrRem">Correos autorizados para reenviar los avisos (además de Bancrecer)</label>
                 <input id="bcrRem" value="${esc((e.remitentes || []).join(', '))}" placeholder="Por ejemplo: cuenta@outlook.com"></div></div>
             <div class="nota">Si los avisos llegan a otro correo (por ejemplo Outlook), cree allí una regla que los reenvíe a ${esc(e.cuenta || 'la cuenta del sistema')} y escriba aquí ese correo. Los avisos de cualquier otro remitente no cuentan.</div>
@@ -6329,14 +6334,48 @@
         fondo.classList.remove('hidden');
     }
     // (15/11) Los 5 grupos de Telegram de los cuadres de caja: cuáles encontró el sistema
-    async function tgCuadreVer(btn) {
-        const texto = btn.textContent; btnCargando(btn, 'Buscando...');
+    // Ventana: cada grupo (encontrado o no, con el motivo), lo que dice Telegram y el ID puesto a mano para los que no aparecen
+    async function tgCuadreVer(btn, ids) {
+        const texto = btn ? btn.textContent : ''; if (btn) btnCargando(btn, ids ? 'Guardando...' : 'Buscando...');
+        let r = null, error = '';
+        try { r = await DATOS.aGoogle(() => llamarApi({ action: 'tg_grupos_cuadre', ids: ids || null })); } catch (x) { error = x.message; }
+        if (btn) { btn.disabled = false; btn.textContent = texto; }
+        let fondo = document.getElementById('fbhDlg');
+        if (!fondo) { fondo = document.createElement('div'); fondo.id = 'fbhDlg'; fondo.className = 'req-dlg-fondo'; document.body.appendChild(fondo); }
+        fondo.onclick = ev => { if (ev.target === fondo) fondo.classList.add('hidden'); };
+        const d = (r && r.diag) || {}, faltan = r ? r.grupos.filter(g => !g.ok) : [];
+        const html = `<div class="req-dlg" style="max-width:720px"><h3>Grupos de cuadre en Telegram</h3>
+            ${error ? `<div class="banner error" style="display:block">${esc(error)}</div>` : `
+            <div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Grupo</th><th class="izq">Estado</th><th class="izq">ID del grupo (si falta)</th></tr></thead><tbody>
+            ${r.grupos.map((g, i) => `<tr><td class="izq"><b>${esc(g.grupo)}</b>${g.titulo && g.titulo !== g.grupo ? `<small>En Telegram: ${esc(g.titulo)}</small>` : ''}</td>
+                <td class="izq">${g.ok ? '<span class="chip st-ok">Listo</span>' : `<span class="chip st-falta">Falta</span>${g.error ? `<small>${esc(g.error.slice(0, 220))}</small>` : ''}`}</td>
+                <td class="izq">${g.ok ? '' : `<input id="tgId${i}" data-local="${esc(g.local)}" placeholder="-100... o la dirección del grupo" style="max-width:16rem">`}</td></tr>`).join('')}
+            </tbody></table></div>
+            ${faltan.length ? `<div class="nota">Si un grupo no aparece solo, ponga su ID: en <b>web.telegram.org</b> abra el grupo y copie el número que sale al final de la dirección (empieza con -100), o en Telegram de PC active Ajustes › Avanzado › Funciones experimentales › "Mostrar ID" y cópielo de la información del grupo. El bot tiene que estar dentro del grupo.</div>
+                <div class="req-acciones" style="justify-content:flex-end"><button type="button" class="btn-primary btn-mini" onclick="tgCuadreGuardarIds(this)">Guardar los ID</button></div>` : '<div class="banner ok" style="display:block">Listo: el sistema puede avisar en los 5 grupos.</div>'}
+            <div class="nota">Lo que dice Telegram: ${d.webhook === 'no' ? 'el sistema recibe los mensajes del bot' : 'los mensajes del bot los recibe otro programa (' + esc(d.webhook || '?') + '), por eso el sistema no ve los /start: ponga los ID a mano'}${d.pendientes != null ? ' · mensajes en espera: ' + esc(String(d.pendientes)) : ''}.
+                ${(d.vistos || []).length ? 'Grupos que el sistema ha visto: ' + esc(d.vistos.join(' · ')) : 'Todavía no ha visto ningún grupo.'}</div>`}
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-primary" onclick="document.getElementById('fbhDlg').classList.add('hidden')">Cerrar</button></div></div>`;
+        if (!fondo.classList.contains('hidden') && /Grupos de cuadre/.test((fondo.querySelector('h3') || {}).textContent || '')) pintarVentana(fondo, html); else fondo.innerHTML = html;
+        fondo.classList.remove('hidden');
+    }
+    function tgCuadreGuardarIds(btn) {
+        const ids = {}; document.querySelectorAll('#fbhDlg input[id^="tgId"]').forEach(i => { if (i.value.trim()) ids[i.dataset.local] = i.value.trim(); });
+        if (!Object.keys(ids).length) { mostrarBanner('Escriba al menos un ID.', 'warn'); return; }
+        tgCuadreVer(btn, ids);
+    }
+    // (15/11) La ficha de cuadre procesada en el servidor nuevo (número al instante) o, al volver, en Google como antes
+    async function cfFichaAbrir(btn) {
+        const on = !!((fbEstadoDatos || {}).otros || {}).ficha;
+        if (!confirm(on ? '¿Volver a que Google procese las fichas? (más lento: el número tarda unos segundos o espera la revisión de 5 minutos)'
+                        : 'Las fichas se procesarán en el servidor nuevo: el cajero recibe el número al instante y se guardan las mismas filas que hoy (cuadre, flujo general, gastos y créditos, asistencia y lo enviado en Control de efectivo). Google solo revisa después el pago móvil de Bancrecer. Si el servidor nuevo no responde, la ficha sigue por Google como antes.\n\n¿Encender?')) return;
+        const texto = btn.textContent; btnCargando(btn, on ? 'Volviendo...' : 'Encendiendo...');
         try {
-            const r = await DATOS.aGoogle(() => llamarApi({ action: 'tg_grupos_cuadre' })), faltan = r.grupos.filter(g => !g.ok);
-            mostrarBanner(r.grupos.map(g => g.grupo + ': ' + (g.ok ? 'encontrado' : 'falta')).join(' · ') +
-                (faltan.length ? '. En cada grupo que falta escriba /start@TetrisRequeBot y pulse otra vez este botón.' : '. Listo: el sistema ya puede avisar en los 5.'), faltan.length ? 'warn' : 'ok');
-        } catch (x) { mostrarBanner('No se pudo revisar: ' + x.message, 'error'); }
-        btn.disabled = false; btn.textContent = texto;
+            await DATOS.aGoogle(() => llamarApi({ action: 'cf_ficha', activar: !on }));
+            cfSes.modHora = 0;
+            mostrarBanner(on ? 'Las fichas vuelven a procesarse en Google.' : 'Listo: las fichas se procesan en el servidor nuevo.', 'ok');
+            fbEstadoDatos = null; fbEstadoCargar();
+        } catch (x) { mostrarBanner('No se pudo: ' + x.message, 'error'); btn.disabled = false; btn.textContent = texto; }
     }
     // (15/11) Facturar para quien solo factura: encender (lee del servidor nuevo) o volver a Google
     async function cfFacturarAbrir(btn) {
@@ -6682,7 +6721,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-15.12';
+    const VERSION_SERVIDOR = '2026-11-15.18';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
