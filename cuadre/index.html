@@ -199,6 +199,11 @@
         .dynamic-list { background: var(--list-bg); padding: 1rem; border-radius: var(--radius); margin-bottom: 1rem; border: 1px solid var(--border); }
         .dynamic-row { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; align-items: center; flex-wrap: wrap; }
         .dynamic-row > * { flex: 1; min-width: 110px; }
+        /* (15/11) Pago móvil de Bancrecer: si está en la cuenta (debajo de cada renglón) */
+        .dynamic-row > .pm-estado { flex-basis: 100%; min-width: 0; font-size: .82rem; margin-top: -.2rem; color: var(--text-muted); }
+        .pm-estado:empty { display: none; }
+        .pm-estado.ok { color: #16a34a; } .pm-estado.mal { color: var(--danger); font-weight: 600; } .pm-estado.duda { color: #b45309; }
+        @media (prefers-color-scheme: dark) { .pm-estado.ok { color: #4ade80; } .pm-estado.duda { color: #fbbf24; } }
         
         button {
             padding: 0.6rem 1rem;
@@ -1186,6 +1191,19 @@
         });
     }
     async function traerListasFicha() {
+        // (15/11) Del servidor nuevo (ahí las guarda el panel ahora); si no responde, de Firebase como antes
+        try {
+            const cf = await cfPublico('pub_listas', {}, 8000);
+            if (cf && cf.listas) {
+                const l = {};
+                ['bancosTDD', 'bancosPM', 'titularesTDD', 'titularesPM', 'tiposGasto'].forEach(k => { if (Array.isArray(cf.listas[k])) l[k] = cf.listas[k].filter(x => typeof x === 'string'); });
+                const antes = JSON.stringify([listaBancos, listaBancosPM, listaTitulares, listaTitularesPM, listaTiposGasto]);
+                usarListasFicha(l);
+                try { localStorage.setItem('ficha_listas', JSON.stringify(l)); } catch (e) {}
+                if (JSON.stringify([listaBancos, listaBancosPM, listaTitulares, listaTitularesPM, listaTiposGasto]) !== antes) refrescarListasFicha();
+                return;
+            }
+        } catch (e) {}
         try {
             const c = new AbortController(), t = setTimeout(() => c.abort(), 8000);
             const r = await fetch(LISTAS_FB_URL, { cache: 'no-store', signal: c.signal }); clearTimeout(t);
@@ -1210,6 +1228,17 @@
     // ==========================================
     const FS_FICHAS = 'https://firestore.googleapis.com/v1/projects/plazavalencia-c2cb0/databases/(default)/documents/fichas/';
     const FB_LLAVE_API = 'AIzaSyChfkb5hOmbIWMtkYOvoVzjZK0KLzxFGgw';
+    // (15/11) Servidor nuevo (Cloudflare): la ficha y el pase del carnet van ahí primero; Firebase queda solo de respaldo
+    const CF_API = 'https://plaza-software.jdsistemas.workers.dev/api', CF_EMPRESA = 'plaza-valencia';
+    async function cfPublico(action, datos, ms) {
+        const c = new AbortController(), t = setTimeout(() => c.abort(), ms || 8000);
+        try {
+            const r = await fetch(CF_API, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                                            body: JSON.stringify(Object.assign({ empresa: CF_EMPRESA, action }, datos)), signal: c.signal });
+            const j = await r.json().catch(() => null);
+            return j && j.ok ? j : null;
+        } catch (e) { return null; } finally { clearTimeout(t); }
+    }
     function fsValorFicha(v) {
         if (v === null || v === undefined) return { nullValue: null };
         if (typeof v === 'boolean') return { booleanValue: v };
@@ -1223,9 +1252,11 @@
         // Con clave de administrador (sin marcaje o fecha cambiada) va solo a Apps Script: la clave nunca se deja en Firebase
         if (payload.sinMarcaje || payload.cambioFecha || !/^[A-Za-z0-9_-]{8,60}$/.test(payload.idem || '')) return false;
         const datos = Object.assign({}, payload);
-        ['equipo', 'idem', 'sinMarcaje', 'cambioFecha', 'enFirebase'].forEach(k => delete datos[k]);
+        ['equipo', 'idem', 'sinMarcaje', 'cambioFecha', 'enFirebase', 'enCF'].forEach(k => delete datos[k]);
         const doc = { datos, estado: 'pendiente', creadoLocal: Date.now(), tienda: String(payload.tienda || ''), fecha: String(payload.fecha || ''),
                       turno: String(payload.turno || ''), cajero: String(payload.cajero || ''), equipo: String(payload.equipo || '') };
+        if (await cfPublico('pub_ficha', { idem: payload.idem, doc }, 8000)) { payload.enCF = true; return true; }
+        delete payload.enCF;
         try {
             const c = new AbortController(), t = setTimeout(() => c.abort(), 8000);
             const r = await fetch(FS_FICHAS + payload.idem + '?key=' + FB_LLAVE_API, { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
@@ -1237,6 +1268,7 @@
     // Se descartó en "Pendientes por enviar": que Apps Script no la pase después (si ya está en la hoja, Firebase no deja)
     function fichaFbDescartar(idem) {
         if (!/^[A-Za-z0-9_-]{8,60}$/.test(idem || '')) return;
+        cfPublico('pub_ficha_descartar', { idem });
         fetch(FS_FICHAS + idem + '?updateMask.fieldPaths=estado&key=' + FB_LLAVE_API, { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ fields: { estado: { stringValue: 'descartada' } } }) }).catch(() => {});
     }
@@ -1383,11 +1415,13 @@
             <select class="pm-banco" required><option value="">Banco...</option>${generarOpciones(listaBancosPM)}</select>
             <select class="pm-titular" required><option value="">Titular...</option>${generarOpciones(listaTitularesPM)}</select>
             <input type="number" step="0.01" min="0" class="pm-monto" placeholder="Monto Bs" value="${monto}" oninput="calcularPagoMovil(); guardarBorrador();" required>
-            <button type="button" class="btn-remove" onclick="this.parentElement.remove(); calcularPagoMovil(); guardarBorrador();">X</button>
+            <button type="button" class="btn-remove" onclick="this.parentElement.remove(); calcularPagoMovil(); guardarBorrador(); pmRevisarPronto();">X</button>
+            <small class="pm-estado" aria-live="polite"></small>
         `;
         fijarValor(div.querySelector('.pm-banco'), banco);
         fijarValor(div.querySelector('.pm-titular'), titular);
         div.querySelectorAll('input, select').forEach(el => el.addEventListener('input', guardarBorrador));
+        div.querySelectorAll('.pm-ref, .pm-banco, .pm-monto').forEach(el => { el.addEventListener('input', pmRevisarPronto); el.addEventListener('change', pmRevisarPronto); });
         document.getElementById('pagoMovilContainer').appendChild(div);
     }
 
@@ -1450,6 +1484,54 @@
         const total = (deje + envie + sumaGastos) - recibi;
         document.getElementById('totalVentasDiv').textContent = formatearMoneda(total);
     }
+
+    // ---------- (15/11) Pago móvil de Bancrecer: ¿está en la cuenta? ----------
+    // Bancrecer manda un correo por cada pago móvil recibido; el sistema lo lee y lo deja en el servidor nuevo. Aquí, al escribir los
+    // 4 dígitos y el monto de un pago de Bancrecer, se pregunta al momento: en la cuenta, ya reportado en otra ficha o tienda, el monto
+    // no coincide, o todavía no aparece (en ese caso se le pide al sistema leer el correo ya mismo). Solo dice el estado.
+    let pmT = 0, pmPidiendo = 0;
+    const pmRenglones = () => Array.from(document.querySelectorAll('#pagoMovilContainer .dynamic-row')).map(row => ({ row,
+        ref4: String(row.querySelector('.pm-ref').value || '').trim(), banco: row.querySelector('.pm-banco').value, monto: parseFloat(row.querySelector('.pm-monto').value) || 0 }))
+        .filter(x => /bancrecer/i.test(x.banco));
+    function pmRevisarPronto() { clearTimeout(pmT); pmT = setTimeout(() => pmRevisar(false), 700); }
+    function pmPintar(x, r) {
+        const el = x.row.querySelector('.pm-estado'); if (!el) return;
+        const fmt = n => Number(n).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const t = !r ? ['', ''] : r.estado === 'ok' ? ['ok', '✓ Está en la cuenta de Bancrecer' + (r.hora ? ' (recibido ' + (r.fecha && r.fecha !== document.getElementById('fecha').value ? r.fecha.split('-').reverse().join('/') + ' ' : '') + r.hora + ')' : '')]
+            : r.estado === 'usado' ? ['mal', '✕ Este pago ya se reportó en ' + (r.tienda || 'otra ficha') + (r.fechaFicha ? ' (' + r.fechaFicha.split('-').reverse().join('/') + (r.turno ? ', ' + r.turno : '') + ')' : '') + (r.nroFicha ? ' · ficha ' + r.nroFicha : '')]
+            : r.estado === 'repetido' ? ['mal', '✕ Está repetido en esta ficha']
+            : r.estado === 'monto' ? ['duda', 'En el banco esa referencia es por Bs ' + fmt(r.montoBanco) + ': revise el monto']
+            : r.estado === 'no' ? ['duda', r.leido ? 'Todavía no aparece en la cuenta de Bancrecer (revise la referencia y el monto, o espere unos minutos)' : 'Buscando en la cuenta de Bancrecer...']
+            : r.estado === 'sinred' ? ['', 'No se pudo revisar ahora (sin internet)'] : ['', ''];
+        el.className = 'pm-estado ' + t[0]; el.textContent = t[1];
+    }
+    // final: al enviar (devuelve los que no cuadran)
+    async function pmRevisar(final) {
+        const l = pmRenglones(), fecha = document.getElementById('fecha').value;
+        document.querySelectorAll('#pagoMovilContainer .dynamic-row').forEach(row => { if (!l.some(x => x.row === row)) { const el = row.querySelector('.pm-estado'); if (el) { el.textContent = ''; el.className = 'pm-estado'; } } });
+        const listos = l.filter(x => /^\d{4}$/.test(x.ref4) && x.monto > 0);
+        l.filter(x => !listos.includes(x)).forEach(x => pmPintar(x, null));
+        if (!listos.length) return [];
+        const yo = ++pmPidiendo, pagos = listos.map(x => ({ ref4: x.ref4, monto: x.monto, fecha }));
+        let idem = ''; try { idem = localStorage.getItem('caja_idem') || ''; } catch (e) {}
+        let r = await cfPublico('pub_pm_ver', { pagos, idem }, 6000);
+        if (yo !== pmPidiendo) return [];
+        if (!r) { listos.forEach(x => pmPintar(x, { estado: 'sinred' })); return []; }
+        r.resultados.forEach((v, i) => pmPintar(listos[i], v));
+        // Los que no aparecen: el sistema lee el correo ahora mismo y se vuelve a preguntar
+        if (r.resultados.some(v => v.estado === 'no')) {
+            try {
+                const resp = await fetch(URL_HOJA, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify({ consultaFicha: 'pago_movil', equipo: fichaEquipo(), pagos, idem }) });
+                const j = JSON.parse(await resp.text());
+                if (yo === pmPidiendo && j && Array.isArray(j.resultados)) r = j;
+            } catch (e) {}
+            if (yo !== pmPidiendo) return [];
+            r.resultados.forEach((v, i) => pmPintar(listos[i], Object.assign({ leido: true }, v)));
+        }
+        return final ? r.resultados.map((v, i) => Object.assign({ ref4: listos[i].ref4, monto: listos[i].monto }, v)).filter(v => v.estado !== 'ok') : [];
+    }
+    setTimeout(() => pmRevisar(false), 1500);   // lo que quedó del borrador
 
     function calcularPagoMovil() {
         let total = 0;
@@ -1734,6 +1816,7 @@
     // llega después de Google; si Google no responde, la marca se pasa sola desde Firebase. Sin internet: como antes (COLA).
     const MF_CONOCIDOS = 'ficha_marcaje_conocidos';   // código leído -> nombre y foto (para mostrarlos al instante la próxima vez)
     let mfActual = '';
+    const mfBandejaCF = {};   // (15/11) pases que quedaron en el servidor nuevo (la respuesta a "¿qué va a marcar?" lo dice)
     const mfConocidos = () => { try { return JSON.parse(localStorage.getItem(MF_CONOCIDOS) || '{}') || {}; } catch (e) { return {}; } };
     function mfAprender(codigo, r) {
         if (!r || !r.nombre) return;
@@ -1745,6 +1828,12 @@
     }
     async function mfAFirebase(id, token, codigo) {
         if (!/^\d{12,30}$/.test(codigo) || !token || !mfLocalActual) return null;
+        // (15/11) Primero el servidor nuevo (la hora la pone él); Firebase solo si no responde
+        const cf = await cfPublico('pub_marca', { id, equipo: token, codigo, local: mfLocalActual, creadoLocal: Date.now() }, 5000);
+        if (cf && cf.creado) {
+            COLA.horaServidor(cf.creado); mfBandejaCF[id] = true;
+            return new Date(cf.creado).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Caracas' });
+        }
         const base = 'projects/plazavalencia-c2cb0/databases/(default)/documents';
         const cuerpo = { writes: [{ update: { name: base + '/marcas/' + id, fields: { equipo: { stringValue: token }, codigo: { stringValue: codigo },
             local: { stringValue: mfLocalActual }, estado: { stringValue: 'pendiente' }, creadoLocal: { integerValue: String(Date.now()) } } },
@@ -1772,7 +1861,8 @@
         const conocido = mfConocidos()[codigo] || {};
         const recibida = espera => mfResultado({ recibida: true, espera, hora, nombre: conocido.n || '', foto: conocido.f || '' });
         if (hora) { mfOcupado = false; recibida(false); }
-        const datos = Object.assign({ action: 'marca_registrar', equipo: token, codigo, idem }, hora ? { bandeja: true } : {}, paso ? { paso } : {}, bandejaId ? { bandejaId } : {});
+        const datos = Object.assign({ action: 'marca_registrar', equipo: token, codigo, idem }, hora ? { bandeja: mfBandejaCF[idem] ? 'cf' : true } : {}, paso ? { paso } : {},
+                                    bandejaId ? { bandejaId } : {}, bandejaId && mfBandejaCF[bandejaId] ? { bandejaCF: true } : {});
         try {
             const r = await mfApi(datos);
             mfAprender(codigo, r); COLA.horaServidor(r && r.ahora);
@@ -2468,6 +2558,18 @@
                 return;
             }
         }
+
+        // (15/11) Pagos móviles de Bancrecer: se revisan antes de enviar. Si alguno no cuadra se avisa (se puede enviar igual: el sistema
+        // lo vuelve a revisar al guardarla y avisa a administración si sigue sin cuadrar)
+        try {
+            const malos = await Promise.race([pmRevisar(true), new Promise(ok => setTimeout(() => ok([]), 12000))]);
+            if (malos.length) {
+                const fmt = n => Number(n).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                const txt = malos.map(v => '• Ref. ' + v.ref4 + ' · Bs ' + fmt(v.monto) + ': ' + (v.estado === 'usado' ? 'ya se reportó en ' + (v.tienda || 'otra ficha') : v.estado === 'repetido' ? 'repetido en esta ficha'
+                    : v.estado === 'monto' ? 'en el banco es por Bs ' + fmt(v.montoBanco) : v.estado === 'sinred' ? 'no se pudo revisar' : 'no aparece en la cuenta')).join('\n');
+                if (!confirm('Pagos móviles de Bancrecer que no cuadran:\n\n' + txt + '\n\nRevíselos. ¿Enviar la ficha de todas formas? (Administración recibirá el aviso)')) return;
+            }
+        } catch (e) {}
 
         if (fichaYaConfirmada()) {
             if (!confirm("¿Enviar la ficha otra vez?")) return;

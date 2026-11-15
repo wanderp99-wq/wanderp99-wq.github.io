@@ -727,7 +727,9 @@
         .per-reg-vence { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: .5rem 1rem; align-items: end; }
         .per-reg-vence .per-reg-rapido { display: flex; gap: .35rem; flex-wrap: wrap; grid-column: 1 / -1; } .per-reg-vence .nota { grid-column: 1 / -1; }
         .per-num { background: none; border: 0; padding: 0; color: var(--primary); cursor: pointer; text-decoration: underline; font: inherit; font-weight: 700; white-space: nowrap; }
-        .per-cuenta { max-width: 640px; overflow-x: hidden; } .per-cuenta .per-reg { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); } .per-cuenta .per-reg input { width: 100%; box-sizing: border-box; min-width: 0; } .per-cuenta .per-desglose td:first-child { color: var(--text-muted); width: 34%; }
+        .per-cuenta { max-width: 640px; overflow-x: hidden; }
+        .req-dlg.per-cuenta { width: min(640px, 100%); }
+        @media (min-width: 900px) { .req-dlg.per-cuenta { max-width: none; width: min(1040px, 94vw); } .per-cuenta-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1.6rem; align-items: start; } .per-cuenta-cols > div:last-child > .req-sub:first-child { margin-top: 0 !important; } } .per-cuenta .per-reg { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); } .per-cuenta .per-reg input { width: 100%; box-sizing: border-box; min-width: 0; } .per-cuenta .per-desglose td:first-child { color: var(--text-muted); width: 34%; }
         .per-cuenta .per-desglose { table-layout: fixed; } .per-cuenta .per-desglose td:nth-child(2) { white-space: normal; overflow-wrap: anywhere; }   /* textos largos (vence, nombre) bajan de línea en vez de cortarse */
         .cua-faltante { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: center; margin: .75rem 0; padding: .7rem .9rem; border: 1px solid var(--bad); border-radius: 10px; background: var(--bad-bg); }
         /* Ventana "Nuevo registro" */
@@ -1451,6 +1453,23 @@
         .nom-barra-seg.pag, .nom-sw-pag { background: var(--ok) !important; } .nom-barra-seg.pend, .nom-sw-pend { background: var(--amar) !important; }
         .nom-barra-seg.pend { color: #1f2937; }   /* texto oscuro sobre el amarillo */
         .kpi.amar .k-value { color: var(--amar-txt); } .chip.st-amar { background: var(--amar-bg); color: var(--amar-txt); }
+        /* (15/11) Cuentas por pagar con los colores del usuario: rojo (Rojo Racing #E4002B) para lo vencido, verde para lo vigente o por pagar,
+           azul glaciar de apoyo. Se cambian las variables solo dentro del módulo y sus ventanas (el amarillo oliva se veía opaco). */
+        #vistaCxp, .cxp-dlg { --amar-txt: #15803d; --amar-bg: rgba(22, 163, 74, .12); --amar: #16a34a; --bad: #E4002B; --bad-bg: rgba(228, 0, 43, .10);
+                              --cxp-azul: #3d7ea6; --cxp-azul-bg: rgba(123, 167, 194, .18); }
+        :root:not([data-theme="light"]) #vistaCxp, :root:not([data-theme="light"]) .cxp-dlg { --amar-txt: #4ade80; --amar-bg: rgba(74, 222, 128, .14); --amar: #4ade80; --bad: #ff4d6a; --bad-bg: rgba(255, 77, 106, .14);
+                              --cxp-azul: #8fc1de; --cxp-azul-bg: rgba(143, 193, 222, .16); }
+        #vistaCxp .chip.st-falta, .cxp-dlg .chip.st-falta { background: var(--bad-bg); color: var(--bad); }
+        #vistaCxp .kpi.azul .k-value { color: var(--cxp-azul); } #vistaCxp .chip.st-azul { background: var(--cxp-azul-bg); color: var(--cxp-azul); }
+        .cxp-graf { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); gap: .8rem; margin: .2rem 0 .8rem; }
+        .cxp-graf > div { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: .7rem .8rem; }
+        .cxp-graf h5 { margin: 0 0 .5rem; font-size: .85rem; color: var(--text-muted); font-weight: 600; }
+        .cxp-bar { display: grid; grid-template-columns: minmax(5rem, 9rem) 1fr auto; align-items: center; gap: .5rem; font-size: .82rem; margin: .28rem 0; }
+        .cxp-bar .pista { height: 14px; border-radius: 4px; background: var(--list-bg); overflow: hidden; display: flex; }
+        .cxp-bar .pista i { display: block; height: 100%; } .cxp-bar .pista i.v { background: var(--amar); } .cxp-bar .pista i.r { background: var(--bad); }
+        .cxp-bar .nom { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .cxp-bar b { white-space: nowrap; }
+        .cxp-com { border-left: 3px solid var(--cxp-azul, var(--primary)); background: var(--list-bg); border-radius: 6px; padding: .4rem .6rem; margin: .3rem 0; font-size: .88rem; }
+        .cxp-com small { color: var(--text-muted); display: block; }
         .nom-barra-seg span { white-space: nowrap; overflow: hidden; padding: 0 .4rem; } .nom-barra-seg:focus-visible { outline: 2px solid var(--text-main); outline-offset: 1px; }
         .nom-barra-pie { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-top: .45rem; font-size: .85rem; color: var(--text-muted); } .nom-barra-pie b { color: var(--text-main); }
         .alm-guardando { display: none; } .alm-guardando.activo { display: inline-flex; margin-right: .6rem; padding: .1rem .55rem; border-radius: 999px; background: var(--warn-bg); color: var(--warn); font-weight: 600; }
@@ -3506,7 +3525,7 @@
         }
         if (PERVIVO_ACC.test(payload.action) && !perVivoSaltar) { const r = await perVivoResponder(payload); if (r) return r; }
         if (REQVIVO_ACC.test(payload.action)) { const rc = await cfReqResponder(payload); if (rc) return rc; const r = await reqDirecto.responder(payload); if (r) return r; }
-        if (FACTVIVO_ACC.test(payload.action)) { const r = await factDirecto.responder(payload); if (r) return r; }
+        if (FACTVIVO_ACC.test(payload.action)) { const rc = await cfFactResponder(payload); if (rc) return rc; const r = await factDirecto.responder(payload); if (r) return r; }
         const t0 = performance.now();
         let llaveIdem = '', llaveLS = '';
         // Leer la factura no guarda nada: sin idem (si no, pulsar Leer otra vez mientras Google seguía con el primero daba "todavía se está guardando").
@@ -4966,7 +4985,10 @@
                 if (a) (aplic[a[1] + ':' + a[2]] = aplic[a[1] + ':' + a[2]] || []).push({ id: x.id, tipo: x.tipo, fecha: x.fecha, usd: Number(a[3]), nota: x.descripcion, quien: x.registradoPor });
             }));
             const abonado = {}; Object.keys(aplic).forEach(k => { abonado[k] = aplic[k].reduce((s, x) => s + x.usd, 0); });
+            const comCxc = {};   // (15/11) comentarios de cada cuenta (filas COMENTARIO de BD CXC)
+            cxc.filter(m => m.tipo === 'COMENTARIO').forEach(m => { (comCxc[m.aplicado] = comCxc[m.aplicado] || []).push({ texto: m.descripcion, quien: m.registradoPor, cuando: m.registro }); });
             const conAbonado = x => {
+                if (comCxc[x.ref]) x.comentarios = comCxc[x.ref];
                 if (aplic[x.ref]) x.aplicaciones = aplic[x.ref];
                 const a = x.estado === 'pagado' ? 0 : Math.round((abonado[x.ref] || 0) * 100) / 100;
                 if (!a) return x;
@@ -5325,8 +5347,16 @@
     async function cfToken() {
         if (!clave) throw new Error('sin sesión');
         if (cfSes.token && cfSes.clave === clave && cfSes.vence - Date.now() > 60000) return cfSes.token;
+        // (15/11) Si el servidor nuevo no reconoció esta clave hace poco, no se insiste: cada intento contaba como clave incorrecta
+        // (bloqueaba el equipo y mandaba avisos de seguridad). Google le pasa las claves solo; se vuelve a probar en 5 minutos.
+        if (cfSes.mala === clave && Date.now() < cfSes.malaHasta) throw new Error('El servidor nuevo todavía no tiene esta clave');
         const r = await cfPedir({ action: 'login', clave, eq: EQUIPO_ID, disp: DISPOSITIVO });
-        if (!r.ok) throw new Error(r.error || 'no se pudo entrar');
+        if (!r.ok) {
+            // Ojo: el mensaje NO debe decir "clave incorrecta": en el panel eso cierra la sesión (la clave de Google sí es buena)
+            if (/clave|intentos/i.test(r.error || '')) { cfSes.mala = clave; cfSes.malaHasta = Date.now() + 5 * 60000; try { llamarApi({ action: 'cf_claves' }).catch(() => {}); } catch (e) {} throw new Error('El servidor nuevo todavía no tiene esta clave'); }
+            throw new Error('Servidor nuevo: ' + (r.error || 'no se pudo entrar'));
+        }
+        cfSes.mala = '';
         Object.assign(cfSes, { token: r.token, vence: r.vence, clave, modulos: (r.empresa || {}).modulos || {}, modHora: Date.now() });
         return r.token;
     }
@@ -5465,6 +5495,40 @@
         } catch (e) { cfSes.roto = Date.now(); console.log('Servidor nuevo (Cloudflare): ' + e.message + ' (se usa lo de antes)'); return null; }
     }
     // Requerimientos de charcutería (REQFB)
+    // (15/11) Quien solo factura, desde el servidor nuevo: vista_facturar (sin existencia, mínimo ni costo) y sus ventas en espera.
+    // Esperando como mucho 3 s a que tenga el último cambio que este panel conoce; si no, Google como siempre.
+    async function cfFactResponder(p) {
+        if (!FACTVIVO_ACC.test(p.action) || !cfModuloEncendido('facturar')) return null;
+        const espera = p.action === 'alm_espera_listar';
+        if (espera ? !almVivoTiene('facturar') : !(factSolo() && (p.action === 'alm_datos' || (p.ultimas && Object.keys(p).every(k => ['action', 'ultimas'].includes(k)))))) return null;
+        try {
+            const t0 = performance.now();
+            if (espera) {
+                const x = await cfLeerAlDia(['ALM ESPERA'], ['alm']); if (!x) return null;
+                const t = v => String(v == null ? '' : v).trim(), n = v => { const y = Number(String(v).replace(',', '.')); return isFinite(y) ? y : 0; };
+                const r = { ok: true, esperas: x.H['ALM ESPERA'].valores.filter(f => t(f[0]) && !t(f[6])).map(f => {
+                    let items = []; try { items = JSON.parse(String(f[5] || '[]')); } catch (e) {}
+                    return { id: t(f[0]), guardada: t(f[1]), usuario: t(f[2]), renglones: n(f[3]), total: n(f[4]), items }; }) };
+                anotarTiempo(p.action + ' (Cloudflare)', Math.round(performance.now() - t0), 0, true);
+                return r;
+            }
+            const parte = p.action === 'alm_datos' ? 'datos' : 'notas', desde = Date.now();
+            const leer = async rutas => { const r = await cfPedir({ action: 'docs_leer', token: await cfToken(), rutas }); if (!r.ok) { if (r.sesion === false) cfSes.token = ''; throw new Error(r.error || 'sin respuesta'); } return r; };
+            for (;;) {
+                const m = await leer(['vista_facturar/meta']);
+                if (m.docs['vista_facturar/meta'] && cfAlDia(m.ver || {}, ['alm', 'per'])) {
+                    const meta = JSON.parse(JSON.parse(m.docs['vista_facturar/meta']).datos || 'null') || {}, nP = (meta.partes || {})[parte];
+                    if (!nP) return null;
+                    const rutas = Array.from({ length: nP }, (_, i) => 'vista_facturar/' + parte + '_' + i), r = await leer(rutas);
+                    let txt = ''; for (const ru of rutas) { if (!r.docs[ru]) return null; txt += JSON.parse(r.docs[ru]).datos || ''; }
+                    anotarTiempo(p.action + ' (Cloudflare)', Math.round(performance.now() - t0), 0, true);
+                    return Object.assign({ ok: true }, JSON.parse(txt));
+                }
+                if (Date.now() - desde > 3000) { vivoMotivo = 'Cloudflare sin el último cambio'; return null; }
+                await new Promise(r => setTimeout(r, 600));
+            }
+        } catch (e) { cfSes.roto = Date.now(); console.log('Servidor nuevo (Cloudflare): ' + e.message + ' (se usa Google)'); return null; }
+    }
     async function cfReqResponder(p) {
         if (reqDirecto.s.saltar || !almVivoTiene('reqcharcu') || !cfModuloEncendido('req')) return null;
         try {
@@ -5604,12 +5668,12 @@
             <div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Grupo</th><th class="izq">Dónde está</th><th></th></tr></thead><tbody>
             ${e.grupos.map(g => `<tr><td class="izq">${esc(g.nombre)}</td><td class="izq">${donde(g)}</td><td>${g.cf
                 ? `<button type="button" class="btn-ghost btn-mini" onclick="cfHojasCambiar(this, 'volver', '${g.grupo}')">Volver a Firebase</button>`
-                : g.fs ? `<button type="button" class="btn-primary btn-mini" onclick="cfHojasCambiar(this, 'pasar', '${g.grupo}')">Pasar</button>` : '<small>Primero a Firebase</small>'}</td></tr>`).join('')}
+                : `<button type="button" class="btn-primary btn-mini" onclick="cfHojasCambiar(this, 'pasar', '${g.grupo}')">Pasar</button>`}</td></tr>`).join('')}
             </tbody></table></div>
             <div class="req-sub" style="margin-top:.5rem">Última copia a la hoja de Google: ${esc(e.ultimaCopia || '—')}</div>
             <div class="login-error" id="cfHojasError"></div>
             <div class="req-acciones" style="justify-content:flex-end">
-                ${e.grupos.some(g => !g.cf && g.fs) ? `<button type="button" class="btn-ghost btn-mini" onclick="cfHojasCambiar(this, 'todos')">Pasar todos</button>` : ''}
+                ${e.grupos.some(g => !g.cf) ? `<button type="button" class="btn-ghost btn-mini" onclick="cfHojasCambiar(this, 'todos')">Pasar todos</button>` : ''}
                 ${e.grupos.some(g => g.cf) ? `<button type="button" class="btn-ghost btn-mini" onclick="cfHojasCambiar(this, 'copiar')">Copiar a la hoja ahora</button>` : ''}</div>`}
             <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-primary" onclick="document.getElementById('fbhDlg').classList.add('hidden')">Cerrar</button></div></div>`;
         fondo.classList.remove('hidden');
@@ -5625,7 +5689,7 @@
                 mostrarBanner(`Copia a la hoja de Google hecha: ${fmtNum(n)} fila${n === 1 ? '' : 's'} al día.`, 'ok');
             } else if (que === 'todos') {
                 const e = await DATOS.aGoogle(() => llamarApi({ action: 'cf_hojas', que: 'estado' })), hechos = [], fallas = [];
-                for (const g of e.grupos.filter(x => !x.cf && x.fs)) {
+                for (const g of e.grupos.filter(x => !x.cf)) {
                     btnCargando(btn, 'Pasando ' + g.nombre.split(' (')[0] + '...');
                     try { await DATOS.aGoogle(() => llamarApi({ action: 'cf_hojas', que: 'pasar', grupo: g.grupo, claveAdmin: clave })); hechos.push(g.nombre.split(' (')[0]); }
                     catch (x) { fallas.push(g.nombre.split(' (')[0] + ': ' + x.message); }
@@ -5639,7 +5703,87 @@
             await cfHojasAbrir(null);
         } catch (x) { if (err) err.textContent = x.message; btn.disabled = false; btn.textContent = texto; }
     }
-    async function cfEfectivoCambiar(btn, que) {
+    // (15/11) Cuentas por pagar guardado en el servidor nuevo (antes directo en Firebase)
+    async function cfCxpAbrir(btn) {
+        const texto = btn ? btn.textContent : ''; if (btn) btnCargando(btn, 'Consultando...');
+        let e = null, error = '';
+        try { e = await DATOS.aGoogle(() => llamarApi({ action: 'cf_cxp', estado: true })); } catch (x) { error = x.message; }
+        finally { if (btn) { btn.disabled = false; btn.textContent = texto; } }
+        let fondo = document.getElementById('fbhDlg');
+        if (!fondo) { fondo = document.createElement('div'); fondo.id = 'fbhDlg'; fondo.className = 'req-dlg-fondo'; document.body.appendChild(fondo); }
+        fondo.onclick = ev => { if (ev.target === fondo) fondo.classList.add('hidden'); };
+        const on = !!(e && e.oficial);
+        fondo.innerHTML = `<div class="req-dlg" style="max-width:640px"><h3>Cuentas por pagar en el servidor nuevo</h3>
+            ${error ? `<div class="banner error" style="display:block">${esc(error)}</div>` : `
+            <div class="req-sub">${on ? 'El servidor nuevo (Cloudflare) es el oficial de Cuentas por pagar.' : 'Hoy Cuentas por pagar se guarda en Firebase.'}</div>
+            <div class="nota">Al encender: todas las facturas, préstamos, pagos y datos de la empresa pasan de Firebase al servidor nuevo, se comparan uno por uno y solo si todo es igual queda encendido.
+                Los permisos son los mismos (almacén solo registra, Tesorería paga, Administración todo). Los paneles abiertos se cambian solos en unos segundos.
+                Firebase deja de usarse para Cuentas por pagar y se guarda una copia en Drive una vez al día (de madrugada).<br>
+                Mejor hágalo cuando nadie esté registrando pagos. "Volver a Firebase" copia todo de vuelta.</div>
+            <div class="kpis" style="margin-top:.5rem"><div class="kpi"><div class="k-label">Estado</div><div class="k-value">${on ? 'Encendido' : 'Apagado'}</div></div>
+                <div class="kpi"><div class="k-label">Última copia en Drive</div><div class="k-value" style="font-size:1rem">${esc(e.ultimaCopia || '—')}</div></div></div>
+            <div class="login-error" id="cfCxpError"></div>
+            <div class="req-acciones" style="justify-content:flex-end">
+                ${on ? `<button type="button" class="btn-ghost btn-mini" onclick="cfCxpCambiar(this, 'copiar')">Copiar a Drive ahora</button>
+                        ${e.firebase ? `<button type="button" class="btn-ghost btn-mini" onclick="cfCxpCambiar(this, 'volver')">Volver a Firebase</button>` : ''}`
+                     : `<button type="button" class="btn-primary btn-mini" onclick="cfCxpCambiar(this, 'encender')">Encender</button>`}
+            </div>`}
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-primary" onclick="document.getElementById('fbhDlg').classList.add('hidden')">Cerrar</button></div></div>`;
+        fondo.classList.remove('hidden');
+    }
+    // (15/11) Venta express guardada en el servidor nuevo (antes directo en Firebase, también sin internet)
+    async function cfVxAbrir(btn) {
+        const texto = btn ? btn.textContent : ''; if (btn) btnCargando(btn, 'Consultando...');
+        let e = null, error = '';
+        try { e = await DATOS.aGoogle(() => llamarApi({ action: 'cf_vx', estado: true })); } catch (x) { error = x.message; }
+        finally { if (btn) { btn.disabled = false; btn.textContent = texto; } }
+        let fondo = document.getElementById('fbhDlg');
+        if (!fondo) { fondo = document.createElement('div'); fondo.id = 'fbhDlg'; fondo.className = 'req-dlg-fondo'; document.body.appendChild(fondo); }
+        fondo.onclick = ev => { if (ev.target === fondo) fondo.classList.add('hidden'); };
+        const on = !!(e && e.oficial);
+        fondo.innerHTML = `<div class="req-dlg" style="max-width:640px"><h3>Venta express en el servidor nuevo</h3>
+            ${error ? `<div class="banner error" style="display:block">${esc(error)}</div>` : `
+            <div class="req-sub">${on ? 'El servidor nuevo (Cloudflare) es el oficial de Venta express.' : 'Hoy Venta express se guarda en Firebase.'}</div>
+            <div class="nota">Al encender: productos, datos del ticket, tickets, cierres y cajas de cada tienda pasan de Firebase al servidor nuevo, se comparan y solo si todo es igual queda encendido.
+                Las cajas siguen funcionando sin internet igual que antes: lo que se vende queda en el equipo y sube solo al volver la conexión.
+                Una caja que esté sin internet al momento de encender sube sus tickets a Firebase cuando se conecte; durante 3 días esos tickets se pasan solos al servidor nuevo.<br>
+                "Volver a Firebase" copia todo de vuelta.</div>
+            <div class="kpis" style="margin-top:.5rem"><div class="kpi"><div class="k-label">Estado</div><div class="k-value">${on ? 'Encendido' : 'Apagado'}</div></div></div>
+            <div class="login-error" id="cfVxError"></div>
+            <div class="req-acciones" style="justify-content:flex-end">
+                ${on ? (e.firebase ? `<button type="button" class="btn-ghost btn-mini" onclick="cfVxCambiar(this, 'volver')">Volver a Firebase</button>` : '')
+                     : `<button type="button" class="btn-primary btn-mini" onclick="cfVxCambiar(this, 'encender')">Encender</button>`}
+            </div>`}
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-primary" onclick="document.getElementById('fbhDlg').classList.add('hidden')">Cerrar</button></div></div>`;
+        fondo.classList.remove('hidden');
+    }
+    async function cfVxCambiar(btn, que) {
+        const err = document.getElementById('cfVxError'); if (err) err.textContent = '';
+        if (que === 'encender' && !confirm('¿Pasar Venta express al servidor nuevo? Desde ahora se guardará allá. Si algo no cuadra, se puede volver a Firebase aquí mismo.')) return;
+        if (que === 'volver' && !confirm('¿Volver a guardar Venta express en Firebase? Todo lo del servidor nuevo se copia de vuelta.')) return;
+        const texto = btn.textContent; btnCargando(btn, que === 'encender' ? 'Pasando y comparando...' : 'Volviendo...');
+        try {
+            const r = await DATOS.aGoogle(() => llamarApi({ action: 'cf_vx', activar: que === 'encender', claveAdmin: clave }));
+            mostrarBanner(que === 'encender' ? `Listo: Venta express se guarda ahora en el servidor nuevo (${fmtNum(r.documentos || 0)} documentos, todos iguales a Firebase).`
+                        : `Venta express vuelve a guardarse en Firebase (${fmtNum(r.documentos || 0)} documentos copiados).`, 'ok');
+            document.getElementById('fbhDlg').classList.add('hidden');
+            cfSes.modHora = 0;
+        } catch (x) { if (err) err.textContent = x.message; btn.disabled = false; btn.textContent = texto; }
+    }
+    async function cfCxpCambiar(btn, que) {
+        const err = document.getElementById('cfCxpError'); if (err) err.textContent = '';
+        if (que === 'encender' && !confirm('¿Pasar Cuentas por pagar al servidor nuevo? Desde ahora se guardará allá. Si algo no cuadra, se puede volver a Firebase aquí mismo.')) return;
+        if (que === 'volver' && !confirm('¿Volver a guardar Cuentas por pagar en Firebase? Todo lo del servidor nuevo se copia de vuelta.')) return;
+        const texto = btn.textContent; btnCargando(btn, que === 'copiar' ? 'Copiando...' : que === 'encender' ? 'Pasando y comparando...' : 'Volviendo...');
+        try {
+            const r = await DATOS.aGoogle(() => llamarApi(que === 'copiar' ? { action: 'cf_cxp', copiar: true } : { action: 'cf_cxp', activar: que === 'encender', claveAdmin: clave }));
+            mostrarBanner(que === 'encender' ? `Listo: Cuentas por pagar se guarda ahora en el servidor nuevo (${fmtNum(r.documentos || 0)} documentos, todos iguales a Firebase${r.tarde ? '; ' + r.tarde + ' guardado(s) en esos segundos también pasaron' : ''}).`
+                        : que === 'volver' ? `Cuentas por pagar vuelve a guardarse en Firebase (${fmtNum(r.documentos || 0)} documentos copiados).`
+                        : `Copia en Drive hecha: ${fmtNum(r.copia.documentos)} documentos.`, 'ok');
+            document.getElementById('fbhDlg').classList.add('hidden');
+            cfSes.modHora = 0; if (typeof cxpAvisoCF === 'function') cxpAvisoCF();
+        } catch (x) { if (err) err.textContent = x.message; btn.disabled = false; btn.textContent = texto; }
+    }    async function cfEfectivoCambiar(btn, que) {
         const err = document.getElementById('cfEfeError'); if (err) err.textContent = '';
         if (que === 'encender' && !confirm('¿Pasar el efectivo y la caja chica al servidor nuevo? Desde ahora se guardarán allá. Si algo no cuadra, se puede volver a Google aquí mismo.')) return;
         if (que === 'volver' && !confirm('¿Volver a guardar el efectivo en Google (Firebase)? Todo lo del servidor nuevo se copia de vuelta.')) return;
@@ -5717,6 +5861,8 @@
                     return;
                 }
                 if (m.tipo === 'pend') { if (typeof pendRevisar === 'function') pendRevisar(true); return; }   // cambió la campanita
+                if (m.tipo === 'cxp') { CXPCF.refrescar(); cxpAvisoCF(); return; }
+                if (m.tipo === 'vx') { VXCF.aviso(m.local); vxAvisoCF(); return; }   // (15/11) Venta express: otra caja vendió o cerró (o la pasaron al servidor nuevo)   // (15/11) Cuentas por pagar cambió en otro equipo
                 if (m.tipo !== 'versiones') return;
                 const v = Number((m.v || {}).efe || 0);
                 if (cfWsVer !== null && v !== cfWsVer) cfEfeCambio();
@@ -5727,7 +5873,7 @@
                 if (!vivoFbOff) vivoFbVer = null;   // sin conexión: los avisos vuelven a preguntarse a Google cada 30 s hasta que se reconecte
                 if (clave) setTimeout(cfVivoIniciar, Math.min(60000, 3000 * (++cfWsReintento)));
             };
-        }).catch(() => { cfWs = null; });
+        }).catch(() => { cfWs = null; if (clave) setTimeout(cfVivoIniciar, Math.min(60000, 3000 * (++cfWsReintento))); });   // (15/11) sin internet al abrir: se reintenta igual
     }
     // Llegó un cambio del efectivo: se vuelve a leer (sin molestar si se está escribiendo o hay una lista abierta)
     let cfEfeCambioT = 0;
@@ -6101,7 +6247,19 @@
         const el = document.getElementById('fbEstado'), r = fbEstadoDatos; if (!el || !r) return;
         const ef = r.efectivo || {}, g = r.grupos || {};
         const chip = (si, txt) => `<span class="chip ${si ? 'st-ok' : 'st-pend'}">${txt}</span>`;
+        // (15/11) Lo que ya está en el servidor nuevo (Cloudflare) se dice así: antes salía "En Firebase" o "En la hoja de Google"
+        const chipCF = '<span class="chip st-ok">En el servidor nuevo</span>';
         const filas = FB_ORDEN.map(([id, nombre]) => {
+            if (id === 'efectivo' && ef.cf) return { si: true, cf: true, html: `<tr><td class="izq"><b>${nombre}</b><small>efectivo enviado, gastos, por llegar y caja chica</small></td><td class="izq">${chipCF}</td><td class="fb-acc"><button type="button" class="btn-ghost btn-mini" onclick="cfEfectivoAbrir(this)">Detalle</button></td></tr>` };
+            if (id !== 'efectivo' && (g[id] || {}).cf) {
+                const desc = (FB_GRUPOS[id] || [])[1] || '';
+                return { si: true, cf: true, html: `<tr><td class="izq"><b>${nombre}</b><small>${esc(desc)}</small></td><td class="izq">${chipCF}</td><td class="fb-acc"><button type="button" class="btn-ghost btn-mini" onclick="cfHojasAbrir(this)">Detalle</button></td></tr>` };
+            }
+            if (id !== 'efectivo' && g[id] && !g[id].activo && r.llave) {
+                // En la hoja de Google: se pasa DIRECTO al servidor nuevo (Firebase se está dejando)
+                const desc = (FB_GRUPOS[id] || [])[1] || '';
+                return { si: false, html: `<tr><td class="izq"><b>${nombre}</b><small>${esc(desc)}</small></td><td class="izq">${chip(false, 'En la hoja de Google')}</td><td class="fb-acc"><button type="button" class="btn-primary btn-mini" onclick="fbPasarCF(this, '${id}')">Pasar al servidor nuevo</button></td></tr>` };
+            }
             if (id === 'efectivo') {
                 const estado = ef.oficial ? chip(true, 'En Firebase') : ef.espejo ? `<span class="chip st-info">Hoja + copia en Firebase</span>` : chip(false, 'En la hoja de Google');
                 const acc = ef.oficial ? `<button type="button" class="btn-ghost btn-mini" onclick="fbVerdad(this, 'hoja')">Copiar a la hoja</button><button type="button" class="btn-ghost btn-mini" onclick="fbVerdad(this, 'volver')">Volver a la hoja</button>`
@@ -6115,11 +6273,20 @@
                 : `<button type="button" class="btn-primary btn-mini" onclick="fbHojas(this, 'activar', '${id}')">Pasar a Firebase</button>`;
             return { si: x.activo, html: `<tr><td class="izq"><b>${nombre}</b><small>${esc(desc)}</small></td><td class="izq">${chip(x.activo, x.activo ? 'En Firebase' : 'En la hoja de Google')}</td><td class="fb-acc">${acc}</td></tr>` };
         }).filter(Boolean);
-        const n = filas.filter(f => f.si).length, faltan = FB_ORDEN.filter(([id]) => !(id === 'efectivo' ? ef.oficial : (g[id] || {}).activo)).map(x => x[1]);
+        const otros = r.otros || {};
+        [['cxp', 'Cuentas por pagar', 'facturas de proveedores, préstamos y pagos', 'cfCxpAbrir'], ['vx', 'Venta express', 'productos, tickets y cierres de las cajas', 'cfVxAbrir'],
+         ['facturar', 'Facturar (quien solo factura)', 'catálogo sin existencia ni costo, últimas notas y ventas en espera', 'cfFacturarAbrir']].forEach(([k, nombre, desc, fn]) => {
+            if (!(k in otros)) return;
+            const antes = k === 'facturar' ? '<span class="chip st-pend">Lee de Google</span>' : '<span class="chip st-info">En Firebase</span>';
+            filas.push({ si: !!otros[k], cf: !!otros[k], html: `<tr><td class="izq"><b>${nombre}</b><small>${desc}</small></td><td class="izq">${otros[k] ? chipCF : antes}</td>
+                <td class="fb-acc"><button type="button" class="${otros[k] ? 'btn-ghost' : 'btn-primary'} btn-mini" onclick="${fn}(this)">${otros[k] ? (k === 'facturar' ? 'Volver a Google' : 'Detalle') : 'Pasar al servidor nuevo'}</button></td></tr>` });
+        });
+        const nCF = filas.filter(f => f.cf).length;
+        const n = filas.filter(f => f.si).length, faltan = FB_ORDEN.filter(([id]) => !(id === 'efectivo' ? (ef.oficial || ef.cf) : ((g[id] || {}).activo || (g[id] || {}).cf))).map(x => x[1]);
         const lect = Number(r.lecturasHoy) || 0, pct = Math.min(100, lect / 500);
         const rev = r.revision && r.revision.firebase;
         const revHace = r.revision && r.revision.ultima ? Math.max(0, Math.round((Date.now() - r.revision.ultima) / 60000)) : null;
-        el.innerHTML = `<div class="fb-cab"><h4>Firebase</h4><span class="fb-res"><b>${n} de ${filas.length}</b> módulos ya se guardan en Firebase${faltan.length ? ` · faltan: ${esc(faltan.join(', '))}` : ' · todos'}</span></div>
+        el.innerHTML = `<div class="fb-cab"><h4>Dónde se guardan los datos</h4><span class="fb-res"><b>${nCF} de ${filas.length}</b> módulos ya se guardan en el servidor nuevo${faltan.length ? ` · en la hoja de Google: ${esc(faltan.join(', '))}` : ''}</span></div>
             <div class="fb-indicadores">
                 <div class="fb-ind"><span>Lecturas de Firebase hoy</span><b>${fmtNum(lect)} <small>de 50.000</small></b><span class="fb-barra"><i style="width:${pct}%" class="${pct > 70 ? 'alto' : ''}"></i></span></div>
                 ${(() => { const u = (r.revision && r.revision.llamadas) || null; if (!u) return ''; const p = Math.min(100, u.total / 200);
@@ -6130,8 +6297,71 @@
                     : `<div class="fb-ind"><span>Revisión automática (cada 5 min)</span><b>${rev ? (revHace != null ? `Activa · corrió hace ${revHace} min` : 'Activa · todavía no corre') : 'No activa'}</b><button type="button" class="btn-ghost btn-mini" onclick="fbRevision(this, false)">Pasar a manual</button></div>`}
             </div>
             <div class="tabla-wrap"><table class="req-tabla fb-tabla" data-sin-paginar><thead><tr><th class="izq">Módulo</th><th class="izq">Dónde se guarda</th><th></th></tr></thead><tbody>${filas.map(f => f.html).join('')}</tbody></table></div>
-            <div class="req-acciones" style="justify-content:flex-end;margin:.5rem 0 0"><button type="button" class="btn-ghost btn-mini" onclick="fbHojas(this, 'copiar', 'pagos')">Copiar todo a la hoja ahora</button><button type="button" class="btn-ghost btn-mini" onclick="fbProbar(this)">Probar Firebase</button><button type="button" class="btn-ghost btn-mini" onclick="fbhComparar(this)">Comparar Nómina (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="almfbComparar(this)">Comparar Almacén y compras (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="cajafbComparar(this)">Comparar Cuadre y Validar pagos (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="perfbComparar(this)">Comparar Cuentas por cobrar, asistencia y horarios (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="reqfactComparar(this)">Comparar Requerimientos y Facturar (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="cfAbrir()">Servidor nuevo (Cloudflare)</button><button type="button" class="btn-primary btn-mini" onclick="fbRevisarAhora(this)">Actualizar</button></div>
-            <div class="nota">"En Firebase": lo que se guarda en ese módulo vive en Firebase y la hoja de Google se llena sola como copia (lo que se cambie a mano en la hoja ya no cuenta). "Volver a la hoja" copia todo a Google antes de cambiar.</div>`;
+            <div class="req-acciones" style="justify-content:flex-end;margin:.5rem 0 0"><button type="button" class="btn-ghost btn-mini" onclick="fbHojas(this, 'copiar', 'pagos')">Copiar todo a la hoja ahora</button><button type="button" class="btn-ghost btn-mini" onclick="fbProbar(this)">Probar Firebase</button><button type="button" class="btn-ghost btn-mini" onclick="fbhComparar(this)">Comparar Nómina (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="almfbComparar(this)">Comparar Almacén y compras (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="cajafbComparar(this)">Comparar Cuadre y Validar pagos (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="perfbComparar(this)">Comparar Cuentas por cobrar, asistencia y horarios (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="reqfactComparar(this)">Comparar Requerimientos y Facturar (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="cfAbrir()">Servidor nuevo (Cloudflare)</button><button type="button" class="btn-ghost btn-mini" onclick="tgCuadreVer(this)">Grupos de cuadre en Telegram</button><button type="button" class="btn-ghost btn-mini" onclick="bcrAbrir(this)">Pago móvil Bancrecer</button><button type="button" class="btn-primary btn-mini" onclick="fbRevisarAhora(this)">Actualizar</button></div>
+            <div class="nota">"En el servidor nuevo": lo de ese módulo se guarda en Cloudflare y la hoja de Google recibe una copia una vez al día (lo que se cambie a mano en la hoja ya no cuenta). "Pasar al servidor nuevo" copia todo, lo compara y solo si queda igual se cambia; cada uno se puede devolver desde su "Detalle".</div>`;
+    }
+    // (15/11) Pago móvil de Bancrecer leído del correo: correos autorizados para reenviar los avisos, leer ahora y los últimos leídos
+    async function bcrAbrir(btn, extra) {
+        const texto = btn ? btn.textContent : ''; if (btn) btnCargando(btn, 'Consultando...');
+        let e = null, error = '';
+        try { e = await DATOS.aGoogle(() => llamarApi(Object.assign({ action: 'bcr_estado' }, extra || {}))); } catch (x) { error = x.message; }
+        finally { if (btn) { btn.disabled = false; btn.textContent = texto; } }
+        let fondo = document.getElementById('fbhDlg');
+        if (!fondo) { fondo = document.createElement('div'); fondo.id = 'fbhDlg'; fondo.className = 'req-dlg-fondo'; document.body.appendChild(fondo); }
+        fondo.onclick = ev => { if (ev.target === fondo) fondo.classList.add('hidden'); };
+        const fecha = f => String(f || '').slice(8, 10) + '/' + String(f || '').slice(5, 7) + ' ' + String(f || '').slice(11, 16);
+        const html = `<div class="req-dlg" style="max-width:720px"><h3>Pago móvil de Bancrecer</h3>
+            ${error ? `<div class="banner error" style="display:block">${esc(error)}</div>` : `
+            <div class="req-sub">El sistema lee los avisos de Bancrecer en el correo <b>${esc(e.cuenta || '')}</b> cada 5 minutos (y al momento cuando una ficha pregunta por uno que no aparece).
+                ${e.ultimo ? 'Última lectura: ' + esc(e.ultimo.cuando) + '.' : 'Todavía no se ha leído.'}</div>
+            ${e.lectura ? `<div class="banner ok" style="display:block">Leído ahora: ${fmtNum(e.lectura.revisados || 0)} correo(s) revisado(s), ${fmtNum(e.lectura.nuevos || 0)} pago(s) nuevo(s).</div>` : ''}
+            <div class="filters"><div style="grid-column:1/-1"><label for="bcrRem">Correos autorizados para reenviar los avisos (además de Bancrecer)</label>
+                <input id="bcrRem" value="${esc((e.remitentes || []).join(', '))}" placeholder="Por ejemplo: cuenta@outlook.com"></div></div>
+            <div class="nota">Si los avisos llegan a otro correo (por ejemplo Outlook), cree allí una regla que los reenvíe a ${esc(e.cuenta || 'la cuenta del sistema')} y escriba aquí ese correo. Los avisos de cualquier otro remitente no cuentan.</div>
+            <div class="req-acciones" style="justify-content:flex-end"><button type="button" class="btn-ghost btn-mini" onclick="bcrAbrir(this, { remitentes: document.getElementById('bcrRem').value })">Guardar correos</button>
+                <button type="button" class="btn-primary btn-mini" onclick="bcrAbrir(this, { leer: true })">Leer el correo ahora</button></div>
+            <div class="tabla-wrap" style="max-height:20rem;overflow:auto"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Fecha</th><th class="izq">Referencia</th><th>Monto Bs</th><th class="izq">Teléfono</th><th class="izq">Usado en</th></tr></thead><tbody>
+                ${(e.pagos || []).map(p => `<tr><td class="izq">${esc(fecha(p.fecha))}</td><td class="izq">${esc(p.ref)}</td><td>${fmt(p.monto)}</td><td class="izq">${esc(p.tel || '')}</td>
+                    <td class="izq">${p.usado ? esc(p.usado.tienda + ' · ' + p.usado.fecha + (p.usado.nroFicha ? ' · ficha ' + p.usado.nroFicha : '')) : '<span class="chip st-pend">Sin usar</span>'}</td></tr>`).join('') || '<tr><td colspan="5" class="izq">Todavía no hay pagos leídos.</td></tr>'}
+            </tbody></table></div>`}
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-primary" onclick="document.getElementById('fbhDlg').classList.add('hidden')">Cerrar</button></div></div>`;
+        if (!fondo.classList.contains('hidden') && fondo.querySelector('h3') && /Bancrecer/.test(fondo.querySelector('h3').textContent)) pintarVentana(fondo, html); else fondo.innerHTML = html;
+        fondo.classList.remove('hidden');
+    }
+    // (15/11) Los 5 grupos de Telegram de los cuadres de caja: cuáles encontró el sistema
+    async function tgCuadreVer(btn) {
+        const texto = btn.textContent; btnCargando(btn, 'Buscando...');
+        try {
+            const r = await DATOS.aGoogle(() => llamarApi({ action: 'tg_grupos_cuadre' })), faltan = r.grupos.filter(g => !g.ok);
+            mostrarBanner(r.grupos.map(g => g.grupo + ': ' + (g.ok ? 'encontrado' : 'falta')).join(' · ') +
+                (faltan.length ? '. En cada grupo que falta escriba /start@TetrisRequeBot y pulse otra vez este botón.' : '. Listo: el sistema ya puede avisar en los 5.'), faltan.length ? 'warn' : 'ok');
+        } catch (x) { mostrarBanner('No se pudo revisar: ' + x.message, 'error'); }
+        btn.disabled = false; btn.textContent = texto;
+    }
+    // (15/11) Facturar para quien solo factura: encender (lee del servidor nuevo) o volver a Google
+    async function cfFacturarAbrir(btn) {
+        const on = !!((fbEstadoDatos || {}).otros || {}).facturar;
+        if (!confirm(on ? '¿Volver a que quien solo factura lea de Google? (más lento, pero no cambia nada más)'
+                        : 'Quien solo factura (sin ver existencia ni costos) leerá el catálogo, las últimas notas y las ventas en espera directo del servidor nuevo, sin esperar a Google. Lo que se publica es lo mismo que hoy le da Google.\n\n¿Encender?')) return;
+        const texto = btn.textContent; btnCargando(btn, on ? 'Volviendo...' : 'Publicando...');
+        try {
+            await DATOS.aGoogle(() => llamarApi({ action: 'cf_facturar', activar: !on }));
+            cfSes.modHora = 0;
+            mostrarBanner(on ? 'Quien solo factura vuelve a leer de Google.' : 'Listo: quien solo factura lee del servidor nuevo.', 'ok');
+            fbEstadoDatos = null; fbEstadoCargar();
+        } catch (x) { mostrarBanner('No se pudo: ' + x.message, 'error'); btn.disabled = false; btn.textContent = texto; }
+    }
+    // (15/11) Un grupo que sigue en la hoja de Google pasa directo al servidor nuevo (se compara parte por parte)
+    async function fbPasarCF(btn, grupo) {
+        const nombre = ((FB_ORDEN.find(x => x[0] === grupo) || [])[1]) || grupo;
+        if (!confirm(`${nombre} pasará a guardarse en el servidor nuevo. Se copia TODO lo de la hoja de Google, se compara parte por parte y solo si queda idéntico se cambia. La hoja de Google recibe una copia una vez al día.\n\n¿Continuar?`)) return;
+        const texto = btn.textContent; btnCargando(btn, 'Pasando y comparando...');
+        try {
+            const r = await DATOS.aGoogle(() => llamarApi({ action: 'cf_hojas', que: 'pasar', grupo, claveAdmin: clave }));
+            mostrarBanner(`Listo: ${nombre} ya se guarda en el servidor nuevo (${Object.keys(r.hojas || {}).length} hojas, todas iguales a la hoja de Google).`, 'ok');
+            if (typeof CFH !== 'undefined') CFH.olvidar();
+            fbEstadoDatos = null; fbEstadoCargar();
+        } catch (x) { mostrarBanner('No se pasó: ' + x.message, 'error'); btn.disabled = false; btn.textContent = texto; }
     }
     async function fbHojas(btn, que, grupo) {
         grupo = grupo || 'pagos';
@@ -6263,6 +6493,8 @@
                 <button type="button" class="btn-ghost btn-mini" onclick="cfAlmComparar(this)">Comparar Almacén, compras y requerimientos</button>
                 <button type="button" class="btn-ghost btn-mini" onclick="cfEfeComparar(this)">Comparar Efectivo y caja chica</button>
                 <button type="button" class="btn-ghost btn-mini" onclick="cfEfectivoAbrir(this)">Efectivo: guardar en el servidor nuevo</button>
+                <button type="button" class="btn-ghost btn-mini" onclick="cfCxpAbrir(this)">Cuentas por pagar: guardar en el servidor nuevo</button>
+                <button type="button" class="btn-ghost btn-mini" onclick="cfVxAbrir(this)">Venta express: guardar en el servidor nuevo</button>
                 <button type="button" class="btn-ghost btn-mini" onclick="cfHojasAbrir(this)">Hojas: guardar en el servidor nuevo</button>
                 <button type="button" class="btn-ghost btn-mini" onclick="cfPasarDatos(this)">Pasar datos</button>
                 <button type="button" class="btn-ghost btn-mini" onclick="cfProbarEntrada(this)">Probar entrada</button>
@@ -6450,7 +6682,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-15.8';
+    const VERSION_SERVIDOR = '2026-11-15.12';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -9093,11 +9325,162 @@
         if (!vx.equipo || vx.listo || vx.conectando) { vxFoco(); return; }
         vxConectar();
     }
+    // (15/11) Venta express en el servidor nuevo (interruptor "vx"). VXCF hace lo mismo que Firestore hacía aquí, con las mismas
+    // funciones (doc, onSnapshot, writeBatch, setDoc, getDoc): lo último que se leyó queda guardado en el equipo (se abre sin internet)
+    // y cada guardado entra a una COLA en el equipo que se envía en orden al haber conexión. Un reenvío nunca duplica (el servidor
+    // reconoce el ticket o el cierre que ya tiene). Lo que todavía no subió se ve "Por subir", como antes.
+    const VXCF = (() => {
+        const CACHE = l => 'vxcf_' + l, COLA = 'vxcf_cola';
+        let L = '', st = null, enviando = false, reT = 0, reN = 0, traerT = 0, cadaT = 0, conectado = false;
+        const oyentes = new Set(), promesas = new Map();
+        const leerLS = (k, d) => { try { return JSON.parse(localStorage.getItem(k) || 'null') || d; } catch (e) { return d; } };
+        const ponerLS = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } };
+        const vacio = () => ({ cfg: null, productos: null, prodVer: 0, abiertas: [], cierres: [], cajas: [] });
+        const estado = l => { if (L !== l || !st) { L = l; st = leerLS(CACHE(l), null) || vacio(); } return st; };
+        const sinTs = o => { const x = Object.assign({}, o); Object.keys(x).forEach(k => { if (x[k] && x[k].__fs === 'ts') x[k] = null; }); return x; };
+        // Referencias como las de Firestore: express/<tienda>[/col/id]
+        const doc = (_, ...s) => ({ tipo: 'doc', local: s[1], ruta: s.length > 2 ? s.slice(2).join('/') : 'cfg', id: s.length > 2 ? s[s.length - 1] : s[1] });
+        const collection = (_, ...s) => ({ tipo: 'col', local: s[1], col: s[2], donde: [] });
+        const where = (c, op, v) => [c, op, v];
+        const query = (c, ...w) => Object.assign({}, c, { donde: w });
+        const serverTimestamp = () => ({ __fs: 'ts' });
+        // Un cambio sobre un estado (el del servidor o el que se ve con lo que falta subir)
+        function aplicar(s, o, pend) {
+            const [col, id] = o.ruta === 'cfg' ? ['cfg', ''] : o.ruta.split('/');
+            const d = sinTs(o.datos);
+            if (col === 'cfg') s.cfg = Object.assign({}, o.merge ? s.cfg || {} : {}, d);
+            else if (col === 'datos') { s.productos = d; if (!pend) s.prodVer = -1; }
+            else if (col === 'cajas') { s.cajas = s.cajas.filter(x => x._id !== id).concat([Object.assign({}, (s.cajas.find(x => x._id === id) || {}), d, { _id: id })]); }
+            else if (col === 'ventas') {
+                if (o.op === 'update') { if ('cierre' in d && d.cierre) s.abiertas = s.abiertas.filter(x => x._id !== id); }
+                else if (!s.abiertas.some(x => x._id === id)) s.abiertas = s.abiertas.concat([Object.assign({}, d, { _id: id }, pend ? { _pend: true } : {})]);
+            } else if (col === 'cierres' && !s.cierres.some(x => x._id === id)) s.cierres = [Object.assign({}, d, { _id: id }, pend ? { _pend: true } : {})].concat(s.cierres);
+        }
+        function vista() {
+            const v = JSON.parse(JSON.stringify(st || vacio()));
+            cola().filter(x => x.local === L).forEach(x => x.ops.forEach(o => aplicar(v, o, true)));
+            return v;
+        }
+        const cola = () => leerLS(COLA, []);
+        const snapDoc = (id, x) => ({ id, exists: () => !!x, data: () => x ? JSON.parse(JSON.stringify(x)) : undefined, metadata: { hasPendingWrites: false } });
+        const snapLista = l => ({ docs: l.map(x => { const o = Object.assign({}, x); delete o._id; delete o._pend; return { id: x._id, data: () => JSON.parse(JSON.stringify(o)), metadata: { hasPendingWrites: !!x._pend } }; }) });
+        function avisarOyentes() {
+            const v = vista();
+            oyentes.forEach(o => {
+                try {
+                    if (o.t.tipo === 'doc') o.cb(snapDoc(o.t.id, o.t.ruta === 'cfg' ? v.cfg : o.t.ruta === 'datos/productos' ? v.productos : (v.cajas.find(x => x._id === o.t.id) || null)));
+                    else if (o.t.col === 'ventas') o.cb(snapLista(v.abiertas));
+                    else if (o.t.col === 'cierres') o.cb(snapLista(v.cierres));
+                } catch (e) { console.log('Venta express: ' + e.message); }
+            });
+        }
+        async function pedir(b) {
+            let r;
+            try { r = await cfPedir(Object.assign({ token: await cfToken() }, b)); if (r && r.sesion === false) { cfSes.token = ''; r = await cfPedir(Object.assign({ token: await cfToken() }, b)); } }
+            catch (e) { conectado = false; const x = new Error('sin internet'); x.red = true; throw x; }
+            conectado = true;
+            if (r && r.ok) return r;
+            const e = new Error((r && r.error) || 'El servidor no respondió');
+            if (r && r.permiso === false) e.code = 'permission-denied';
+            if (r && r.noAqui) e.noAqui = true;
+            throw e;
+        }
+        // Traer lo del servidor (y guardarlo en el equipo)
+        async function traer() {
+            if (!L) return false;
+            try {
+                const r = await pedir({ action: 'vx_leer', local: L, prodVer: st.prodVer });
+                st = { cfg: r.cfg, productos: 'productos' in r ? r.productos : st.productos, prodVer: r.prodVer, abiertas: r.abiertas, cierres: r.cierres, cajas: r.cajas };
+                if (!ponerLS(CACHE(L), st)) ponerLS(CACHE(L), Object.assign({}, st, { cierres: st.cierres.slice(0, 30) }));
+                avisarOyentes(); return true;
+            } catch (e) { if (!e.red && oyentes.size) oyentes.forEach(o => o.err && o.err(e)); return false; }
+        }
+        function traerPronto() { clearTimeout(traerT); traerT = setTimeout(traer, 200); }
+        // Mandar la cola, en orden
+        async function enviar() {
+            if (enviando) return; enviando = true; clearTimeout(reT);
+            try {
+                for (;;) {
+                    const x = cola()[0]; if (!x) break;
+                    try {
+                        await pedir({ action: 'vx_escribir', local: x.local, ops: x.ops });
+                        if (x.local === L && st) { x.ops.forEach(o => aplicar(st, o, false)); ponerLS(CACHE(L), st); }
+                        ponerLS(COLA, cola().filter(y => y.id !== x.id)); reN = 0;
+                        const p = promesas.get(x.id); if (p) { p.ok(); promesas.delete(x.id); }
+                    } catch (e) {
+                        if (e.red || e.noAqui || /sesión|clave/i.test(e.message)) { reT = setTimeout(enviar, Math.min(60000, 3000 * Math.pow(2, reN++))); break; }
+                        // El servidor no lo acepta (no es la red): sale de la cola; los tickets quedan en "Tickets › Reintentar"
+                        ponerLS(COLA, cola().filter(y => y.id !== x.id));
+                        const p = promesas.get(x.id);
+                        if (p) { p.no(e); promesas.delete(x.id); }
+                        else x.ops.filter(o => /^ventas\//.test(o.ruta) && o.op === 'set').forEach(o => { try { vxNoSubio(sinTs(o.datos), e); } catch (z) {} });
+                    }
+                }
+            } finally { enviando = false; avisarOyentes(); }
+            if (!cola().length) traerPronto();
+        }
+        function encolar(local, ops) {
+            const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+            const l = cola(); l.push({ id, local, ops, t: Date.now() });
+            if (!ponerLS(COLA, l)) return Promise.reject(new Error('No hay espacio en este equipo para guardar la venta'));
+            const pr = new Promise((ok, no) => promesas.set(id, { ok, no }));
+            avisarOyentes(); setTimeout(enviar, 0);
+            return pr;
+        }
+        const op = (tipo, ref, datos, o) => ({ op: tipo, ruta: ref.ruta, datos, merge: !!(o && o.merge) });
+        const writeBatch = () => { const ops = []; let local = ''; const b = { set: (r, d, o) => { local = r.local; ops.push(op('set', r, d, o)); return b; }, update: (r, d) => { local = r.local; ops.push(op('update', r, d)); return b; }, commit: () => encolar(local, ops) }; return b; };
+        const setDoc = (r, d, o) => encolar(r.local, [op('set', r, d, o)]);
+        async function getDoc(r) { estado(r.local); await Promise.race([traer(), new Promise(ok => setTimeout(ok, 5000))]); const v = vista(); return snapDoc(r.id, r.ruta === 'cfg' ? v.cfg : r.ruta === 'datos/productos' ? v.productos : (v.cajas.find(x => x._id === r.id) || null)); }
+        function onSnapshot(t, a, b, c) {
+            const cb = typeof a === 'function' ? a : b, err = typeof a === 'function' ? b : c;
+            estado(t.local);
+            const o = { t, cb, err }; oyentes.add(o);
+            setTimeout(() => { if (oyentes.has(o)) avisarOyentes(); }, 0);   // lo guardado en el equipo, al instante
+            traerPronto(); cfVivoIniciar();
+            if (!cadaT) cadaT = setInterval(() => { if (!oyentes.size) { clearInterval(cadaT); cadaT = 0; return; } if (cola().length) enviar(); if (!cfWs || cfWs.readyState !== 1) traer(); }, 30000);
+            return () => oyentes.delete(o);
+        }
+        window.addEventListener('online', () => { if (cola().length) enviar(); traerPronto(); });
+        if (cola().length) setTimeout(() => { if (clave) enviar(); }, 4000);
+        return {
+            fs: { doc, collection, where, query, serverTimestamp, onSnapshot, writeBatch, setDoc, getDoc },
+            fbl: () => ({ db: { cf: true }, lib: { fs: VXCF.fs }, auth: { currentUser: null } }),
+            async probar(local) { estado(local); return Promise.race([traer(), new Promise(ok => setTimeout(() => ok(false), 9000))]); },
+            aviso(local) { if (local === L) traerPronto(); },
+            enviar, conectado: () => conectado, porSubir: () => cola().length
+        };
+    })();
+    async function vxEnCF() {
+        if (!clave) return false;
+        let si = null;
+        try {
+            const r = await Promise.race([cfToken().then(t => cfPedir({ action: 'cfg_leer', token: t })), new Promise(ok => setTimeout(() => ok(null), 6000))]);
+            if (r && r.ok) { cfSes.modulos = (r.empresa || {}).modulos || {}; cfSes.modHora = Date.now(); si = !!cfSes.modulos.vx; }
+        } catch (e) {}
+        if (si === null) { try { si = localStorage.getItem('vx_cf') === '1'; } catch (e) { si = false; } }   // sin internet: lo último que se supo
+        else { try { localStorage.setItem('vx_cf', si ? '1' : '0'); } catch (e) {} }
+        return si;
+    }
+    // Esta caja escucha Firebase y la pasaron al servidor nuevo (o al revés): se reconecta donde corresponde
+    let vxAvisoT = 0;
+    function vxAvisoCF() {
+        if (!vx.listo || vx.conectando) return;
+        clearTimeout(vxAvisoT);
+        vxAvisoT = setTimeout(async () => {
+            cfSes.modHora = 0;
+            const si = await vxEnCF();
+            if (si !== !!vx.enCF) { vx.offs.forEach(o => { try { o(); } catch (e) {} }); vx.offs = []; vx.listo = false; vxConectar(); }
+        }, 500);
+    }
     async function vxConectar() {
         vx.conectando = true; vx.error = ''; vxPintar();
         try {
+            if (await vxEnCF()) { vx.fbl = VXCF.fbl(); vx.enCF = true; vx.sinInternet = !(await VXCF.probar(vxL())); }
+            else {
+            vx.enCF = false;
             try { vx.fbl = await Promise.race([FB.listo(), new Promise((_, no) => setTimeout(() => no(new Error('sin respuesta')), 9000))]); vx.sinInternet = false; }
             catch (e) { vx.fbl = await FB.listoGuardado(); vx.sinInternet = true; }   // sin internet: la sesión guardada en el equipo
+            }
             vxEscuchar(); vx.listo = true;
             if (!vx.sinInternet) { try { flAsegurar(); } catch (e) {} }   // bancos del pago móvil (Listas de la ficha)
         } catch (e) { vx.error = e.message; }
@@ -9110,6 +9493,8 @@
         const err = e => {
             if (vx.error) return;   // un solo aviso (varias escuchas fallan a la vez)
             const reglas = FB.problemaReglas ? FB.problemaReglas() : '';
+            if (vx.enCF && e.noAqui) { vx.listo = false; vx.offs.forEach(o => { try { o(); } catch (x) {} }); vx.offs = []; cfSes.modHora = 0; vxConectar(); return; }   // lo devolvieron a Firebase
+            if (vx.enCF) { vx.error = e.code === 'permission-denied' ? 'Su clave no tiene Venta express.' : e.message; vx.listo = false; vx.offs.forEach(o => { try { o(); } catch (x) {} }); vx.offs = []; vxPintar(); return; }
             vx.error = 'Firebase: ' + (e.code === 'permission-denied' ? 'sin permiso' + (reglas ? ': ' + reglas : '. Pulse Reintentar (pide un pase nuevo con sus permisos); si sigue, revise que su clave tenga el módulo Venta express.') : (e.code || e.message));
             vx.listo = false; vx.offs.forEach(o => { try { o(); } catch (x) {} }); vx.offs = []; vxPintar();
         };
@@ -9186,7 +9571,7 @@
         const tasa = vxTasa(), cab = `<div class="vx-cab">
             <div><b>${esc(vx.equipo.local)}</b> · Caja ${esc(vx.equipo.caja)} · ${esc(nombreUsuario)}</div>
             <div class="vx-cab-d">${tasa ? `Tasa BCV <b>${fmt(tasa)}</b> · divisas ${fmt(vxTasaDiv())} (−${nfVE(0, 2).format(vxDesc())} %)` : '<span style="color:var(--danger)">Sin tasa BCV: revise internet o fije la tasa en Productos y ajustes</span>'}
-                ${vx.pend ? ` · <span class="chip st-amar">${vx.pend} ticket(s) por subir</span>` : vx.listo ? ' · <span class="chip st-ok">Al día en Firebase</span>' : ''}${vx.sinInternet ? ' <span class="chip st-falta">Sin internet</span>' : ''}</div></div>
+                ${vx.pend ? ` · <span class="chip st-amar">${vx.pend} ticket(s) por subir</span>` : vx.listo ? ' · <span class="chip st-ok">Al día en el servidor</span>' : ''}${vx.sinInternet ? ' <span class="chip st-falta">Sin internet</span>' : ''}</div></div>
             <div class="modo-tabs">${tabs.map(([k, n]) => `<button type="button" class="tab${vx.tab === k ? ' active' : ''}" onclick="vx.tab='${k}';vxPintar();vxFoco()">${n}</button>`).join('')}</div>`;
         if (vx.error) return cab + `<div class="banner error" style="display:block">${esc(vx.error)}</div><div class="req-acciones"><button type="button" class="btn-ghost" onclick="FB.renovar();vxConectar()">Reintentar</button></div>`;
         if (!vx.listo) return cab + cargandoHTML('Conectando con Firebase...');
@@ -9430,10 +9815,10 @@
         vxCerrarDlg(); vxPintar();
         mostrarBanner(`Ticket ${v.nroTxt}: Bs ${fmt(v.totalBs)}${v.vuelto.monto ? ` · vuelto ${v.vuelto.moneda === 'usd' ? '$' : 'Bs'} ${fmt(v.vuelto.monto)}` : ''}.`, 'ok');
     }
-    // Firebase rechazó el ticket (no es falta de internet): queda guardado en el equipo para reintentarlo
+    // El servidor rechazó el ticket (no es falta de internet): queda guardado en el equipo para reintentarlo
     function vxNoSubio(v, err) {
         try { const l = JSON.parse(localStorage.getItem('vx_fallidas') || '[]'); l.push(Object.assign({}, v, { creado: null, _error: String(err && (err.code || err.message) || err) })); localStorage.setItem('vx_fallidas', JSON.stringify(l)); } catch (e) {}
-        mostrarBanner(`El ticket ${v.nroTxt} no se pudo guardar en Firebase (${err && (err.code || err.message)}). Quedó en este equipo: vea "Tickets" › Reintentar.`, 'error');
+        mostrarBanner(`El ticket ${v.nroTxt} no se pudo guardar en el servidor (${err && (err.code || err.message)}). Quedó en este equipo: vea "Tickets" › Reintentar.`, 'error');
         vxPintar();
     }
     function vxFallidas() { try { return JSON.parse(localStorage.getItem('vx_fallidas') || '[]'); } catch (e) { return []; } }
@@ -9442,7 +9827,7 @@
         const { db, lib } = vx.fbl, fs = lib.fs;
         try { localStorage.setItem('vx_fallidas', '[]'); } catch (e) {}
         l.forEach(v => { const x = Object.assign({}, v, { creado: fs.serverTimestamp() }); delete x._error; fs.setDoc(fs.doc(db, 'express', vxL(), 'ventas', v.id), x).catch(err => vxNoSubio(v, err)); });
-        mostrarBanner(l.length + ' ticket(s) enviados otra vez a Firebase.', 'ok'); vxPintar();
+        mostrarBanner(l.length + ' ticket(s) enviados otra vez.', 'ok'); vxPintar();
     }
 
     // ---------- Ticket de 58 mm (32 letras por línea, como el de BigSoft) ----------
@@ -9500,7 +9885,7 @@
         const l = vx.abiertas.slice().reverse(), fall = vxFallidas();
         const filas = l.map(v => `<tr><td class="izq"><b>${esc(v.nroTxt)}</b><small>Caja ${esc(v.caja)}</small></td><td class="izq">${esc(fechaBonita(v.fecha))} ${esc(String(v.hora || '').slice(0, 5))}</td>
             <td class="izq">${esc(v.cajero || '')}</td><td>${fmt(v.totalBs)}</td><td class="izq">${(v.pagos || []).map(p => esc(VX_FORMAS[p.f] || p.f)).join(', ')}</td>
-            <td class="izq">${v.anulada ? '<span class="chip st-falta">Anulado</span>' : v._pend ? '<span class="chip st-amar">Por subir</span>' : '<span class="chip st-ok">En Firebase</span>'}</td>
+            <td class="izq">${v.anulada ? '<span class="chip st-falta">Anulado</span>' : v._pend ? '<span class="chip st-amar">Por subir</span>' : '<span class="chip st-ok">En el servidor</span>'}</td>
             <td class="izq"><span style="display:inline-flex;gap:.3rem"><button type="button" class="btn-ghost btn-mini" onclick="vxReimprimir('${esc(v._id)}')">Reimprimir</button>
                 ${v.anulada ? '' : `<button type="button" class="btn-ghost btn-mini btn-quitar" onclick="vxAnularAbrir('${esc(v._id)}')">Anular</button>`}</span></td></tr>`).join('');
         return `${fall.length ? `<div class="banner error" style="display:block">${fall.length} ticket(s) no se pudieron guardar en Firebase (${esc(fall[0]._error || '')}). <button type="button" class="btn-ghost btn-mini" onclick="vxReintentarFallidas()">Reintentar</button></div>` : ''}
@@ -9614,7 +9999,7 @@
             const b = fs.writeBatch(db);
             if (!k) b.set(fs.doc(db, 'express', L, 'cierres', id), x);
             ids.forEach(vid => b.update(fs.doc(db, 'express', L, 'ventas', vid), { cierre: id }));
-            b.commit().catch(err => mostrarBanner('El cierre no se pudo guardar en Firebase: ' + (err.code || err.message), 'error'));
+            b.commit().catch(err => mostrarBanner('El cierre no se pudo guardar en el servidor: ' + (err.code || err.message), 'error'));
         });
         vxImprimir(vxCierreTexto(x, false));
         vx.contado = {}; mostrarBanner(`Caja ${e.caja} cerrada: ${r.n} ticket(s), Bs ${fmt(r.totalBs)}.`, 'ok'); vxPintar();
@@ -9702,7 +10087,7 @@
             return n;
         });
         const btn = document.getElementById('vxMdGuardar'); if (btn) btnCargando(btn, 'Guardando...');
-        try { const r = await vxEscribirProductos(p, vx.base); vx.cambios = {}; mostrarBanner(r === 'espera' ? 'Guardado en este equipo: sube a Firebase cuando haya internet.' : 'Cambios guardados.', 'ok'); }
+        try { const r = await vxEscribirProductos(p, vx.base); vx.cambios = {}; mostrarBanner(r === 'espera' ? 'Guardado en este equipo: sube solo cuando haya internet.' : 'Cambios guardados.', 'ok'); }
         catch (e) { mostrarBanner('No se pudo guardar: ' + (e.code || e.message), 'error'); }
         vxPintar();
     }
@@ -9732,7 +10117,7 @@
             const conEx = p.filter(x => x.e > 0).length;
             if (!confirm(`Cargar ${p.length} productos de ${vx.equipo.local} (${conEx} con existencia).\n\nLa existencia queda como la del archivo y desde ahora se descuenta lo que se venda.${vx.prods.length ? ' Reemplaza la lista anterior (se conserva el "Mayor desde").' : ''}\n\n¿Continuar?`)) return;
             const r = await vxEscribirProductos(p, { en: Date.now(), fecha: fechaLocalHoy(), por: nombreUsuario, archivo: file.name, n: p.length });
-            mostrarBanner(r === 'espera' ? 'Cargado en este equipo: sube a Firebase cuando haya internet.' : `Listo: ${p.length} productos cargados.`, 'ok');
+            mostrarBanner(r === 'espera' ? 'Cargado en este equipo: sube solo cuando haya internet.' : `Listo: ${p.length} productos cargados.`, 'ok');
         } catch (e) { mostrarBanner('No se pudo cargar: ' + (e.code || e.message), 'error'); }
     }
     async function vxGuardarCfg(btn) {
@@ -15212,12 +15597,13 @@
     }
     // ---------- Ventana de una cuenta: detalle, abonos/descuentos aplicados y cambios con clave de administrador ----------
     // desde = 'nom': abierta desde la Nómina (lee las deudas de la semana y al guardar vuelve a pintar la nómina)
-    let perCuentaDesde = '';
+    let perCuentaDesde = '', perCuentaX = null;
     function perCuentaAbrir(ref, desde) {
         perCuentaDesde = desde === 'nom' ? 'nom' : '';
         const datos = perCuentaDesde ? nomDatos : (perDeudasHist && perDeudasHistDatos) ? perDeudasHistDatos : perDeudasPend;
         const x = datos && (datos.deudas || []).find(g => g.ref === ref);
         if (!x) return;
+        perCuentaX = x;
         const panel = ref[0] === 'X', gasto = x.tipoPersona === 'Gasto de tienda', pagada = x.estado === 'pagado';
         // (14/11) Los de la ficha también se corrigen aquí: monto en la moneda del renglón (Bs; $ si es gasto en divisas)
         const fichaUsd = !panel && /^DIV/i.test(x.tipo || ''), montoFicha = fichaUsd ? (x.usdTotal || x.usd) : (x.bsTotal != null ? x.bsTotal : x.bs);
@@ -15232,6 +15618,7 @@
         fondo.innerHTML = `<form class="req-dlg per-cuenta" onsubmit="perCuentaGuardar(event, '${ref}')">
             <h3>Cuenta ${esc(x.num)} · ${esc(x.nombre)}</h3>
             <div class="req-sub">${esc(x.tipoPersona)}${x.id ? ' ' + esc(x.id) : ''} · ${esc(x.origen || '')}${x.ficha ? ' · ficha ' + esc(x.ficha) : ''}</div>
+            <div class="per-cuenta-cols"><div>
             <table class="per-desglose"><tbody>
                 ${fila('Fecha', `${diaSemana(x.fecha)} ${fechaBonita(x.fecha)}`)}
                 ${fila('Tipo · local', esc([x.tipo, x.local, x.turno].filter(Boolean).join(' · ')))}
@@ -15245,6 +15632,8 @@
                 ${x.registradoPor ? fila('Registró', esc(x.registradoPor)) : ''}
             </tbody></table>
             ${aplic.length ? `<div class="req-sub" style="margin-top:.6rem"><b>Movimientos aplicados</b></div><ul class="per-cuenta-movs">${aplic.map(a => `<li>${fechaBonita(a.fecha)} · ${a.tipo === 'ABONO' ? 'Abono' : 'Descuento'} ${esc(a.id)} · <b>${perUsd(a.usd)}</b>${a.nota ? ' · ' + esc(a.nota) : ''}${a.quien ? ' · ' + esc(a.quien) : ''}</li>`).join('')}</ul>` : ''}
+            <div id="pcComCaja">${perCuentaComHTML(x)}</div>
+            </div><div>
             ${pagada ? '<div class="nota">Esta cuenta ya está pagada: no se puede modificar.</div><div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-ghost" onclick="document.getElementById(\'perCuentaDlg\').classList.add(\'hidden\')">Cerrar</button></div>' : `
             <div class="req-sub" style="margin-top:.8rem"><b>Modificar</b> (clave de administrador)</div>
             <div class="per-reg">
@@ -15264,8 +15653,31 @@
                 <div class="per-reg-ancho" id="pcRes"></div>
             </div>
             <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-ghost" onclick="document.getElementById('perCuentaDlg').classList.add('hidden')">Cerrar</button><button type="submit" class="btn-primary" id="pcBtn">Guardar cambios</button></div>`}
+            </div></div>
         </form>`;
         fondo.classList.remove('hidden');
+    }
+    // (15/11) Comentarios de la cuenta: los cambios quedan solos (con quién, cuándo y el motivo) y se pueden agregar a mano sin clave
+    function perCuentaComHTML(x) {
+        const l = (x.comentarios || []).slice().reverse();
+        return `<div class="req-sub" style="margin-top:.7rem"><b>Comentarios</b></div>
+            ${l.map(c => `<div class="cxp-com">${esc(c.texto)}<small>${esc(c.quien || '')} · ${esc(c.cuando || '')}</small></div>`).join('') || '<div class="nota">Sin comentarios todavía.</div>'}
+            <div class="per-reg" style="grid-template-columns:1fr auto;margin-top:.4rem"><label>Agregar comentario<input id="pcCom" maxlength="500" placeholder="Escriba el comentario" onkeydown="if(event.key==='Enter'){event.preventDefault();perCuentaComentar('${x.ref}')}"></label>
+            <button type="button" class="btn-ghost" id="pcComBtn" onclick="perCuentaComentar('${x.ref}')">Agregar</button></div>`;
+    }
+    async function perCuentaComentar(ref) {
+        const inp = document.getElementById('pcCom'), btn = document.getElementById('pcComBtn'), texto = String(inp && inp.value || '').trim();
+        if (!texto) return;
+        btnCargando(btn, 'Guardando...');
+        try {
+            const r = await llamarApi({ action: 'cxc_comentar', ref, texto, idem: nuevoIdem() });
+            perDeudasPend = r; perDeudasHistDatos = null;
+            const x = (r.deudas || []).find(g => g.ref === ref) || { ref, comentarios: ((perCuentaX && perCuentaX.ref === ref && perCuentaX.comentarios) || []).concat(r.comentario) };
+            perCuentaX = x;
+            const caja = document.getElementById('pcComCaja'); if (caja) pintarConservando(caja, perCuentaComHTML(x));
+            const i2 = document.getElementById('pcCom'); if (i2) { i2.value = ''; i2.focus(); }
+            if (perCuentaDesde !== 'nom') perPintar();
+        } catch (e) { mostrarBanner('No se guardó el comentario: ' + e.message, 'error'); const b = document.getElementById('pcComBtn'); if (b) { b.disabled = false; b.textContent = 'Agregar'; } }
     }
     function perCuentaVence(origen, fecha) {
         const dias = document.getElementById('pcDias'), ven = document.getElementById('pcVence'), fd = document.getElementById('pcFecha');
@@ -16029,8 +16441,11 @@
         if (cxp.off || !clave) return;
         cxp.off = 'iniciando'; cxp.error = '';
         try {
-            const { db, lib } = await FB.listo(), fs = lib.fs;
-            const err = e => { cxp.error = e.code === 'permission-denied' ? 'Firebase no le da permiso. Pulse Actualizar; si sigue, revise que su clave tenga Cuentas por pagar.' + (FB.problemaReglas && FB.problemaReglas() ? ' ' + FB.problemaReglas() : '') : 'Firebase: ' + (e.code || e.message); cxp.cargado = true; cxpDetener(); cxpPintar(); };
+            const { db, fs } = await cxpDb();
+            cxp.enCF = !!fs.cf;
+            const err = e => {
+                if (fs.cf && e.code === 'unavailable' && cxp.cargado && !cxp.error) { mostrarBanner('Cuentas por pagar: sin conexión con el servidor; lo que ve puede no estar al día.', 'warn'); return; }   // se sigue intentando cada minuto
+                cxp.error = e.code === 'permission-denied' ? 'El sistema no le da permiso. Pulse Actualizar; si sigue, revise que su clave tenga Cuentas por pagar.' + (FB.problemaReglas && FB.problemaReglas() ? ' ' + FB.problemaReglas() : '') : (fs.cf ? '' : 'Firebase: ') + (fs.cf ? e.message : (e.code || e.message)); cxp.cargado = true; cxpDetener(); cxpPintar(); };
             const offs = [fs.onSnapshot(fs.query(fs.collection(db, 'cxp_docs'), fs.where('abierta', '==', true)), s => {
                 cxp.docs = s.docs.map(x => Object.assign({ id: x.id }, x.data())); cxp.cargado = true; cxp.error = '';
                 // (13/11) El N° del comprobante de retención se pone aparte, cuando Firebase ya confirmó la aprobación (aprobar no lo espera)
@@ -16041,6 +16456,13 @@
         } catch (e) { cxp.off = null; cxp.error = e.message; cxp.cargado = true; cxpPintar(); }
     }
     function cxpDetener() { if (typeof cxp.off === 'function') cxp.off(); cxp.off = null; }
+    // (15/11) Lo pasaron al servidor nuevo (o lo devolvieron) mientras el módulo estaba abierto: se vuelve a escuchar donde corresponde
+    async function cxpAvisoCF() {
+        if (typeof cxp.off !== 'function') return;
+        cfSes.modHora = 0;
+        const enCF = await cxpEnCF();
+        if (enCF !== !!cxp.enCF) { cxpDetener(); cxpEscuchar(); }
+    }
     function cxpIniciar() {
         if (!cxpAdmin() && cxp.tab === 'revisar') cxp.tab = 'agenda';
         cxpPintar(); cxpEscuchar();
@@ -16052,7 +16474,88 @@
         cxp.provs = [];
         try { const h = await FBH.leer('ALM PROVEEDORES'); cxp.provs = h.valores.filter(r => String(r[1] || '').trim()).map(r => ({ id: String(r[0]).trim(), nombre: String(r[1]).trim(), rif: String(r[2] || '').trim() })); } catch (e) {}
     }
-    const cxpDb = async () => { const { db, lib } = await FB.listo(); return { db, fs: lib.fs }; };
+    // (15/11) Con Cuentas por pagar en el servidor nuevo (interruptor "cxp"), el mismo código usa CXPCF: las mismas funciones de
+    // Firestore que se usan aquí (doc, getDoc, getDocs, setDoc, updateDoc, runTransaction, onSnapshot...) pero contra Cloudflare,
+    // que tiene las mismas reglas. Los cambios de otros equipos llegan por la conexión en vivo (cfWs, aviso "cxp").
+    const CXPCF = (() => {
+        const db = { cf: true }, oyentes = new Set();
+        const doc = (_, col, id) => ({ tipo: 'doc', col, id, ruta: col + '/' + id });
+        const collection = (_, col) => ({ tipo: 'col', col, donde: [] });
+        const where = (campo, op, valor) => [campo, op, valor];
+        const query = (c, ...ws) => ({ tipo: 'col', col: c.col, donde: ws });
+        const serverTimestamp = () => ({ __fs: 'ts' });
+        const arrayUnion = (...v) => ({ __fs: 'union', v });
+        const copia = v => v == null ? v : JSON.parse(JSON.stringify(v));
+        const snap = (id, x) => ({ id, exists: () => !!x, data: () => x ? copia(x.v) : undefined, metadata: { hasPendingWrites: !!(x && x._pend), fromCache: false } });
+        async function pedir(b) {
+            let r;
+            try { r = await cfPedir(Object.assign({ token: await cfToken() }, b)); if (r && r.sesion === false) { cfSes.token = ''; r = await cfPedir(Object.assign({ token: await cfToken() }, b)); } }
+            catch (e) { const x = new Error('Sin conexión con el servidor. Revise el internet e intente de nuevo.'); x.code = 'unavailable'; throw x; }
+            if (r && r.ok) return r;
+            const e = new Error((r && r.error) || 'El servidor no respondió');
+            if (r && r.permiso === false) e.code = 'permission-denied';
+            if (r && r.conflicto) e.conflicto = true;
+            if (r && r.noAqui) { e.noAqui = true; cfSes.modulos = Object.assign({}, cfSes.modulos, { cxp: false }); e.message = 'Cuentas por pagar volvió a Firebase: cierre y vuelva a abrir el módulo.'; }
+            throw e;
+        }
+        const leer = async rutas => (await pedir({ action: 'cxp_leer', rutas })).docs;
+        const getDoc = async ref => snap(ref.id, (await leer([ref.ruta]))[ref.ruta]);
+        const getDocs = async q => ({ docs: (await pedir({ action: 'cxp_consulta', col: q.col, donde: q.donde })).docs.map(x => snap(x.id, x)) });
+        // Lo que se ve en pantalla cambia al instante (como Firestore); si el servidor no lo acepta, se vuelve a leer
+        const cumple = (v, [c, op, x]) => op === '==' ? JSON.stringify(v[c]) === JSON.stringify(x) : op === '>=' ? v[c] >= x : op === '<=' ? v[c] <= x : false;
+        function aplicarLocal(ruta, datos) {
+            const [col, id] = ruta.split('/');
+            oyentes.forEach(o => {
+                if (o.t.tipo !== 'col' || o.t.col !== col || !o.ultimo) return;
+                const x = o.ultimo.find(y => y.id === id); if (!x) return;
+                const v = Object.assign({}, x.v);
+                Object.keys(datos).forEach(k => { const d = datos[k]; v[k] = d && d.__fs === 'union' ? (v[k] || []).concat(d.v.filter(a => !(v[k] || []).some(b => JSON.stringify(a) === JSON.stringify(b)))) : d && d.__fs === 'ts' ? new Date().toISOString() : d; });
+                x.v = v; x._pend = true; o.ultimo = o.ultimo.filter(y => o.t.donde.every(w => cumple(y.v, w)));
+                o.cb({ docs: o.ultimo.map(y => snap(y.id, y)) });
+            });
+        }
+        const escribir = (ops, lecturas) => pedir({ action: 'cxp_escribir', ops, lecturas: lecturas || [] }).finally(refrescar);
+        const setDoc = (ref, datos, o) => escribir([{ op: 'set', ruta: ref.ruta, datos, merge: !!(o && o.merge) }]);
+        const updateDoc = (ref, datos) => { aplicarLocal(ref.ruta, datos); return escribir([{ op: 'update', ruta: ref.ruta, datos }]); };
+        async function runTransaction(_, fn) {
+            for (let i = 0; i < 5; i++) {
+                const vistos = {}, ops = [];
+                const tx = {
+                    get: async ref => { const x = (await leer([ref.ruta]))[ref.ruta]; if (!(ref.ruta in vistos)) vistos[ref.ruta] = x ? x.ver : 0; return snap(ref.id, x); },
+                    set: (ref, datos, o) => { ops.push({ op: 'set', ruta: ref.ruta, datos, merge: !!(o && o.merge) }); return tx; },
+                    update: (ref, datos) => { ops.push({ op: 'update', ruta: ref.ruta, datos }); return tx; }
+                };
+                const res = await fn(tx);
+                if (!ops.length) return res;
+                try { await escribir(ops, Object.keys(vistos).map(ruta => ({ ruta, ver: vistos[ruta] }))); return res; }
+                catch (e) { if (!e.conflicto) throw e; await new Promise(r => setTimeout(r, 150 + Math.random() * 300)); }
+            }
+            throw new Error('Otra persona estaba cambiando lo mismo. Intente de nuevo.');
+        }
+        // Escuchar: se lee al empezar, con cada aviso del servidor (otro equipo cambió algo) y, por si la conexión en vivo se cae, cada minuto
+        async function leerOyente(o) {
+            try {
+                if (o.t.tipo === 'doc') { const x = (await leer([o.t.ruta]))[o.t.ruta]; if (o.vivo) o.cb(snap(o.t.id, x)); }
+                else { const l = (await pedir({ action: 'cxp_consulta', col: o.t.col, donde: o.t.donde })).docs; if (o.vivo) { o.ultimo = l; o.cb({ docs: l.map(x => snap(x.id, x)) }); } }
+            } catch (e) { if (o.vivo && o.err) o.err(e); }
+        }
+        let refT = 0, cadaMin = 0;
+        function refrescar() { clearTimeout(refT); refT = setTimeout(() => oyentes.forEach(leerOyente), 150); }
+        function onSnapshot(t, a, b, c) {
+            const cb = typeof a === 'function' ? a : b, err = typeof a === 'function' ? b : c;
+            const o = { t, cb, err, vivo: true }; oyentes.add(o); leerOyente(o);
+            cfVivoIniciar();
+            if (!cadaMin) cadaMin = setInterval(() => { if (!oyentes.size) { clearInterval(cadaMin); cadaMin = 0; } else if (!cfWs || cfWs.readyState !== 1) refrescar(); }, 60000);
+            return () => { o.vivo = false; oyentes.delete(o); };
+        }
+        return { cf: true, db, doc, collection, where, query, serverTimestamp, arrayUnion, getDoc, getDocs, setDoc, updateDoc, runTransaction, onSnapshot, refrescar };
+    })();
+    async function cxpEnCF() {
+        if (!clave) return false;
+        if (!cfSes.modulos || Date.now() - cfSes.modHora > 300000) { try { await cfModulos(); } catch (e) {} }
+        return !!(cfSes.modulos || {}).cxp;
+    }
+    const cxpDb = async () => { if (await cxpEnCF()) return { db: CXPCF.db, fs: CXPCF }; const { db, lib } = await FB.listo(); return { db, fs: lib.fs }; };
 
     // ---------- Pantalla ----------
     function cxpPintar() {
@@ -16062,7 +16565,7 @@
         const suma = l => cxpR(l.reduce((s, x) => s + x.saldo, 0)), venc = ren.filter(x => x.dias < 0), semana = ren.filter(x => x.dias >= 0 && x.dias <= 7);
         const ahorro = cxpR(ren.reduce((s, x) => s + (x.desc ? x.desc.usd : 0), 0)), tasa = cxpTasa(hoy);
         const kpi = (t, v, sub, cls) => `<div class="kpi ${cls || ''}"><div class="k-label">${t}</div><div class="k-value">${v}</div>${sub ? `<div class="k-label">${sub}</div>` : ''}</div>`;
-        const tabs = CXP_TABS.filter(([t]) => t !== 'revisar' || admin).map(([t, n]) => `<button type="button" class="tab${cxp.tab === t ? ' active' : ''}" onclick="cxpModo('${t}')">${n}${t === 'revisar' && rev.length ? ` <span class="chip st-amar">${rev.length}</span>` : ''}</button>`).join('');
+        const tabs = CXP_TABS.filter(([t]) => t !== 'revisar' || admin).map(([t, n]) => `<button type="button" class="tab${cxp.tab === t ? ' active' : ''}" onclick="cxpModo('${t}')">${n}${t === 'revisar' && rev.length ? ` <span class="chip st-azul">${rev.length}</span>` : ''}</button>`).join('');
         const acciones = `<div class="req-acciones" style="justify-content:flex-start;flex-wrap:wrap;margin:0 0 .6rem;max-width:100%">
             ${admin ? `<button type="button" class="btn-ghost btn-mini" onclick="cxpRevisar('')">＋ Factura</button><button type="button" class="btn-ghost btn-mini" onclick="cxpPrestamo()">＋ Préstamo</button>` : ''}
             <button type="button" class="btn-ghost btn-mini" onclick="cxpExcel(this)">${ico('descargar')}Excel</button>
@@ -16070,11 +16573,11 @@
                        <button type="button" class="btn-ghost btn-mini" onclick="cxpAvisar(this, 'semana')" title="Manda ya el resumen de la semana">${ico('avisar')}Avisar semana</button>
                        <button type="button" class="btn-ghost btn-mini" onclick="cxpEmpresaEditar()">Datos de la empresa</button>` : ''}</div>`;
         const cab = (cxp.error ? `<div class="banner error" style="display:block">${esc(cxp.error)} <button type="button" class="btn-ghost btn-mini" onclick="cxpDetener();cxpEscuchar()">Reintentar</button></div>` : '') +
-            `<div class="kpis">${kpi('Por pagar', cxpUsd(suma(ren)), tasa ? '≈ ' + fmtBs(suma(ren) * tasa) + ' hoy' : ren.length + ' pago(s)')}
+            `<div class="kpis">${kpi('Por pagar', cxpUsd(suma(ren)), tasa ? '≈ ' + fmtBs(suma(ren) * tasa) + ' hoy' : ren.length + ' pago(s)', ren.length ? 'amar' : '')}
              ${kpi('Vencido', cxpUsd(suma(venc)), venc.length + ' pago(s)', venc.length ? 'bad' : 'ok')}
              ${kpi('Próximos 7 días', cxpUsd(suma(semana)), semana.length + ' pago(s)', semana.length ? 'amar' : '')}
              ${ahorro ? kpi('Ahorro por pronto pago', cxpUsd(ahorro), 'si se paga a tiempo', 'ok') : ''}
-             ${admin ? kpi('Por revisar', String(rev.length), 'facturas recibidas', rev.length ? 'amar' : '') : ''}</div>
+             ${admin ? kpi('Por revisar', String(rev.length), 'facturas recibidas', rev.length ? 'azul' : '') : ''}</div>
             <div class="modo-tabs" role="tablist" style="margin:.4rem 0 .5rem">${tabs}</div>${acciones}`;
         const cuerpo = cxp.tab === 'revisar' ? cxpVistaRevisar(rev) : cxp.tab === 'prestamos' ? cxpVistaPrestamos() : cxp.tab === 'pagos' ? cxpVistaPagos()
                      : cxp.tab === 'proveedores' ? cxpVistaProveedores(ren) : cxpVistaAgenda(ren);
@@ -16087,13 +16590,28 @@
     const cxpCoincide = (...t) => { const b = cxpNorm(cxp.buscar || ''); return !b || cxpNorm(t.join(' ')).includes(b); };
     const cxpBuscador = ph => `<div class="filters" style="grid-template-columns:minmax(0,22rem)"><div><label for="cxpBus">Buscar</label><input id="cxpBus" type="search" placeholder="${ph}" value="${esc(cxp.buscar)}" oninput="cxpBuscar(this.value)"></div></div>`;
 
+    // (15/11) Gráficos (barras de CSS, sin librerías: no pesan nada): lo que vence por semana y lo que se debe a cada proveedor
+    function cxpGraficos(ren) {
+        if (!ren.length) return '';
+        const hoy = cxpHoy(), sem = [['Vencido', x => x.dias < 0, 'r'], ['Esta semana', x => x.dias >= 0 && x.dias <= 7, 'v'], ['Semana 2', x => x.dias > 7 && x.dias <= 14, 'v'],
+                     ['Semana 3', x => x.dias > 14 && x.dias <= 21, 'v'], ['Semana 4', x => x.dias > 21 && x.dias <= 28, 'v'], ['Más adelante', x => x.dias > 28, 'v']]
+            .map(([n, f, c]) => ({ n, c, v: cxpR(ren.filter(f).reduce((s, x) => s + x.saldo, 0)) }));
+        const m = new Map();
+        ren.forEach(x => { const p = m.get(x.quien) || (m.set(x.quien, { n: x.quien, v: 0, r: 0 }), m.get(x.quien)); p.v = cxpR(p.v + x.saldo); if (x.dias < 0) p.r = cxpR(p.r + x.saldo); });
+        const provs = [...m.values()].sort((a, b) => b.v - a.v), top = provs.slice(0, 8), resto = provs.slice(8);
+        if (resto.length) top.push({ n: resto.length + ' más', v: cxpR(resto.reduce((s, p) => s + p.v, 0)), r: cxpR(resto.reduce((s, p) => s + p.r, 0)) });
+        const max1 = Math.max(...sem.map(s => s.v), 0.01), max2 = Math.max(...top.map(p => p.v), 0.01), pct = (v, mx) => Math.max(v > 0 ? 1.5 : 0, v / mx * 100).toFixed(1);
+        return `<div class="cxp-graf" aria-label="Gráficos de cuentas por pagar">
+            <div><h5>Cuándo vence (saldo en $)</h5>${sem.map(s => `<div class="cxp-bar"><span class="nom">${s.n}</span><span class="pista"><i class="${s.c}" style="width:${pct(s.v, max1)}%"></i></span><b>${s.v ? cxpUsd(s.v) : '—'}</b></div>`).join('')}</div>
+            <div><h5>Por proveedor <small>(rojo: vencido)</small></h5>${top.map(p => `<div class="cxp-bar" title="${esc(p.n)}: ${cxpUsd(p.v)}${p.r ? ' · vencido ' + cxpUsd(p.r) : ''}"><span class="nom">${esc(p.n)}</span><span class="pista"><i class="r" style="width:${pct(p.r, max2)}%"></i><i class="v" style="width:${pct(p.v - p.r, max2)}%"></i></span><b>${cxpUsd(p.v)}</b></div>`).join('')}</div></div>`;
+    }
     function cxpVistaAgenda(ren) {
         // De cada préstamo solo la próxima cuota (y las vencidas o de los próximos 7 días); el plan completo está en Préstamos
         const primera = {}; ren.forEach(x => { if (x.cuota && !(x.d.id in primera)) primera[x.d.id] = x.cuota; });
         const l = ren.filter(x => (!x.cuota || x.dias <= 7 || primera[x.d.id] === x.cuota) && cxpCoincide(x.quien, x.doc)), tasa = cxpTasa();
         if (!cxp.docs.length && !cxp.error) return '<div class="empty">No hay nada por pagar. Las facturas que registra el almacén (o Administración) aparecen aquí al aprobarlas.</div>';
         const grupos = [['Vencidas', x => x.dias < 0], ['Hoy', x => x.dias === 0], ['Próximos 7 días', x => x.dias > 0 && x.dias <= 7], ['Más adelante', x => x.dias > 7]];
-        return cxpBuscador('Proveedor, banco o N° de factura') + grupos.map(([t, f]) => {
+        return cxpGraficos(ren) + cxpBuscador('Proveedor, banco o N° de factura') + grupos.map(([t, f]) => {
             const g = l.filter(f); if (!g.length) return '';
             return `<h4 class="per-sub">${t} <small class="nota" style="display:inline">· ${g.length} · ${cxpUsd(cxpR(g.reduce((s, x) => s + x.saldo, 0)))}</small></h4>
             <div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Proveedor</th><th class="izq">Documento</th><th class="izq">Factura</th><th class="izq">Vence</th><th>Saldo $</th><th>≈ Bs hoy</th><th class="izq">Pronto pago</th><th></th></tr></thead><tbody>${g.map(x => `
@@ -16111,7 +16629,7 @@
             <tr><td class="izq">${cxpF(d.fechaRecibida || d.fechaFactura)}<br><small>${esc(d.creadoPor || '')}</small></td><td class="izq"><b>${esc(d.proveedor)}</b></td><td class="izq">${esc(d.documento)}${d.fiscal ? ' <span class="chip st-info">Fiscal</span>' : ''}</td>
             <td>${d.moneda === 'Bs' ? fmtBs(d.montoBruto) : cxpUsd(d.montoBruto)}</td><td class="izq"><small>${esc(d.origen === 'compra' ? 'Compra con foto' : d.origen === 'ingreso' ? 'Operación de inventario' : d.origen === 'almacen' ? 'Registrada por el almacén' : 'Administración')}${d.ref ? ' · ' + esc(d.ref) : ''}</small></td>
             <td class="izq">${(d.fotos || []).map((u, i) => `<a href="${esc(u)}" target="_blank" rel="noopener">${ico('imagen')}${(d.fotos || []).length > 1 ? i + 1 : 'Ver'}</a>`).join(' ') || '<span class="nota">Sin foto</span>'}</td>
-            <td><button type="button" class="btn-primary btn-mini" onclick="cxpRevisar('${d.id}')">Revisar</button></td></tr>`).join('')}</tbody></table></div>`;
+            <td><div class="req-acciones" style="margin:0;flex-wrap:nowrap"><button type="button" class="btn-primary btn-mini" onclick="cxpRevisar('${d.id}')">Revisar</button><button type="button" class="btn-ghost btn-mini" title="Fue una compra al contado: sale de Cuentas por pagar" onclick="cxpSacarContado('${d.id}')">Fue de contado</button></div></td></tr>`).join('')}</tbody></table></div>`;
     }
     function cxpVistaPrestamos() {
         const l = cxp.docs.filter(d => d.tipo === 'prestamo' && d.estado !== 'anulada');
@@ -16164,6 +16682,29 @@
             : '<div class="empty">No hay pagos en estas fechas.</div>');
     }
 
+    // ---------- (15/11) Comentarios de una factura o préstamo: quedan con quién y cuándo; cualquiera que vea Cuentas por pagar puede agregar ----------
+    function cxpComentariosHTML(d) {
+        const l = (d.comentarios || []).slice().reverse();
+        return `<h4 class="per-sub">Comentarios</h4>
+            ${l.map(c => `<div class="cxp-com">${esc(c.texto)}<small>${esc(c.quien || '')} · ${esc(c.cuando || '')}</small></div>`).join('') || '<div class="nota">Sin comentarios todavía.</div>'}
+            <div class="filters" style="grid-template-columns:1fr auto;align-items:end;margin-top:.3rem"><div><label for="cxCom">Agregar comentario</label><input id="cxCom" maxlength="300" placeholder="Escriba el comentario" onkeydown="if(event.key==='Enter'){event.preventDefault();cxpComentar('${d.id}', this)}"></div>
+            <div><button type="button" class="btn-ghost" onclick="cxpComentar('${d.id}', document.getElementById('cxCom'))">Agregar</button></div></div>`;
+    }
+    async function cxpComentar(id, inp) {
+        const texto = String(inp && inp.value || '').trim();
+        if (!texto) return;
+        const c = { texto: texto.slice(0, 300), quien: nombreUsuario, cuando: cxpHoy() + ' ' + new Date().toTimeString().slice(0, 5) };
+        inp.value = '';
+        try {
+            const { db, fs } = await cxpDb();
+            await fs.updateDoc(fs.doc(db, 'cxp_docs', id), { comentarios: fs.arrayUnion(c) });
+            const d = cxp.docs.find(x => x.id === id) || cxp._ver;
+            if (d) { d.comentarios = (d.comentarios || []).concat(c); if (cxp._ver && cxp._ver.id === id && cxp._ver !== d) cxp._ver.comentarios = (cxp._ver.comentarios || []).concat(c); }
+            const caja = document.getElementById('cxpComCaja');
+            if (caja && d) pintarConservando(caja, cxpComentariosHTML(d));
+        } catch (e) { inp.value = texto; mostrarBanner('No se guardó el comentario: ' + (e.code === 'permission-denied' ? 'El sistema no le da permiso.' : (e.code || e.message)), 'error'); }
+    }
+
     // ---------- Ver una factura o préstamo ----------
     async function cxpVer(id) {
         let d = cxp.docs.find(x => x.id === id);
@@ -16185,8 +16726,8 @@
             <td><button type="button" class="btn-ghost btn-mini" onclick="cxpImprimirPago('${p.id}')">${ico('imprimir')}</button></td></tr>`).join('')}</tbody></table></div>` : '';
         const desc = (d.descuentos || []).map(x => `${x.pct ? x.pct + ' %' : cxpUsd(x.monto)} si se paga completa antes del ${cxpF(cxpSumar(d.fechaFactura || d.fechaRecibida, Number(x.dias)))} (${x.dias} días)`).join('<br>');
         cxp._ver = d;
-        almVentana(`<div class="req-dlg alm-dlg-ancho"><h3>${d.tipo === 'prestamo' ? 'Préstamo · ' + esc(d.banco || d.proveedor) : esc(d.proveedor) + ' · factura ' + esc(d.documento)}</h3>
-            <div class="req-sub">${d.estado === 'por_revisar' ? '<span class="chip st-amar">Por revisar</span>' : d.estado === 'aprobada' ? '<span class="chip st-info">Por pagar</span>' : d.estado === 'pagada' ? '<span class="chip st-ok">Pagada</span>' : '<span class="chip st-falta">Anulada</span>'}
+        almVentana(`<div class="req-dlg cxp-dlg alm-dlg-ancho"><h3>${d.tipo === 'prestamo' ? 'Préstamo · ' + esc(d.banco || d.proveedor) : esc(d.proveedor) + ' · factura ' + esc(d.documento)}</h3>
+            <div class="req-sub">${d.estado === 'por_revisar' ? '<span class="chip st-amar">Por revisar</span>' : d.estado === 'aprobada' ? '<span class="chip st-info">Por pagar</span>' : d.estado === 'pagada' ? '<span class="chip st-ok">Pagada</span>' : d.estado === 'contado' ? '<span class="chip st-ok">Pagada al contado</span>' : '<span class="chip st-falta">Anulada</span>'}
                 ${d.registro ? ' Registrada el ' + esc(d.registro) + ' por ' + esc(d.creadoPor || '') : ''}${d.revisadoPor ? ' · revisó ' + esc(d.revisadoPor) : ''}</div>
             <div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><tbody>
                 ${fila('Proveedor', esc(d.proveedor) + (d.rif ? ' · ' + esc(d.rif) : ''))}${fila('Documento', esc(d.documento || '') + (d.control ? ' · control ' + esc(d.control) : ''))}
@@ -16194,10 +16735,11 @@
                 ${fiscal}${fila('Deuda', cxpUsd(d.totalUsd || 0))}${fila('Pagado', d.pagado ? cxpUsd(d.pagado) + (d.descontado ? ' (incluye ' + cxpUsd(d.descontado) + ' de descuento)' : '') : '')}
                 ${fila('Saldo', '<span style="font-size:1.1rem">' + cxpUsd(saldo) + '</span>')}${d.tipo !== 'prestamo' ? fila('Vence', d.vence ? fechaBonita(d.vence) + ' (' + (d.credito || 0) + ' días de crédito)' : '') : ''}
                 ${fila('Pronto pago', desc)}${fila('Nota', esc(d.nota || ''))}${fila('Foto', (d.fotos || []).map((u, i) => `<a href="${esc(u)}" target="_blank" rel="noopener">${ico('imagen')}Foto ${i + 1}</a>`).join(' '))}
-                ${d.anulada ? fila('Anulada', esc(d.anulada.quien + ' · ' + d.anulada.cuando + ' · ' + d.anulada.motivo)) : ''}
-            </tbody></table></div>${cuotas}${pagos}
+                ${d.anulada ? fila('Anulada', esc(d.anulada.quien + ' · ' + d.anulada.cuando + ' · ' + d.anulada.motivo)) : ''}${d.contado ? fila('Al contado', esc(d.contado.quien + ' · ' + d.contado.cuando + (d.contado.motivo ? ' · ' + d.contado.motivo : ''))) : ''}
+            </tbody></table></div>${cuotas}${pagos}<div id="cxpComCaja">${cxpComentariosHTML(d)}</div>
             <div class="req-acciones" style="justify-content:flex-end">
                 ${admin && d.estado !== 'anulada' && !(d.pagado > 0) ? `<button type="button" class="btn-ghost" onclick="cxpAnular('${d.id}')">Anular</button>` : ''}
+                ${admin && d.tipo !== 'prestamo' && (d.estado === 'por_revisar' || d.estado === 'aprobada') && !(d.pagado > 0) ? `<button type="button" class="btn-ghost" onclick="cxpSacarContado('${d.id}')">Fue de contado</button>` : ''}
                 ${d.retIva > 0 && d.numRet ? `<button type="button" class="btn-ghost" onclick="cxpImprimirRetencion()">${ico('imprimir')}Comprobante de retención</button>` : ''}
                 ${admin && d.tipo !== 'prestamo' && d.estado !== 'anulada' && d.estado !== 'pagada' ? `<button type="button" class="btn-ghost" onclick="almCerrar();cxpRevisar('${d.id}')">${d.estado === 'por_revisar' ? 'Revisar' : 'Cambiar condiciones'}</button>` : ''}
                 ${d.estado === 'aprobada' && saldo > 0 && d.tipo !== 'prestamo' ? `<button type="button" class="btn-primary" onclick="almCerrar();cxpPagar('${d.id}', 0)">Pagar</button>` : ''}
@@ -16232,7 +16774,7 @@
     function cxpRevPintar(nuevo) {
         const r = cxpRev, neto = cxpRevCalcular(r), mon = v => r.moneda === 'Bs' ? fmtBs(v) : cxpUsd(v);
         const provs = (cxp.provs || []).map(p => `<option value="${esc(p.nombre)}">${esc(p.rif || '')}</option>`).join('');
-        const html = `<div class="req-dlg alm-dlg-ancho"><h3>${r.id ? 'Revisar factura' : 'Registrar factura'}</h3>
+        const html = `<div class="req-dlg cxp-dlg alm-dlg-ancho"><h3>${r.id ? 'Revisar factura' : 'Registrar factura'}</h3>
             <div class="req-sub">${r.id ? 'Registrada por ' + esc(r.creadoPor || '') + (r.registro ? ' el ' + esc(r.registro) : '') + ((r.fotos || []).length ? ' · ' + r.fotos.map((u, i) => `<a href="${esc(u)}" target="_blank" rel="noopener">${ico('imagen')}foto ${i + 1}</a>`).join(' ') : ' · sin foto') : 'Factura de proveedor cargada por Administración.'}</div>
             <div class="filters">
                 <div><label for="crProv">Proveedor</label><input id="crProv" list="crProvL" value="${esc(r.proveedor || '')}" oninput="cxpRevCampo('proveedor', this.value)"><datalist id="crProvL">${provs}</datalist></div>
@@ -16321,7 +16863,7 @@
                 // (antes una transacción con 3 viajes de ida y vuelta: varios segundos en "Guardando..."). La lista cambia en el momento y, si
                 // Firebase lo rechaza, el cambio se deshace solo y sale el aviso. El N° de retención lo pone cxpNumeroRetencion después.
                 if (Number(ya.pagado) > 0 && datos.totalUsd < Number(ya.pagado) - 0.004) throw new Error('Ya tiene pagos por más de la deuda nueva: revise los montos.');
-                fs.updateDoc(ref, datos).catch(e => mostrarBanner(`No se guardó la factura ${datos.documento} de ${datos.proveedor}: ` + (e.code === 'permission-denied' ? 'Firebase no le da permiso (necesita Administración de Cuentas por pagar).' : (e.code || e.message)), 'error'));
+                fs.updateDoc(ref, datos).catch(e => mostrarBanner(`No se guardó la factura ${datos.documento} de ${datos.proveedor}: ` + (e.code === 'permission-denied' ? 'El sistema no le da permiso (necesita Administración de Cuentas por pagar).' : (e.code || e.message)), 'error'));
                 return listo();
             }
             // Factura nueva (o que ya no está abierta): se confirma con Firebase que no esté registrada
@@ -16334,7 +16876,7 @@
                 else tx.set(ref, Object.assign(datos, { estado: aprobar ? 'aprobada' : 'por_revisar', abierta: true, pagado: 0, fotos: [], origen: 'admin', creadoPor: quien, creado: fs.serverTimestamp(), registro: ahora }));
             });
             listo();
-        } catch (e) { err.textContent = e.code === 'permission-denied' ? 'Firebase no le da permiso (necesita Administración de Cuentas por pagar).' : e.message; btn.disabled = false; btn.textContent = aprobar ? 'Aprobar para pagar' : 'Guardar sin aprobar'; }
+        } catch (e) { err.textContent = e.code === 'permission-denied' ? 'El sistema no le da permiso (necesita Administración de Cuentas por pagar).' : e.message; btn.disabled = false; btn.textContent = aprobar ? 'Aprobar para pagar' : 'Guardar sin aprobar'; }
     }
     // Comprobante de retención: número AAAAMM + 8 dígitos, uno por factura aprobada con retención. Va en su propia transacción, de fondo,
     // cuando Firebase ya tiene la aprobación (lo llama la lista en vivo); si falla (sin internet) se intenta de nuevo con el próximo cambio.
@@ -16354,6 +16896,19 @@
             });
         } catch (e) { console.log('Retención ' + id + ': ' + (e.code || e.message)); }
         finally { setTimeout(() => cxpRetEnCurso.delete(id), 30000); }
+    }
+    // (15/11) Compra que fue al contado (entró por el almacén sin preguntar): sale de Cuentas por pagar y queda como constancia
+    async function cxpSacarContado(id) {
+        const d = cxp.docs.find(x => x.id === id) || cxp._ver;
+        if (!d) return;
+        if (Number(d.pagado) > 0) return mostrarBanner('Tiene pagos registrados: anúlelos primero.', 'error');
+        const motivo = prompt('La factura ' + d.documento + ' de ' + d.proveedor + ' sale de Cuentas por pagar como compra al contado (ya pagada).\n\nNota (opcional, por ejemplo cómo se pagó):', '');
+        if (motivo === null) return;
+        try {
+            const { db, fs } = await cxpDb(), c = { quien: nombreUsuario, cuando: cxpHoy() + ' ' + new Date().toTimeString().slice(0, 5), motivo: String(motivo).trim().slice(0, 200) };
+            await fs.updateDoc(fs.doc(db, 'cxp_docs', id), { estado: 'contado', abierta: false, contado: c, comentarios: fs.arrayUnion({ texto: 'Sacada de Cuentas por pagar: fue al contado' + (c.motivo ? ' (' + c.motivo + ')' : ''), quien: c.quien, cuando: c.cuando }) });
+            almCerrar(); mostrarBanner('Factura ' + d.documento + ' de ' + d.proveedor + ' sacada de Cuentas por pagar (al contado).', 'ok');
+        } catch (e) { mostrarBanner('No se pudo sacar: ' + (e.code === 'permission-denied' ? 'El sistema no le da permiso (necesita Administración de Cuentas por pagar).' : e.message), 'error'); }
     }
     async function cxpAnular(id) {
         const d = cxp.docs.find(x => x.id === id) || cxp._ver;
@@ -16394,7 +16949,7 @@
     }
     function cxpPrePintar(nuevo) {
         const p = cxpPre, c = p.capital > 0 && p.meses > 0 ? cxpCuotas(p) : [];
-        const html = `<div class="req-dlg alm-dlg-ancho"><h3>Registrar préstamo bancario</h3><div class="req-sub">Cada cuota aparece en la Agenda de pagos en su fecha (deuda en $).</div>
+        const html = `<div class="req-dlg cxp-dlg alm-dlg-ancho"><h3>Registrar préstamo bancario</h3><div class="req-sub">Cada cuota aparece en la Agenda de pagos en su fecha (deuda en $).</div>
             <div class="filters">
                 <div><label for="cpBanco">Banco</label><input id="cpBanco" value="${esc(p.banco)}" oninput="cxpPre.banco=this.value"></div>
                 <div><label for="cpDoc">N° del préstamo</label><input id="cpDoc" value="${esc(p.documento)}" oninput="cxpPre.documento=this.value"></div>
@@ -16422,7 +16977,7 @@
                 capital: cxpR(p.capital), tasaAnual: Number(p.tasaAnual) || 0, sistema: p.sistema, cuotas, totalUsd: cxpR(cuotas.reduce((s, x) => s + x.total, 0)), vence: cuotas[0].vence,
                 moneda: '$', nota: '', pagado: 0, origen: 'admin', creadoPor: nombreUsuario, creado: fs.serverTimestamp(), registro: cxpHoy() + ' ' + new Date().toTimeString().slice(0, 5) });
             almCerrar(); mostrarBanner(`Préstamo de ${p.banco} registrado: ${cuotas.length} cuota(s).`, 'ok');
-        } catch (e) { err.textContent = e.code === 'permission-denied' ? 'Firebase no le da permiso (necesita Administración de Cuentas por pagar).' : e.message; btn.disabled = false; btn.textContent = 'Registrar préstamo'; }
+        } catch (e) { err.textContent = e.code === 'permission-denied' ? 'El sistema no le da permiso (necesita Administración de Cuentas por pagar).' : e.message; btn.disabled = false; btn.textContent = 'Registrar préstamo'; }
     }
 
     // ---------- Pagar (Tesorería) ----------
@@ -16435,6 +16990,25 @@
         cxpPag = { id, cuota: cuota || 0, fecha: cxpHoy(), forma: 'transferencia', monto: saldo, completo: true, referencia: '', banco: '', nota: '' };
         cxpPagPintar(true);
     }
+    // (15/11) El abono se puede escribir en $ o en Bs: el otro se calcula con la tasa BCV de la fecha del pago
+    function cxpPagMonto(en, v) {
+        const k = cxpPagCalc(), n = Number(v) || 0;
+        cxpPag.monto = en === 'bs' ? (k.tasa ? cxpR(n / k.tasa) : 0) : n;
+        cxpPag.montoBs = en === 'bs' && k.tasa ? cxpR(n) : 0;   // lo escrito en Bs se paga tal cual (sin ida y vuelta por la tasa)
+        cxpPagPintar();
+    }
+    // Bancos para autocompletar: los ya usados en pagos (en este equipo) y los de siempre
+    const CXP_BANCOS_BASE = ['Bancrecer', 'BNC', 'R4', 'Banco de Venezuela', 'Banesco', 'Mercantil', 'Provincial', 'Bancaribe', 'Exterior', 'Tesoro', 'Bicentenario', 'Plaza', 'Caja chica', 'Zelle'];
+    function cxpBancos() {
+        let u = []; try { u = JSON.parse(localStorage.getItem('cxp_bancos') || '[]') || []; } catch (e) {}
+        const vistos = new Set(), l = [];
+        u.concat((cxp.pagos || []).map(p => p.banco), CXP_BANCOS_BASE).forEach(b => { b = String(b || '').trim(); const k = cxpNorm(b); if (b && !vistos.has(k)) { vistos.add(k); l.push(b); } });
+        return l.slice(0, 40);
+    }
+    function cxpBancoRecordar(b) {
+        b = String(b || '').trim(); if (!b) return;
+        try { const u = (JSON.parse(localStorage.getItem('cxp_bancos') || '[]') || []).filter(x => cxpNorm(x) !== cxpNorm(b)); u.unshift(b); localStorage.setItem('cxp_bancos', JSON.stringify(u.slice(0, 20))); } catch (e) {}
+    }
     function cxpPagCalc() {
         const p = cxpPag, d = cxp.docs.find(x => x.id === p.id) || {}, c = p.cuota ? (d.cuotas || []).find(x => x.n === p.cuota) : null;
         const saldo = c ? cxpR(c.total - (c.pagado || 0)) : cxpSaldo(d);
@@ -16442,26 +17016,29 @@
         const desc = !c && p.completo ? cxpDescuento(d, p.fecha) : null;
         const descuento = desc ? Math.min(desc.usd, aplicado) : 0, pagadoUsd = cxpR(aplicado - descuento);
         const forma = CXP_FORMAS.find(f => f[0] === p.forma) || CXP_FORMAS[0], tasa = forma[2] === 'Bs' ? cxpTasa(p.fecha) : 0;
-        return { d, c, saldo, aplicado, desc, descuento, pagadoUsd, forma, tasa, montoMoneda: forma[2] === 'Bs' ? cxpR(pagadoUsd * tasa) : pagadoUsd };
+        const bsEscrito = forma[2] === 'Bs' && !p.completo && p.montoBs > 0 && !descuento && Math.abs(cxpR(p.montoBs / tasa) - aplicado) < 0.006;
+        return { d, c, saldo, aplicado, desc, descuento, pagadoUsd, forma, tasa, montoMoneda: forma[2] === 'Bs' ? (bsEscrito ? p.montoBs : cxpR(pagadoUsd * tasa)) : pagadoUsd };
     }
     function cxpPagPintar(nuevo) {
         const p = cxpPag, k = cxpPagCalc(), d = k.d;
-        const html = `<div class="req-dlg"><h3>Pagar · ${esc(d.banco || d.proveedor)}</h3>
+        const html = `<div class="req-dlg cxp-dlg"><h3>Pagar · ${esc(d.banco || d.proveedor)}</h3>
             <div class="req-sub">${esc(d.documento || '')}${k.c ? ' · cuota ' + k.c.n + ' de ' + d.cuotas.length + ' (vence ' + fechaBonita(k.c.vence) + ')' : ' · vence ' + fechaBonita(d.vence)} · saldo <b>${cxpUsd(k.saldo)}</b></div>
             <div class="filters">
                 <div><label for="cgFecha">Fecha del pago</label><input id="cgFecha" type="date" value="${p.fecha}" max="${cxpHoy()}" onchange="cxpPag.fecha=this.value;cxpPagPintar()"></div>
                 <div><label for="cgForma">Forma de pago</label><select id="cgForma" onchange="cxpPag.forma=this.value;cxpPagPintar()">${CXP_FORMAS.map(f => `<option value="${f[0]}" ${p.forma === f[0] ? 'selected' : ''}>${f[1]}</option>`).join('')}</select></div>
                 <div><label for="cgCual">Cuánto</label><select id="cgCual" onchange="cxpPag.completo=this.value==='1';cxpPagPintar()"><option value="1" ${p.completo ? 'selected' : ''}>Todo el saldo</option><option value="0" ${p.completo ? '' : 'selected'}>Un abono</option></select></div>
-                ${p.completo ? '' : `<div><label for="cgMonto">Abono $</label><input id="cgMonto" type="number" step="0.01" min="0.01" max="${k.saldo}" value="${p.monto || ''}" onchange="cxpPag.monto=Number(this.value)||0;cxpPagPintar()"></div>`}
-                <div><label for="cgRef">Referencia</label><input id="cgRef" value="${esc(p.referencia)}" oninput="cxpPag.referencia=this.value" maxlength="40"></div>
-                <div><label for="cgBanco">Banco o cuenta de origen</label><input id="cgBanco" value="${esc(p.banco)}" oninput="cxpPag.banco=this.value" maxlength="60"></div>
+                ${p.completo ? '' : `<div><label for="cgMonto">Abono $</label><input id="cgMonto" type="number" step="0.01" min="0.01" max="${k.saldo}" value="${p.monto || ''}" onchange="cxpPagMonto('usd', this.value)"></div>
+                    ${k.forma[2] === 'Bs' ? `<div><label for="cgMontoBs">o el abono en Bs</label><input id="cgMontoBs" type="number" step="0.01" min="0" value="${p.montoBs || (k.tasa && p.monto ? cxpR(p.monto * k.tasa) : '')}" onchange="cxpPagMonto('bs', this.value)" ${k.tasa ? '' : 'disabled title="No hay tasa BCV de esa fecha"'}></div>` : ''}`}
+                <div><label for="cgRef">Referencia <small>(opcional)</small></label><input id="cgRef" value="${esc(p.referencia)}" oninput="cxpPag.referencia=this.value" maxlength="40"></div>
+                <div><label for="cgBanco">Banco o cuenta de origen <small>(opcional)</small></label><input id="cgBanco" list="cgBancoL" autocomplete="off" value="${esc(p.banco)}" oninput="cxpPag.banco=this.value" maxlength="60"><datalist id="cgBancoL">${cxpBancos().map(b => `<option value="${esc(b)}">`).join('')}</datalist></div>
             </div>
             <div class="kpis">
                 ${k.descuento ? `<div class="kpi ok"><div class="k-label">Descuento por pronto pago</div><div class="k-value" style="font-size:1.1rem">− ${cxpUsd(k.descuento)}</div><div class="k-label">${k.desc.pct ? k.desc.pct + ' %' : 'monto fijo'} · pagando antes del ${cxpF(k.desc.hasta)}</div></div>` : ''}
                 <div class="kpi amar"><div class="k-label">A pagar</div><div class="k-value" style="font-size:1.2rem">${k.forma[2] === 'Bs' ? fmtBs(k.montoMoneda) : cxpUsd(k.montoMoneda)}</div>
                     <div class="k-label">${k.forma[2] === 'Bs' ? (k.tasa ? cxpUsd(k.pagadoUsd) + ' · tasa BCV del ' + cxpF(p.fecha) + ': ' + fmt(k.tasa) : 'No hay tasa BCV de esa fecha') : 'en $'}</div></div>
                 <div class="kpi"><div class="k-label">Queda debiendo</div><div class="k-value" style="font-size:1.1rem">${cxpUsd(cxpR(k.saldo - k.aplicado))}</div></div></div>
-            <div class="filters"><div style="grid-column:1/-1"><label for="cgNota">Nota</label><input id="cgNota" value="${esc(p.nota)}" oninput="cxpPag.nota=this.value" maxlength="200"></div></div>
+            <div class="filters"><div style="grid-column:1/-1"><label for="cgNota">Nota del pago <small>(sale en el comprobante)</small></label><input id="cgNota" value="${esc(p.nota)}" oninput="cxpPag.nota=this.value" maxlength="200"></div></div>
+            <div id="cxpComCaja">${cxpComentariosHTML(d)}</div>
             <div class="login-error" id="cgErr"></div>
             <div class="req-acciones" style="justify-content:flex-end"><button type="button" class="btn-ghost" onclick="almCerrar()">Cancelar</button><button type="button" class="btn-primary" onclick="cxpPagGuardar(this)">Registrar pago</button></div></div>`;
         const f = document.querySelector('.req-dlg-fondo:not(.hidden) .req-dlg');
@@ -16489,13 +17066,13 @@
                 tx.update(ref, cambio);
                 tx.set(fs.doc(db, 'cxp_pagos', pid), { docId: p.id, tipo: d.tipo, proveedor: d.banco || d.proveedor, rif: d.rif || '', documento: d.documento || '', cuota: p.cuota || 0, fecha: p.fecha,
                     forma: p.forma, moneda: k.forma[2], tasa: k.tasa, montoMoneda: k.montoMoneda, pagadoUsd: k.pagadoUsd, aplicadoUsd: k.aplicado, descuentoUsd: k.descuento,
-                    saldoAntes: saldo, referencia: p.referencia.trim(), banco: p.banco.trim(), nota: p.nota.trim(), quien, uid: (await FB.listo()).auth.currentUser.uid, creado: fs.serverTimestamp(),
+                    saldoAntes: saldo, referencia: p.referencia.trim(), banco: p.banco.trim(), nota: p.nota.trim(), quien, uid: fs.cf ? '' : (await FB.listo()).auth.currentUser.uid, creado: fs.serverTimestamp(),
                     registro: cxpHoy() + ' ' + new Date().toTimeString().slice(0, 5), anulado: false });
             });
-            cxp.pagos = null;
-            almVentana(`<div class="req-dlg"><h3>Pago registrado</h3><div class="req-sub">${esc(k.d.banco || k.d.proveedor)} · ${k.forma[2] === 'Bs' ? fmtBs(k.montoMoneda) : cxpUsd(k.montoMoneda)}${k.descuento ? ' · ahorró ' + cxpUsd(k.descuento) : ''}</div>
+            cxp.pagos = null; cxpBancoRecordar(p.banco);
+            almVentana(`<div class="req-dlg cxp-dlg"><h3>Pago registrado</h3><div class="req-sub">${esc(k.d.banco || k.d.proveedor)} · ${k.forma[2] === 'Bs' ? fmtBs(k.montoMoneda) : cxpUsd(k.montoMoneda)}${k.descuento ? ' · ahorró ' + cxpUsd(k.descuento) : ''}</div>
                 <div class="req-acciones" style="justify-content:flex-end"><button type="button" class="btn-ghost" onclick="almCerrar()">Cerrar</button><button type="button" class="btn-primary" onclick="cxpImprimirPago('${pid}')">${ico('imprimir')}Imprimir comprobante</button></div></div>`);
-        } catch (e) { err.textContent = e.code === 'permission-denied' ? 'Firebase no le da permiso para pagar (necesita Tesorería de Cuentas por pagar).' : e.message; btn.disabled = false; btn.textContent = 'Registrar pago'; }
+        } catch (e) { err.textContent = e.code === 'permission-denied' ? 'El sistema no le da permiso para pagar (necesita Tesorería de Cuentas por pagar).' : e.message; btn.disabled = false; btn.textContent = 'Registrar pago'; }
     }
     async function cxpAnularPago(pid) {
         const motivo = prompt('Motivo para anular este pago (la deuda vuelve a quedar pendiente):');
@@ -16522,7 +17099,7 @@
             const pagos = ps.docs.map(x => x.data()).filter(p => !p.anulado).sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)));
             cxp._ec = { prov, docs, pagos };
             const saldo = cxpR(docs.reduce((s, d) => s + cxpSaldo(d), 0));
-            almVentana(`<div class="req-dlg alm-dlg-ancho"><h3>Estado de cuenta · ${esc(prov)}</h3><div class="req-sub">${docs.length} documento(s) · ${pagos.length} pago(s) · saldo <b>${cxpUsd(saldo)}</b></div>
+            almVentana(`<div class="req-dlg cxp-dlg alm-dlg-ancho"><h3>Estado de cuenta · ${esc(prov)}</h3><div class="req-sub">${docs.length} documento(s) · ${pagos.length} pago(s) · saldo <b>${cxpUsd(saldo)}</b></div>
                 <div class="tabla-wrap" style="max-height:22rem;overflow:auto"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Fecha</th><th class="izq">Movimiento</th><th>Debe $</th><th>Pagó $</th></tr></thead><tbody>
                 ${[...docs.map(d => ({ f: d.fechaFactura, t: (d.tipo === 'prestamo' ? 'Préstamo ' : 'Factura ') + (d.documento || ''), debe: d.totalUsd || 0, haber: 0 })),
                    ...pagos.map(p => ({ f: p.fecha, t: 'Pago ' + ((CXP_FORMAS.find(f => f[0] === p.forma) || [, p.forma])[1]) + (p.documento ? ' · ' + p.documento : '') + (p.referencia ? ' · ref. ' + p.referencia : '') + (p.descuentoUsd ? ' (desc. ' + cxpUsd(p.descuentoUsd) + ')' : ''), debe: 0, haber: p.aplicadoUsd || 0 }))]
@@ -16649,7 +17226,7 @@
     }
     function cxpEmpresaEditar() {
         const e = cxpEmpresa();
-        almVentana(`<div class="req-dlg"><h3>Datos de la empresa</h3><div class="req-sub">Salen en los comprobantes de pago y de retención de IVA.</div>
+        almVentana(`<div class="req-dlg cxp-dlg"><h3>Datos de la empresa</h3><div class="req-sub">Salen en los comprobantes de pago y de retención de IVA.</div>
             <div class="filters"><div style="grid-column:1/-1"><label for="ceNom">Razón social</label><input id="ceNom" value="${esc(e.nombre)}"></div><div><label for="ceRif">RIF</label><input id="ceRif" value="${esc(e.rif)}"></div>
             <div><label for="ceTel">Teléfono</label><input id="ceTel" value="${esc(e.telefono || '')}"></div><div style="grid-column:1/-1"><label for="ceDir">Dirección fiscal</label><input id="ceDir" value="${esc(e.direccion || '')}"></div></div>
             <div class="req-acciones" style="justify-content:flex-end"><button type="button" class="btn-ghost" onclick="almCerrar()">Cancelar</button><button type="button" class="btn-primary" onclick="cxpEmpresaGuardar(this)">Guardar</button></div></div>`);
@@ -17502,6 +18079,7 @@
                                <button type="button" class="btn-ghost" onclick="almNuevoProveedor()">+ Nuevo</button>`}</div>
                         ${almIng.proveedorId ? '' : `<div class="alm-lista corta" id="almProvLista">${almProvListaHTML()}</div>`}</div>
                     <div><label for="almIngDoc">${op === 'COMPRA' ? 'N° de factura o nota' : 'Referencia (opcional)'}</label><input type="text" id="almIngDoc" autocomplete="off" maxlength="40" ${op === 'COMPRA' ? 'required' : ''} value="${esc(almIng.documento)}" oninput="almIng.documento=this.value"></div>
+                    ${op === 'COMPRA' ? `<div><label for="almIngPago">¿Cómo se paga?</label><select id="almIngPago" onchange="almIng.pago=this.value"><option value="" ${!almIng.pago ? 'selected' : ''}>Elija...</option><option value="credito" ${almIng.pago === 'credito' ? 'selected' : ''}>A crédito (va a Cuentas por pagar)</option><option value="contado" ${almIng.pago === 'contado' ? 'selected' : ''}>Al contado (ya está pagada)</option></select></div>` : ''}
                     ${op === 'COMPRA' || op === 'SIN_FACTURA' ? `<div style="align-self:end"><label class="interruptor"><input type="checkbox" id="almIngFiscal" ${almIng.fiscal ? 'checked' : ''} onchange="almIng.fiscal=this.checked"><span class="sw-pista"></span> Factura fiscal</label></div>` : ''}
                     ${op === 'DEV_PROVEEDOR' ? '<div class="per-ancho nota" style="margin-top:0">La mercancía sale del almacén de vuelta al proveedor (p. ej. devolver un préstamo). Por cada producto escriba cuánto sale: nunca más de lo que hay.</div>' : ''}
                     <div class="per-ancho"><label for="almIngNota">${op === 'DEV_PROVEEDOR' ? 'Motivo (opcional)' : 'Nota (opcional)'}</label><input type="text" id="almIngNota" autocomplete="off" maxlength="150" value="${esc(almIng.nota)}" ${op === 'DEV_PROVEEDOR' ? 'placeholder="Ej.: devolución del préstamo de queso"' : ''} oninput="almIng.nota=this.value"></div>
@@ -17574,7 +18152,9 @@
         ev.preventDefault();
         const v = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
         if ((almIng.operacion === 'COMPRA' || almIng.operacion === 'DEV_PROVEEDOR') && !almIng.proveedorId) { mostrarBanner('Elija el proveedor (si no está registrado, use "+ Nuevo").', 'warn'); const b = document.getElementById('almIngProv'); if (b) b.focus(); return; }
-        const fis = document.getElementById('almIngFiscal');
+        const fis = document.getElementById('almIngFiscal'), pg = document.getElementById('almIngPago');
+        if (almIng.operacion === 'COMPRA' && pg && !pg.value) { mostrarBanner('Elija si la compra es al contado o a crédito (las de contado no van a Cuentas por pagar).', 'warn'); pg.focus(); return; }
+        if (pg) almIng.pago = pg.value;
         Object.assign(almIng, { documento: v('almIngDoc'), clienteId: v('almIngCli'), nota: v('almIngNota'), fiscal: !!(fis && fis.checked), listo: true });
         almPintar(); almEnfocar();
     }
@@ -17724,7 +18304,7 @@
                       renglones: detalle.length, total: almR(detalle.reduce((s, x) => s + x.total, 0)), usuario: nombreUsuario, detalle };
         doc.fiscal = !!op.fiscal;
         const pedido = { action: 'alm_ingresar', operacion: op.operacion, proveedorId: op.proveedorId, documento: op.documento, clienteId: op.clienteId,
-                         nota: op.nota, fiscal: !!op.fiscal, claveAdmin, items: op.items.map(x => ({ codigo: x.codigo, cantidad: x.cantidad, costo: x.costo, contado: op.operacion === 'AJUSTE' ? x.contado : undefined })) };
+                         nota: op.nota, fiscal: !!op.fiscal, pago: op.operacion === 'COMPRA' ? (op.pago || '') : undefined, claveAdmin, items: op.items.map(x => ({ codigo: x.codigo, cantidad: x.cantidad, costo: x.costo, contado: op.operacion === 'AJUSTE' ? x.contado : undefined })) };
         almMoverLocal(op.items, 1, op.operacion === 'COMPRA');
         almDatos.proximoIngreso = almNumeroTxt((Number(doc.numero) || 0) + 1);
         almIng = { operacion: op.operacion, proveedorId: '', documento: '', clienteId: '', nota: '', items: [], sel: -1, listo: false, ultimo: '' };
@@ -18475,7 +19055,7 @@ Reglas:
             </tbody></table></div></div>`;
     }
     // Lo que se guarda del avance (las fotos ya están en Drive: van sus enlaces)
-    const cmpAvanceDatos = () => ({ proveedorId: cmp.proveedorId, proveedorLeido: cmp.proveedorLeido, factura: cmp.factura, fechaFactura: cmp.fechaFactura, tasaManual: cmp.tasaManual || 0, fiscal: !!cmp.fiscal, enlaces: cmp.enlaces,
+    const cmpAvanceDatos = () => ({ proveedorId: cmp.proveedorId, proveedorLeido: cmp.proveedorLeido, factura: cmp.factura, fechaFactura: cmp.fechaFactura, tasaManual: cmp.tasaManual || 0, fiscal: !!cmp.fiscal, pago: cmp.pago || '', enlaces: cmp.enlaces,
                                     leido: cmp.leido ? { total: cmp.leido.total, moneda: cmp.leido.moneda, tasa: cmp.leido.tasa } : null, lineas: cmp.lineas });
     // Cada cambio en la compra: se guarda solo 2 s después de dejar de escribir
     function cmpAvanceProgramar() {
@@ -18508,7 +19088,7 @@ Reglas:
         if (!(await cmpAvanceGuardar())) { if (btn) { btn.disabled = false; btn.textContent = 'Guardar en curso'; } return; }
         const id = cmp.borradorId;
         clearTimeout(cmpAvanceEspera);
-        Object.assign(cmp, { paso: 'foto', fotos: [], lineas: [], leido: null, enlaces: [], proveedorId: '', proveedorLeido: null, factura: '', fechaFactura: '', tasaManual: 0, fiscal: false, borradorId: null, borradorVer: '' });
+        Object.assign(cmp, { paso: 'foto', fotos: [], lineas: [], leido: null, enlaces: [], proveedorId: '', proveedorLeido: null, factura: '', fechaFactura: '', tasaManual: 0, fiscal: false, pago: '', borradorId: null, borradorVer: '' });
         cmpAvanceEstado = '';
         mostrarBanner(`Compra guardada en curso (${id}). Para seguirla, pulse "Seguir" en Compras en curso.`, 'ok');
         cmpPintarCompra(document.getElementById('almContenido'), true);
@@ -18528,7 +19108,7 @@ Reglas:
         if (btn) btnCargando(btn, 'Abriendo...');
         try {
             const b = (await llamarApi({ action: 'cmp_borrador', id })).borrador, x = b.datos || {};
-            Object.assign(cmp, { paso: 'revisar', fotos: [], leyendo: false, proveedorId: x.proveedorId || '', proveedorLeido: x.proveedorLeido || null, factura: x.factura || '', fechaFactura: x.fechaFactura || '', tasaManual: Number(x.tasaManual) || 0, fiscal: !!x.fiscal,
+            Object.assign(cmp, { paso: 'revisar', fotos: [], leyendo: false, proveedorId: x.proveedorId || '', proveedorLeido: x.proveedorLeido || null, factura: x.factura || '', fechaFactura: x.fechaFactura || '', tasaManual: Number(x.tasaManual) || 0, fiscal: !!x.fiscal, pago: x.pago || '',
                                  enlaces: x.enlaces || [], leido: x.leido || null, lineas: (x.lineas || []).map(l => cmpLineaNueva(Object.assign({}, l, { merma: 0 }))), borradorId: b.id, borradorVer: b.version });
             if (!cmp.lineas.length) cmp.lineas.push(cmpLineaNueva());
             cmpAvanceEstado = `Compra en curso ${b.id} · guardada por ${b.actualizo} a las ${String(b.actualizada).slice(11)}`;
@@ -18656,7 +19236,7 @@ Reglas:
             cmpAplicarSugerencia(x);
             return x;
         });
-        Object.assign(cmp, { paso: 'revisar', leido: r, fiscal: false, proveedorId: r.proveedorId || '', proveedorLeido: r.proveedorLeido || null, factura: r.factura || '', fechaFactura: r.fechaFactura || '', enlaces: r.fotos || [], lineas,
+        Object.assign(cmp, { paso: 'revisar', leido: r, fiscal: false, pago: '', proveedorId: r.proveedorId || '', proveedorLeido: r.proveedorLeido || null, factura: r.factura || '', fechaFactura: r.fechaFactura || '', enlaces: r.fotos || [], lineas,
                              borradorId: null, borradorVer: '' });
         if (!cmp.lineas.length) cmp.lineas.push(cmpLineaNueva());
         const ivaAuto = cmpIvaDetectar(lineas, r);
@@ -18667,7 +19247,7 @@ Reglas:
         if (r.moneda === 'BS' && cmpTasaCompra() > 0) mostrarBanner(`La factura está en bolívares: los costos se pasaron a $ con la tasa ${fmt(cmpTasaCompra())}. Revíselos.`, 'warn');
     }
     function cmpSinFoto() {
-        Object.assign(cmp, { paso: 'revisar', leido: null, proveedorId: '', proveedorLeido: null, factura: '', fechaFactura: fechaLocalHoy(), tasaManual: 0, fiscal: false, enlaces: [], lineas: [cmpLineaNueva()], borradorId: null, borradorVer: '' });
+        Object.assign(cmp, { paso: 'revisar', leido: null, proveedorId: '', proveedorLeido: null, factura: '', fechaFactura: fechaLocalHoy(), tasaManual: 0, fiscal: false, pago: '', enlaces: [], lineas: [cmpLineaNueva()], borradorId: null, borradorVer: '' });
         cmpAvanceEstado = '';
         cmpPintarCompra(document.getElementById('almContenido'), true);
     }
@@ -18800,6 +19380,7 @@ Reglas:
                             : (() => { const t = tasaBCVdel(cmp.fechaFactura || fechaLocalHoy()); return t ? `BCV del ${fechaBonita(t[0])}` : 'Sin tasa del BCV: escríbala'; })()}</small></div>
                     ${cmp.lineas.some(l => l.leido) ? `<div><label for="cmpMoneda">Costos de la factura en</label><select id="cmpMoneda" onchange="cmpCambiarMoneda(this.value)">
                         <option value="USD"${cmpMonedaFactura() === 'USD' ? ' selected' : ''}>Dólares ($)</option><option value="BS"${cmpMonedaFactura() === 'BS' ? ' selected' : ''}>Bolívares (Bs): se pasan a $ con la tasa</option></select></div>` : ''}
+                    <div><label for="cmpPago">¿Cómo se paga?</label><select id="cmpPago" onchange="cmp.pago=this.value"><option value="" ${!cmp.pago ? 'selected' : ''}>Elija...</option><option value="credito" ${cmp.pago === 'credito' ? 'selected' : ''}>A crédito (va a Cuentas por pagar)</option><option value="contado" ${cmp.pago === 'contado' ? 'selected' : ''}>Al contado (ya está pagada)</option></select></div>
                     <div style="align-self:end"><label class="interruptor"><input type="checkbox" ${cmp.fiscal ? 'checked' : ''} onchange="cmp.fiscal=this.checked"><span class="sw-pista"></span> Factura fiscal</label></div>
                 </div>
                 <div class="nota">Escriba el <b>%</b> y el precio de venta sale solo (costo ÷ (1 − %)); también puede escribir el precio y el % se calcula. El % sale sugerido según el manual (o el de la última vez). Los productos <b>sin código</b> se trabajan con su descripción y se reparten completos; solo lo que queda en el almacén necesita estar registrado. Las cajas y bultos se pasan a unidades.</div>
@@ -18821,7 +19402,7 @@ Reglas:
         if (!confirm(cmp.borradorId ? `¿Descartar esta compra? También se borra de "Compras en curso" (${cmp.borradorId}).` : '¿Descartar esta compra sin guardar?')) return;
         clearTimeout(cmpAvanceEspera);
         const id = cmp.borradorId;
-        Object.assign(cmp, { paso: 'foto', fotos: [], lineas: [], leido: null, enlaces: [], tasaManual: 0, fiscal: false, borradorId: null, borradorVer: '' });
+        Object.assign(cmp, { paso: 'foto', fotos: [], lineas: [], leido: null, enlaces: [], tasaManual: 0, fiscal: false, pago: '', borradorId: null, borradorVer: '' });
         cmpAvanceEstado = '';
         if (id) { cmpBorradores = cmpBorradores.filter(x => x.id !== id); llamarApi({ action: 'cmp_borrador_borrar', id }).then(r => { cmpBorradores = r.borradores || cmpBorradores; }).catch(e => mostrarBanner('No se pudo borrar la compra en curso: ' + e.message, 'error')); }
         cmpPintarCompra(document.getElementById('almContenido'), true);
@@ -18898,6 +19479,7 @@ Reglas:
                 : `Renglón ${n}: "${p.descripcion}" no tiene código, así que se reparte completo. Reparta lo que queda o regístrelo en el catálogo para dejarlo en el almacén.`;
             return;
         }
+        if (!cmp.pago) { err.textContent = 'Elija si la compra es al contado o a crédito (las de contado no van a Cuentas por pagar).'; const s = document.getElementById('cmpPago'); if (s) s.focus(); return; }
         const notas = CMP_TIENDAS.filter(t => lineas.some(l => Number(l.dist[t]) > 0)), alAlmacen = lineas.filter(l => l.codigo).length;
         const sinPrecio = lineas.filter(l => !(l.detal > 0) && cmpProd(l).categoria !== 'Insumos').length;
         if (!confirm(`${alAlmacen ? alAlmacen + ' producto(s) con código entran al almacén. ' : ''}${notas.length ? 'Se emite una nota a: ' + notas.join(', ') + ' (se envían solas a Telegram).' : 'No se reparte nada a las tiendas: no se emiten notas ni se envía nada a Telegram.'}` + (sinPrecio ? `\n${sinPrecio} producto(s) sin precio al detal: quedan "por definir precio".` : '') + '\n\n¿Guardar la compra?')) return;
@@ -18912,7 +19494,7 @@ Reglas:
         // Un mismo identificador para esta compra en cada intento: si Google tardó y dio error pero sí la guardó, el reintento NO la
         // repite (05/11: una factura entró dos veces). Además Google no acepta la misma factura del mismo proveedor dos veces.
         cmp.idemGuardar = cmp.idemGuardar || nuevoIdem();
-        const pedido = { action: 'cmp_guardar', idem: cmp.idemGuardar, libroAparte: true, tgEquipo: true, fiscal: !!cmp.fiscal, borradorId: cmp.borradorId || '', proveedorId: cmp.proveedorId, factura: cmp.factura.trim(), fechaFactura: cmp.fechaFactura, tasa: cmpTasaCompra(), fotos: cmp.enlaces,
+        const pedido = { action: 'cmp_guardar', idem: cmp.idemGuardar, libroAparte: true, tgEquipo: true, fiscal: !!cmp.fiscal, pago: cmp.pago || '', borradorId: cmp.borradorId || '', proveedorId: cmp.proveedorId, factura: cmp.factura.trim(), fechaFactura: cmp.fechaFactura, tasa: cmpTasaCompra(), fotos: cmp.enlaces,
                 tasaFactura: cmpTasaCompra(),
                 lineas: lineas.map(l => ({ codigo: l.codigo, descripcion: cmpProd(l).descripcion, categoria: cmpProd(l).categoria, claveProveedor: l.claveProveedor, cantidad: l.cantidad, costo: l.costo, merma: l.merma, margenDetal: l.margenDetal, detal: l.detal,
                                            margenMayor: l.margenMayor, mayor: l.mayor, dist: l.dist })) };
@@ -20917,6 +21499,7 @@ Reglas:
     // sola desde Firebase (Firebase.gs · fbMarcasAplicar). Sin internet: como antes (queda en este equipo y se envía al volver).
     const MARCA_CONOCIDOS = 'marcaje_conocidos';   // código leído -> nombre y foto (para mostrarlos al instante la próxima vez)
     let marcaActual = '';
+    const marcaBandejaCF = {};   // (15/11) pases que quedaron en el servidor nuevo
     const marcaConocidos = () => { try { return JSON.parse(localStorage.getItem(MARCA_CONOCIDOS) || '{}') || {}; } catch (e) { return {}; } };
     function marcaAprender(codigo, r) {
         if (!r || !r.nombre) return;
@@ -20929,6 +21512,18 @@ Reglas:
     // Deja el pase en Firestore marcas/{id}. Devuelve la hora "HH:mm" que puso Firebase, o null si no se pudo (sin internet, reglas)
     async function marcaAFirebase(id, eq, codigo) {
         if (!/^\d{12,30}$/.test(codigo) || !eq.token || !eq.local) return null;
+        // (15/11) Primero el servidor nuevo (la hora la pone él, sin sesión como el equipo de marcaje); Firebase solo si no responde
+        try {
+            const c = new AbortController(), t = setTimeout(() => c.abort(), 5000);
+            const r = await fetch(CF_URL + '/api', { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, signal: c.signal,
+                body: JSON.stringify({ empresa: CF_EMPRESA, action: 'pub_marca', id, equipo: eq.token, codigo, local: eq.local, creadoLocal: Date.now() }) });
+            clearTimeout(t);
+            const j = await r.json().catch(() => null);
+            if (j && j.ok && j.creado) {
+                COLA.horaServidor(j.creado); marcaBandejaCF[id] = true;
+                return new Date(j.creado).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Caracas' });
+            }
+        } catch (e) {}
         const base = `projects/${FB_CONFIG.projectId}/databases/(default)/documents`;
         const cuerpo = { writes: [{ update: { name: `${base}/marcas/${id}`, fields: { equipo: { stringValue: eq.token }, codigo: { stringValue: codigo },
             local: { stringValue: eq.local }, estado: { stringValue: 'pendiente' }, creadoLocal: { integerValue: String(Date.now()) } } },
@@ -20961,8 +21556,8 @@ Reglas:
         if (hora) { marcaOcupado = false; recibida(false); }
         // 2) Google: el resultado de siempre (entrada o salida, mensajes, o la pregunta de la oficina)
         try {
-            const r = await llamarApi(Object.assign({ action: 'marca_registrar', equipo: eq.token, codigo, idem: id }, hora ? { bandeja: true } : {},
-                                                    paso ? { paso } : {}, bandejaId ? { bandejaId } : {}));
+            const r = await llamarApi(Object.assign({ action: 'marca_registrar', equipo: eq.token, codigo, idem: id }, hora ? { bandeja: marcaBandejaCF[id] ? 'cf' : true } : {},
+                                                    paso ? { paso } : {}, bandejaId ? { bandejaId } : {}, bandejaId && marcaBandejaCF[bandejaId] ? { bandejaCF: true } : {}));
             marcaAprender(codigo, r); COLA.horaServidor(r && r.ahora);
             if (marcaActual !== mio) return;   // ya pasó otro carnet: no se tapa su pantalla
             if (r.pendiente && hora) recibida(true);
