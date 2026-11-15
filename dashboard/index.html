@@ -5517,7 +5517,7 @@
                     : `<div class="fb-ind"><span>Revisión automática (cada 5 min)</span><b>${rev ? (revHace != null ? `Activa · corrió hace ${revHace} min` : 'Activa · todavía no corre') : 'No activa'}</b><button type="button" class="btn-ghost btn-mini" onclick="fbRevision(this, false)">Pasar a manual</button></div>`}
             </div>
             <div class="tabla-wrap"><table class="req-tabla fb-tabla" data-sin-paginar><thead><tr><th class="izq">Módulo</th><th class="izq">Dónde se guarda</th><th></th></tr></thead><tbody>${filas.map(f => f.html).join('')}</tbody></table></div>
-            <div class="req-acciones" style="justify-content:flex-end;margin:.5rem 0 0"><button type="button" class="btn-ghost btn-mini" onclick="fbHojas(this, 'copiar', 'pagos')">Copiar todo a la hoja ahora</button><button type="button" class="btn-ghost btn-mini" onclick="fbProbar(this)">Probar Firebase</button><button type="button" class="btn-ghost btn-mini" onclick="fbhComparar(this)">Comparar Nómina (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="almfbComparar(this)">Comparar Almacén y compras (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="cajafbComparar(this)">Comparar Cuadre y Validar pagos (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="perfbComparar(this)">Comparar Cuentas por cobrar, asistencia y horarios (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="reqfactComparar(this)">Comparar Requerimientos y Facturar (Firebase directo)</button><button type="button" class="btn-primary btn-mini" onclick="fbRevisarAhora(this)">Actualizar</button></div>
+            <div class="req-acciones" style="justify-content:flex-end;margin:.5rem 0 0"><button type="button" class="btn-ghost btn-mini" onclick="fbHojas(this, 'copiar', 'pagos')">Copiar todo a la hoja ahora</button><button type="button" class="btn-ghost btn-mini" onclick="fbProbar(this)">Probar Firebase</button><button type="button" class="btn-ghost btn-mini" onclick="fbhComparar(this)">Comparar Nómina (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="almfbComparar(this)">Comparar Almacén y compras (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="cajafbComparar(this)">Comparar Cuadre y Validar pagos (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="perfbComparar(this)">Comparar Cuentas por cobrar, asistencia y horarios (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="reqfactComparar(this)">Comparar Requerimientos y Facturar (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="cfAbrir()">Servidor nuevo (Cloudflare)</button><button type="button" class="btn-primary btn-mini" onclick="fbRevisarAhora(this)">Actualizar</button></div>
             <div class="nota">"En Firebase": lo que se guarda en ese módulo vive en Firebase y la hoja de Google se llena sola como copia (lo que se cambie a mano en la hoja ya no cuenta). "Volver a la hoja" copia todo a Google antes de cambiar.</div>`;
     }
     async function fbHojas(btn, que, grupo) {
@@ -5628,6 +5628,51 @@
             efeFbActivo = !!r.activo; if (!r.activo) efeFbDetener(); else efeFbIniciar();
         } catch (e) { out.innerHTML = `<div class="banner error" style="display:block">${esc(e.message)}</div>`; }
         finally { if (document.getElementById('fbEstado')) setTimeout(fbEstadoCargar, 0); btn.disabled = false; btn.textContent = activar ? 'Activar Efectivo en Firebase' : 'Desactivar'; }
+    }
+    // (14/11) Servidor nuevo en Cloudflare (JD Sistemas), etapa 1: pasar las claves de hoy y probar la entrada desde este equipo.
+    // El sistema de todos los días sigue en Google hasta que cada módulo se pase.
+    const CF_URL = 'https://plaza-software.jdsistemas.workers.dev';
+    function cfAbrir() {
+        const out = document.getElementById('fbPruebaRes'); if (!out) return;
+        out.innerHTML = `<div class="card" style="margin-top:.5rem">
+            <h3 style="margin-top:0">Servidor nuevo (Cloudflare)</h3>
+            <div class="nota">1) "Pasar claves" copia las personas, sus claves (cifradas, nadie las ve), las huellas y los grupos de Telegram al servidor nuevo. Se puede repetir: reemplaza lo anterior.<br>
+                2) "Probar entrada" entra al servidor nuevo con su clave y mide cuánto tarda desde este equipo. Nada del trabajo diario cambia.</div>
+            <form class="filters" onsubmit="event.preventDefault(); cfPasarClaves(document.getElementById('cfBtnPasar'))" style="margin-top:.5rem">
+                <div><label for="cfEmpresa">Empresa en el servidor nuevo</label><input id="cfEmpresa" value="plaza-valencia" autocomplete="off" spellcheck="false"></div>
+                <div><label for="cfDueno">Clave del dueño (la de "Configurar Cloudflare")</label><input id="cfDueno" type="password" autocomplete="off"></div>
+            </form>
+            <div class="login-error" id="cfError"></div>
+            <div class="req-acciones" style="justify-content:flex-end"><button type="button" class="btn-ghost btn-mini" onclick="cfProbarEntrada(this)">Probar entrada</button>
+                <button type="button" class="btn-primary btn-mini" id="cfBtnPasar" onclick="cfPasarClaves(this)">Pasar claves</button></div>
+            <div id="cfRes"></div></div>`;
+    }
+    const cfEmpresaElegida = () => String((document.getElementById('cfEmpresa') || {}).value || 'plaza-valencia').trim().toLowerCase();
+    async function cfPasarClaves(btn) {
+        const err = document.getElementById('cfError'), res = document.getElementById('cfRes'), dueno = (document.getElementById('cfDueno') || {}).value || '';
+        err.textContent = ''; if (!dueno) { err.textContent = 'Escriba la clave del dueño.'; return; }
+        const texto = btn.textContent; btn.disabled = true; btnCargando(btn, 'Pasando claves...');
+        try {
+            const r = await DATOS.aGoogle(() => llamarApi({ action: 'cf_exportar', dueno, empresa: cfEmpresaElegida() }));
+            res.innerHTML = `<div class="banner ok" style="display:block">Listo: ${r.usuarios} clave${r.usuarios === 1 ? '' : 's'} y ${r.huellas} huella${r.huellas === 1 ? '' : 's'} en el servidor nuevo${r.creada ? ' (la empresa se creó ahora)' : ''}. Grupos de Telegram: ${esc((r.grupos || []).join(', ') || 'ninguno')}.</div>`;
+            document.getElementById('cfDueno').value = '';
+        } catch (e) { err.textContent = e.message; }
+        finally { btn.disabled = false; btn.textContent = texto; }
+    }
+    async function cfProbarEntrada(btn) {
+        const err = document.getElementById('cfError'), res = document.getElementById('cfRes'); err.textContent = '';
+        const texto = btn.textContent; btn.disabled = true; btnCargando(btn, 'Probando...');
+        const pedir = async b => { const t = performance.now(); const r = await (await fetch(CF_URL + '/api', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(Object.assign({ empresa: cfEmpresaElegida() }, b)) })).json(); r._ms = performance.now() - t; return r; };
+        try {
+            const e = await pedir({ action: 'login', clave, eq: 'panel-prueba', disp: navigator.userAgent.slice(0, 60) });
+            if (!e.ok) throw new Error(e.error || 'No se pudo entrar');
+            const veces = []; for (let i = 0; i < 3; i++) veces.push((await pedir({ action: 'yo', token: e.token }))._ms);
+            const g0 = performance.now(); await DATOS.aGoogle(() => llamarApi({ action: 'ping' })).catch(() => null); const g = performance.now() - g0;
+            const s = ms => ms < 1000 ? Math.round(ms) + ' ms' : (ms / 1000).toFixed(1) + ' s';
+            res.innerHTML = `<div class="banner ok" style="display:block">Entró al servidor nuevo como <b>${esc(e.usuario.nombre)}</b> (${e.usuario.admin ? 'administrador' : e.usuario.permisos.length + ' permisos'}).<br>
+                Entrar: <b>${s(e._ms)}</b> · cada pedido: <b>${s(Math.min(...veces))}</b> a ${s(Math.max(...veces))} · el mismo pedido en Google: <b>${s(g)}</b>.</div>`;
+        } catch (x) { err.textContent = x.message === 'Failed to fetch' ? 'No hubo respuesta del servidor nuevo (revise internet).' : x.message; }
+        finally { btn.disabled = false; btn.textContent = texto; }
     }
     async function fbProbar(btn) {
         const out = document.getElementById('fbPruebaRes'); btn.disabled = true; btnCargando(btn, 'Probando...');
@@ -5754,7 +5799,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-14.6';
+    const VERSION_SERVIDOR = '2026-11-14.7';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -8589,7 +8634,7 @@
     function vxPesoListo() {
         const p = vx.porCod.get(vx.pesoCod), g = vxNum((document.getElementById('vxPeso') || {}).value), kg = vxR3(g / 1000), err = document.getElementById('vxPesoError');
         if (!(kg > 0)) { if (err) err.textContent = 'Escriba el peso en gramos'; return; }
-        if (g > 100000) { if (err) err.textContent = 'Revise el peso: ' + fmt(g / 1000) + ' kg (se escribe en gramos)'; return; }
+        if (g > 100000 && !confirm(`El peso es ${vxCant(kg, true)} kg (se escribe en gramos: ${fmtNum(g)} g).\n\n¿Es correcto?`)) { const i = document.getElementById('vxPeso'); if (i) { i.focus(); i.select(); } return; }
         vxCerrarDlg(); vxAgregar(p, kg);
     }
     function vxAgregar(p, q) {
@@ -16341,7 +16386,8 @@
         // Se escribe en gramos y en la nota va en kg (520 g = 0,520 kg)
         const p = almProducto(codigo), g = almNum(document.getElementById('almPeso').value), v = almR(g / 1000, 3);
         if (!(v > 0)) { document.getElementById('almPesoError').textContent = 'Escriba el peso en gramos'; return; }
-        if (g > 100000) { document.getElementById('almPesoError').textContent = 'Revise el peso: ' + fmt(g / 1000) + ' kg (se escribe en gramos)'; return; }
+        // Más de 100 kg: pregunta (puede ser un error de escribir en kg), pero deja facturar si se confirma
+        if (g > 100000 && !confirm(`El peso es ${almCant(v, 'Pesado')} kg (se escribe en gramos: ${fmtNum(g)} g).\n\n¿Es correcto?`)) { const i = document.getElementById('almPeso'); if (i) { i.focus(); i.select(); } return; }
         almCerrar();
         almAgregarVenta(p, v);
     }
