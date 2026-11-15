@@ -3491,6 +3491,10 @@
         } catch (e) {}
     }
     async function llamarApiPedido(payload) {
+        // (15/11) Efectivo y caja chica: directo al servidor nuevo cuando es el oficial (sin pasar por Google)
+        if (CFEFE_ACC.test(payload.action)) { const r = await cfEfeResponder(payload); if (r) return r; }
+        // (15/11) Historial de nóminas: del servidor nuevo (con la Nómina encendida allá)
+        if (payload.action === 'nom_historial') { const r = await cfNomHistorial(payload); if (r) return r; }
         // (12/11) Lecturas del almacén con "Usar Firebase en el Almacén" encendido: se responden aquí con lo de Firebase (sin Google)
         if (ALMVIVO_ACC.test(payload.action) && !almVivoSaltar) { const r = await almVivoResponder(payload); if (r) return r; }
         vivoMotivo = '';
@@ -3501,7 +3505,7 @@
             payload = Object.assign({}, payload, { porGoogle: vivoMotivo || 'sin motivo' });
         }
         if (PERVIVO_ACC.test(payload.action) && !perVivoSaltar) { const r = await perVivoResponder(payload); if (r) return r; }
-        if (REQVIVO_ACC.test(payload.action)) { const r = await reqDirecto.responder(payload); if (r) return r; }
+        if (REQVIVO_ACC.test(payload.action)) { const rc = await cfReqResponder(payload); if (rc) return rc; const r = await reqDirecto.responder(payload); if (r) return r; }
         if (FACTVIVO_ACC.test(payload.action)) { const r = await factDirecto.responder(payload); if (r) return r; }
         const t0 = performance.now();
         let llaveIdem = '', llaveLS = '';
@@ -3518,6 +3522,7 @@
             const r = await llamarApiReal(payload, t0);
             if (llaveIdem) { idemPendientes.delete(llaveIdem); idemRecordar(llaveLS, ''); }
             if (r && r._ver) vivoUsar(r._ver);   // qué versión de su área trae esta respuesta (cambios en vivo)
+            if (r && r._cf) cfSyncPronto();      // (14/11) poner al día el servidor nuevo con lo que se acaba de guardar
             if (r.yaRegistrado) mostrarBanner('Ese cambio ya estaba guardado (Google lo registró la vez anterior aunque no respondió). No se repitió.', 'ok');
             return r;
         }
@@ -3545,7 +3550,7 @@
         finally { if (llaveIdem) escriturasEnCurso--; }
     }
     // Lo que no se guarda para después (necesita respuesta en el momento o es de administración de claves)
-    const NO_COLA = /^(login|ping|cambios|enlinea|nom_autorizar|adm_|alm_|cmp_|bsr_|huella_)/;   // el almacén necesita internet: la nota lleva número y existencia del momento
+    const NO_COLA = /^(login|ping|cambios|enlinea|nom_autorizar|adm_|alm_|cmp_|bsr_|huella_|cf_)/;   // el almacén necesita internet: la nota lleva número y existencia del momento
     COLA.configurar({ url: WEB_APP_URL, clave: () => clave, usuario: () => nombreUsuario,
         alTerminar: hechos => mostrarBanner(`Se enviaron ${hechos.length} registro(s) que estaban pendientes sin conexión.` + (hechos.some(x => x.tipo === 'panel') ? ' Pulse Actualizar para verlos.' : ''), 'ok') });
     // Identificador de este equipo (al azar, queda en el navegador): el servidor cuenta los intentos con clave incorrecta por equipo
@@ -3975,6 +3980,7 @@
         if (almVivoSaltar || !ALMVIVO_ACC.test(p.action)) return null;
         const grupo = almVivoGrupo(p.action);
         if (!grupo) return null;   // sin ese permiso: Google (que tampoco se lo da)
+        { const rc = await cfAlmResponder(p, grupo); if (rc) return rc; }   // (14/11) primero el servidor nuevo, si está encendido y al día
         try {
             if (!(await almVivoActiva())) return null;
             ALMVIVO.tocar();
@@ -4453,6 +4459,8 @@
         if (cajaVivoSaltar) { vivoMotivo = 'comparar'; return null; }
         if (!CAJAVIVO_ACC.test(p.action)) return null;
         if (!cajaVivoPermite(p.action)) { vivoMotivo = 'sin permiso'; return null; }
+        // (14/11) Primero el servidor nuevo (Cloudflare), si está encendido y al día
+        { const rc = await cfCajaResponder(p); if (rc) return rc; }
         try {
             const cfg = await cajaVivoConfig();
             if (!cfg) { vivoMotivo = CAJAVIVO.estado() === 'roto' ? 'Firebase falló hace poco' : 'sin sesión de Firebase'; return null; }
@@ -4573,6 +4581,7 @@
     }
     async function perVivoResponder(p) {
         if (perVivoSaltar || !PERVIVO_ACC.test(p.action) || !perVivoPermite(p.action)) return null;
+        { const rc = await cfPerResponder(p); if (rc) return rc; }   // (14/11) primero el servidor nuevo, si está encendido y al día
         try {
             const cfg = await perVivoConfig();
             if (!cfg || !cfg.directa) return null;
@@ -5061,7 +5070,23 @@
             }
             return null;
         }
-        return { calcular, leerTodo, HOJAS, responder };
+        // (15/11) Historial de nóminas cerradas (nominaHistorial: todas o las de las semanas entre desde y hasta, de la más nueva a la más vieja)
+        function historial(H, d) {
+            const desde = /^\d{4}-\d{2}-\d{2}$/.test(String(d.desde)) ? d.desde : '0000-00-00', hasta = /^\d{4}-\d{2}-\d{2}$/.test(String(d.hasta)) ? d.hasta : '9999-12-31';
+            const pagos = filasHoja(H['BD PAGOS NOMINA'], 35).filter(x => textoCelda(x.r[0]) && !/^anulad/i.test(textoCelda(x.r[30]))).map(({ r, fila }) => ({
+                fila, id: textoCelda(r[0]), desde: normalizarFecha(r[1]) || textoCelda(r[1]), hasta: normalizarFecha(r[2]) || textoCelda(r[2]),
+                trabajadorId: textoCelda(r[3]), trabajador: textoCelda(r[4]), local: textoCelda(r[5]), perfil: textoCelda(r[6]),
+                turnos: numCelda(r[7]), horas: numCelda(r[8]), pagoTurnos: numCelda(r[9]), horasExtra: numCelda(r[10]), tarifaExtra: numCelda(r[11]), pagoExtra: numCelda(r[12]),
+                bonoPuntualidad: numCelda(r[13]), bonoProductividad: numCelda(r[14]), bonoAdicional: numCelda(r[15]), motivoBono: textoCelda(r[16]),
+                generado: numCelda(r[17]), sueldoBase: numCelda(r[18]), ayudaSocial: numCelda(r[19]), descontado: numCelda(r[20]), deudasDescontadas: textoCelda(r[21]),
+                deudasExcluidas: textoCelda(r[22]), neto: numCelda(r[23]), movimiento: textoCelda(r[24]), cerro: textoCelda(r[25]), fechaCierre: textoCelda(r[26]), detalle: textoCelda(r[27]),
+                tasa: numCelda(r[28]), netoBs: numCelda(r[29]),
+                pagado: /^pagad/i.test(textoCelda(r[30])), pagadoPor: textoCelda(r[31]), fechaPago: textoCelda(r[32]), referencia: textoCelda(r[33]), comprobante: textoCelda(r[34])
+            })).filter(p => p.desde >= desde && p.desde <= hasta)
+              .sort((a, b) => b.desde.localeCompare(a.desde) || b.id.localeCompare(a.id) || a.trabajador.localeCompare(b.trabajador));
+            return { ok: true, pagos };
+        }
+        return { calcular, leerTodo, HOJAS, responder, historial };
     })();
     // JSON con las propiedades ordenadas: para comparar sin que importe el orden de las claves
     const jsonOrdenado = v => JSON.stringify(v, (k, x) => x && typeof x === 'object' && !Array.isArray(x) ? Object.keys(x).sort().reduce((o, c) => { o[c] = x[c]; return o; }, {}) : x);
@@ -5286,6 +5311,594 @@
             mostrarBanner(activar ? 'Cuadre y Validar pagos con Firebase encendidos: se leen en el panel y se actualizan en vivo.' : 'Cuadre y Validar pagos con Firebase apagados: vuelven a pedirse a Google.', 'ok');
             document.getElementById('fbhDlg').classList.add('hidden');
         } catch (e) { mostrarBanner('No se pudo cambiar: ' + e.message, 'error'); btn.disabled = false; }
+    }
+    // ---------- (14/11, etapa 3) Cuadre de caja y Validar pagos leídos del SERVIDOR NUEVO (Cloudflare) ----------
+    // Las mismas cuentas de siempre (CAJAFB, copia del Apps Script) sobre las hojas que guarda el servidor nuevo. El servidor solo
+    // entrega las hojas (casi no gasta cálculo) y solo las que cambiaron desde la última vez. Se usa si el interruptor "caja" está
+    // encendido allá y la copia tiene el último cambio que este panel conoce; si no, sigue como antes (Firebase o Google).
+    const CF_EMPRESA = 'plaza-valencia';
+    let cfSes = { token: '', vence: 0, clave: '', modulos: null, modHora: 0, roto: 0, pidiendo: null };
+    async function cfPedir(b) {
+        const r = await fetch(CF_URL + '/api', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(Object.assign({ empresa: CF_EMPRESA }, b)) });
+        return r.json();
+    }
+    async function cfToken() {
+        if (!clave) throw new Error('sin sesión');
+        if (cfSes.token && cfSes.clave === clave && cfSes.vence - Date.now() > 60000) return cfSes.token;
+        const r = await cfPedir({ action: 'login', clave, eq: EQUIPO_ID, disp: DISPOSITIVO });
+        if (!r.ok) throw new Error(r.error || 'no se pudo entrar');
+        Object.assign(cfSes, { token: r.token, vence: r.vence, clave, modulos: (r.empresa || {}).modulos || {}, modHora: Date.now() });
+        return r.token;
+    }
+    // Interruptores del servidor nuevo (cada 5 minutos, sin demorar la lectura: la primera vez se consulta aparte)
+    function cfModulos() {
+        if (cfSes.pidiendo) return cfSes.pidiendo;
+        cfSes.pidiendo = (async () => {
+            try {
+                const t = await cfToken(), r = await cfPedir({ action: 'cfg_leer', token: t });
+                if (r.ok) { cfSes.modulos = (r.empresa || {}).modulos || {}; cfSes.modHora = Date.now(); }
+                else if (r.sesion === false) cfSes.token = '';
+            } catch (e) { cfSes.modulos = cfSes.modulos || {}; cfSes.modHora = Date.now(); }
+            finally { cfSes.pidiendo = null; }
+            return cfSes.modulos;
+        })();
+        return cfSes.pidiendo;
+    }
+    // Fecha guardada como {"$d": ms} (hojas que estaban en Google) -> texto, igual que Firebase (fsValorHoja)
+    const cfFmtFecha = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Caracas', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+    function cfFecha(ms) {
+        const d = new Date(ms), t = cfFmtFecha.format(d);
+        if (d.getUTCFullYear() < 1900) return t.slice(11, 16);
+        return t.slice(11) === '00:00:00' ? t.slice(0, 10) : t;
+    }
+    const CFH = (() => {
+        const cache = {};
+        function armar(n, x) {
+            const filas = [], cols = x.cols, valores = [];
+            x.bloques.forEach(b => (typeof b === 'string' ? JSON.parse(b) : b).forEach(f => filas.push(f)));
+            for (let i = 1; i < x.ultima; i++) {
+                const f = filas[i], fila = [];
+                for (let c = 0; c < cols; c++) { const v = f ? f[c] : ''; fila.push(v === undefined || v === null ? '' : (v && typeof v === 'object' && '$d' in v) ? cfFecha(v.$d) : v); }
+                valores.push(fila);
+            }
+            return { nombre: n, ultima: x.ultima, valores };
+        }
+        async function leer(nombres) {
+            const t = await cfToken(), tengo = {};
+            nombres.forEach(n => { if (cache[n]) tengo[n] = cache[n].actualizado; });
+            const r = await cfPedir({ action: 'hojas_leer', token: t, hojas: nombres, tengo });
+            if (!r.ok) { if (r.sesion === false) cfSes.token = ''; throw new Error(r.error || 'sin respuesta'); }
+            const H = {};
+            nombres.forEach(n => {
+                const x = r.hojas[n];
+                if (!x) throw new Error(n + ' no está en el servidor nuevo');
+                if (!x.igual) cache[n] = { actualizado: x.actualizado, h: armar(n, x) };
+                H[n] = cache[n].h;
+            });
+            return { H, ver: r.ver || {}, oficiales: r.oficiales || [] };
+        }
+        return { leer, olvidar: () => Object.keys(cache).forEach(k => { delete cache[k]; }) };
+    })();
+    // ¿Tiene el servidor nuevo el último cambio que este panel conoce? (las mismas áreas que con Firebase)
+    const cfAlDia = (ver, areas) => areas.every(a => !verConocida[a] || Number(ver[a] || 0) >= Number(verConocida[a]));
+    // (15/11) Hojas cuyo oficial ya es el servidor nuevo: lo que se guarda llega allí antes de que Google responda (no hay copia que esperar)
+    const cfTodasOficiales = (x, hojas) => !!(x && x.oficiales && hojas.length && hojas.every(h => x.oficiales.includes(h)));
+    async function cfCajaResponder(p) {
+        if (!clave) return null;
+        if (!cfSes.modulos || Date.now() - cfSes.modHora > 300000) { cfModulos(); if (!cfSes.modulos) return null; }
+        if (!cfSes.modulos.caja) return null;
+        if (cfSes.roto && Date.now() - cfSes.roto < 120000) return null;   // falló hace poco: 2 minutos como antes
+        try {
+            const necesita = CAJAVIVO_HOJAS_DE[p.action], areas = /^cuadre_detalle/.test(p.action) ? ['cuadre', 'per'] : ['cuadre'];
+            const t0 = performance.now(), desde = Date.now();
+            let x = await CFH.leer(necesita);
+            while (!cfTodasOficiales(x, necesita) && !cfAlDia(x.ver, areas)) {
+                if (Date.now() - desde > 3000) { vivoMotivo = 'Cloudflare sin el último cambio'; cfSyncPronto(); return null; }
+                await new Promise(r => setTimeout(r, 600));
+                x = await CFH.leer(necesita);
+            }
+            const r = CAJAFB.responder(p, x.H);
+            if (r) anotarTiempo(p.action + ' (Cloudflare)', Math.round(performance.now() - t0), 0, true);
+            return r;
+        } catch (e) { cfSes.roto = Date.now(); console.log('Servidor nuevo (Cloudflare): ' + e.message + ' (se usa lo de antes)'); return null; }
+    }
+    // Documentos que publica Google para los paneles (config/nomina, vista/personas, vista/trabajadores): { datos: JSON }
+    async function cfDocs(rutas) {
+        const t = await cfToken(), r = await cfPedir({ action: 'docs_leer', token: t, rutas });
+        if (!r.ok) { if (r.sesion === false) cfSes.token = ''; throw new Error(r.error || 'sin respuesta'); }
+        const D = {};
+        rutas.forEach(ruta => { const s = r.docs[ruta]; if (!s) throw new Error(ruta + ' no está en el servidor nuevo'); D[ruta] = JSON.parse(JSON.parse(s).datos || 'null'); });
+        return D;
+    }
+    // Hojas (y documentos) del servidor nuevo, esperando como mucho 3 s a que tengan el último cambio que este panel conoce
+    async function cfLeerAlDia(hojas, areas) {
+        const desde = Date.now();
+        let x = await CFH.leer(hojas);
+        while (!cfTodasOficiales(x, hojas) && !cfAlDia(x.ver, areas)) {
+            if (Date.now() - desde > 3000) { cfSyncPronto(); return null; }
+            await new Promise(r => setTimeout(r, 600));
+            x = await CFH.leer(hojas);
+        }
+        return x;
+    }
+    // ¿Encendido allá? (sin demorar: la primera vez se consulta aparte y esta lectura sigue como antes)
+    function cfModuloEncendido(m) {
+        if (!clave) return false;
+        if (!cfSes.modulos || Date.now() - cfSes.modHora > 300000) { cfModulos(); if (!cfSes.modulos) return false; }
+        if (cfSes.roto && Date.now() - cfSes.roto < 120000) return false;
+        return !!cfSes.modulos[m];
+    }
+    // Cuentas por cobrar, Gestión de asistencia y Horarios de trabajo (las mismas cuentas NOMFB que con Firebase)
+    async function cfPerResponder(p) {
+        if (!cfModuloEncendido('personal')) return null;
+        try {
+            const t0 = performance.now(), x = await cfLeerAlDia(PERVIVO_HOJAS_DE[p.action], PERVIVO_AREAS[p.action]);
+            if (!x) return null;
+            const D = await cfDocs(['config/nomina', 'vista/personas']);
+            const r = NOMFB.responder(p, x.H, D['config/nomina'] || {}, D['vista/personas'] || []);
+            if (r) anotarTiempo(p.action + ' (Cloudflare)', Math.round(performance.now() - t0), 0, true);
+            return r;
+        } catch (e) { cfSes.roto = Date.now(); console.log('Servidor nuevo (Cloudflare): ' + e.message + ' (se usa lo de antes)'); return null; }
+    }
+    // Nómina de la semana (NOMFB.calcular, igual que con Firebase)
+    const CF_NOM_AREAS = ['per', 'asis', 'cuadre', 'alm'];
+    async function cfNomTraer(sem) {
+        if (!permisos.includes('nomina') || !cfModuloEncendido('nomina')) return null;
+        try {
+            const t0 = performance.now(), x = await cfLeerAlDia(NOMFB.HOJAS, CF_NOM_AREAS);
+            if (!x) return null;
+            const D = await cfDocs(['config/nomina', 'vista/trabajadores']);
+            const r = NOMFB.calcular(sem, x.H, D['config/nomina'], D['vista/trabajadores']);
+            anotarTiempo('nom_semana (Cloudflare)', Math.round(performance.now() - t0), 0, true);
+            return r;
+        } catch (e) { cfSes.roto = Date.now(); console.log('Servidor nuevo (Cloudflare): ' + e.message + ' (se usa lo de antes)'); return null; }
+    }
+    // Almacén y compras (las mismas cuentas ALMFB que con Firebase; cada persona lee solo las hojas de su grupo)
+    async function cfAlmResponder(p, grupo) {
+        if (!cfModuloEncendido('almacen')) return null;
+        try {
+            const t0 = performance.now(), x = await cfLeerAlDia(ALMVIVO_HOJAS_DE[grupo], ['alm', 'per']);
+            if (!x) return null;
+            const D = await cfDocs(['config/almacen']), r = ALMFB.responder(p, x.H, D['config/almacen'] || {});
+            if (r) anotarTiempo(p.action + ' (Cloudflare)', Math.round(performance.now() - t0), 0, true);
+            return r;
+        } catch (e) { cfSes.roto = Date.now(); console.log('Servidor nuevo (Cloudflare): ' + e.message + ' (se usa lo de antes)'); return null; }
+    }
+    // Requerimientos de charcutería (REQFB)
+    async function cfReqResponder(p) {
+        if (reqDirecto.s.saltar || !almVivoTiene('reqcharcu') || !cfModuloEncendido('req')) return null;
+        try {
+            const t0 = performance.now(), x = await cfLeerAlDia(REQ_HOJAS, ['req']);
+            if (!x) return null;
+            const r = REQFB.responder(p, x.H);
+            if (r) anotarTiempo(p.action + ' (Cloudflare)', Math.round(performance.now() - t0), 0, true);
+            return r;
+        } catch (e) { cfSes.roto = Date.now(); console.log('Servidor nuevo (Cloudflare): ' + e.message + ' (se usa lo de antes)'); return null; }
+    }
+    // Comparar Almacén, Compras y Requerimientos (servidor nuevo vs Google)
+    async function cfAlmComparar(btn) {
+        const texto = btn.textContent; btnCargando(btn, 'Comparando...');
+        const partes = []; let error = '', leer = 0, alDia = true;
+        const verAlm = almVivoHojas().length > 0, verReq = almVivoTiene('reqcharcu');
+        try {
+            await DATOS.aGoogle(() => llamarApi({ action: 'cf_sync' }));
+            await cfModulos();
+            if (!verAlm && !verReq) throw new Error('Su clave no tiene Almacén, Compras ni Requerimientos.');
+            const fuera = ['ms', '_ver', 'hora', 'ok', 'sinInventario', 'yaRegistrado', 'pasos', '_cf'];
+            // Cada grupo por su cuenta: si uno no se puede leer, el otro igual se compara
+            const leerGrupo = async (hojas, docs, areas) => {
+                const t0 = performance.now(), x = await CFH.leer(hojas), D = docs.length ? await cfDocs(docs) : {};
+                leer += Math.round(performance.now() - t0); if (!cfAlDia(x.ver, areas)) alDia = false;
+                return Object.assign(x, { D });
+            };
+            let A = null, R = null;
+            if (verAlm) try { A = await leerGrupo(almVivoHojas(), ['config/almacen'], ['alm', 'per']); } catch (e) { partes.push({ parte: 'Almacén y compras', igual: false, detalle: e.message }); }
+            if (verReq) try { R = await leerGrupo(REQ_HOJAS, [], ['req']); } catch (e) { partes.push({ parte: 'Requerimientos', igual: false, detalle: e.message }); }
+            if (A) {
+                const H = A.H, D = A.D;
+                const pedidos = [['Datos', { action: 'alm_datos' }], ['Últimas notas', { action: 'alm_notas', ultimas: true }], ['Últimas operaciones', { action: 'alm_ingresos', ultimas: true }],
+                                 ['Existencias', { action: 'alm_existencias' }], ['Órdenes pendientes', { action: 'cmp_ordenes', ver: 'pendientes' }],
+                                 ['Órdenes completas', { action: 'cmp_ordenes', ver: 'completas' }], ['Historial de precios', { action: 'cmp_ordenes', ver: 'historial', desde: '2000-01-01', hasta: '2100-12-31' }],
+                                 ['Compras', { action: 'cmp_compras' }], ['Compras en curso', { action: 'cmp_borradores' }]].filter(([, p]) => almVivoGrupo(p.action));
+                almVivoSaltar++;
+                try { for (const [titulo, p] of pedidos) cfDiferencias(ALMFB.responder(p, H, D['config/almacen'] || {}), await DATOS.aGoogle(() => llamarApi(p)), titulo, partes, fuera); }
+                finally { almVivoSaltar--; }
+            }
+            if (R) {
+                const H = R.H;
+                reqDirecto.s.saltar++;
+                try {
+                    const d = REQFB.responder({ action: 'req_datos' }, H), periodos = (d.periodos || []).map(y => y.periodo);
+                    for (const [titulo, p] of [['Requerimientos · datos', { action: 'req_datos' }], ['Requerimientos · ventas', { action: 'req_ventas', periodos }], ['Requerimientos · historial', { action: 'req_historial' }]])
+                        cfDiferencias(REQFB.responder(p, H), await DATOS.aGoogle(() => llamarApi(p)), titulo, partes, fuera);
+                } finally { reqDirecto.s.saltar--; }
+            }
+        } catch (e) { error = e.message; }
+        finally { btn.disabled = false; btn.textContent = texto; }
+        const bien = !error && partes.length && partes.every(p => p.igual), m = cfSes.modulos || {};
+        cfDialogo('Almacén, compras y requerimientos: servidor nuevo (Cloudflare)',
+            `Leer del servidor nuevo: ${(leer / 1000).toFixed(2).replace('.', ',')} s.${alDia ? '' : ' (La copia todavía no tenía el último cambio: espere un minuto y compare otra vez.)'} Cada persona lee solo lo que sus permisos le dejan ver; quien solo factura sigue como antes. Guardar sigue por Google.`,
+            error, partes, (verAlm ? [{ modulo: 'almacen', texto: 'Leer Almacén y Compras del servidor nuevo', encendido: !!m.almacen }] : [])
+                .concat(verReq ? [{ modulo: 'req', texto: 'Leer Requerimientos de charcutería del servidor nuevo', encendido: !!m.req }] : []), bien);
+    }
+    // (15/11) Efectivo y caja chica: la copia del servidor nuevo, mes por mes y movimiento por movimiento, contra Firebase (lo oficial
+    // hoy). El efectivo ya no lee de Google (escucha Firebase en vivo); esta copia es la base para que después GUARDE en el servidor nuevo.
+    async function cfEfeComparar(btn) {
+        const texto = btn.textContent; btnCargando(btn, 'Comparando...');
+        const partes = []; let error = '', leer = 0, nMov = 0;
+        try {
+            const cols = permisos.includes('efectivo') || esPrincipal ? ['flujo', 'caja'] : permisos.includes('cajachica') ? ['caja'] : [];
+            if (!cols.length) throw new Error('Su clave no tiene Control de efectivo ni Caja chica.');
+            await DATOS.aGoogle(() => llamarApi({ action: 'cf_sync' }));
+            const t = await cfToken(), { db, lib } = await FB.listo();
+            for (const col of cols) {
+                const t0 = performance.now(), r = await cfPedir({ action: 'docs_listar', token: t, col });
+                if (!r.ok) throw new Error(r.error || 'sin respuesta');
+                leer += Math.round(performance.now() - t0);
+                const cf = {}; Object.keys(r.docs).forEach(ruta => { cf[ruta.split('/')[1]] = (JSON.parse(r.docs[ruta]) || {}).m || {}; });
+                const s = await lib.fs.getDocsFromServer(lib.fs.collection(db, col)), fb = {};
+                s.docs.forEach(x => { fb[x.id] = (x.data() || {}).m || {}; });
+                const nombre = col === 'flujo' ? 'Flujo de efectivo' : 'Caja chica';
+                [...new Set(Object.keys(cf).concat(Object.keys(fb)))].sort().forEach(mes => {
+                    const a = cf[mes], b = fb[mes], parte = nombre + ' · ' + mes;
+                    if (!a) { partes.push({ parte, igual: false, detalle: 'No está en el servidor nuevo' }); return; }
+                    if (!b) { partes.push({ parte, igual: false, detalle: 'Está en el servidor nuevo pero no en Firebase' }); return; }
+                    const ids = [...new Set(Object.keys(a).concat(Object.keys(b)))], malo = ids.find(id => jsonOrdenado(a[id]) !== jsonOrdenado(b[id]));
+                    nMov += Object.keys(b).length;
+                    if (!malo) partes.push({ parte, igual: true, n: Object.keys(b).length + ' movimientos' });
+                    else partes.push({ parte, igual: false, detalle: `${malo}: Servidor nuevo ${jsonOrdenado(a[malo] || null).slice(0, 140)} · Firebase ${jsonOrdenado(b[malo] || null).slice(0, 140)}` });
+                });
+            }
+        } catch (e) { error = e.code || e.message; }
+        finally { btn.disabled = false; btn.textContent = texto; }
+        const bien = !error && partes.length && partes.every(p => p.igual);
+        cfDialogo('Efectivo y caja chica: copia en el servidor nuevo (Cloudflare)',
+            `${fmtNum(nMov)} movimientos comparados uno por uno con Firebase. Leer del servidor nuevo: ${(leer / 1000).toFixed(2).replace('.', ',')} s.
+             El efectivo ya se lee en vivo desde Firebase (sin Google); esta copia se mantiene al día sola y es la base para que, en la próxima etapa, el efectivo se guarde en el servidor nuevo.`,
+            error, partes, [], bien, { bien: '✓ La copia es idéntica a Firebase.', mal: 'Hay diferencias: pulse "Pasar datos" y compare otra vez; si siguen, mándelas.' });
+    }
+    // (15/11, etapa 4b) El efectivo GUARDADO en el servidor nuevo. Encendido, todo lo del efectivo (panel, ficha, cuadre, campanita)
+    // se guarda y se lee allá; Firebase deja de usarse para el efectivo y la hoja recibe una copia una vez al día.
+    async function cfEfectivoAbrir(btn) {
+        const texto = btn.textContent; btnCargando(btn, 'Consultando...');
+        let e = null, error = '';
+        try { e = await DATOS.aGoogle(() => llamarApi({ action: 'cf_efectivo', estado: true })); } catch (x) { error = x.message; }
+        finally { btn.disabled = false; btn.textContent = texto; }
+        let fondo = document.getElementById('fbhDlg');
+        if (!fondo) { fondo = document.createElement('div'); fondo.id = 'fbhDlg'; fondo.className = 'req-dlg-fondo'; document.body.appendChild(fondo); }
+        fondo.onclick = ev => { if (ev.target === fondo) fondo.classList.add('hidden'); };
+        const on = !!(e && e.oficial);
+        fondo.innerHTML = `<div class="req-dlg" style="max-width:640px"><h3>Efectivo y caja chica en el servidor nuevo</h3>
+            ${error ? `<div class="banner error" style="display:block">${esc(error)}</div>` : `
+            <div class="req-sub">${on ? 'El servidor nuevo (Cloudflare) es el oficial del efectivo.' : 'Hoy el efectivo se guarda en Google (Firebase).'}</div>
+            <div class="nota">Al encender: lo último de Firebase pasa al servidor nuevo, se compara movimiento por movimiento y solo si todo es igual queda encendido.
+                Desde ese momento todo lo del efectivo (gastos, caja chica, recibidos, envíos de las fichas, correcciones del cuadre) se guarda allá.
+                Firebase deja de usarse para el efectivo y las hojas FLUJO DE EFECTIVO y CAJA CHICA reciben una copia una vez al día (de madrugada).<br>
+                "Volver a Google" copia todo de vuelta a Firebase y a la hoja, y sigue como antes.</div>
+            <div class="kpis" style="margin-top:.5rem"><div class="kpi"><div class="k-label">Estado</div><div class="k-value">${on ? 'Encendido' : 'Apagado'}</div></div>
+                <div class="kpi"><div class="k-label">Última copia a la hoja</div><div class="k-value" style="font-size:1rem">${esc(e.ultimaCopia || '—')}</div></div></div>
+            <div class="login-error" id="cfEfeError"></div>
+            <div class="req-acciones" style="justify-content:flex-end">
+                ${on ? `<button type="button" class="btn-ghost btn-mini" onclick="cfEfectivoCambiar(this, 'copiar')">Copiar a la hoja ahora</button>
+                        <button type="button" class="btn-ghost btn-mini" onclick="cfEfectivoCambiar(this, 'volver')">Volver a Google</button>`
+                     : `<button type="button" class="btn-primary btn-mini" onclick="cfEfectivoCambiar(this, 'encender')" ${e.verdad ? '' : 'disabled title="El efectivo tiene que estar en Firebase como oficial"'}>Encender</button>`}
+            </div>`}
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-primary" onclick="document.getElementById('fbhDlg').classList.add('hidden')">Cerrar</button></div></div>`;
+        fondo.classList.remove('hidden');
+    }
+    // (15/11, etapa 5) Las hojas de cada grupo con el servidor nuevo como oficial (Firebase deja de usarse; la hoja de Google, copia del día)
+    async function cfHojasAbrir(btn) {
+        const texto = btn ? btn.textContent : ''; if (btn) btnCargando(btn, 'Consultando...');
+        let e = null, error = '';
+        try { e = await DATOS.aGoogle(() => llamarApi({ action: 'cf_hojas', que: 'estado' })); } catch (x) { error = x.message; }
+        finally { if (btn) { btn.disabled = false; btn.textContent = texto; } }
+        let fondo = document.getElementById('fbhDlg');
+        if (!fondo) { fondo = document.createElement('div'); fondo.id = 'fbhDlg'; fondo.className = 'req-dlg-fondo'; document.body.appendChild(fondo); }
+        fondo.onclick = ev => { if (ev.target === fondo) fondo.classList.add('hidden'); };
+        const donde = g => g.cf ? '<span class="chip st-ok">Servidor nuevo</span>' : g.fs ? '<span class="chip st-info">Firebase</span>' : '<span class="chip st-pend">Hoja de Google</span>';
+        fondo.innerHTML = `<div class="req-dlg" style="max-width:760px"><h3>Hojas en el servidor nuevo</h3>
+            ${error ? `<div class="banner error" style="display:block">${esc(error)}</div>` : `
+            <div class="nota">"Pasar" envía cada hoja del grupo desde Firebase, compara cada parte y, solo si todo quedó idéntico, el servidor nuevo pasa a ser el oficial:
+                todo lo que se guarde en esas hojas (facturar, abonos, fichas, nómina...) se guarda allá. Firebase deja de usarse para ellas y la hoja de Google recibe una copia
+                una vez al día (de madrugada). "Volver a Firebase" lo deshace. Mientras se pasa un grupo nadie puede guardar en él (unos segundos).</div>
+            <div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Grupo</th><th class="izq">Dónde está</th><th></th></tr></thead><tbody>
+            ${e.grupos.map(g => `<tr><td class="izq">${esc(g.nombre)}</td><td class="izq">${donde(g)}</td><td>${g.cf
+                ? `<button type="button" class="btn-ghost btn-mini" onclick="cfHojasCambiar(this, 'volver', '${g.grupo}')">Volver a Firebase</button>`
+                : g.fs ? `<button type="button" class="btn-primary btn-mini" onclick="cfHojasCambiar(this, 'pasar', '${g.grupo}')">Pasar</button>` : '<small>Primero a Firebase</small>'}</td></tr>`).join('')}
+            </tbody></table></div>
+            <div class="req-sub" style="margin-top:.5rem">Última copia a la hoja de Google: ${esc(e.ultimaCopia || '—')}</div>
+            <div class="login-error" id="cfHojasError"></div>
+            <div class="req-acciones" style="justify-content:flex-end">
+                ${e.grupos.some(g => !g.cf && g.fs) ? `<button type="button" class="btn-ghost btn-mini" onclick="cfHojasCambiar(this, 'todos')">Pasar todos</button>` : ''}
+                ${e.grupos.some(g => g.cf) ? `<button type="button" class="btn-ghost btn-mini" onclick="cfHojasCambiar(this, 'copiar')">Copiar a la hoja ahora</button>` : ''}</div>`}
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-primary" onclick="document.getElementById('fbhDlg').classList.add('hidden')">Cerrar</button></div></div>`;
+        fondo.classList.remove('hidden');
+    }
+    async function cfHojasCambiar(btn, que, grupo) {
+        const err = document.getElementById('cfHojasError'); if (err) err.textContent = '';
+        if (que === 'volver' && !confirm('¿Volver este grupo a Firebase? Lo del servidor nuevo se copia a la hoja de Google y de ahí a Firebase.')) return;
+        if (que === 'todos' && !confirm('¿Pasar todos los grupos al servidor nuevo, uno por uno? Cada grupo se compara antes; si alguno no queda igual, ese se queda en Firebase.')) return;
+        const texto = btn.textContent; btnCargando(btn, que === 'copiar' ? 'Copiando...' : que === 'volver' ? 'Volviendo...' : 'Pasando y comparando...');
+        try {
+            if (que === 'copiar') {
+                const r = await DATOS.aGoogle(() => llamarApi({ action: 'cf_hojas', que: 'copiar' })), n = Object.values(r.copia || {}).reduce((s, x) => s + (Number(x) || 0), 0);
+                mostrarBanner(`Copia a la hoja de Google hecha: ${fmtNum(n)} fila${n === 1 ? '' : 's'} al día.`, 'ok');
+            } else if (que === 'todos') {
+                const e = await DATOS.aGoogle(() => llamarApi({ action: 'cf_hojas', que: 'estado' })), hechos = [], fallas = [];
+                for (const g of e.grupos.filter(x => !x.cf && x.fs)) {
+                    btnCargando(btn, 'Pasando ' + g.nombre.split(' (')[0] + '...');
+                    try { await DATOS.aGoogle(() => llamarApi({ action: 'cf_hojas', que: 'pasar', grupo: g.grupo, claveAdmin: clave })); hechos.push(g.nombre.split(' (')[0]); }
+                    catch (x) { fallas.push(g.nombre.split(' (')[0] + ': ' + x.message); }
+                }
+                mostrarBanner(`Pasados al servidor nuevo: ${hechos.join(', ') || 'ninguno'}.${fallas.length ? ' No se pasaron: ' + fallas.join(' · ') : ''}`, fallas.length ? 'warn' : 'ok');
+            } else {
+                const r = await DATOS.aGoogle(() => llamarApi({ action: 'cf_hojas', que, grupo, claveAdmin: clave }));
+                mostrarBanner(que === 'pasar' ? `Listo: ${Object.keys(r.hojas || {}).length} hojas ya se guardan en el servidor nuevo (todas iguales a Firebase).` : 'Listo: el grupo volvió a Firebase.', 'ok');
+            }
+            CFH.olvidar(); DATOS.olvidarAreas && DATOS.olvidarAreas('cuadre');
+            await cfHojasAbrir(null);
+        } catch (x) { if (err) err.textContent = x.message; btn.disabled = false; btn.textContent = texto; }
+    }
+    async function cfEfectivoCambiar(btn, que) {
+        const err = document.getElementById('cfEfeError'); if (err) err.textContent = '';
+        if (que === 'encender' && !confirm('¿Pasar el efectivo y la caja chica al servidor nuevo? Desde ahora se guardarán allá. Si algo no cuadra, se puede volver a Google aquí mismo.')) return;
+        if (que === 'volver' && !confirm('¿Volver a guardar el efectivo en Google (Firebase)? Todo lo del servidor nuevo se copia de vuelta.')) return;
+        btnCargando(btn, que === 'copiar' ? 'Copiando...' : que === 'encender' ? 'Pasando y comparando...' : 'Volviendo...');
+        try {
+            const r = await DATOS.aGoogle(() => llamarApi(que === 'copiar' ? { action: 'cf_efectivo', copiar: true } : { action: 'cf_efectivo', activar: que === 'encender', claveAdmin: clave }));
+            mostrarBanner(que === 'encender' ? `Listo: el efectivo se guarda ahora en el servidor nuevo (${fmtNum(r.movimientos || 0)} movimientos, todos iguales a Firebase).`
+                        : que === 'volver' ? `El efectivo vuelve a guardarse en Google (${r.meses} meses copiados a Firebase).`
+                        : `Copia a la hoja hecha: ${r.copia.flujo} cambios en el flujo, ${r.copia.caja} en caja chica, ${r.copia.borradas} quitados, ${r.copia.bitacora} en la bitácora.`, 'ok');
+            document.getElementById('fbhDlg').classList.add('hidden');
+            if (/^(efectivo|cajachica)$/.test(vistaActual)) efeCargar();
+        } catch (x) { if (err) err.textContent = x.message; btn.disabled = false; btn.textContent = que === 'copiar' ? 'Copiar a la hoja ahora' : que === 'encender' ? 'Encender' : 'Volver a Google'; }
+    }
+    // ---------- (15/11) El panel guarda y lee el EFECTIVO directo en el servidor nuevo ----------
+    // Mismas acciones y respuestas que Google (el servidor nuevo tiene las mismas reglas). La foto se sube antes a Google (Drive) y
+    // va la dirección. Si el servidor nuevo no responde por la red, se usa el camino de Google, que guarda en el mismo servidor nuevo
+    // (el efectivo nunca queda en dos lugares) con el mismo ID: si el primero sí alcanzó a guardarse, no se repite.
+    // "Modificar monto por llegar" sigue por Google (cambia también el cuadre y el flujo general).
+    const CFEFE_ACC = /^(efe_(listar|marcar|egreso|externo|verificar|verificar_lote|desverificar|eliminar)|cc_(listar|registrar|verificar|verificar_lote|desverificar|eliminar))$/;
+    const cfEfeIds = new Map();   // pedido -> ID del movimiento (si se reintenta el mismo, lleva el mismo ID y no queda doble)
+    async function cfEfeResponder(p) {
+        if (!clave) return null;
+        // ¿Encendido? La primera vez se espera la respuesta (el efectivo no debe ir a otro lado si ya está allá)
+        if (!cfSes.modulos || Date.now() - cfSes.modHora > 300000) { try { await cfModulos(); } catch (e) {} }
+        if (!(cfSes.modulos || {}).efectivo) return null;
+        const t0 = performance.now(), datos = Object.assign({}, p), registra = /^(efe_egreso|efe_externo|cc_registrar)$/.test(p.action);
+        if (registra && !datos.idPanel) {
+            const k = JSON.stringify(Object.assign({}, p, { comprobante: p.comprobante ? (p.comprobante.nombre || 'foto') + (p.comprobante.base64 || '').length : null }));
+            if (!cfEfeIds.has(k)) cfEfeIds.set(k, (p.action === 'cc_registrar' ? 'c' : p.action === 'efe_externo' ? 'x' : 'e') + Date.now().toString(36) + Math.random().toString(36).slice(2, 6));
+            datos.idPanel = cfEfeIds.get(k); datos.__k = k;
+        }
+        // La foto primero (Google la guarda en Drive y devuelve su dirección)
+        if (datos.comprobante && datos.comprobante.base64) {
+            const f = await llamarApiReal({ action: 'cf_foto', comprobante: datos.comprobante, fecha: datos.fecha, moneda: datos.moneda || (datos.usd && !datos.bs ? '$' : 'Bs'),
+                                            monto: datos.monto || datos.bs || datos.usd, concepto: datos.concepto }, performance.now());
+            if (p.action === 'cc_registrar') datos.comprobanteUrl = f.url; else datos.fotoUrl = f.url;
+        }
+        delete datos.comprobante;
+        const k = datos.__k; delete datos.__k;
+        let r;
+        try {
+            r = await cfPedir(Object.assign({}, datos, { token: await cfToken() }));
+            if (r && r.sesion === false) { cfSes.token = ''; r = await cfPedir(Object.assign({}, datos, { token: await cfToken() })); }
+        } catch (e) {
+            // Sin respuesta del servidor nuevo (red): por Google, que guarda en el mismo lugar y con el mismo ID
+            console.log('Servidor nuevo sin respuesta (' + e.message + '): el efectivo va por Google');
+            return llamarApiReal(datos, performance.now());
+        }
+        if (r && r.noAqui) { cfSes.modulos = Object.assign({}, cfSes.modulos, { efectivo: false }); return null; }   // lo apagaron: por Google
+        if (!r || !r.ok) throw new Error((r && r.error) || 'El servidor nuevo no respondió');
+        if (k) cfEfeIds.delete(k);
+        anotarTiempo(p.action + ' (Cloudflare)', performance.now() - t0, typeof r.ms === 'number' ? r.ms : null, true);
+        cfVivoIniciar();
+        return r;
+    }
+    // Avisos al instante: el servidor nuevo avisa por una conexión abierta (WebSocket) cuando el efectivo cambió en otro equipo
+    let cfWs = null, cfWsVer = null, cfWsReintento = 0;
+    function cfVivoIniciar() {
+        if (cfWs || !clave) return;
+        cfWs = 'abriendo';
+        cfToken().then(t => {
+            const ws = new WebSocket(CF_URL.replace(/^http/, 'ws') + '/vivo?empresa=' + CF_EMPRESA + '&token=' + encodeURIComponent(t));
+            cfWs = ws;
+            ws.onopen = () => { cfWsReintento = 0; };
+            ws.onmessage = ev => {
+                let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+                // (15/11) Avisos al instante de todas las áreas (antes por Firebase, vivo/versiones): lo mismo que hacía su escucha
+                if (m.tipo === 'google') {
+                    const ver = {}; AREAS_VIVO.forEach(k => { if (m.v && m.v[k]) ver[k] = String(m.v[k]); });
+                    vivoFbVer = ver;
+                    setTimeout(vivoRevisar, 50);
+                    const firma = AREAS_VIVO.map(k => ver[k] || '').join('|');
+                    if (vivoPendVer && firma !== vivoPendVer && typeof pendRevisar === 'function') setTimeout(() => pendRevisar(true), 1500);
+                    vivoPendVer = firma;
+                    return;
+                }
+                if (m.tipo === 'pend') { if (typeof pendRevisar === 'function') pendRevisar(true); return; }   // cambió la campanita
+                if (m.tipo !== 'versiones') return;
+                const v = Number((m.v || {}).efe || 0);
+                if (cfWsVer !== null && v !== cfWsVer) cfEfeCambio();
+                cfWsVer = v;
+            };
+            ws.onclose = () => {
+                cfWs = null;
+                if (!vivoFbOff) vivoFbVer = null;   // sin conexión: los avisos vuelven a preguntarse a Google cada 30 s hasta que se reconecte
+                if (clave) setTimeout(cfVivoIniciar, Math.min(60000, 3000 * (++cfWsReintento)));
+            };
+        }).catch(() => { cfWs = null; });
+    }
+    // Llegó un cambio del efectivo: se vuelve a leer (sin molestar si se está escribiendo o hay una lista abierta)
+    let cfEfeCambioT = 0;
+    function cfEfeCambio() {
+        if (!/^(efectivo|cajachica)$/.test(vistaActual)) return;
+        clearTimeout(cfEfeCambioT);
+        cfEfeCambioT = setTimeout(function intentar() {
+            if (!/^(efectivo|cajachica)$/.test(vistaActual)) return;
+            // La misma regla que efeFbRedibujar: solo cambian las tablas y los totales (lo que se escribe no se pierde); se espera
+            // únicamente si la pestaña está escondida o hay una lista desplegable abierta
+            const a = document.activeElement;
+            if (document.visibilityState !== 'visible' || (a && a.tagName === 'SELECT')) { cfEfeCambioT = setTimeout(intentar, 1500); return; }
+            DATOS.aGoogle(() => efeCargar()).catch(() => {});
+        }, 400);
+    }
+    async function cfNomHistorial(p) {
+        if (!(permisos.includes('nomina') || permisos.includes('pagonomina') || esPrincipal) || !cfModuloEncendido('nomina')) return null;
+        try {
+            const t0 = performance.now(), x = await cfLeerAlDia(['BD PAGOS NOMINA'], ['per']);
+            if (!x) return null;
+            const r = NOMFB.historial(x.H, p);
+            anotarTiempo('nom_historial (Cloudflare)', Math.round(performance.now() - t0), 0, true);
+            return r;
+        } catch (e) { cfSes.roto = Date.now(); console.log('Servidor nuevo (Cloudflare): ' + e.message + ' (se usa lo de antes)'); return null; }
+    }
+    // Después de cada guardado (la respuesta trae _cf): Google envía al servidor nuevo lo que cambió, sin demorar el guardado
+    let cfSyncT = 0;
+    function cfSyncPronto() { clearTimeout(cfSyncT); cfSyncT = setTimeout(() => { llamarApi({ action: 'cf_sync' }).catch(() => {}); }, 800); }
+    // Comparar (administradores): lo que calcula el panel con las hojas del servidor nuevo contra lo que responde Google
+    async function cfCajaComparar(btn) {
+        const texto = btn.textContent; btnCargando(btn, 'Comparando...');
+        const partes = []; let error = '', periodo = '', leer = 0, alDia = true, encendido = false;
+        try {
+            await DATOS.aGoogle(() => llamarApi({ action: 'cf_sync' }));   // primero, que el servidor nuevo tenga lo último
+            await cfModulos(); encendido = !!(cfSes.modulos || {}).caja;
+            const hojas = [...new Set(Object.keys(CAJAVIVO_HOJAS_DE).filter(cajaVivoPermite).flatMap(a => CAJAVIVO_HOJAS_DE[a]))];
+            const t0 = performance.now(), x = await CFH.leer(hojas), H = x.H; leer = Math.round(performance.now() - t0);
+            alDia = cfAlDia(x.ver, ['cuadre', 'per']);
+            const fuera = ['ms', '_ver', 'ok', 'pasos', '_cf'];
+            const puede = a => cajaVivoPermite(a) && CAJAVIVO_HOJAS_DE[a].every(n => hojas.includes(n));
+            const sumar = (iso, n) => { const p = iso.split('-').map(Number); return new Date(Date.UTC(p[0], p[1] - 1, p[2] + n)).toISOString().slice(0, 10); };
+            let hasta = fechaLocalHoy();
+            if (H['BASE DE DATOS CUADRE DE CAJA']) hasta = CAJAFB.responder({ action: 'list', desde: '2000-01-01' }, H).ultimaFecha || hasta;
+            const desde = sumar(hasta, -6); periodo = fechaBonita(desde) + ' al ' + fechaBonita(hasta);
+            const pedidos = [['Cajas', { action: 'list', desde, hasta }], ['Desglose de las cajas', { action: 'cuadre_detalle_lote', desde, hasta }],
+                             ['Movimientos del banco', { action: 'mov_listar', desde, hasta }], ['Conciliación', { action: 'conc_listar', desde, hasta }]].filter(([, p]) => puede(p.action));
+            if (puede('cuadre_detalle')) {
+                const l = CAJAFB.responder({ action: 'list', desde, hasta }, H).filas, f = l[l.length - 1];
+                if (f) pedidos.splice(2, 0, ['Desglose de una caja', { action: 'cuadre_detalle', fila: f.fila, control: { tienda: f.tienda, cajero: f.cajero, turno: f.turno, fecha: f.fecha } }]);
+            }
+            cajaVivoSaltar++;
+            try {
+                for (const [titulo, p] of pedidos) {
+                    const cf = CAJAFB.responder(p, H) || {}, g = await DATOS.aGoogle(() => llamarApi(p));
+                    [...new Set(Object.keys(cf).concat(Object.keys(g)))].filter(k => !fuera.includes(k)).forEach(k => {
+                        const a = cf[k], b = g[k], ja = jsonOrdenado(a), jb = jsonOrdenado(b), parte = titulo + ' · ' + k;
+                        if (ja === jb) { partes.push({ parte, igual: true, n: Array.isArray(a) ? a.length : a && typeof a === 'object' ? Object.keys(a).length : String(a) }); return; }
+                        let detalle;
+                        if (Array.isArray(a) && Array.isArray(b) && a.length !== b.length) detalle = `Servidor nuevo ${a.length} · Google ${b.length}`;
+                        else if (Array.isArray(a) && Array.isArray(b)) { const i = a.findIndex((y, j) => jsonOrdenado(y) !== jsonOrdenado(b[j])); detalle = `#${i + 1}: Servidor nuevo ${jsonOrdenado(a[i]).slice(0, 160)} · Google ${jsonOrdenado(b[i]).slice(0, 160)}`; }
+                        else if (a && b && typeof a === 'object') { const c = [...new Set(Object.keys(a).concat(Object.keys(b)))].find(y => jsonOrdenado(a[y]) !== jsonOrdenado(b[y])); detalle = `${c}: Servidor nuevo ${String(jsonOrdenado(a[c])).slice(0, 140)} · Google ${String(jsonOrdenado(b[c])).slice(0, 140)}`; }
+                        else detalle = `Servidor nuevo ${String(ja).slice(0, 140)} · Google ${String(jb).slice(0, 140)}`;
+                        partes.push({ parte, igual: false, detalle });
+                    });
+                }
+            } finally { cajaVivoSaltar--; }
+        } catch (e) { error = e.message; }
+        finally { btn.disabled = false; btn.textContent = texto; }
+        const bien = !error && partes.length && partes.every(p => p.igual);
+        let fondo = document.getElementById('fbhDlg');
+        if (!fondo) { fondo = document.createElement('div'); fondo.id = 'fbhDlg'; fondo.className = 'req-dlg-fondo'; document.body.appendChild(fondo); }
+        fondo.onclick = e => { if (e.target === fondo) fondo.classList.add('hidden'); };
+        fondo.innerHTML = `<div class="req-dlg" style="max-width:760px"><h3>Cuadre de caja y Validar pagos: servidor nuevo (Cloudflare)</h3>
+            <div class="req-sub">${error ? 'No se pudo comparar.' : bien ? '✓ Todo sale igual que en Google.' : 'Hay diferencias: no conviene encenderlo todavía.'}${periodo ? ' Semana comparada: ' + esc(periodo) + '.' : ''}
+                Leer las hojas del servidor nuevo: ${(leer / 1000).toFixed(2).replace('.', ',')} s.${alDia ? '' : ' (La copia todavía no tenía el último cambio: espere un minuto y compare otra vez.)'}
+                Cada persona lee solo lo que sus permisos le dejan ver. Validar, guardar y corregir siguen por Google.</div>
+            ${error ? `<div class="banner error" style="display:block">${esc(error)}</div>` : `<div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><tbody>${partes.map(p => `<tr><td class="izq">${p.igual ? '<span class="chip st-ok">Igual</span>' : '<span class="chip st-sobra">Distinto</span>'}</td><td class="izq">${esc(p.parte)}<small>${esc(p.igual ? String(p.n) : p.detalle)}</small></td></tr>`).join('')}</tbody></table></div>`}
+            <div class="fb-ind" style="margin-top:1rem"><span>Leer Cuadre de caja, Validar pagos y Conciliación del servidor nuevo</span><b>${encendido ? 'Encendido' : 'Apagado'}</b>
+                ${encendido ? '<button type="button" class="btn-ghost btn-mini" onclick="cfCajaDirecta(this, false)">Apagar (volver a lo de antes)</button>'
+                            : `<button type="button" class="btn-primary btn-mini" onclick="cfCajaDirecta(this, true)" ${bien ? '' : 'title="Hay diferencias: revíselas antes de encenderlo"'}>Encender</button>`}</div>
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-primary" onclick="document.getElementById('fbhDlg').classList.add('hidden')">Cerrar</button></div></div>`;
+        fondo.classList.remove('hidden');
+    }
+    async function cfCajaDirecta(btn, activar) {
+        if (activar && !confirm('¿Leer Cuadre de caja, Validar pagos y Conciliación del servidor nuevo (Cloudflare)? Vale para todos los paneles en unos minutos. Validar y guardar sigue igual. Se puede apagar aquí mismo en cualquier momento.')) return;
+        btnCargando(btn, activar ? 'Encendiendo...' : 'Apagando...');
+        try {
+            const t = await cfToken(), r = await cfPedir({ action: 'modulo_directo', token: t, claveAdmin: clave, modulo: 'caja', activar });
+            if (!r.ok) throw new Error(r.error);
+            cfSes.modulos = (r.empresa || {}).modulos || {}; cfSes.modHora = Date.now(); cfSes.roto = 0; CFH.olvidar();
+            mostrarBanner(activar ? 'Cuadre y Validar pagos se leen ahora del servidor nuevo.' : 'Cuadre y Validar pagos vuelven a leerse como antes.', 'ok');
+            document.getElementById('fbhDlg').classList.add('hidden');
+        } catch (e) { mostrarBanner('No se pudo cambiar: ' + e.message, 'error'); btn.disabled = false; btn.textContent = activar ? 'Encender' : 'Apagar (volver a lo de antes)'; }
+    }
+    // Compara una respuesta calculada con el servidor nuevo contra la de Google, parte por parte (lo mismo que los "Comparar" de Firebase)
+    function cfDiferencias(cf, g, titulo, partes, fuera) {
+        [...new Set(Object.keys(cf || {}).concat(Object.keys(g || {})))].filter(k => !(fuera || []).includes(k)).forEach(k => {
+            const a = (cf || {})[k], b = (g || {})[k], ja = jsonOrdenado(a), jb = jsonOrdenado(b), parte = titulo + ' · ' + k;
+            if (ja === jb) { partes.push({ parte, igual: true, n: Array.isArray(a) ? a.length : a && typeof a === 'object' ? Object.keys(a).length : String(a) }); return; }
+            let detalle;
+            if (Array.isArray(a) && Array.isArray(b) && a.length !== b.length) detalle = `Servidor nuevo ${a.length} · Google ${b.length}`;
+            else if (Array.isArray(a) && Array.isArray(b)) { const i = a.findIndex((y, j) => jsonOrdenado(y) !== jsonOrdenado(b[j])); detalle = `#${i + 1}: Servidor nuevo ${jsonOrdenado(a[i]).slice(0, 160)} · Google ${jsonOrdenado(b[i]).slice(0, 160)}`; }
+            else if (a && b && typeof a === 'object') { const c = [...new Set(Object.keys(a).concat(Object.keys(b)))].find(y => jsonOrdenado(a[y]) !== jsonOrdenado(b[y])); detalle = `${c}: Servidor nuevo ${String(jsonOrdenado(a[c])).slice(0, 140)} · Google ${String(jsonOrdenado(b[c])).slice(0, 140)}`; }
+            else detalle = `Servidor nuevo ${String(ja).slice(0, 140)} · Google ${String(jb).slice(0, 140)}`;
+            partes.push({ parte, igual: false, detalle });
+        });
+    }
+    // Ventana del resultado con los interruptores de cada módulo: [{ modulo, texto, encendido }]
+    function cfDialogo(titulo, sub, error, partes, interruptores, bien, textos) {
+        const tx = Object.assign({ bien: '✓ Todo sale igual que en Google.', mal: 'Hay diferencias: no conviene encenderlo todavía.' }, textos || {});
+        let fondo = document.getElementById('fbhDlg');
+        if (!fondo) { fondo = document.createElement('div'); fondo.id = 'fbhDlg'; fondo.className = 'req-dlg-fondo'; document.body.appendChild(fondo); }
+        fondo.onclick = e => { if (e.target === fondo) fondo.classList.add('hidden'); };
+        fondo.innerHTML = `<div class="req-dlg" style="max-width:760px"><h3>${esc(titulo)}</h3>
+            <div class="req-sub">${error ? 'No se pudo comparar.' : bien ? tx.bien : tx.mal} ${sub}</div>
+            ${error ? `<div class="banner error" style="display:block">${esc(error)}</div>` : `<div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><tbody>${partes.map(p => `<tr><td class="izq">${p.igual ? '<span class="chip st-ok">Igual</span>' : '<span class="chip st-sobra">Distinto</span>'}</td><td class="izq">${esc(p.parte)}<small>${esc(p.igual ? String(p.n) : p.detalle)}</small></td></tr>`).join('')}</tbody></table></div>`}
+            ${interruptores.map(x => `<div class="fb-ind" style="margin-top:1rem"><span>${esc(x.texto)}</span><b>${x.encendido ? 'Encendido' : 'Apagado'}</b>
+                ${x.encendido ? `<button type="button" class="btn-ghost btn-mini" onclick="cfModuloCambiar(this, '${x.modulo}', false)">Apagar (volver a lo de antes)</button>`
+                              : `<button type="button" class="btn-primary btn-mini" onclick="cfModuloCambiar(this, '${x.modulo}', true)" ${bien ? '' : 'title="Hay diferencias: revíselas antes de encenderlo"'}>Encender</button>`}</div>`).join('')}
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-primary" onclick="document.getElementById('fbhDlg').classList.add('hidden')">Cerrar</button></div></div>`;
+        fondo.classList.remove('hidden');
+    }
+    const CF_NOMBRE_MODULO = { caja: 'Cuadre de caja, Validar pagos y Conciliación', personal: 'Cuentas por cobrar, Gestión de asistencia y Horarios de trabajo', nomina: 'la Nómina',
+                               almacen: 'Almacén y Compras', req: 'Requerimientos de charcutería' };
+    async function cfModuloCambiar(btn, modulo, activar) {
+        if (activar && !confirm(`¿Leer ${CF_NOMBRE_MODULO[modulo]} del servidor nuevo (Cloudflare)? Vale para todos los paneles en unos minutos. Guardar sigue igual. Se puede apagar aquí mismo en cualquier momento.`)) return;
+        btnCargando(btn, activar ? 'Encendiendo...' : 'Apagando...');
+        try {
+            const t = await cfToken(), r = await cfPedir({ action: 'modulo_directo', token: t, claveAdmin: clave, modulo, activar });
+            if (!r.ok) throw new Error(r.error);
+            cfSes.modulos = (r.empresa || {}).modulos || {}; cfSes.modHora = Date.now(); cfSes.roto = 0; CFH.olvidar();
+            if (modulo === 'nomina') Object.keys(nomCache).forEach(k => delete nomCache[k]);
+            mostrarBanner(activar ? `${CF_NOMBRE_MODULO[modulo]}: se lee ahora del servidor nuevo.` : `${CF_NOMBRE_MODULO[modulo]}: vuelve a leerse como antes.`, 'ok');
+            btn.closest('.fb-ind').querySelector('b').textContent = activar ? 'Encendido' : 'Apagado';
+            btn.remove();
+        } catch (e) { mostrarBanner('No se pudo cambiar: ' + e.message, 'error'); btn.disabled = false; btn.textContent = activar ? 'Encender' : 'Apagar (volver a lo de antes)'; }
+    }
+    // Comparar Cuentas por cobrar, Gestión de asistencia, Horarios y Nómina (servidor nuevo vs Google)
+    async function cfPersonalComparar(btn) {
+        const texto = btn.textContent; btnCargando(btn, 'Comparando...');
+        const partes = []; let error = '', periodo = '', leer = 0, alDia = true;
+        try {
+            await DATOS.aGoogle(() => llamarApi({ action: 'cf_sync' }));
+            await cfModulos();
+            const acciones = Object.keys(PERVIVO_HOJAS_DE).filter(perVivoPermite);
+            const hojas = [...new Set(acciones.flatMap(a => PERVIVO_HOJAS_DE[a]).concat(permisos.includes('nomina') ? NOMFB.HOJAS : []))];
+            const rutas = ['config/nomina', 'vista/personas'].concat(permisos.includes('nomina') ? ['vista/trabajadores'] : []);
+            const t0 = performance.now(), x = await CFH.leer(hojas), D = await cfDocs(rutas), H = x.H; leer = Math.round(performance.now() - t0);
+            alDia = cfAlDia(x.ver, CF_NOM_AREAS);
+            const sumar = (iso, n) => { const p = iso.split('-').map(Number); return new Date(Date.UTC(p[0], p[1] - 1, p[2] + n)).toISOString().slice(0, 10); };
+            let ref = fechaLocalHoy();
+            if (H['BD ASISTENCIA']) ref = H['BD ASISTENCIA'].valores.reduce((m, r) => { const f = String(r[0] || '').slice(0, 10); return /^\d{4}-\d{2}-\d{2}$/.test(f) && f > m ? f : m; }, '') || ref;
+            const dia = new Date(ref + 'T12:00:00').getDay(), sabado = sumar(ref, -((dia + 1) % 7)), viernes = sumar(sabado, 6);
+            periodo = fechaBonita(sabado) + ' al ' + fechaBonita(viernes);
+            const pedidos = [['Cuentas por cobrar (pendientes)', { action: 'cxc_deudas' }], ['Cuentas por cobrar (histórico 30 días)', { action: 'cxc_deudas', historico: true, desde: sumar(viernes, -30), hasta: viernes }],
+                             ['Gestión de asistencia', { action: 'asisg_listar', desde: sabado, hasta: viernes }], ['Horarios de trabajo', { action: 'hor_datos', semana: sabado }]].filter(([, p]) => perVivoPermite(p.action));
+            perVivoSaltar++;
+            try {
+                for (const [titulo, p] of pedidos) cfDiferencias(NOMFB.responder(p, H, D['config/nomina'] || {}, D['vista/personas'] || []), await DATOS.aGoogle(() => llamarApi(p)), titulo, partes, ['ms', '_ver', 'ok', 'pasos', '_cf']);
+            } finally { perVivoSaltar--; }
+            if (permisos.includes('nomina')) {
+                const cf = NOMFB.calcular(sabado, H, D['config/nomina'], D['vista/trabajadores']), g = await DATOS.aGoogle(() => llamarApi({ action: 'nom_semana', semana: sabado }));
+                nomfbComparar(cf, g).forEach(p => partes.push(Object.assign(p, { parte: 'Nómina · ' + p.parte, detalle: p.detalle && p.detalle.replace(/Firebase/g, 'Servidor nuevo') })));
+            }
+        } catch (e) { error = e.message; }
+        finally { btn.disabled = false; btn.textContent = texto; }
+        const bien = !error && partes.length && partes.every(p => p.igual), m = cfSes.modulos || {};
+        cfDialogo('Cuentas por cobrar, asistencia, horarios y nómina: servidor nuevo (Cloudflare)',
+            `${periodo ? 'Semana comparada: ' + esc(periodo) + '. ' : ''}Leer del servidor nuevo: ${(leer / 1000).toFixed(2).replace('.', ',')} s.${alDia ? '' : ' (La copia todavía no tenía el último cambio: espere un minuto y compare otra vez.)'} Guardar sigue por Google.`,
+            error, partes, [{ modulo: 'personal', texto: 'Leer Cuentas por cobrar, Gestión de asistencia y Horarios del servidor nuevo', encendido: !!m.personal }]
+                .concat(permisos.includes('nomina') ? [{ modulo: 'nomina', texto: 'Calcular la Nómina con el servidor nuevo', encendido: !!m.nomina }] : []), bien);
     }
     // Modo comparar de Cuentas por cobrar, Gestión de asistencia y Horarios de trabajo (administradores)
     async function perfbComparar(btn) {
@@ -5637,13 +6250,22 @@
         out.innerHTML = `<div class="card" style="margin-top:.5rem">
             <h3 style="margin-top:0">Servidor nuevo (Cloudflare)</h3>
             <div class="nota">1) "Pasar claves" copia las personas, sus claves (cifradas, nadie las ve), las huellas y los grupos de Telegram al servidor nuevo. Se puede repetir: reemplaza lo anterior.<br>
-                2) "Probar entrada" entra al servidor nuevo con su clave y mide cuánto tarda desde este equipo. Nada del trabajo diario cambia.</div>
+                2) "Probar entrada" entra al servidor nuevo con su clave y mide cuánto tarda desde este equipo.<br>
+                3) "Pasar datos" copia todas las hojas y lo que está en Firebase (efectivo, cuentas por pagar, venta express) y compara cada parte: debe quedar idéntico. Tarda unos minutos y se puede repetir. Después, lo que cambia se envía solo.<br>
+                4) Los botones "Comparar" calculan con las hojas del servidor nuevo y lo comparan con Google; si todo sale igual, se puede encender ese módulo.</div>
             <form class="filters" onsubmit="event.preventDefault(); cfPasarClaves(document.getElementById('cfBtnPasar'))" style="margin-top:.5rem">
                 <div><label for="cfEmpresa">Empresa en el servidor nuevo</label><input id="cfEmpresa" value="plaza-valencia" autocomplete="off" spellcheck="false"></div>
                 <div><label for="cfDueno">Clave del dueño (la de "Configurar Cloudflare")</label><input id="cfDueno" type="password" autocomplete="off"></div>
             </form>
             <div class="login-error" id="cfError"></div>
-            <div class="req-acciones" style="justify-content:flex-end"><button type="button" class="btn-ghost btn-mini" onclick="cfProbarEntrada(this)">Probar entrada</button>
+            <div class="req-acciones" style="justify-content:flex-end"><button type="button" class="btn-ghost btn-mini" onclick="cfCajaComparar(this)">Comparar Cuadre y Validar pagos</button>
+                <button type="button" class="btn-ghost btn-mini" onclick="cfPersonalComparar(this)">Comparar Cuentas por cobrar, asistencia y nómina</button>
+                <button type="button" class="btn-ghost btn-mini" onclick="cfAlmComparar(this)">Comparar Almacén, compras y requerimientos</button>
+                <button type="button" class="btn-ghost btn-mini" onclick="cfEfeComparar(this)">Comparar Efectivo y caja chica</button>
+                <button type="button" class="btn-ghost btn-mini" onclick="cfEfectivoAbrir(this)">Efectivo: guardar en el servidor nuevo</button>
+                <button type="button" class="btn-ghost btn-mini" onclick="cfHojasAbrir(this)">Hojas: guardar en el servidor nuevo</button>
+                <button type="button" class="btn-ghost btn-mini" onclick="cfPasarDatos(this)">Pasar datos</button>
+                <button type="button" class="btn-ghost btn-mini" onclick="cfProbarEntrada(this)">Probar entrada</button>
                 <button type="button" class="btn-primary btn-mini" id="cfBtnPasar" onclick="cfPasarClaves(this)">Pasar claves</button></div>
             <div id="cfRes"></div></div>`;
     }
@@ -5657,6 +6279,35 @@
             res.innerHTML = `<div class="banner ok" style="display:block">Listo: ${r.usuarios} clave${r.usuarios === 1 ? '' : 's'} y ${r.huellas} huella${r.huellas === 1 ? '' : 's'} en el servidor nuevo${r.creada ? ' (la empresa se creó ahora)' : ''}. Grupos de Telegram: ${esc((r.grupos || []).join(', ') || 'ninguno')}.</div>`;
             document.getElementById('cfDueno').value = '';
         } catch (e) { err.textContent = e.message; }
+        finally { btn.disabled = false; btn.textContent = texto; }
+    }
+    // (etapa 2) Pasar los datos: Google trabaja unos minutos por llamada y devuelve dónde quedó; aquí se repite hasta terminar
+    async function cfPasarDatos(btn) {
+        const err = document.getElementById('cfError'), res = document.getElementById('cfRes'); err.textContent = '';
+        const texto = btn.textContent; btn.disabled = true;
+        let cursor = null, lote = null, vuelta = 0, r = null;
+        const hecho = [], errores = [], t0 = Date.now();
+        const aviso = txt => { btnCargando(btn, 'Pasando datos...'); res.innerHTML = `<div class="banner warn" style="display:block"><span>${esc(txt)}</span></div>`; };
+        try {
+            do {
+                vuelta++;
+                aviso(`Pasando datos (vuelta ${vuelta}${hecho.length ? ` · ${hecho.length} partes listas` : ''}). No cierre esta ventana.`);
+                r = await DATOS.aGoogle(() => llamarApi({ action: 'cf_migrar', cursor, lote }));
+                (r.hecho || []).forEach(x => hecho.push(x)); (r.errores || []).forEach(x => errores.push(x));
+                cursor = r.cursor || null; lote = r.lote;
+            } while (!r.listo && vuelta < 40);
+            const e = r.estado || {}, filas = (e.hojas || []).reduce((s, h) => s + Math.max(0, (h.ultima || 0) - 1), 0);
+            const docs = (e.docs || []).reduce((s, x) => s + x.n, 0), mb = e.bytes ? fmtNum(Math.round(e.bytes / 1048576 * 10) / 10) + ' MB' : '';
+            res.innerHTML = `<div class="banner ${errores.length ? 'error' : 'ok'}" style="display:block">${errores.length
+                    ? `<b>Terminó con ${errores.length} diferencia${errores.length === 1 ? '' : 's'}</b> (se pueden volver a pasar):<br>${errores.slice(0, 15).map(esc).join('<br>')}`
+                    : '<b>Datos pasados e idénticos.</b> Cada parte se comparó con su firma.'}<br>
+                ${(e.hojas || []).length} hojas · ${fmtNum(filas)} filas · ${fmtNum(docs)} documentos de Firebase${mb ? ' · ' + mb : ''} · ${fmtNum(Math.round((Date.now() - t0) / 1000))} s.</div>
+                <details style="margin-top:.5rem"><summary>Ver el detalle</summary><div class="tabla-wrap"><table class="req-tabla" data-sin-paginar>
+                <thead><tr><th class="izq">Hoja</th><th>Filas</th><th>Columnas</th><th class="izq">Desde</th></tr></thead><tbody>
+                ${(e.hojas || []).map(h => `<tr><td class="izq">${esc(h.hoja)}</td><td>${fmtNum(Math.max(0, h.ultima - 1))}</td><td>${h.cols}</td><td class="izq">${h.origen === 'firebase' ? 'Firebase' : 'Google'}</td></tr>`).join('')}
+                ${(e.docs || []).map(x => `<tr><td class="izq">Firebase: ${esc(x.col)}</td><td>${fmtNum(x.n)}</td><td>—</td><td class="izq">documentos</td></tr>`).join('')}
+                </tbody></table></div></details>`;
+        } catch (x) { err.textContent = x.message; res.innerHTML = ''; }
         finally { btn.disabled = false; btn.textContent = texto; }
     }
     async function cfProbarEntrada(btn) {
@@ -5799,7 +6450,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-14.7';
+    const VERSION_SERVIDOR = '2026-11-15.8';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -6235,8 +6886,11 @@
     // panel la escucha. Con eso no hace falta preguntar a Google: cada 3 s se compara con lo ya visto (sin red) y solo si cambió el
     // área del módulo abierto se relee. Si Firebase no responde, vuelve a preguntar a Google cada 30 s como antes.
     let vivoFbOff = null, vivoFbVer = null, vivoUltimaGoogle = 0, vivoPendVer = '';
-    const vivoFbSano = () => !!(vivoFbOff && vivoFbVer);
+    // (15/11) Sanos también por la conexión abierta con el servidor nuevo (que es por donde llegan ahora)
+    const vivoFbSano = () => !!(vivoFbVer && ((vivoFbOff && typeof vivoFbOff === 'function') || (typeof cfWs !== 'undefined' && cfWs && cfWs.readyState === 1)));
     async function vivoFbIniciar() {
+        // (15/11) Los avisos llegan por el servidor nuevo; Firebase ya no se escucha para esto
+        if (typeof cfVivoIniciar === 'function' && typeof CF_URL !== 'undefined') { cfVivoIniciar(); return; }
         if (vivoFbOff || !clave || typeof FB === 'undefined') return;
         vivoFbOff = 'iniciando';
         try {
@@ -6254,7 +6908,11 @@
             if (vivoFbOff === 'iniciando') vivoFbOff = off; else off();   // se cerró la sesión mientras entraba
         } catch (e) { vivoFbOff = null; }
     }
-    function vivoFbDetener() { if (typeof vivoFbOff === 'function') try { vivoFbOff(); } catch (e) {} vivoFbOff = null; vivoFbVer = null; vivoPendVer = ''; }
+    function vivoFbDetener() {
+        if (typeof vivoFbOff === 'function') try { vivoFbOff(); } catch (e) {}
+        vivoFbOff = null; vivoFbVer = null; vivoPendVer = '';
+        if (typeof cfWs !== 'undefined' && cfWs && cfWs.close) { const w = cfWs; cfWs = null; try { w.onclose = null; w.close(); } catch (e) {} }   // al salir: se cierra la conexión
+    }
     const AREAS_VIVO = ['cuadre', 'efe', 'per', 'alm', 'req', 'asis', 'otros'];
     async function vivoRevisar() {
         if (vivoOcupado || !vivoPuede()) return;
@@ -6641,6 +7299,7 @@
         return { grupos, hora: horas.sort().pop() || '' };
     }
     async function pendFbIniciar() {
+        if (typeof cfPedir === 'function') return;   // (15/11) la campanita ya no se publica en Firebase (servidor nuevo, o Google)
         if (pendFbEstado !== 'apagado' || !clave || typeof FB === 'undefined') return;
         const mias = pendFbMias();
         if (!mias.length) return;
@@ -6660,8 +7319,34 @@
         } catch (e) { pendFbEstado = 'roto'; pendFbRotoHora = Date.now(); }
     }
     function pendFbDetener() { pendFbOff.forEach(q => { try { q(); } catch (e) {} }); pendFbOff = []; pendFbDocs = {}; pendFbEstado = 'apagado'; }
+    // (15/11) La campanita desde el servidor nuevo (Google la publica allí: pend/<sección>). Se lee al entrar, cuando llega un aviso de
+    // cambio (por la conexión abierta) y, por si acaso, cada 5 minutos. Firebase ya no se usa para esto.
+    let pendCfUltima = 0, pendCfFalla = 0;
+    async function cfPendLeer() {
+        const mias = pendFbMias(); if (!mias.length) return { grupos: [], hora: '' };
+        const t = await cfToken(), r = await cfPedir({ action: 'docs_leer', token: t, rutas: mias.map(id => 'pend/' + id) });
+        if (!r.ok) { if (r.sesion === false) cfSes.token = ''; throw new Error(r.error || 'sin respuesta'); }
+        const grupos = [], horas = [];
+        for (const id of mias) {
+            const s = r.docs['pend/' + id]; if (!s) return null;   // todavía no publicada allá: Google
+            const d = JSON.parse(JSON.parse(s).datos || '{}');
+            if (d.hora) horas.push(d.hora);
+            (d.g || []).filter(g => id !== 'efectivo' || g.modulo !== 'efectivo' || esPrincipal || permisos.includes('efectivo')).forEach(g => grupos.push(g));
+        }
+        return { grupos, hora: horas.sort().pop() || '' };
+    }
     async function pendRevisar(forzar) {
         if (!clave || !WEB_APP_URL || pendCargando || vistaActual === 'login' || vistaActual === 'marcaje') return;
+        if (typeof cfPedir === 'function' && Date.now() - pendCfFalla > 120000) {
+            if (pendDatos && !forzar && Date.now() - pendCfUltima < 300000) return;   // al día: se espera el aviso de cambio
+            pendCargando = true;
+            try {
+                const d = await cfPendLeer();
+                if (d) { pendDatos = d; pendUltima = pendCfUltima = Date.now(); pendAvisarNuevos(d.grupos); return; }
+            } catch (e) { pendCfFalla = Date.now(); console.log('Campanita en el servidor nuevo: ' + e.message + ' (se pregunta a Google)'); }
+            finally { pendCargando = false; pendPintar(); }
+            pendFbEstado = 'roto'; pendFbRotoHora = Date.now();   // Firebase ya no se publica: directo a Google
+        }
         if (pendFbEstado === 'roto' && Date.now() - pendFbRotoHora > 600000) pendFbEstado = 'apagado';   // a los 10 min se reintenta Firebase
         if (pendFbEstado === 'apagado') pendFbIniciar();
         // Recién entrando: unos segundos para que llegue lo de Firebase antes de preguntarle a Google
@@ -12392,7 +13077,7 @@
             let todo = null;
             // (12/11, etapa 3) Con "Usar Firebase en la Nómina" encendido: calculada aquí con Firebase, en vivo y sin pedirle nada a Google.
             // Si Firebase no responde o falta algo, se sigue por Google como siempre.
-            try { todo = await nomVivoTraer(sem); }
+            try { todo = await cfNomTraer(sem) || await nomVivoTraer(sem); }   // (14/11) primero el servidor nuevo (Cloudflare)
             catch (e) { nomVivoFallo(e); todo = null; }
             if (!todo) {
                 try { todo = await llamarApi({ action: 'nom_semana', semana: sem }); }
