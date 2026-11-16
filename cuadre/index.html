@@ -1861,6 +1861,23 @@
             return isNaN(d) ? null : d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Caracas' });
         } catch (e) { return null; }
     }
+    // (15/11) El pase marcado en el servidor nuevo: su resultado, { error } si el carnet no vale, o null para seguir como antes
+    // (marcaje apagado allá, que se recuerda 10 minutos; sin respuesta; o el equipo todavía no llegó allá)
+    let mfCFNo = 0;
+    async function mfEnServidor(id, token, codigo, paso) {
+        if (Date.now() < mfCFNo || !/^\d{12,30}$/.test(codigo) || !token || !navigator.onLine) return null;
+        const c = new AbortController(), t = setTimeout(() => c.abort(), 6000);
+        try {
+            const r = await fetch(CF_API, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, signal: c.signal,
+                body: JSON.stringify(Object.assign({ empresa: CF_EMPRESA, action: 'pub_marca_registrar', id, equipo: token, codigo }, paso ? { paso } : {})) });
+            const j = await r.json().catch(() => null);
+            if (!j) return null;
+            if (j.noAqui) { mfCFNo = Date.now() + 10 * 60000; return null; }
+            if (j.ok) return j;
+            if (/no está autorizado|Marca inválida/.test(j.error || '')) return null;   // que lo decida Google (tiene la lista al día)
+            return { error: j.error || 'No se pudo marcar' };
+        } catch (e) { return null; } finally { clearTimeout(t); }
+    }
     async function mfMarcar(codigo, paso, bandejaId) {
         const token = mfEquipos()[mfLocalActual];
         if (!token || mfOcupado) return;
@@ -1868,6 +1885,18 @@
         mfUltimo = { codigo, en: Date.now() }; mfOcupado = true;
         mfResultado({ cargando: true });
         const idem = COLA.nuevoIdem(), mio = mfActual = idem;
+        // (15/11) Con el marcaje encendido en el servidor nuevo, allá se marca al instante (entrada o salida, mensajes)
+        const enCF = await mfEnServidor(idem, token, codigo, paso);
+        if (enCF) {
+            mfOcupado = false;
+            if (!enCF.error) { mfAprender(codigo, enCF); COLA.horaServidor(enCF.ahora); }
+            if (mfActual !== mio) return;
+            if (enCF.elegirPaso) {
+                mfResultado(Object.assign({}, enCF, { pregunta: true }));
+                document.getElementById('mfPasos').innerHTML = enCF.opciones.map(p => `<button type="button" class="btn-add" onclick="document.getElementById('mfPasos').innerHTML=''; mfMarcar('${codigo}', '${p}', '')">${MF_PASOS[p]}</button>`).join('');
+            } else mfResultado(enCF);
+            return;
+        }
         const hora = paso ? null : await mfAFirebase(idem, token, codigo);
         const conocido = mfConocidos()[codigo] || {};
         const recibida = espera => mfResultado({ recibida: true, espera, hora, nombre: conocido.n || '', foto: conocido.f || '' });

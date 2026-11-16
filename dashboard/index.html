@@ -2539,6 +2539,7 @@
     <section id="vistaFl" class="vista hidden"><div id="flContenido"></div></section>
     <section id="vistaVx" class="vista hidden"><div id="vxContenido"></div></section>
     <section id="vistaCxp" class="vista hidden"><div id="cxpContenido"></div></section>
+    <section id="vistaCie" class="vista hidden"><div id="cieContenido"></div></section>
 
     <section id="vistaAlm" class="vista hidden">
         <div class="modo-tabs" role="tablist" id="almTabs"></div>
@@ -3347,7 +3348,7 @@
         if (TIEMPOS.length > 60) TIEMPOS.pop();
     }
     // Solo lectura: si la respuesta de Google no llega, se reintenta una vez sola (no cambia nada en la hoja)
-    const SOLO_LECTURA = /^(nom_semana|fb_hoja_leer|login|fb_token|fb_prueba|list|cuadre_detalle|cuadre_detalle_lote|mov_listar|cuentas_listar|conc_listar|efe_listar|cc_listar|req_datos|req_ventas|req_historial|asis_hoy|asis_listar|asisg_listar|per_listar|cxc_deudas|nom_historial|nom_autorizar|nom_ajustes|hor_datos|alm_datos|alm_notas|alm_ingresos|alm_kardex|alm_seguimiento|alm_tiendas|alm_existencias|alm_espera_listar|cmp_compras|cmp_ordenes|cmp_enlazar|cmp_borradores|cmp_borrador|pnom_listar|ping|cambios|pendientes|enlinea|marca_estado)$/;
+    const SOLO_LECTURA = /^(nom_semana|fb_hoja_leer|login|fb_token|fb_prueba|list|cuadre_detalle|cuadre_detalle_lote|mov_listar|cuentas_listar|conc_listar|efe_listar|cc_listar|req_datos|req_ventas|req_historial|asis_hoy|asis_listar|asisg_listar|per_listar|cxc_deudas|nom_historial|nom_autorizar|nom_ajustes|hor_datos|alm_datos|alm_notas|alm_ingresos|alm_kardex|alm_seguimiento|alm_tiendas|alm_existencias|alm_espera_listar|cmp_compras|cmp_ordenes|cmp_enlazar|cmp_borradores|cmp_borrador|pnom_listar|ping|cambios|pendientes|enlinea|marca_estado|tg_grupos_cuadre)$/;
     // Guardados sin repetir: cada cambio lleva un "idem". Si no llegó la respuesta y se vuelve a pulsar el MISMO cambio,
     // se manda el mismo idem y Google responde "ya estaba registrado" en vez de guardarlo otra vez.
     const idemPendientes = new Map();   // contenido del cambio -> idem del intento sin respuesta
@@ -6276,11 +6277,13 @@
         const otros = r.otros || {};
         [['cxp', 'Cuentas por pagar', 'facturas de proveedores, préstamos y pagos', 'cfCxpAbrir'], ['vx', 'Venta express', 'productos, tickets y cierres de las cajas', 'cfVxAbrir'],
          ['facturar', 'Facturar (quien solo factura)', 'catálogo sin existencia ni costo, últimas notas y ventas en espera', 'cfFacturarAbrir'],
-         ['ficha', 'Ficha de cuadre', 'número de ficha al instante, cuadre, flujo general, gastos y créditos, asistencia y efectivo enviado', 'cfFichaAbrir']].forEach(([k, nombre, desc, fn]) => {
+         ['ficha', 'Ficha de cuadre', 'número de ficha al instante, cuadre, flujo general, gastos y créditos, asistencia y efectivo enviado', 'cfFichaAbrir'],
+         ['marcaje', 'Marcaje con carnet', 'entrada o salida al instante, puntualidad y avisos de apertura y cierre a las tiendas', 'cfMarcajeAbrir']].forEach(([k, nombre, desc, fn]) => {
             if (!(k in otros)) return;
-            const antes = k === 'facturar' || k === 'ficha' ? '<span class="chip st-pend">' + (k === 'ficha' ? 'La procesa Google' : 'Lee de Google') + '</span>' : '<span class="chip st-info">En Firebase</span>';
+            const google = k === 'facturar' || k === 'ficha' || k === 'marcaje';
+            const antes = google ? '<span class="chip st-pend">' + (k === 'facturar' ? 'Lee de Google' : 'Lo procesa Google') + '</span>' : '<span class="chip st-info">En Firebase</span>';
             filas.push({ si: !!otros[k], cf: !!otros[k], html: `<tr><td class="izq"><b>${nombre}</b><small>${desc}</small></td><td class="izq">${otros[k] ? chipCF : antes}</td>
-                <td class="fb-acc"><button type="button" class="${otros[k] ? 'btn-ghost' : 'btn-primary'} btn-mini" onclick="${fn}(this)">${otros[k] ? (k === 'facturar' || k === 'ficha' ? 'Volver a Google' : 'Detalle') : 'Pasar al servidor nuevo'}</button></td></tr>` });
+                <td class="fb-acc"><button type="button" class="${otros[k] ? 'btn-ghost' : 'btn-primary'} btn-mini" onclick="${fn}(this)">${otros[k] ? (google ? 'Volver a Google' : 'Detalle') : 'Pasar al servidor nuevo'}</button></td></tr>` });
         });
         const nCF = filas.filter(f => f.cf).length;
         const n = filas.filter(f => f.si).length, faltan = FB_ORDEN.filter(([id]) => !(id === 'efectivo' ? (ef.oficial || ef.cf) : ((g[id] || {}).activo || (g[id] || {}).cf))).map(x => x[1]);
@@ -6343,8 +6346,18 @@
         let fondo = document.getElementById('fbhDlg');
         if (!fondo) { fondo = document.createElement('div'); fondo.id = 'fbhDlg'; fondo.className = 'req-dlg-fondo'; document.body.appendChild(fondo); }
         fondo.onclick = ev => { if (ev.target === fondo) fondo.classList.add('hidden'); };
+        if (r && !Array.isArray(r.grupos)) { error = 'Google respondió algo inesperado (' + esc(JSON.stringify(r).slice(0, 120)) + '). Recargue el panel (Ctrl + F5) y vuelva a intentar.'; r = null; }
         const d = (r && r.diag) || {}, faltan = r ? r.grupos.filter(g => !g.ok) : [];
+        // (16/11) Lo que recibió Google de los números escritos y qué pasó con cada uno
+        const enviados = ids ? Object.keys(ids).length : 0, recib = (r && r.recibidos) || [];
+        const resumen = !ids || !r ? '' : !recib.length
+            ? `<div class="banner error" style="display:block">Se enviaron ${enviados} número(s) pero Google no recibió ninguno${r.conIds === undefined ? ' (Google tiene una versión anterior: publique otra vez Apps Script)' : ''}.</div>`
+            : `<div class="banner ${recib.every(x => (r.grupos.find(g => g.grupo === x.grupo) || {}).ok) ? 'ok' : 'warn'}" style="display:block">Google recibió: ${recib.map(x => {
+                const g = r.grupos.find(y => y.grupo === x.grupo) || {};
+                return esc(x.grupo) + ' (' + esc(x.texto) + ') → ' + (g.ok ? 'Listo' + (g.titulo ? ' · en Telegram se llama "' + esc(g.titulo) + '"' : '') : esc(g.error || 'no se pudo'));
+            }).join('<br>')}</div>`;
         const html = `<div class="req-dlg" style="max-width:720px"><h3>Grupos de cuadre en Telegram</h3>
+            ${resumen}
             ${error ? `<div class="banner error" style="display:block">${esc(error)}</div>` : `
             <div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Grupo</th><th class="izq">Estado</th><th class="izq">ID del grupo (si falta)</th></tr></thead><tbody>
             ${r.grupos.map((g, i) => `<tr><td class="izq"><b>${esc(g.grupo)}</b>${g.titulo && g.titulo !== g.grupo ? `<small>En Telegram: ${esc(g.titulo)}</small>` : ''}</td>
@@ -6353,6 +6366,7 @@
             </tbody></table></div>
             ${faltan.length ? `<div class="nota">Si un grupo no aparece solo, ponga su ID: en <b>web.telegram.org</b> abra el grupo y copie el número que sale al final de la dirección (empieza con -100), o en Telegram de PC active Ajustes › Avanzado › Funciones experimentales › "Mostrar ID" y cópielo de la información del grupo. El bot tiene que estar dentro del grupo.</div>
                 <div class="req-acciones" style="justify-content:flex-end"><button type="button" class="btn-primary btn-mini" onclick="tgCuadreGuardarIds(this)">Guardar los ID</button></div>` : '<div class="banner ok" style="display:block">Listo: el sistema puede avisar en los 5 grupos.</div>'}
+            <div class="banner ${d.bot ? 'ok' : 'warn'}" style="display:block">El bot que usa el sistema es <b>${esc(d.bot || '¿?')}</b>: ese es el que tiene que ser miembro de cada grupo.</div>
             <div class="nota">Lo que dice Telegram: ${d.webhook === 'no' ? 'el sistema recibe los mensajes del bot' : 'los mensajes del bot los recibe otro programa (' + esc(d.webhook || '?') + '), por eso el sistema no ve los /start: ponga los ID a mano'}${d.pendientes != null ? ' · mensajes en espera: ' + esc(String(d.pendientes)) : ''}.
                 ${(d.vistos || []).length ? 'Grupos que el sistema ha visto: ' + esc(d.vistos.join(' · ')) : 'Todavía no ha visto ningún grupo.'}</div>`}
             <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-primary" onclick="document.getElementById('fbhDlg').classList.add('hidden')">Cerrar</button></div></div>`;
@@ -6374,6 +6388,19 @@
             await DATOS.aGoogle(() => llamarApi({ action: 'cf_ficha', activar: !on }));
             cfSes.modHora = 0;
             mostrarBanner(on ? 'Las fichas vuelven a procesarse en Google.' : 'Listo: las fichas se procesan en el servidor nuevo.', 'ok');
+            fbEstadoDatos = null; fbEstadoCargar();
+        } catch (x) { mostrarBanner('No se pudo: ' + x.message, 'error'); btn.disabled = false; btn.textContent = texto; }
+    }
+    // (15/11) El marcaje con carnet procesado en el servidor nuevo (entrada o salida al instante) o, al volver, en Google como antes
+    async function cfMarcajeAbrir(btn) {
+        const on = !!((fbEstadoDatos || {}).otros || {}).marcaje;
+        if (!confirm(on ? '¿Volver a que Google procese los pases del carnet? (más lento: el resultado tarda unos segundos)'
+                        : 'Los pases del carnet se marcarán en el servidor nuevo: la persona ve su entrada o salida al instante, con las mismas reglas y mensajes de hoy, y la tienda recibe el aviso de apertura o cierre. Las marcas hechas sin internet siguen por Google. Si el servidor nuevo no responde, el pase sigue por Google como antes.\n\n¿Encender?')) return;
+        const texto = btn.textContent; btnCargando(btn, on ? 'Volviendo...' : 'Encendiendo...');
+        try {
+            await DATOS.aGoogle(() => llamarApi({ action: 'cf_marcaje', activar: !on }));
+            cfSes.modHora = 0;
+            mostrarBanner(on ? 'Los pases del carnet vuelven a procesarse en Google.' : 'Listo: los pases del carnet se marcan en el servidor nuevo.', 'ok');
             fbEstadoDatos = null; fbEstadoCargar();
         } catch (x) { mostrarBanner('No se pudo: ' + x.message, 'error'); btn.disabled = false; btn.textContent = texto; }
     }
@@ -6671,6 +6698,7 @@
         reqcharcu: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 3v2h6V3"/><path d="M8.5 10h7M8.5 13.5h7M8.5 17h4"/></svg>',
         precios: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z"/><circle cx="8" cy="8" r="1.5"/><path d="m12 16 1.5 1.5 3-3"/></svg>',
         movalmacen: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h13l-3-3M20 16H7l3 3"/></svg>',
+        cierrecaja: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="10" width="18" height="10" rx="1.5"/><path d="M7 10V7a5 5 0 0 1 10 0v3"/><path d="M12 14v2"/></svg>',
         reportes: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5"/><path d="M9 17v-3M12 17v-5M15 17v-2"/></svg>',
         facturar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>',
         talento: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="8" r="3.5"/><path d="M3.5 20c0-3.6 2.9-6.5 6.5-6.5 1.3 0 2.5.4 3.5 1"/><path d="m17.5 13 1.2 2.4 2.6.4-1.9 1.8.5 2.6-2.4-1.3-2.4 1.3.5-2.6-1.9-1.8 2.6-.4z"/></svg>',
@@ -6686,6 +6714,7 @@
     const MODULOS = [
         { id: 'cuadre', titulo: 'Cuadre de caja',     desc: 'Cargar montos del sistema y revisar si cada caja cuadra.', listo: true },
         { id: 'pagos',  titulo: 'Validar pagos',      desc: 'Pagos móviles y lotes de TDD contra el banco.', listo: true },
+        { id: 'cierrecaja', titulo: 'Cierre de cajas', desc: 'Cerrar a distancia la caja de un cajero en el BigSoft de la tienda. Los totales van a su ficha y a Telegram.', listo: true },
         { id: 'ventas', titulo: 'Visor de ventas',    desc: 'Ventas por día y por tienda, según los cuadres de caja.', listo: true },
         { id: 'efectivo', titulo: 'Control de efectivo', desc: 'Disponible, por llegar, egresos y caja chica.', listo: true },
         { id: 'cajachica', titulo: 'Caja chica',      desc: 'Gastos de caja chica con su comprobante (personal de compras).', listo: true },
@@ -6721,7 +6750,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-15.18';
+    const VERSION_SERVIDOR = '2026-11-15.22';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -7065,8 +7094,8 @@
         claveAdminAuto(document.body);
         // login, menu, cuadre, ventas y admin tienen su propia sección; el resto usa la genérica "en construcción"
         // Caja chica usa la misma sección de Control de efectivo, mostrando solo la caja chica
-        const seccion = vista === 'cajachica' ? 'efectivo' : vista === 'reqcharcu' ? 'req' : vista === 'asistencia' ? 'asis' : vista === 'asisgestion' ? 'asisg' : (vista === 'nomina' || vista === 'talento' || vista === 'cxc' || vista === 'horarios') ? 'per' : (vista === 'inventario' || vista === 'movalmacen' || vista === 'precios' || vista === 'facturar' || vista === 'reportes') ? 'alm' : vista === 'pagonomina' ? 'pnom' : vista === 'listasficha' ? 'fl' : vista === 'ventaexpress' ? 'vx' : vista === 'marcaje' ? 'marca' : vista === 'cxp' ? 'cxp' : ['login', 'menu', 'cuadre', 'ventas', 'admin', 'pagos', 'efectivo'].includes(vista) ? vista : 'modulo';
-        ['login', 'menu', 'cuadre', 'ventas', 'admin', 'pagos', 'efectivo', 'req', 'asis', 'asisg', 'per', 'alm', 'pnom', 'fl', 'vx', 'marca', 'cxp', 'modulo'].forEach(v => {
+        const seccion = vista === 'cierrecaja' ? 'cie' : vista === 'cajachica' ? 'efectivo' : vista === 'reqcharcu' ? 'req' : vista === 'asistencia' ? 'asis' : vista === 'asisgestion' ? 'asisg' : (vista === 'nomina' || vista === 'talento' || vista === 'cxc' || vista === 'horarios') ? 'per' : (vista === 'inventario' || vista === 'movalmacen' || vista === 'precios' || vista === 'facturar' || vista === 'reportes') ? 'alm' : vista === 'pagonomina' ? 'pnom' : vista === 'listasficha' ? 'fl' : vista === 'ventaexpress' ? 'vx' : vista === 'marcaje' ? 'marca' : vista === 'cxp' ? 'cxp' : ['login', 'menu', 'cuadre', 'ventas', 'admin', 'pagos', 'efectivo'].includes(vista) ? vista : 'modulo';
+        ['login', 'menu', 'cuadre', 'ventas', 'admin', 'pagos', 'efectivo', 'req', 'asis', 'asisg', 'per', 'alm', 'pnom', 'fl', 'vx', 'marca', 'cxp', 'cie', 'modulo'].forEach(v => {
             const el = document.getElementById('vista' + v[0].toUpperCase() + v.slice(1));
             el.dataset.pantalla = '';   // al aparecer entra deslizándose (ANIM)
             el.classList.toggle('hidden', v !== seccion);
@@ -7103,6 +7132,7 @@
         if (vista === 'listasficha') flIniciar();
         if (vista === 'ventaexpress') vxIniciar();
         if (vista === 'cxp') cxpIniciar();
+        if (vista === 'cierrecaja') cieIniciar();
         if (vista !== 'login' && vista !== 'marcaje') setTimeout(() => avisarEnLinea(true), 500);
         if (vista === 'efectivo' || vista === 'cajachica') efeIniciar(vista === 'cajachica');
         // Cuadre y Visor de ventas comparten los mismos datos (filas de la hoja de cuadres)
@@ -7134,7 +7164,8 @@
         reportes: () => almPintar(),   // los reportes se piden con su botón (cada uno lo saca la PC de la tienda)
         listasficha: () => flCargar(),
         ventaexpress: () => vxPintar(),   // Firebase lo trae en vivo
-        cxp: () => { cxp.pagos = null; cxpPintar(); }   // en vivo (Firebase); los pagos hechos se vuelven a leer
+        cxp: () => { cxp.pagos = null; cxpPintar(); },   // en vivo (Firebase); los pagos hechos se vuelven a leer
+        cierrecaja: () => cieCargar()
     };
     // ---------- Cambios en vivo: cada 30 s se pregunta a Google qué áreas cambiaron (respuesta mínima).
     // Si cambió la del módulo abierto, se vuelve a leer solo, sin molestar: no mientras se escribe, hay una ventana abierta o algo se guarda.
@@ -12956,7 +12987,7 @@
             ${lista.map(f => `<tr class="${!f.salida && f.fecha < fechaLocalHoy() ? 'req-alerta' : ''}"><td class="izq">${diaSemana(f.fecha)} ${fechaBonita(f.fecha)}</td><td class="izq">${asisgBotonNombre(f.persona, 'oficina')}<small>${esc((asisgDepDe(f.persona) || {}).nombre || '')}</small></td>
                 <td>${f.entrada || '—'}</td><td>${f.salidaAlmuerzo || '—'}</td><td>${f.regresoAlmuerzo || '—'}</td><td>${f.salida || '<span class="chip st-sobra">Sin salida</span>'}</td>
                 <td>${asisgH(f.horasAlmuerzo, minEntre(f.salidaAlmuerzo, f.regresoAlmuerzo))}</td><td><b>${asisgH(f.horasTrabajadas, asisgMinOficina(f))}</b></td><td class="izq"><div class="punt-lista">${asisgPuntChipsOficina(f)}</div></td><td class="izq"><small>${esc(f.nota)}</small></td>
-                <td><button type="button" class="btn-ghost btn-mini" onclick="asisgEditarOficina(${f.fila})">Modificar</button></td></tr>`).join('')}
+                <td><div class="req-acciones" style="margin:0;flex-wrap:nowrap"><button type="button" class="btn-ghost btn-mini" onclick="asisgEditarOficina(${f.fila})">Modificar</button><button type="button" class="btn-ghost btn-mini" onclick="asisgQuitar('O', ${f.fila})">Eliminar</button></div></td></tr>`).join('')}
             </tbody></table></div>` : '<div class="empty">No hay asistencia de oficina con estos filtros.</div>'}`;
     }
 
@@ -12970,7 +13001,7 @@
             ${lista.length ? `<div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">Fecha</th><th class="izq">Local</th><th class="izq">Turno</th><th class="izq">Trabajador</th><th>Entrada</th><th>Salida</th><th>Horas</th><th class="izq">Puntualidad</th><th class="izq">Registró</th><th>Ficha</th><th></th></tr></thead><tbody>
             ${lista.map(f => `<tr><td class="izq">${diaSemana(f.fecha)} ${fechaBonita(f.fecha)}</td><td class="izq">${esc(f.tienda)}</td><td class="izq">${esc(f.turno)}</td><td class="izq">${asisgBotonNombre(f.trabajador, 'locales')}</td>
                 <td>${f.entrada || '—'}</td><td>${f.salida || '—'}</td><td><b>${f.salida ? asisgH(f.horas, minEntre(f.entrada, f.salida)) : '—'}</b></td><td class="izq"><div class="punt-lista">${asisgPuntChips(f)}</div></td><td class="izq"><small>${esc(f.responsable)}</small></td><td>${esc(f.ficha)}</td>
-                <td><button type="button" class="btn-ghost btn-mini" onclick="asisgEditarLocal(${f.fila})">Modificar</button></td></tr>`).join('')}
+                <td><div class="req-acciones" style="margin:0;flex-wrap:nowrap"><button type="button" class="btn-ghost btn-mini" onclick="asisgEditarLocal(${f.fila})">Modificar</button><button type="button" class="btn-ghost btn-mini" onclick="asisgQuitar('L', ${f.fila})">Eliminar</button></div></td></tr>`).join('')}
             </tbody></table></div>` : '<div class="empty">No hay asistencia de locales con estos filtros.</div>'}
             <div class="nota">La asistencia de los locales la registra la ficha de cada caja (BD ASISTENCIA).</div>`;
     }
@@ -13186,6 +13217,37 @@
             mostrarBanner(`Asistencia modificada: ${f.trabajador} · ${f.tienda} ${fechaBonita(f.fecha)}.`, 'ok');
             if (!r.registro) await asisgCargar(true); else asisgPintar();
         } catch (e) { err.textContent = e.message; btn.disabled = false; btn.textContent = 'Guardar'; }
+    }
+
+    // (16/11) Eliminar un turno (local) o un día (oficina) marcado por error. La fila no se borra de la hoja (la nómina usa su número):
+    // se le quita el nombre, deja de contar y queda anotado quién, cuándo, por qué y qué tenía (asisGestionQuitar).
+    function asisgQuitar(tipo, fila) {
+        const f = (tipo === 'L' ? asisgDatos.locales : asisgDatos.oficina).find(x => x.fila === fila);
+        if (!f) return;
+        const quien = tipo === 'L' ? f.trabajador : f.persona;
+        const detalle = tipo === 'L' ? `${esc(f.tienda)} · ${esc(f.turno)} · entrada ${f.entrada || '—'}, salida ${f.salida || '—'}${f.ficha ? ' (ficha ' + esc(f.ficha) + ')' : ''}`
+                                     : `entrada ${f.entrada || '—'}, salida ${f.salida || '—'}`;
+        asisgVentana(`<form class="req-dlg" onsubmit="asisgQuitarHecho(event, '${tipo}', ${fila})">
+            <h3>Eliminar asistencia</h3>
+            <div class="req-sub">${esc(quien)} · ${diaSemana(f.fecha)} ${fechaBonita(f.fecha)} · ${detalle}</div>
+            <div class="nota">Deja de contar en la nómina y en la puntualidad. Queda anotado quién la eliminó, cuándo y por qué.</div>
+            ${asisgPie.replace('>Guardar</button>', '>Eliminar</button>')}</form>`);
+    }
+    async function asisgQuitarHecho(ev, tipo, fila) {
+        ev.preventDefault();
+        const lista = tipo === 'L' ? asisgDatos.locales : asisgDatos.oficina, f = lista.find(x => x.fila === fila);
+        const err = document.getElementById('asisgError'), btn = document.getElementById('asisgBtnG');
+        const motivo = document.getElementById('asisgMotivo').value.trim();
+        if (!motivo) { err.textContent = 'Escriba el motivo.'; return; }
+        btnCargando(btn, 'Eliminando...');
+        try {
+            await llamarApi(tipo === 'L' ? { action: 'asisg_local_quitar', fila, fecha: f.fecha, trabajador: f.trabajador, motivo }
+                                         : { action: 'asisg_oficina_quitar', fila, fecha: f.fecha, persona: f.persona, motivo });
+            lista.splice(lista.indexOf(f), 1);
+            asisgCerrar();
+            mostrarBanner(`Asistencia eliminada: ${tipo === 'L' ? f.trabajador + ' · ' + f.tienda : f.persona} ${fechaBonita(f.fecha)}.`, 'ok');
+            asisgPintar();
+        } catch (e) { err.textContent = e.message; btn.disabled = false; btn.textContent = 'Eliminar'; }
     }
 
     // Agregar a un trabajador en un turno de local que no quedó en la ficha
@@ -20736,7 +20798,88 @@ Reglas:
     const bsrDetenido = () => { const e = new Error('Se dejó de esperar a la PC de la tienda.'); e.detenido = true; return e; };
     // PowerShell convierte una lista de UN solo elemento en el elemento suelto (y una vacía en null): con una sola orden de
     // precio llegaba "lineas" como objeto y fallaba ("forEach is not a function"). Aquí se vuelven listas otra vez.
-    const BSR_LISTAS = new Set(['lineas', 'sugerencias', 'productos', 'categorias', 'unidades', 'ivas', 'proveedores', 'hechos', 'noCargados', 'registrados', 'notas', 'resumen', 'hojas']);
+    const BSR_LISTAS = new Set(['lineas', 'sugerencias', 'productos', 'categorias', 'unidades', 'ivas', 'proveedores', 'hechos', 'noCargados', 'registrados', 'notas', 'resumen', 'hojas', 'cajas']);
+
+    // ==========================================
+    // (15/11) CIERRE DE CAJAS: la PC de la tienda cierra en su BigSoft la caja de un cajero (Utilidades\Cierre.ps1, igual que el
+    // cierre de BigSoft). Google la registra, avisa por Telegram y llena los montos "sistema" de la ficha de ese cajero.
+    // ==========================================
+    const cieNorm = v => String(v || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
+    let cie = { local: '', cajas: null, buscando: false, espera: '', error: '', cierres: [], trabajadores: [], asignados: [], cerrando: '', aviso: null, cargado: false };
+    function cieIniciar() { if (!cie.local) cie.local = TIENDAS_ORDEN[0].nombre; ciePintar(); if (!cie.cargado) cieCargar(); }
+    async function cieCargar() {
+        try { const r = await llamarApi({ action: 'bsc_listar', dias: 14 }); Object.assign(cie, { cierres: r.cierres || [], trabajadores: r.trabajadores || [], asignados: r.asignados || [], cargado: true }); }
+        catch (e) { cie.error = e.message; }
+        ciePintar();
+    }
+    const cieEsperando = (estado, vivo, seg, local) => { bsr = Object.assign(bsr || {}, { estadoTarea: estado, vivo, seg, local }); cie.espera = estado; ciePintar(); };
+    async function cieVerCajas() {
+        Object.assign(cie, { buscando: true, cajas: null, error: '', aviso: null }); ciePintar();
+        try { const t = await bsrTarea('cajas', { local: cie.local }, cieEsperando, 180); cie.cajas = (t.resultado || {}).cajas || []; }
+        catch (e) { cie.error = e.message; }
+        cie.buscando = false; ciePintar();
+    }
+    async function cieCerrar(login) {
+        const c = (cie.cajas || []).find(x => x.login === login); if (!c) return;
+        if (!confirm(`¿Cerrar la caja de ${c.nombre || login} (usuario ${login}) en ${cie.local}?\n\nSe cierran sus ${c.facturas} factura(s) en BigSoft, igual que el cierre de la caja. No se puede deshacer.`)) return;
+        Object.assign(cie, { cerrando: login, error: '', aviso: null }); ciePintar();
+        try {
+            const t = await bsrTarea('cierre', { local: cie.local, login }, cieEsperando, 300);
+            cie.aviso = t.resultado || {};
+            cie.cajas = (cie.cajas || []).filter(x => x.login !== login);
+            await cieCargar();
+        } catch (e) { cie.error = e.message; }
+        cie.cerrando = ''; ciePintar();
+    }
+    async function cieCajero(login, trabajador) {
+        try { const r = await llamarApi({ action: 'bsc_cajero', local: cie.local, login, trabajador, idem: nuevoIdem() }); Object.assign(cie, { cierres: r.cierres || [], asignados: r.asignados || [] }); mostrarBanner('Listo: ' + login + (trabajador ? ' es ' + trabajador : ' quedó sin trabajador') + '.', 'ok'); }
+        catch (e) { mostrarBanner('No se pudo: ' + e.message, 'error'); }
+        ciePintar();
+    }
+    // El trabajador de un usuario de BigSoft: el elegido aquí o el que reconoció Google en su último cierre
+    function cieTrabajadorDe(local, login) {
+        const a = cie.asignados.find(x => cieNorm(x.local) === cieNorm(local) && cieNorm(x.login) === cieNorm(login));
+        if (a) return a.trabajador;
+        const c = cie.cierres.find(x => cieNorm(x.local) === cieNorm(local) && x.login === login && x.trabajador);
+        return c ? c.trabajador : '';
+    }
+    const CIE_ESTADO = { 'Cuadra': 'st-ok', 'Con diferencias': 'st-falta', 'Sin ficha': 'st-pend', 'Sin trabajador': 'st-amar' };
+    function cieVista() {
+        const hora = h => h ? horaAmPm(String(h).slice(11, 16)) : '';
+        const fecha = f => f ? String(f).slice(8, 10) + '/' + String(f).slice(5, 7) : '';
+        const opciones = sel => `<option value="">Sin elegir</option>` + cie.trabajadores.map(t => `<option${t === sel ? ' selected' : ''}>${esc(t)}</option>`).join('');
+        const a = cie.aviso;
+        const cajas = cie.buscando ? bsrEsperaHTML('Preguntando a la PC de ' + cie.local + ' por sus cajas abiertas...')
+            : !cie.cajas ? '<div class="nota">Pulse "Ver cajas abiertas": la PC de la tienda responde en unos segundos (debe estar encendida y con el avisador abierto).</div>'
+            : !cie.cajas.length ? '<div class="empty">No hay cajas abiertas en ' + esc(cie.local) + '.</div>'
+            : `<div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Usuario de BigSoft</th><th class="izq">Trabajador</th><th class="izq">Abierta</th><th>Facturas</th><th class="izq">Estado</th><th></th></tr></thead><tbody>
+                ${cie.cajas.map(c => {
+                    const no = c.conectado ? 'Dentro de la caja' : c.enEspera ? c.enEspera + ' en espera' : !c.facturas ? 'Sin ventas' : '';
+                    const sel = cieTrabajadorDe(cie.local, c.login);
+                    return `<tr><td class="izq"><b>${esc(c.login)}</b>${c.nombre ? `<small>${esc(c.nombre)}</small>` : ''}</td>
+                        <td class="izq"><select aria-label="Trabajador de ${esc(c.login)}" data-login="${esc(c.login)}" onchange="cieCajero(this.dataset.login, this.value)">${opciones(sel)}</select></td>
+                        <td class="izq">${esc(fecha(c.abierta || c.desde))} ${esc(hora(c.abierta || c.desde))}${c.hasta ? `<small>última venta ${esc(hora(c.hasta))}</small>` : ''}</td>
+                        <td>${fmtNum(c.facturas || 0)}</td>
+                        <td class="izq">${no ? `<span class="chip ${c.conectado || c.enEspera ? 'st-sobra' : 'st-pend'}">${esc(no)}</span>` : '<span class="chip st-ok">Se puede cerrar</span>'}</td>
+                        <td>${no ? '' : `<button type="button" class="btn-primary btn-mini" data-login="${esc(c.login)}" ${cie.cerrando ? 'disabled' : ''} onclick="cieCerrar(this.dataset.login)">${cie.cerrando === c.login ? 'Cerrando...' : 'Cerrar caja'}</button>`}</td></tr>`;
+                }).join('')}</tbody></table></div>
+                ${cie.cajas.some(c => c.conectado) ? '<div class="nota">"Dentro de la caja": el cajero tiene abierto el programa de caja. Para cerrarla debe salir primero (BigSoft tampoco la cierra así).</div>' : ''}`;
+        const res = a ? `<div class="banner ok" style="display:block">Caja de <b>${esc(a.nombre || a.login)}</b> cerrada en BigSoft (cierre N° ${esc(String(a.nroCierre || ''))}, ${fmtNum(a.facturas || 0)} facturas). Total ${fmt(a.total || 0)} Bs ·
+                efectivo ${fmt(a.efectivo || 0)} · punto ${fmt(a.tarjeta || 0)} · pago móvil ${fmt(a.pagoMovil || 0)} · biopago ${fmt(a.biopago || 0)} · divisas ${fmt(a.divisas || 0)} $.
+                ${a.registro && a.registro.error ? `<br><b>No se pudo registrar en Plaza Valencia:</b> ${esc(a.registro.error)}` : a.registro && a.registro.ficha && a.registro.ficha.ficha ? `<br>Ficha ${esc(String(a.registro.ficha.ficha))}: ${esc(a.registro.ficha.estado || '')}${a.registro.ficha.diferencias ? ' (' + esc(a.registro.ficha.diferencias) + ')' : ''}.` : '<br>Su ficha todavía no ha llegado: los montos se pasan solos cuando llegue.'}</div>` : '';
+        const lista = cie.cierres.length ? `<div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">Fecha</th><th class="izq">Tienda</th><th class="izq">Cajero</th><th>N°</th><th>Total Bs</th><th class="izq">Ficha</th><th class="izq">Estado</th></tr></thead><tbody>
+                ${cie.cierres.map(x => `<tr><td class="izq">${esc(fecha(x.fecha))}<small>${esc(String(x.hora || '').slice(0, 5))}</small></td><td class="izq">${esc(x.local)}</td>
+                    <td class="izq">${esc(x.trabajador || x.nombreBs || x.login)}<small>${esc(x.login)}</small></td><td>${esc(x.nro)}</td><td>${fmt(x.total)}</td><td class="izq">${esc(x.ficha) || '—'}</td>
+                    <td class="izq"><span class="chip ${CIE_ESTADO[x.estado] || 'st-info'}">${esc(x.estado)}</span>${x.diferencias ? `<small>${esc(x.diferencias)}</small>` : ''}</td></tr>`).join('')}</tbody></table></div>`
+            : cie.cargado ? '<div class="empty">No hay cierres en los últimos 14 días.</div>' : cargandoHTML('Cargando cierres...');
+        return `<div class="filters"><div><label for="cieTienda">Tienda</label><select id="cieTienda" onchange="cie.local = this.value; cie.cajas = null; cie.aviso = null; ciePintar()">${TIENDAS_ORDEN.map(t => `<option${t.nombre === cie.local ? ' selected' : ''}>${esc(t.nombre)}</option>`).join('')}</select></div></div>
+            <div class="req-acciones"><button type="button" class="btn-primary" ${cie.buscando || cie.cerrando ? 'disabled' : ''} onclick="cieVerCajas()">Ver cajas abiertas</button></div>
+            ${cie.error ? `<div class="banner error" style="display:block">${esc(cie.error)}</div>` : ''}${res}
+            ${cie.cerrando ? bsrEsperaHTML('Cerrando la caja de ' + cie.cerrando + ' en ' + cie.local + '...') : cajas}
+            <h4 class="per-sub">Cierres de los últimos días</h4>${lista}
+            <div class="nota">Cada cajero cierra con su propio usuario de BigSoft. Elija una vez qué trabajador es cada usuario: así el cierre se junta con su ficha (misma tienda, fecha y turno), llena los montos del sistema y avisa por Telegram si hay diferencias. Si la ficha ya tenía montos del sistema, no se cambian.</div>`;
+    }
+    function ciePintar() { const el = document.getElementById('cieContenido'); if (el && vistaActual === 'cierrecaja') pintarConservando(el, cieVista()); }
     function bsrListas(o) {
         if (!o || typeof o !== 'object') return o;
         if (Array.isArray(o)) { o.forEach(bsrListas); return o; }
@@ -21579,6 +21722,24 @@ Reglas:
             return isNaN(d) ? null : d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Caracas' });
         } catch (e) { return null; }
     }
+    // (15/11) El pase marcado en el servidor nuevo. Devuelve su resultado (o { error } si el carnet no vale), o null para seguir como antes:
+    // marcaje apagado allá (se recuerda 10 minutos para no preguntar en cada pase), sin respuesta, o el equipo todavía no llegó allá
+    let marcaCFNo = 0;
+    async function marcaEnServidor(id, eq, codigo, paso) {
+        if (Date.now() < marcaCFNo || !/^\d{12,30}$/.test(codigo) || !eq.token || !navigator.onLine) return null;
+        try {
+            const c = new AbortController(), t = setTimeout(() => c.abort(), 6000);
+            const r = await fetch(CF_URL + '/api', { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, signal: c.signal,
+                body: JSON.stringify(Object.assign({ empresa: CF_EMPRESA, action: 'pub_marca_registrar', id, equipo: eq.token, codigo }, paso ? { paso } : {})) });
+            clearTimeout(t);
+            const j = await r.json().catch(() => null);
+            if (!j) return null;
+            if (j.noAqui) { marcaCFNo = Date.now() + 10 * 60000; return null; }
+            if (j.ok) return j;
+            if (/no está autorizado|Marca inválida/.test(j.error || '')) return null;   // que lo decida Google (tiene la lista al día)
+            return { error: j.error || 'No se pudo marcar' };
+        } catch (e) { return null; }
+    }
     async function marcaRegistrar(codigo, paso, bandejaId) {
         const eq = marcaEquipo();
         if (!eq || marcaOcupado) return;
@@ -21588,6 +21749,15 @@ Reglas:
         marcaOcupado = true;
         marcaResultado({ cargando: true });
         const id = 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10), mio = marcaActual = id;
+        // 0) (15/11) Con el marcaje encendido en el servidor nuevo, allá se marca al instante (entrada o salida, mensajes)
+        const enCF = await marcaEnServidor(id, eq, codigo, paso);
+        if (enCF) {
+            marcaOcupado = false;
+            if (!enCF.error) { marcaAprender(codigo, enCF); COLA.horaServidor(enCF.ahora); }
+            if (marcaActual !== mio) return;
+            if (enCF.elegirPaso) marcaElegirPaso(codigo, enCF, ''); else marcaResultado(enCF);
+            return;
+        }
         // 1) Firebase: en cuanto la marca está a salvo, el equipo queda libre para el siguiente carnet
         const hora = paso ? null : await marcaAFirebase(id, eq, codigo);
         const conocido = marcaConocidos()[codigo] || {};
