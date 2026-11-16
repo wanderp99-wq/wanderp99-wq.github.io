@@ -3567,6 +3567,9 @@
         if (/^cxc_(registrar|modificar|comentar|verificar)$/.test(payload.action)) { const r = await cfCobrarEscribir(payload); if (r) return r; }
         if (/^(nom_(cerrar|anular|ajuste_guardar)|pnom_(pagar|deshacer))$/.test(payload.action)) { const r = await cfNominaEscribir(payload); if (r) return r; }
         if (CF_PERSONAL_ACC.test(payload.action)) { const r = await cfPersonalEscribir(payload); if (r) return r; }
+        if (/^cmp_(leer|enlazar|borrador_guardar|borrador_borrar|guardar|anular|fotos_compra)$/.test(payload.action)) { const r = await cfComprasEscribir(payload); if (r) return r; }
+        if (/^cmp_(orden_precio|orden_nueva|orden_avisar|avisar_lista|marcar|marcar_lote)$/.test(payload.action)) { const r = await cfPreciosEscribir(payload); if (r) return r; }
+        if (CF_ALMACEN_ACC.test(payload.action)) { const r = await cfAlmacenEscribir(payload); if (r) return r; }
         // (15/11) Historial de nóminas: del servidor nuevo (con la Nómina encendida allá)
         if (payload.action === 'nom_historial') { const r = await cfNomHistorial(payload); if (r) return r; }
         // (12/11) Lecturas del almacén con "Usar Firebase en el Almacén" encendido: se responden aquí con lo de Firebase (sin Google)
@@ -6339,9 +6342,12 @@
          ['nominag', 'Nómina y Pagos de nómina (guardar)', 'cerrar la semana, anular, ajustes de la semana, registrar y deshacer pagos', 'cfNominaAbrir'],
          ['asisg', 'Gestión de asistencia (guardar)', 'corregir, agregar y quitar asistencia de la oficina y de las tiendas', 'cfAsisgAbrir'],
          ['horariog', 'Horarios de trabajo (guardar)', 'horario de la semana de cada tienda y su envío por Telegram', 'cfHorariogAbrir'],
-         ['talento', 'Talento humano (guardar)', 'trabajadores, perfiles, clientes y carnet nuevo', 'cfTalentoAbrir']].forEach(([k, nombre, desc, fn]) => {
+         ['talento', 'Talento humano (guardar)', 'trabajadores, perfiles, clientes, carnet nuevo y ajustes', 'cfTalentoAbrir'],
+         ['almaceng', 'Almacén y Facturar (guardar)', 'notas de entrega, anular y modificar, productos, clientes, proveedores y operaciones de inventario (sin las compras)', 'cfAlmacengAbrir'],
+         ['comprasg', 'Compras (guardar)', 'leer la factura (con otro modelo a la vez si tarda), compras en curso, guardar y anular la compra', 'cfComprasgAbrir'],
+         ['preciosg', 'Precios en tiendas (guardar)', 'definir precios, cambios sin compra, marcas de cada tienda y avisos por Telegram', 'cfPreciosgAbrir']].forEach(([k, nombre, desc, fn]) => {
             if (!(k in otros)) return;
-            const google = ['facturar', 'ficha', 'marcaje', 'cuadre', 'pagos', 'cobrar', 'nominag', 'asisg', 'horariog', 'talento'].includes(k);
+            const google = ['facturar', 'ficha', 'marcaje', 'cuadre', 'pagos', 'cobrar', 'nominag', 'asisg', 'horariog', 'talento', 'almaceng', 'comprasg', 'preciosg'].includes(k);
             const antes = google ? '<span class="chip st-pend">' + (k === 'facturar' ? 'Lee de Google' : 'Lo procesa Google') + '</span>' : '<span class="chip st-info">En Firebase</span>';
             filas.push({ si: !!otros[k], cf: !!otros[k], html: `<tr><td class="izq"><b>${nombre}</b><small>${desc}</small></td><td class="izq">${otros[k] ? chipCF : antes}</td>
                 <td class="fb-acc"><button type="button" class="${otros[k] ? 'btn-ghost' : 'btn-primary'} btn-mini" onclick="${fn}(this)">${otros[k] ? (google ? 'Volver a Google' : 'Detalle') : 'Pasar al servidor nuevo'}</button></td></tr>` });
@@ -6516,6 +6522,46 @@
         if (r && CF_AJUSTES_ACC.test(p.action)) llamarApiPedido({ action: 'cf_ajustes_traer' }).catch(() => {});
         return r;
     }
+    // (16/11) Almacén y Facturar en el servidor nuevo (las compras siguen en Google). Lo que en Google traía todo el almacén
+    // (productos, clientes, anular, importar) responde corto: el almacén se vuelve a leer del servidor nuevo (o de Google, sin ese permiso).
+    const CF_ALMACEN_ACC = /^alm_(facturar|anular|nota_marcar|ingreso_verificar|ingreso_fiscal|nota_credito|nota_modificar|espera_guardar|espera_retomar|producto_guardar|importar|cliente_guardar|proveedor_guardar|ingresar|tg_imagen)$/;
+    async function cfAlmacenEscribir(p) {
+        if (!cfModuloEncendido('almaceng')) return null;
+        const t0 = performance.now(), r = await cfEscribir(Object.assign({}, p, { modulo: 'almaceng', repetible: /^alm_(espera_guardar|espera_retomar|tg_imagen)$/.test(p.action) }));
+        if (!r) return null;
+        if (r.releerAlmacen) {
+            let datos = null;
+            try { datos = await almVivoResponder({ action: 'alm_datos' }); } catch (e) { datos = null; }
+            if (!datos) { try { datos = await DATOS.aGoogle(() => llamarApi({ action: 'alm_datos' })); } catch (e) { datos = null; } }
+            if (datos) { const x = Object.assign({}, datos, r); delete x.releerAlmacen; anotarTiempo(p.action + ' (Cloudflare)', Math.round(performance.now() - t0), 0, true); return x; }
+        }
+        anotarTiempo(p.action + ' (Cloudflare)', Math.round(performance.now() - t0), 0, true);
+        return r;
+    }
+    // (16/11) Compras con foto: leer la factura desde el servidor nuevo (sin el límite de Google y con otro modelo a la vez si tarda)
+    // y las compras en curso. Si el servidor nuevo no responde, lo hace Google como antes.
+    async function cfComprasEscribir(p) {
+        if (!cfModuloEncendido('comprasg')) return null;
+        const t0 = performance.now(), r = await cfEscribir(Object.assign({}, p, { modulo: 'comprasg', repetible: !/^cmp_(borrador_borrar|guardar|anular)$/.test(p.action) }));
+        if (r) anotarTiempo(p.action + ' (Cloudflare)', Math.round(performance.now() - t0), 0, true);
+        return r;
+    }
+    // (16/11) Precios en tiendas en el servidor nuevo: definir precios, cambios sin compra, marcas de cada tienda y avisos por Telegram.
+    // La casilla V del Libro de compras (archivo de Google) se pide a Google aparte, sin esperar.
+    async function cfPreciosEscribir(p) {
+        if (!cfModuloEncendido('preciosg')) return null;
+        const t0 = performance.now(), r = await cfEscribir(Object.assign({}, p, { modulo: 'preciosg', repetible: false }));
+        if (!r) return null;
+        if (Array.isArray(r.libroV) && r.libroV.length) llamarApiPedido({ action: 'cmp_libro_v', items: r.libroV }).catch(e => console.warn('Libro de compras (casilla V): ' + e.message));
+        anotarTiempo(p.action + ' (Cloudflare)', Math.round(performance.now() - t0), 0, true);
+        return r;
+    }
+    function cfPreciosgAbrir(btn) { return cfModuloSwitch(btn, 'preciosg', 'cf_preciosg', 'Precios en tiendas',
+        'Precios en tiendas guardará directo en el servidor nuevo: definir el precio de cada orden, cambios de precio sin compra, las marcas de "ingresado" y "precio actualizado" de cada tienda, y los avisos al grupo "Equipo de información". La casilla V del Libro de compras la sigue poniendo Google, aparte. Si el servidor nuevo no responde, se guarda en Google como antes.'); }
+    function cfComprasgAbrir(btn) { return cfModuloSwitch(btn, 'comprasg', 'cf_comprasg', 'la lectura de facturas de Compras',
+        'La foto de la factura se leerá desde el servidor nuevo: sin el límite de tiempo de Google y, si el modelo tarda, se le pide también a otro a la vez (vale el primero que responda). Las compras en curso también se guardan allá. Guardar y anular la compra también (con sus notas a las tiendas, órdenes de precio y la factura en Cuentas por pagar). Las fotos se siguen guardando en Drive y el Libro de compras lo sigue anotando Google, aparte. Si el servidor nuevo no responde, lo hace Google como antes.'); }
+    function cfAlmacengAbrir(btn) { return cfModuloSwitch(btn, 'almaceng', 'cf_almaceng', 'el Almacén y Facturar',
+        'El Almacén y Facturar guardarán directo en el servidor nuevo: notas de entrega (con su deuda o gasto de tienda), anular, modificar y pasar a crédito, ventas en espera, productos, importar, clientes, proveedores y las operaciones de inventario (devoluciones, ajustes y descuentos). La imagen de cada nota sale a Telegram desde allá. Las compras (con o sin factura) se siguen guardando en Google. Si el servidor nuevo no responde, se guarda en Google como antes.'); }
     function cfAsisgAbrir(btn) { return cfModuloSwitch(btn, 'asisg', 'cf_asisg', 'la Gestión de asistencia',
         'La Gestión de asistencia guardará directo en el servidor nuevo: corregir, agregar o quitar la asistencia de la oficina y de las tiendas, con motivo y las mismas reglas de hoy. Si el servidor nuevo no responde, se guarda en Google como antes.'); }
     function cfHorariogAbrir(btn) { return cfModuloSwitch(btn, 'horariog', 'cf_horariog', 'los Horarios de trabajo',
@@ -6969,7 +7015,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-16.8';
+    const VERSION_SERVIDOR = '2026-11-16.12';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -19539,7 +19585,7 @@ Reglas:
     // ---- Mientras Gemini lee (11/11): la foto con una línea que la recorre y los pasos de la lectura ----
     // Gemini no avisa por dónde va (responde todo junto al final): los pasos avanzan con el tiempo típico de una lectura, y el último
     // se queda "en curso" hasta que llega la respuesta. Si la conexión se corta, se reintenta solo una vez con las mismas fotos.
-    const CMP_PASOS_LECTURA = [[0, 'Enviando la foto a Google'], [3, 'Leyendo el proveedor y el RIF'], [7, 'Leyendo el número y la fecha de la factura'],
+    const CMP_PASOS_LECTURA = [[0, 'Enviando la foto'], [3, 'Leyendo el proveedor y el RIF'], [7, 'Leyendo el número y la fecha de la factura'],
         [11, 'Leyendo los productos'], [18, 'Leyendo cantidades y costos'], [26, 'Calculando el IVA y el total'], [33, 'Buscando los productos en el catálogo']];
     let cmpEsc = { desde: 0, reintento: false, pagina: 0 };
     function cmpEscanerHTML() {
@@ -19554,7 +19600,7 @@ Reglas:
         const s = (Date.now() - cmpEsc.desde) / 1000, ult = CMP_PASOS_LECTURA.filter(p => s >= p[0]).length - 1;
         return CMP_PASOS_LECTURA.map((p, i) => `<li class="${i < ult ? 'hecho' : i === ult ? 'actual' : ''}"><span class="cmp-paso-ic">${i < ult ? '✓' : ''}</span>${p[1]}${i === ult ? '...' : ''}</li>`).join('')
             + (cmpEsc.reintento ? '<li class="aviso"><span class="cmp-paso-ic">!</span>Se cortó la conexión: reintentando (no hace falta tomar la foto otra vez)...</li>'
-                : s > 45 ? '<li class="aviso"><span class="cmp-paso-ic">!</span>Gemini está tardando más de lo normal: espere un poco más...</li>' : '');
+                : s > 45 ? '<li class="aviso"><span class="cmp-paso-ic">!</span>JD Solution está tardando en responder... espere un poco más</li>' : '');
     }
     function cmpEscanerTic() {
         if (!cmp.leyendo) return;
@@ -19577,7 +19623,7 @@ Reglas:
         try {
             const imagenes = cmp.fotos.slice();
             const leer = () => Promise.race([llamarApi({ action: 'cmp_leer', imagenes, fotosAparte: true }),
-                new Promise((_, mal) => setTimeout(() => mal(new Error('Gemini tardó más de 2 minutos y medio sin responder. Vuelva a intentar en un momento; si se repite, recorte la foto a solo la factura o use "Pegar texto de otra IA".')), 150000))]);
+                new Promise((_, mal) => setTimeout(() => mal(new Error('JD Solution está tardando en responder... Pasaron más de 2 minutos y medio. Vuelva a intentar en un momento; si se repite, recorte la foto a solo la factura o use "Pegar texto de otra IA".')), 150000))]);
             let r;
             // Leer no guarda nada: si la conexión se corta (Google no llegó a responder), se vuelve a pedir una vez, solo
             try { r = await leer(); }
