@@ -1470,6 +1470,43 @@
         .cxp-bar .nom { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .cxp-bar b { white-space: nowrap; }
         .cxp-com { border-left: 3px solid var(--cxp-azul, var(--primary)); background: var(--list-bg); border-radius: 6px; padding: .4rem .6rem; margin: .3rem 0; font-size: .88rem; }
         .cxp-com small { color: var(--text-muted); display: block; }
+        /* (16/11) Aviso de diferencia de una forma de pago (Cuadre de caja), arriba de su desglose */
+        .cua-aviso-dif { display: flex; align-items: center; justify-content: space-between; gap: .5rem; flex-wrap: wrap; padding: .45rem .7rem; margin: 0 0 .5rem;
+                         background: var(--list-bg); border: 1px solid var(--border); border-radius: var(--radius); font-size: .9rem; }
+        /* (16/11) Ver una factura o préstamo: en PC ancha y en dos columnas (datos | comentarios); en el teléfono a pantalla completa.
+           Los botones quedan siempre a la vista abajo (antes había que bajar hasta el final para ver "Pagar"). */
+        .req-dlg.cxp-ver { width: min(1040px, 100%); padding: 0; display: flex; flex-direction: column; overflow: hidden; }
+        .cxp-ver-cab { padding: 1.1rem 1.5rem .6rem; border-bottom: 1px solid var(--border); }
+        .cxp-ver-cab h3 { margin: 0 0 .25rem; }
+        .cxp-ver-cab .req-sub { margin: 0; }
+        .cxp-ver-cuerpo { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: .8rem 1.5rem 1rem; display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 1.25rem; align-items: start; }
+        .cxp-ver-datos .req-tabla td { padding-top: .45rem; padding-bottom: .45rem; }
+        .cxp-ver-datos .req-tabla td:first-child { color: var(--text-muted); width: 38%; }
+        .cxp-ver-lado { background: var(--list-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: .4rem .9rem .8rem; position: sticky; top: 0; }
+        .cxp-ver-lado .per-sub { margin-top: .5rem; }
+        .cxp-ver-saldo { display: flex; gap: .75rem; flex-wrap: wrap; margin: 0 0 .75rem; }
+        .cxp-ver-saldo .kpi { flex: 1 1 140px; margin: 0; }
+        .cxp-ver-pie { margin: 0 !important; padding: .75rem 1.5rem; border-top: 1px solid var(--border); background: var(--card-bg); justify-content: flex-end; flex-wrap: wrap; }
+        .cxp-ver-datos, .cxp-ver-lado { min-width: 0; }
+        .cxp-ver-datos .req-tabla td:last-child { overflow-wrap: anywhere; }
+        .cxp-ver-wrap { overflow: visible !important; }
+        .cxp-ver-wrap > .req-tabla { min-width: 0 !important; width: 100%; table-layout: fixed; }
+        .cxp-ver-saldo .k-value { white-space: nowrap; }
+        @media (max-width: 760px) {
+            .req-dlg-fondo:has(.cxp-ver) { padding: 0; }
+            .req-dlg.cxp-ver { width: 100%; height: 100dvh; max-height: 100dvh; border-radius: 0; border: 0; }
+            .cxp-ver-cab { padding: .9rem 1rem .5rem; }
+            .cxp-ver-cuerpo { grid-template-columns: minmax(0, 1fr); padding: .6rem 1rem 1rem; gap: .75rem; }
+            .cxp-ver-lado { position: static; }
+            .cxp-ver-saldo { gap: .5rem; }
+            .cxp-ver-saldo .kpi { flex: 1 1 30%; min-width: 0; padding: .5rem .6rem; }
+            .cxp-ver-saldo .k-value { font-size: .95rem; }
+            .cxp-ver-saldo .k-label { font-size: .75rem; }
+            .cxp-ver-lado .filters { grid-template-columns: minmax(0, 1fr) auto !important; }
+            .req-dlg.cxp-ver .req-acciones.cxp-ver-pie { padding: .5rem .75rem calc(.5rem + env(safe-area-inset-bottom)); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .4rem; flex-direction: initial; }
+            .req-dlg.cxp-ver .cxp-ver-pie > button { width: 100%; margin: 0; padding: .55rem .4rem; min-height: 0; font-size: .9rem; }
+            .req-dlg.cxp-ver .cxp-ver-pie > .btn-primary { grid-column: 1 / -1; order: -1; }
+        }
         .nom-barra-seg span { white-space: nowrap; overflow: hidden; padding: 0 .4rem; } .nom-barra-seg:focus-visible { outline: 2px solid var(--text-main); outline-offset: 1px; }
         .nom-barra-pie { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-top: .45rem; font-size: .85rem; color: var(--text-muted); } .nom-barra-pie b { color: var(--text-main); }
         .alm-guardando { display: none; } .alm-guardando.activo { display: inline-flex; margin-right: .6rem; padding: .1rem .55rem; border-radius: 999px; background: var(--warn-bg); color: var(--warn); font-weight: 600; }
@@ -3570,7 +3607,7 @@
         finally { if (llaveIdem) escriturasEnCurso--; }
     }
     // Lo que no se guarda para después (necesita respuesta en el momento o es de administración de claves)
-    const NO_COLA = /^(login|ping|cambios|enlinea|nom_autorizar|adm_|alm_|cmp_|bsr_|huella_|cf_)/;   // el almacén necesita internet: la nota lleva número y existencia del momento
+    const NO_COLA = /^(login|ping|cambios|enlinea|nom_autorizar|adm_|alm_|cmp_|bsr_|bsc_|huella_|cf_|aviso_tienda)/;   // un aviso de Telegram que llega horas después confunde: sin internet no se envía   // el almacén necesita internet: la nota lleva número y existencia del momento
     COLA.configurar({ url: WEB_APP_URL, clave: () => clave, usuario: () => nombreUsuario,
         alTerminar: hechos => mostrarBanner(`Se enviaron ${hechos.length} registro(s) que estaban pendientes sin conexión.` + (hechos.some(x => x.tipo === 'panel') ? ' Pulse Actualizar para verlos.' : ''), 'ok') });
     // Identificador de este equipo (al azar, queda en el navegador): el servidor cuenta los intentos con clave incorrecta por equipo
@@ -6689,6 +6726,8 @@
     Object.assign(ICONOS, {
         area_admin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 12h18"/><path d="M11 12v2h2v-2"/></svg>',
         area_rrhh: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14.2c2.8.3 5 2.7 5 5.8"/></svg>',
+        area_bigsoft: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M8 20h8M12 16v4"/><path d="M7 8h4M7 11h7"/></svg>',
+        notasbs: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h3"/><path d="m13.5 15 1.5 1.5 3-3"/></svg>',
         area_almacen: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 4l9 5.5V20H3z"/><rect x="7" y="13" width="10" height="7"/><path d="M7 16.5h10"/></svg>',
         asisgestion: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6"/><rect x="13" y="12" width="8" height="8" rx="1.5"/><path d="M15 16l1.5 1.5L19 15"/></svg>',
         asistencia: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/><path d="m9 15 2 2 4-4"/></svg>',
@@ -6708,13 +6747,15 @@
     const AREAS = [
         { id: 'admin',   titulo: 'Administración', desc: 'Cuadres, pagos, ventas, efectivo y caja chica.' },
         { id: 'rrhh',    titulo: 'Recursos humanos', desc: 'Personal, asistencia y nómina.' },
-        { id: 'almacen', titulo: 'Almacén',        desc: 'Inventario y movimientos de mercancía.' }
+        { id: 'almacen', titulo: 'Almacén',        desc: 'Inventario y movimientos de mercancía.' },
+        // (16/11) Lo que se hace en el BigSoft de cada tienda desde aquí
+        { id: 'bigsoft', titulo: 'BigSoft',        desc: 'El sistema de cada tienda: cierres de caja, precios, reportes, notas por ingresar y listas de la ficha.' }
     ];
     // Para agregar un módulo: una línea aquí + su id en los permisos de la clave (CuadreSistema.gs)
     const MODULOS = [
         { id: 'cuadre', titulo: 'Cuadre de caja',     desc: 'Cargar montos del sistema y revisar si cada caja cuadra.', listo: true },
         { id: 'pagos',  titulo: 'Validar pagos',      desc: 'Pagos móviles y lotes de TDD contra el banco.', listo: true },
-        { id: 'cierrecaja', titulo: 'Cierre de cajas', desc: 'Cerrar a distancia la caja de un cajero en el BigSoft de la tienda. Los totales van a su ficha y a Telegram.', listo: true },
+        { id: 'cierrecaja', area: 'bigsoft', titulo: 'Cierre de cajas', desc: 'Cerrar a distancia la caja de un cajero en el BigSoft de la tienda. Los totales van a su ficha y a Telegram.', listo: true },
         { id: 'ventas', titulo: 'Visor de ventas',    desc: 'Ventas por día y por tienda, según los cuadres de caja.', listo: true },
         { id: 'efectivo', titulo: 'Control de efectivo', desc: 'Disponible, por llegar, egresos y caja chica.', listo: true },
         { id: 'cajachica', titulo: 'Caja chica',      desc: 'Gastos de caja chica con su comprobante (personal de compras).', listo: true },
@@ -6722,7 +6763,7 @@
         { id: 'cxp',    titulo: 'Cuentas por pagar',  desc: 'Facturas de proveedores y préstamos: vencimientos, retención de IVA, pronto pago, pagos y comprobantes. En tiempo real.', listo: true },
         { id: 'gastos', titulo: 'Gastos pendientes',  desc: 'Gastos pendientes por pagar.' },
         { id: 'ventaexpress', titulo: 'Venta express (tiendas)', desc: 'Facturar en una tienda sin BigSoft: ticket de 58 mm, formas de pago y cierre de caja. Funciona sin internet y se guarda en Firebase.', listo: true },
-        { id: 'listasficha', titulo: 'Listas de la ficha', desc: 'Bancos, titulares y tipos de gasto que se eligen en la ficha de las tiendas. Se guardan en Firebase.', listo: true },
+        { id: 'listasficha', area: 'bigsoft', titulo: 'Listas de la ficha', desc: 'Bancos, titulares y tipos de gasto que se eligen en la ficha de las tiendas. Se guardan en Firebase.', listo: true },
         { id: 'asistencia', area: 'rrhh',    titulo: 'Control de asistencia', desc: 'Entrada, almuerzo y salida del personal que trabaja fuera de las tiendas.', listo: true },
         { id: 'asisgestion', area: 'rrhh',   titulo: 'Gestión de asistencia', desc: 'Ver y modificar la asistencia de todos los trabajadores: oficina y locales.', listo: true },
         { id: 'talento',    area: 'rrhh',    titulo: 'Talento humano',        desc: 'Trabajadores, perfiles de sueldo y horarios por departamento.', listo: true },
@@ -6733,9 +6774,15 @@
         { id: 'inventario', area: 'almacen', titulo: 'Productos e inventario', desc: 'Catálogo de productos, existencia del almacén y movimientos.', listo: true },
         { id: 'facturar',   area: 'almacen', titulo: 'Facturar',              desc: 'Notas de entrega a clientes y tiendas, y las notas emitidas. Sin acceso al inventario ni a las entradas.', listo: true },
         { id: 'movalmacen', area: 'almacen', titulo: 'Entradas y salidas',    desc: 'Compras con foto de la factura, operaciones de inventario, notas emitidas e inversión por tienda.', listo: true },
-        { id: 'precios',    area: 'almacen', titulo: 'Precios en tiendas',    desc: 'Lo que entró al almacén: costo y precios nuevos, qué falta en cada tienda y cargarlos en su BigSoft.', listo: true },
-        { id: 'reportes',   area: 'almacen', titulo: 'Reportes de tiendas',   desc: 'Existencia, ajustes de inventario y ventas del BigSoft de cada tienda, en Excel.', listo: true }
+        { id: 'precios',    area: 'bigsoft', titulo: 'Precios en tiendas',    desc: 'Lo que entró al almacén: costo y precios nuevos, qué falta en cada tienda y cargarlos en su BigSoft.', listo: true },
+        { id: 'reportes',   area: 'bigsoft', titulo: 'Reportes de tiendas',   desc: 'Existencia, ajustes de inventario y ventas del BigSoft de cada tienda, en Excel.', listo: true },
+        // Atajo (no es un permiso aparte): las notas emitidas "Por ingresar en tienda", para quien tiene Entradas y salidas o Facturar
+        { id: 'notasbs',    area: 'bigsoft', titulo: 'Notas por ingresar',    desc: 'Notas de despacho a las tiendas que faltan por ingresar en su BigSoft. Se ingresan a distancia desde aquí.', listo: true,
+          acceso: ['movalmacen', 'facturar'], abrir: () => { irA(permisos.includes('movalmacen') ? 'movalmacen' : 'facturar'); almIrPendiente('notas', 'ingresar'); } }
     ];
+    // Módulo que puede abrir esta clave (un atajo se ve con cualquiera de sus permisos)
+    const moduloPermitido = m => m.acceso ? m.acceso.some(p => permisos.includes(p)) : permisos.includes(m.id);
+    function abrirModulo(id) { const m = MODULOS.find(x => x.id === id); if (m && m.abrir) m.abrir(); else irA(id); }
     MODULOS.forEach(m => { if (!m.area) m.area = 'admin'; });
     let areaActual = null;   // área abierta en el menú (null = menú de áreas)
     const TITULOS = { login: 'Plaza Software', menu: 'Plaza Software', cuadre: 'Cuadre de Caja vs Sistema', ventas: 'Visor de Ventas', admin: 'Claves y Permisos', pagos: 'Validar Pagos', efectivo: 'Control de Efectivo', cajachica: 'Caja Chica', reqcharcu: 'Requerimientos de Charcutería', asistencia: 'Control de Asistencia', asisgestion: 'Gestión de Asistencia', nomina: 'Nómina', talento: 'Talento Humano', horarios: 'Horarios de Trabajo', cxc: 'Cuentas por Cobrar', marcaje: 'Marcar asistencia' };
@@ -6750,7 +6797,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-15.22';
+    const VERSION_SERVIDOR = '2026-11-16.1';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -7253,7 +7300,7 @@
     }
 
     function renderMenu() {
-        const permitidos = MODULOS.filter(m => permisos.includes(m.id));
+        const permitidos = MODULOS.filter(moduloPermitido);
         const areas = AREAS.filter(a => permitidos.some(m => m.area === a.id));
         if (areaActual && !areas.some(a => a.id === areaActual)) areaActual = null;
         const abierta = areas.length === 1 ? areas[0].id : areaActual;   // con una sola área se entra directo
@@ -7280,7 +7327,7 @@
         const disponibles = permitidos.filter(m => !area || m.area === area.id);
         document.getElementById('menuModulos').innerHTML = disponibles.length
             ? disponibles.map(m => `
-                <button type="button" class="menu-btn" onclick="irA('${m.id}')">
+                <button type="button" class="menu-btn" onclick="abrirModulo('${m.id}')">
                     <span class="menu-icon">${ICONOS[m.id]}</span>
                     <span class="m-title">${m.titulo}</span>
                     <span class="m-desc">${m.desc}</span>
@@ -9257,7 +9304,7 @@
                                 <td class="dif ${c[m.key].estado}" id="dif-${m.key}"></td>
                                 <td class="dif ${c[m.key].estado}" id="difusd-${m.key}"></td>
                                 <td><span class="chip ${c[m.key].estado}" id="chip-${m.key}"></span></td>
-                            </tr>${abierto ? `<tr class="desglose"><td colspan="6">${m.key === 'bs' || m.key === 'divisas' ? cuaDesgloseHTML(f, m.key) : cuaItemsHTML(f, m.key)}</td></tr>` : ''}`;
+                            </tr>${abierto ? `<tr class="desglose"><td colspan="6">${cuaAvisoDifHTML(f, m, c[m.key], hayCambios)}${m.key === 'bs' || m.key === 'divisas' ? cuaDesgloseHTML(f, m.key) : cuaItemsHTML(f, m.key)}</td></tr>` : ''}`;
                         }).join('')}
                         <tr class="total-row">
                             <td>Venta total (sistema)</td><td></td><td id="ventaTotal"></td><td></td><td></td><td></td>
@@ -9266,6 +9313,7 @@
                 </table>
             </div>
             <div class="det-actions">
+                ${!c.sinSistema && c.estado === 'st-ok' ? `<button type="button" class="btn-ghost" id="cuaAvisoCuadra" onclick="cuaAvisar('cuadra')" ${hayCambios ? 'disabled title="Guarde primero los cambios del sistema"' : ''}>${ico('avisar')}Avisar a la tienda: cuadró</button>` : ''}
                 <button type="button" class="btn-ghost" onclick="descartar()" ${hayCambios ? '' : 'disabled'}>Descartar cambios</button>
                 <button type="button" class="btn-save" id="btnGuardar" onclick="guardar()" ${hayCambios ? '' : 'disabled'}>Guardar en la hoja</button>
             </div>
@@ -9278,6 +9326,41 @@
             ${cuaComentariosHTML(f)}
         `;
         actualizarCifras(f);
+    }
+
+    // ---------- (16/11) Avisos al grupo "Cuadre de caja <tienda>", firmados por quien tiene la sesión (Google pone la fecha y hora) ----------
+    // En cada forma de pago desplegada: la diferencia en valor absoluto. Arriba de los botones: "cuadró" (espera de verificación).
+    function cuaAvisoDifHTML(f, m, r, hayCambios) {
+        if (r.sistema === null || r.sistema === undefined || Math.abs(r.dif) < 0.01) return '';
+        return `<div class="cua-aviso-dif"><span>Diferencia en ${esc(m.nombre)}: <b>${fmtMoneda(Math.abs(r.dif), m.moneda)}</b></span>
+            <button type="button" class="btn-ghost btn-mini" id="cuaAvisoDif-${m.key}" onclick="cuaAvisar('diferencia', '${m.key}')" ${hayCambios ? 'disabled title="Guarde primero los cambios del sistema"' : ''}>${ico('avisar')}Avisar diferencia a la tienda</button></div>`;
+    }
+    async function cuaAvisar(tipo, key) {
+        const f = filas.find(x => x.fila === seleccion); if (!f) return;
+        const m = METODOS.find(x => x.key === key), r = m ? calcular(f)[m.key] : null;
+        const datos = { action: 'aviso_tienda', tipo, tienda: f.tienda, fecha: f.fecha, turno: f.turno, cajero: f.cajero };
+        if (tipo === 'diferencia') Object.assign(datos, { metodo: m.nombre, monto: Math.round(Math.abs(r.dif) * 100) / 100, moneda: m.moneda });
+        const que = tipo === 'cuadra' ? 'que la caja cuadró y queda en espera de verificación' : `la diferencia en ${m.nombre} (${fmtMoneda(Math.abs(r.dif), m.moneda)})`;
+        if (!confirm(`¿Avisar al grupo "Cuadre de caja ${f.tienda}" ${que}?\n\nCajero ${f.cajero} · ${fechaBonita(f.fecha)} · turno ${f.turno}. Va firmado con su nombre (${nombreUsuario}), la fecha y la hora.`)) return;
+        await avisoTiendaEnviar(document.getElementById(tipo === 'cuadra' ? 'cuaAvisoCuadra' : 'cuaAvisoDif-' + key), datos);
+    }
+    // Validar pagos: un pago móvil o lote que no está en el banco o tiene otro monto
+    async function pagAvisar(fila) {
+        const f = pagConc.find(x => x.fila === fila); if (!f) return;
+        const banco = f.estado === 'DIFERENCIA' ? ((f.candidatos || [])[0] || {}).credito : 0;
+        const datos = { action: 'aviso_tienda', tipo: 'pago', tienda: f.tienda, fecha: f.fecha, turno: f.turno, cajero: f.cajero,
+                        pago: { tipo: f.tipo, estado: f.estado, monto: f.monto, ref: f.ref4, banco: f.banco, titular: f.titular, montoBanco: (f.candidatos || []).length === 1 ? banco : 0 } };
+        if (!confirm(`¿Avisar al grupo "Cuadre de caja ${f.tienda}" que ${f.tipo === 'PM' ? 'el pago móvil' : 'el lote'} de Bs ${fmt(f.monto)} (${f.tipo === 'PM' ? 'ref.' : 'lote'} ${f.ref4}, ${f.banco}, ${f.titular}) ${f.estado === 'DIFERENCIA' ? 'tiene un monto distinto en el banco' : 'no está en el banco'}?\n\nCajero ${f.cajero} · ${fechaBonita(f.fecha)} · turno ${f.turno}. Va firmado con su nombre (${nombreUsuario}), la fecha y la hora.`)) return;
+        await avisoTiendaEnviar(document.getElementById('pagAviso-' + fila), datos);
+    }
+    async function avisoTiendaEnviar(btn, datos) {
+        const texto = btn ? btn.innerHTML : '';
+        if (btn) btnCargando(btn, 'Enviando...');
+        try {
+            const r = await llamarApi(datos);
+            mostrarBanner('Aviso enviado al grupo "' + r.grupo + '".', 'ok');
+            if (btn) { btn.innerHTML = ico('avisar') + 'Avisado'; btn.disabled = true; btn.title = r.texto; }
+        } catch (e) { mostrarBanner('No se envió el aviso: ' + e.message, 'error'); if (btn) { btn.disabled = false; btn.innerHTML = texto; } }
     }
 
     // ---------- Desglose del efectivo (Bs o $) de la ficha: dejó, recibió, gastó, envió ----------
@@ -11003,7 +11086,7 @@
     let admEditando = null;   // id de la clave que se edita (null = nueva)
 
     // Módulos que se pueden asignar (los del menú)
-    const MODULOS_ASIGNABLES = () => MODULOS.map(m => ({ id: m.id, titulo: m.area === 'admin' ? m.titulo : AREAS.find(a => a.id === m.area).titulo + ' · ' + m.titulo }));
+    const MODULOS_ASIGNABLES = () => MODULOS.filter(m => !m.acceso).map(m => ({ id: m.id, titulo: m.area === 'admin' ? m.titulo : AREAS.find(a => a.id === m.area).titulo + ' · ' + m.titulo }));
 
     async function apiAdmin(payload) {
         if (!WEB_APP_URL) return demoAdmin(payload);
@@ -16827,18 +16910,26 @@
             <td><button type="button" class="btn-ghost btn-mini" onclick="cxpImprimirPago('${p.id}')">${ico('imprimir')}</button></td></tr>`).join('')}</tbody></table></div>` : '';
         const desc = (d.descuentos || []).map(x => `${x.pct ? x.pct + ' %' : cxpUsd(x.monto)} si se paga completa antes del ${cxpF(cxpSumar(d.fechaFactura || d.fechaRecibida, Number(x.dias)))} (${x.dias} días)`).join('<br>');
         cxp._ver = d;
-        almVentana(`<div class="req-dlg cxp-dlg alm-dlg-ancho"><h3>${d.tipo === 'prestamo' ? 'Préstamo · ' + esc(d.banco || d.proveedor) : esc(d.proveedor) + ' · factura ' + esc(d.documento)}</h3>
+        // Lo principal arriba, a la vista: deuda, saldo y vencimiento (en la tabla queda el resto)
+        const venceTxt = d.tipo !== 'prestamo' && d.vence ? fechaBonita(d.vence) : '';
+        const vencida = venceTxt && saldo > 0 && d.vence < cxpHoy();
+        almVentana(`<div class="req-dlg cxp-dlg cxp-ver">
+            <div class="cxp-ver-cab"><h3>${d.tipo === 'prestamo' ? 'Préstamo · ' + esc(d.banco || d.proveedor) : esc(d.proveedor) + ' · factura ' + esc(d.documento)}</h3>
             <div class="req-sub">${d.estado === 'por_revisar' ? '<span class="chip st-amar">Por revisar</span>' : d.estado === 'aprobada' ? '<span class="chip st-info">Por pagar</span>' : d.estado === 'pagada' ? '<span class="chip st-ok">Pagada</span>' : d.estado === 'contado' ? '<span class="chip st-ok">Pagada al contado</span>' : '<span class="chip st-falta">Anulada</span>'}
-                ${d.registro ? ' Registrada el ' + esc(d.registro) + ' por ' + esc(d.creadoPor || '') : ''}${d.revisadoPor ? ' · revisó ' + esc(d.revisadoPor) : ''}</div>
-            <div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><tbody>
+                ${d.registro ? ' Registrada el ' + esc(d.registro) + ' por ' + esc(d.creadoPor || '') : ''}${d.revisadoPor ? ' · revisó ' + esc(d.revisadoPor) : ''}</div></div>
+            <div class="cxp-ver-cuerpo"><div class="cxp-ver-datos">
+            <div class="kpis cxp-ver-saldo"><div class="kpi"><div class="k-label">Deuda</div><div class="k-value">${cxpUsd(d.totalUsd || 0)}</div></div>
+                <div class="kpi amar"><div class="k-label">Saldo</div><div class="k-value">${cxpUsd(saldo)}</div></div>
+                ${venceTxt ? `<div class="kpi"><div class="k-label">Vence</div><div class="k-value" style="font-size:1.05rem">${venceTxt}</div>${vencida ? '<span class="chip st-falta">Vencida</span>' : `<small class="nota" style="margin:0">${d.credito || 0} días de crédito</small>`}</div>` : ''}</div>
+            <div class="tabla-wrap cxp-ver-wrap"><table class="req-tabla" data-sin-paginar><tbody>
                 ${fila('Proveedor', esc(d.proveedor) + (d.rif ? ' · ' + esc(d.rif) : ''))}${fila('Documento', esc(d.documento || '') + (d.control ? ' · control ' + esc(d.control) : ''))}
                 ${fila('Fecha de la factura', fechaBonita(d.fechaFactura))}${d.tipo !== 'prestamo' ? fila('Monto de la factura', mon(d.montoBruto || 0) + (d.moneda === 'Bs' && d.tasaFactura ? ' · tasa ' + fmt(d.tasaFactura) : '')) : fila('Capital', cxpUsd(d.capital) + ' · ' + fmt(d.tasaAnual) + ' % anual · ' + esc(d.sistema || ''))}
-                ${fiscal}${fila('Deuda', cxpUsd(d.totalUsd || 0))}${fila('Pagado', d.pagado ? cxpUsd(d.pagado) + (d.descontado ? ' (incluye ' + cxpUsd(d.descontado) + ' de descuento)' : '') : '')}
-                ${fila('Saldo', '<span style="font-size:1.1rem">' + cxpUsd(saldo) + '</span>')}${d.tipo !== 'prestamo' ? fila('Vence', d.vence ? fechaBonita(d.vence) + ' (' + (d.credito || 0) + ' días de crédito)' : '') : ''}
+                ${fiscal}${fila('Pagado', d.pagado ? cxpUsd(d.pagado) + (d.descontado ? ' (incluye ' + cxpUsd(d.descontado) + ' de descuento)' : '') : '')}
                 ${fila('Pronto pago', desc)}${fila('Nota', esc(d.nota || ''))}${fila('Foto', (d.fotos || []).map((u, i) => `<a href="${esc(u)}" target="_blank" rel="noopener">${ico('imagen')}Foto ${i + 1}</a>`).join(' '))}
                 ${d.anulada ? fila('Anulada', esc(d.anulada.quien + ' · ' + d.anulada.cuando + ' · ' + d.anulada.motivo)) : ''}${d.contado ? fila('Al contado', esc(d.contado.quien + ' · ' + d.contado.cuando + (d.contado.motivo ? ' · ' + d.contado.motivo : ''))) : ''}
-            </tbody></table></div>${cuotas}${pagos}<div id="cxpComCaja">${cxpComentariosHTML(d)}</div>
-            <div class="req-acciones" style="justify-content:flex-end">
+            </tbody></table></div>${cuotas}${pagos}</div>
+            <div class="cxp-ver-lado" id="cxpComCaja">${cxpComentariosHTML(d)}</div></div>
+            <div class="req-acciones cxp-ver-pie">
                 ${admin && d.estado !== 'anulada' && !(d.pagado > 0) ? `<button type="button" class="btn-ghost" onclick="cxpAnular('${d.id}')">Anular</button>` : ''}
                 ${admin && d.tipo !== 'prestamo' && (d.estado === 'por_revisar' || d.estado === 'aprobada') && !(d.pagado > 0) ? `<button type="button" class="btn-ghost" onclick="cxpSacarContado('${d.id}')">Fue de contado</button>` : ''}
                 ${d.retIva > 0 && d.numRet ? `<button type="button" class="btn-ghost" onclick="cxpImprimirRetencion()">${ico('imprimir')}Comprobante de retención</button>` : ''}
@@ -22421,6 +22512,7 @@ Reglas:
                 ${campoClaveAdmin(f.fila)}
                 ${cands.length || porMonto.length ? `<button type="button" class="btn-save" onclick="pagValidar(${f.fila}, true)">Validar con lo marcado</button>` : ''}
                 <button type="button" class="btn-ghost" onclick="pagValidar(${f.fila}, false)">Validar sin movimiento</button>
+                ${f.estado === 'NO_ENCONTRADO' || f.estado === 'DIFERENCIA' ? `<button type="button" class="btn-ghost" id="pagAviso-${f.fila}" onclick="pagAvisar(${f.fila})">${ico('avisar')}Avisar a la tienda</button>` : ''}
             </div></div>`;
     }
 
