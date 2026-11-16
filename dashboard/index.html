@@ -7018,7 +7018,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-16.15';
+    const VERSION_SERVIDOR = '2026-11-16.17';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -13798,6 +13798,9 @@
     }
     function nomMoverSemana(dias) { nomSemana = sumarDias(nomSemana, dias); nomDatos = null; perPintar(); }
     function nomElegirLugar(v) { nomLugar = v; perPintar(); }
+    // (16/11) Filtro de la tabla por estado: '' todos, 'pend' por cerrar, 'cerr' cerrados (pagados o no). Los totales de arriba no cambian.
+    let nomEstado = '';
+    function nomElegirEstado(v) { nomEstado = v; perPintar(); }
     // Datos de cada semana ya leídos (o en camino): la precarga deja listas la semana en curso y la anterior
     const nomCache = {};
     // Se guardó algo de asistencia o de personal en CUALQUIER módulo (p. ej. un turno agregado en Gestión de asistencia): la nómina
@@ -14086,6 +14089,7 @@
                         <small>${nomSemana === actual ? 'semana en curso (todavía no termina)' : nomSemana > actual ? 'semana futura' : 'sábado a viernes'}</small></div>
                     <button type="button" class="btn-ghost" title="Semana siguiente" onclick="nomMoverSemana(7)" ${nomSemana >= actual ? 'disabled' : ''}>›</button></div>
                 <label>Departamento o local <select onchange="nomElegirLugar(this.value)"><option value="">Todos</option>${perOpciones(perLugares(), nomLugar)}</select></label>
+                <label>Estado <select onchange="nomElegirEstado(this.value)">${[['', 'Todos'], ['pend', 'Por cerrar'], ['cerr', 'Cerrados']].map(([v, t]) => `<option value="${v}" ${nomEstado === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
                 <label class="nom-tasa">Tasa (Bs por $) <span><input type="number" id="nomTasa" step="0.0001" min="0" value="${nomTasa() || ''}" onchange="nomCambiarTasa(this.value)">
                     ${nomTasaManual ? `<button type="button" class="btn-ghost btn-mini" onclick="nomTasaManual=0;perPintar()" title="Volver a la tasa BCV de hoy">BCV ${fmt(nomTasaBcv())}</button>` : '<small>BCV de hoy</small>'}</span></label>
             </div>`;
@@ -14102,6 +14106,7 @@
         const suma = (arr, k) => r2(arr.reduce((s, n) => s + n[k], 0));
         [...nomSel].forEach(id => { if (!pend.some(n => n.t.id === id && !n.avisos.length)) nomSel.delete(id); });   // solo los que se pueden pagar
         const sel = pend.filter(n => nomSel.has(n.t.id)), pagables = pend.filter(n => !n.avisos.length);
+        const vista = nomEstado === 'pend' ? pend : nomEstado === 'cerr' ? cerr : lista;   // filas de la tabla según el filtro de estado
         const netoCerr = cerr.reduce((s, n) => s + n.cerrada.neto, 0);
         const bsCerr = r2(cerr.reduce((s, n) => s + (n.cerrada.netoBs || n.cerrada.neto * nomTasa()), 0));   // lo cerrado, en los Bs con que se cerró
         const pag = cerr.filter(n => n.cerrada.pagado), cerrSinPagar = cerr.filter(n => !n.cerrada.pagado);
@@ -14127,14 +14132,14 @@
                 <div class="kpi amar"><div class="k-label">Por pagar</div><div class="k-value">${perUsd(porPagar)}</div><div class="k-label">${porPagarBs ? 'Bs ' + fmt(porPagarBs) : 'sin tasa'}${nomTasa() ? ' · tasa ' + fmt(nomTasa()) : ''}</div></div>
             </div>
             ${nomGrafico(netoPag, porPagar, pag.length, cerrSinPagar.length + pend.length, bsPag, porPagarBs, netoCerrSin)}
-            ${lista.length ? `<div class="tabla-wrap nom-scroll"><table class="req-tabla" data-sin-paginar><thead><tr><th class="nom-col-check">${pagables.length ? `<input type="checkbox" aria-label="Marcar todos" ${sel.length && sel.length === pagables.length ? 'checked' : ''} onchange="nomMarcarTodos(this.checked)">` : ''}</th><th class="izq">Trabajador</th><th class="izq">Local o departamento</th><th>Turnos</th>
-                <th>Generado</th><th>Gastos a debitar</th><th>A cobrar</th><th class="izq">Estado</th></tr></thead><tbody>${lista.map(fila).join('')}</tbody>
-                ${pend.length ? `<tfoot class="nom-pie"><tr><td></td>${sel.length
+            ${vista.length ? `<div class="tabla-wrap nom-scroll"><table class="req-tabla" data-sin-paginar><thead><tr><th class="nom-col-check">${pagables.length ? `<input type="checkbox" aria-label="Marcar todos" ${sel.length && sel.length === pagables.length ? 'checked' : ''} onchange="nomMarcarTodos(this.checked)">` : ''}</th><th class="izq">Trabajador</th><th class="izq">Local o departamento</th><th>Turnos</th>
+                <th>Generado</th><th>Gastos a debitar</th><th>A cobrar</th><th class="izq">Estado</th></tr></thead><tbody>${vista.map(fila).join('')}</tbody>
+                ${pend.length && nomEstado !== 'cerr' ? `<tfoot class="nom-pie"><tr><td></td>${sel.length
                     ? `<td class="izq" colspan="3"><b>Seleccionados (${sel.length})</b></td><td><b>${perUsd(suma(sel, 'generado'))}</b></td><td><b>${perUsd(suma(sel, 'descontar'))}</b></td>
                        <td class="nom-pie-cobrar"><b>${perUsd(suma(sel, 'neto'))}</b> <small>${nomBs(suma(sel, 'neto'))}</small></td>`
                     : `<td class="izq" colspan="6"><small>Marque a quién se le cierra la nómina (casilla a la izquierda); aquí sale su total.</small></td>`}
                     <td><button type="button" class="btn-save btn-mini" ${sel.length ? '' : 'disabled'} onclick="nomAbrir('*')" title="Pasan a Pagos de nómina, donde se registra el pago con su comprobante">Cerrar (${sel.length})</button></td></tr></tfoot>` : ''}</table></div>`
-              : '<div class="empty">No hay trabajadores con estos filtros.</div>'}
+              : `<div class="empty">${nomEstado === 'pend' && lista.length ? 'Ya se cerró la nómina de todos los trabajadores de esta semana.' : nomEstado === 'cerr' && lista.length ? 'Todavía no se ha cerrado la nómina de ningún trabajador de esta semana.' : 'No hay trabajadores con estos filtros.'}</div>`}
             <div class="nota">Toque un trabajador para ver su detalle: turnos, horas extra, bonos y gastos. Pago por turnos según su perfil; un turno que no estaba en su horario de la semana (o, sin horario, distinto al de su perfil) o trabajar su día libre cuenta como hora extra.
                 Se descuenta todo lo que debe, sin pasar de lo que generó; lo que falte (y lo excluido) queda pendiente en Cuentas por cobrar.</div>`;
     }
