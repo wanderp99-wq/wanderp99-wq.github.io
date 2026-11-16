@@ -6499,7 +6499,8 @@
     }
     // (16/11) Gestión de asistencia, Horarios de trabajo y Talento humano en el servidor nuevo (un interruptor cada uno en Tiempos).
     // La foto de un trabajador la guarda Google en Drive (su carpeta de fotos) y allá va el enlace.
-    const CF_PERSONAL_ACC = /^(asis_corregir|asisg_(oficina_guardar|local_guardar|local_agregar|local_quitar|oficina_quitar)|hor_(guardar|telegram)|per_(trab_guardar|perfil_guardar|cli_guardar|cli_eliminar|carnet_nuevo))$/;
+    const CF_PERSONAL_ACC = /^(asis_corregir|asisg_(oficina_guardar|local_guardar|local_agregar|local_quitar|oficina_quitar)|hor_(guardar|telegram|config_guardar)|per_(trab_guardar|perfil_guardar|cli_guardar|cli_eliminar|carnet_nuevo|config_guardar|horarios_guardar|carnet_desde|asis_pausa|importar))$/;
+    const CF_AJUSTES_ACC = /^(per_(config_guardar|horarios_guardar|carnet_desde|asis_pausa)|hor_config_guardar)$/;
     async function cfPersonalEscribir(p) {
         const k = /^asis/.test(p.action) ? 'asisg' : /^hor_/.test(p.action) ? 'horariog' : 'talento';
         if (!cfModuloEncendido(k)) return null;
@@ -6511,6 +6512,8 @@
         }
         const r = await cfEscribir(datos);
         if (r) anotarTiempo(p.action + ' (Cloudflare)', Math.round(performance.now() - t0), 0, true);
+        // Un ajuste cambiado aquí: Google lo trae ya (la ficha y el marcaje que todavía pasan por Google lo usan), sin esperar la respuesta
+        if (r && CF_AJUSTES_ACC.test(p.action)) llamarApiPedido({ action: 'cf_ajustes_traer' }).catch(() => {});
         return r;
     }
     function cfAsisgAbrir(btn) { return cfModuloSwitch(btn, 'asisg', 'cf_asisg', 'la Gestión de asistencia',
@@ -6966,7 +6969,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-16.7';
+    const VERSION_SERVIDOR = '2026-11-16.8';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
