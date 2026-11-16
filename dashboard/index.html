@@ -1741,6 +1741,15 @@
         .nota { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.75rem; }
             /* ===== Caja chica: botones de moneda y gastos por verificar ===== */
         .efe-seg { flex-wrap: wrap; }
+        /* (16/11) Buscador de caja chica */
+        .cc-buscar { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; margin: 0 0 .6rem; }
+        .cc-buscar input { flex: 1 1 260px; min-width: 0; }
+        .cc-buscar .nota { margin: 0; }
+        /* (16/11) Ordenar los módulos del menú (lápiz): cada cuadro con ‹ › para moverlo */
+        .menu-lapiz-barra { display: inline-flex; gap: .4rem; margin-left: .6rem; vertical-align: middle; flex-wrap: wrap; }
+        .menu-btn.ordenando { cursor: default; position: relative; outline: 2px dashed var(--border); outline-offset: -6px; }
+        .menu-mover { display: flex; gap: .5rem; justify-content: center; margin-top: .6rem; }
+        .menu-mover button { min-width: 2.6rem; font-size: 1.1rem; }
         /* Moneda: en su propia línea, debajo de los campos, con los botones uno al lado del otro */
         .efe-moneda { grid-column: 1 / -1; order: 99; }
         .efe-moneda .efe-seg { display: inline-flex; flex-wrap: wrap; width: auto; }
@@ -2465,6 +2474,10 @@
             <div class="grafico-card"><div class="grafico-head"><h3>Movimientos de caja chica</h3>
                 <select id="efeCFiltroMoneda" class="hidden" onchange="efeRenderCaja()"><option value="">Todas las monedas</option><option value="Bs">Solo Bs efectivo</option><option value="BsE">Solo Bs electrónicos</option><option value="$">Solo $</option></select>
                 <div class="segmentado efe-seg" id="efeCFiltroBtns"><button type="button" class="activo" data-m="" onclick="efeCajaFiltro('')">Todas</button><button type="button" data-m="Bs" onclick="efeCajaFiltro('Bs')">Bs efectivo</button><button type="button" data-m="BsE" onclick="efeCajaFiltro('BsE')">Bs electr.</button><button type="button" data-m="$" onclick="efeCajaFiltro('$')">$</button></div></div>
+                <!-- (16/11) Buscador: cada palabra escrita tiene que aparecer en el concepto, el responsable, el tipo, la fecha o el monto -->
+                <div class="cc-buscar"><label for="efeCBuscar" class="sr-only">Buscar en caja chica</label>
+                    <input type="search" id="efeCBuscar" placeholder="Buscar: concepto, responsable, monto o fecha (ej. platos, Wander, 18.091, 15/11)" oninput="efeRenderCaja()" autocomplete="off">
+                    <span class="nota" id="efeCBuscarN"></span></div>
                 <div class="tabla-wrap" id="efeCTabla"></div></div>
         </div>
 
@@ -3550,6 +3563,10 @@
     async function llamarApiPedido(payload) {
         // (15/11) Efectivo y caja chica: directo al servidor nuevo cuando es el oficial (sin pasar por Google)
         if (CFEFE_ACC.test(payload.action)) { const r = await cfEfeResponder(payload); if (r) return r; }
+        // (16/11) Cuentas por cobrar: lo que se guarda va al servidor nuevo si está encendido allá
+        if (/^cxc_(registrar|modificar|comentar|verificar)$/.test(payload.action)) { const r = await cfCobrarEscribir(payload); if (r) return r; }
+        if (/^(nom_(cerrar|anular|ajuste_guardar)|pnom_(pagar|deshacer))$/.test(payload.action)) { const r = await cfNominaEscribir(payload); if (r) return r; }
+        if (CF_PERSONAL_ACC.test(payload.action)) { const r = await cfPersonalEscribir(payload); if (r) return r; }
         // (15/11) Historial de nóminas: del servidor nuevo (con la Nómina encendida allá)
         if (payload.action === 'nom_historial') { const r = await cfNomHistorial(payload); if (r) return r; }
         // (12/11) Lecturas del almacén con "Usar Firebase en el Almacén" encendido: se responden aquí con lo de Firebase (sin Google)
@@ -4432,7 +4449,7 @@
             if (p.action === 'conc_listar') return ok(conciliar(H, p.desde, p.hasta));
             return null;
         }
-        return { responder };
+        return { responder, mapearFila };
     })();
     // Hojas que cada lectura necesita, y en qué grupo de Tiempos están ("Pasar a Firebase"): sin el grupo en Firebase, la hoja de Google es la buena
     const CAJAVIVO_ACC = /^(list|cuadre_detalle|cuadre_detalle_lote|mov_listar|conc_listar)$/;
@@ -6315,9 +6332,16 @@
         [['cxp', 'Cuentas por pagar', 'facturas de proveedores, préstamos y pagos', 'cfCxpAbrir'], ['vx', 'Venta express', 'productos, tickets y cierres de las cajas', 'cfVxAbrir'],
          ['facturar', 'Facturar (quien solo factura)', 'catálogo sin existencia ni costo, últimas notas y ventas en espera', 'cfFacturarAbrir'],
          ['ficha', 'Ficha de cuadre', 'número de ficha al instante, cuadre, flujo general, gastos y créditos, asistencia y efectivo enviado', 'cfFichaAbrir'],
-         ['marcaje', 'Marcaje con carnet', 'entrada o salida al instante, puntualidad y avisos de apertura y cierre a las tiendas', 'cfMarcajeAbrir']].forEach(([k, nombre, desc, fn]) => {
+         ['marcaje', 'Marcaje con carnet', 'entrada o salida al instante, puntualidad y avisos de apertura y cierre a las tiendas', 'cfMarcajeAbrir'],
+         ['cuadre', 'Cuadre de caja (guardar)', 'montos del sistema y comentarios de cada caja, al instante', 'cfCuadreAbrir'],
+         ['pagos', 'Validar pagos (guardar)', 'movimientos del banco, validar automático y a mano, quitar validaciones', 'cfPagosAbrir'],
+         ['cobrar', 'Cuentas por cobrar (guardar)', 'deudas, gastos de tienda y abonos, modificar, comentar y verificar', 'cfCobrarAbrir'],
+         ['nominag', 'Nómina y Pagos de nómina (guardar)', 'cerrar la semana, anular, ajustes de la semana, registrar y deshacer pagos', 'cfNominaAbrir'],
+         ['asisg', 'Gestión de asistencia (guardar)', 'corregir, agregar y quitar asistencia de la oficina y de las tiendas', 'cfAsisgAbrir'],
+         ['horariog', 'Horarios de trabajo (guardar)', 'horario de la semana de cada tienda y su envío por Telegram', 'cfHorariogAbrir'],
+         ['talento', 'Talento humano (guardar)', 'trabajadores, perfiles, clientes y carnet nuevo', 'cfTalentoAbrir']].forEach(([k, nombre, desc, fn]) => {
             if (!(k in otros)) return;
-            const google = k === 'facturar' || k === 'ficha' || k === 'marcaje';
+            const google = ['facturar', 'ficha', 'marcaje', 'cuadre', 'pagos', 'cobrar', 'nominag', 'asisg', 'horariog', 'talento'].includes(k);
             const antes = google ? '<span class="chip st-pend">' + (k === 'facturar' ? 'Lee de Google' : 'Lo procesa Google') + '</span>' : '<span class="chip st-info">En Firebase</span>';
             filas.push({ si: !!otros[k], cf: !!otros[k], html: `<tr><td class="izq"><b>${nombre}</b><small>${desc}</small></td><td class="izq">${otros[k] ? chipCF : antes}</td>
                 <td class="fb-acc"><button type="button" class="${otros[k] ? 'btn-ghost' : 'btn-primary'} btn-mini" onclick="${fn}(this)">${otros[k] ? (google ? 'Volver a Google' : 'Detalle') : 'Pasar al servidor nuevo'}</button></td></tr>` });
@@ -6427,6 +6451,151 @@
             mostrarBanner(on ? 'Las fichas vuelven a procesarse en Google.' : 'Listo: las fichas se procesan en el servidor nuevo.', 'ok');
             fbEstadoDatos = null; fbEstadoCargar();
         } catch (x) { mostrarBanner('No se pudo: ' + x.message, 'error'); btn.disabled = false; btn.textContent = texto; }
+    }
+    // (16/11) Cuadre de caja: guardar los montos del sistema y los comentarios en el servidor nuevo (o, al volver, en Google)
+    async function cfCuadreAbrir(btn) {
+        const on = !!((fbEstadoDatos || {}).otros || {}).cuadre;
+        if (!confirm(on ? '¿Volver a guardar los montos del sistema y los comentarios del cuadre en Google? (más lento)'
+                        : 'Los montos del sistema y los comentarios de cada caja se guardarán directo en el servidor nuevo, al instante, con las mismas comprobaciones de hoy. Las correcciones con clave de administrador siguen por Google. Si el servidor nuevo no responde, se guarda en Google como antes.\n\n¿Encender?')) return;
+        const texto = btn.textContent; btnCargando(btn, on ? 'Volviendo...' : 'Encendiendo...');
+        try {
+            await DATOS.aGoogle(() => llamarApi({ action: 'cf_cuadre', activar: !on }));
+            cfSes.modHora = 0;
+            mostrarBanner(on ? 'El cuadre vuelve a guardar en Google.' : 'Listo: el cuadre guarda en el servidor nuevo.', 'ok');
+            fbEstadoDatos = null; fbEstadoCargar();
+        } catch (x) { mostrarBanner('No se pudo: ' + x.message, 'error'); btn.disabled = false; btn.textContent = texto; }
+    }
+    // (16/11) Cuentas por cobrar en el servidor nuevo. La foto (factura o comprobante) la guarda Google en Drive y allá va el enlace.
+    // null = que lo haga Google (apagado allá o sin conexión antes de guardar). La respuesta es la misma de Google (con las deudas al día).
+    async function cfCobrarEscribir(p) {
+        if (!cfModuloEncendido('cobrar')) return null;
+        const t0 = performance.now(), datos = Object.assign({}, p, { action: 'cobrar_' + p.action.slice(4), modulo: 'cobrar' });
+        delete datos.comprobante;
+        if (p.comprobante && p.comprobante.base64) {
+            const f = await llamarApiPedido({ action: 'cf_foto', comprobante: p.comprobante, fecha: p.fecha || '', moneda: p.moneda || '', monto: p.monto || 0,
+                                             concepto: (p.action === 'cxc_modificar' ? 'Factura corregida ' + p.ref : (p.tipo === 'ABONO' ? 'Abono ' : 'CxC ') + (p.descripcion || '')) });
+            datos.comprobanteUrl = f.url;
+        }
+        const r = await cfEscribir(datos);
+        if (r) anotarTiempo(p.action + ' (Cloudflare)', Math.round(performance.now() - t0), 0, true);
+        return r;
+    }
+    // (16/11) Nómina (cerrar, anular, ajustes) y Pagos de nómina en el servidor nuevo; el comprobante del pago lo guarda Google en Drive
+    async function cfNominaEscribir(p) {
+        if (!cfModuloEncendido('nominag')) return null;
+        const t0 = performance.now(), accion = { nom_cerrar: 'cerrar', nom_anular: 'anular', nom_ajuste_guardar: 'ajuste_guardar', pnom_pagar: 'pagar', pnom_deshacer: 'deshacer' }[p.action];
+        const datos = Object.assign({}, p, { action: 'nomina_' + accion, modulo: 'nominag', repetible: p.action === 'nom_ajuste_guardar' });
+        delete datos.comprobante;
+        if (p.comprobante && p.comprobante.base64) {
+            const sel = (pnomDatos || []).filter(x => (p.filas || []).map(Number).includes(x.fila));
+            const usd = sel.reduce((s, x) => s + (x.neto || 0), 0), bs = sel.reduce((s, x) => s + (x.netoBs || 0), 0);
+            const f = await llamarApiPedido({ action: 'cf_foto', comprobante: p.comprobante, fecha: p.fecha || '', moneda: bs ? 'Bs' : '$', monto: Math.round((bs || usd) * 100) / 100,
+                                             concepto: 'Pago nómina ' + sel.map(x => x.trabajador).join(', ').slice(0, 80) });
+            datos.comprobanteUrl = f.url;
+        }
+        const r = await cfEscribir(datos);
+        if (r) anotarTiempo(p.action + ' (Cloudflare)', Math.round(performance.now() - t0), 0, true);
+        return r;
+    }
+    // (16/11) Gestión de asistencia, Horarios de trabajo y Talento humano en el servidor nuevo (un interruptor cada uno en Tiempos).
+    // La foto de un trabajador la guarda Google en Drive (su carpeta de fotos) y allá va el enlace.
+    const CF_PERSONAL_ACC = /^(asis_corregir|asisg_(oficina_guardar|local_guardar|local_agregar|local_quitar|oficina_quitar)|hor_(guardar|telegram)|per_(trab_guardar|perfil_guardar|cli_guardar|cli_eliminar|carnet_nuevo))$/;
+    async function cfPersonalEscribir(p) {
+        const k = /^asis/.test(p.action) ? 'asisg' : /^hor_/.test(p.action) ? 'horariog' : 'talento';
+        if (!cfModuloEncendido(k)) return null;
+        const t0 = performance.now(), datos = Object.assign({}, p, { modulo: k, repetible: p.action === 'hor_guardar' });
+        delete datos.foto;
+        if (p.foto && p.foto.base64) {
+            const f = await llamarApiPedido({ action: 'cf_foto', tipoFoto: 'trabajador', nombre: String(p.nombre || '').trim(), comprobante: p.foto });
+            datos.fotoUrl = f.url;
+        }
+        const r = await cfEscribir(datos);
+        if (r) anotarTiempo(p.action + ' (Cloudflare)', Math.round(performance.now() - t0), 0, true);
+        return r;
+    }
+    function cfAsisgAbrir(btn) { return cfModuloSwitch(btn, 'asisg', 'cf_asisg', 'la Gestión de asistencia',
+        'La Gestión de asistencia guardará directo en el servidor nuevo: corregir, agregar o quitar la asistencia de la oficina y de las tiendas, con motivo y las mismas reglas de hoy. Si el servidor nuevo no responde, se guarda en Google como antes.'); }
+    function cfHorariogAbrir(btn) { return cfModuloSwitch(btn, 'horariog', 'cf_horariog', 'los Horarios de trabajo',
+        'Los Horarios de trabajo guardarán directo en el servidor nuevo el horario de la semana de cada tienda, y el envío por Telegram al grupo de la tienda y a sus encargados saldrá desde allá. La composición de las tiendas se sigue guardando en Google. Si el servidor nuevo no responde, se guarda en Google como antes.'); }
+    function cfTalentoAbrir(btn) { return cfModuloSwitch(btn, 'talento', 'cf_talento', 'Talento humano',
+        'Talento humano guardará directo en el servidor nuevo: trabajadores (con su foto en Drive), perfiles, clientes, eliminar clientes y carnet nuevo. El sueldo mínimo, los horarios de los turnos, la asistencia con carnet, la pausa, los equipos de marcaje e importar la lista de la ficha se siguen guardando en Google. Si el servidor nuevo no responde, se guarda en Google como antes.'); }
+    function cfNominaAbrir(btn) { return cfModuloSwitch(btn, 'nominag', 'cf_nomina', 'la Nómina',
+        'La Nómina guardará directo en el servidor nuevo: cerrar la semana (con el descuento de las deudas en Cuentas por cobrar), anular un cierre, los ajustes de la semana y, en Pagos de nómina, registrar o deshacer un pago, con las mismas reglas de hoy. Los comprobantes se siguen guardando en Drive. Si el servidor nuevo no responde, se guarda en Google como antes.'); }
+    function cfCobrarAbrir(btn) { return cfModuloSwitch(btn, 'cobrar', 'cf_cobrar', 'Cuentas por cobrar',
+        'Cuentas por cobrar guardará directo en el servidor nuevo: registrar deudas, gastos y abonos, modificar, comentar y verificar gastos de tienda, con las mismas reglas de hoy. Las fotos se siguen guardando en Drive. Si el servidor nuevo no responde, se guarda en Google como antes.'); }
+    async function cfModuloSwitch(btn, k, accion, nombre, texto) {
+        const on = !!((fbEstadoDatos || {}).otros || {})[k];
+        if (!confirm(on ? '¿Volver a guardar ' + nombre + ' en Google? (más lento)' : texto + '\n\n¿Encender?')) return;
+        const t = btn.textContent; btnCargando(btn, on ? 'Volviendo...' : 'Encendiendo...');
+        try {
+            await DATOS.aGoogle(() => llamarApi({ action: accion, activar: !on }));
+            cfSes.modHora = 0;
+            mostrarBanner(on ? nombre + ' vuelve a guardar en Google.' : 'Listo: ' + nombre + ' guarda en el servidor nuevo.', 'ok');
+            fbEstadoDatos = null; fbEstadoCargar();
+        } catch (x) { mostrarBanner('No se pudo: ' + x.message, 'error'); btn.disabled = false; btn.textContent = t; }
+    }
+    // (16/11) Validar pagos: guardar en el servidor nuevo (o, al volver, en Google)
+    async function cfPagosAbrir(btn) {
+        const on = !!((fbEstadoDatos || {}).otros || {}).pagos;
+        if (!confirm(on ? '¿Volver a guardar Validar pagos en Google? (más lento)'
+                        : 'Validar pagos guardará directo en el servidor nuevo: los movimientos del banco, "Validar coincidencias", validar a mano y quitar validaciones, con las mismas reglas de hoy y su registro en BD VALIDACIONES. Si el servidor nuevo no responde, se guarda en Google como antes.\n\n¿Encender?')) return;
+        const texto = btn.textContent; btnCargando(btn, on ? 'Volviendo...' : 'Encendiendo...');
+        try {
+            await DATOS.aGoogle(() => llamarApi({ action: 'cf_pagos', activar: !on }));
+            cfSes.modHora = 0;
+            mostrarBanner(on ? 'Validar pagos vuelve a guardar en Google.' : 'Listo: Validar pagos guarda en el servidor nuevo.', 'ok');
+            fbEstadoDatos = null; fbEstadoCargar();
+        } catch (x) { mostrarBanner('No se pudo: ' + x.message, 'error'); btn.disabled = false; btn.textContent = texto; }
+    }
+    // (16/11) Correcciones con clave del cuadre (agregar, corregir o eliminar un renglón, pago externo de TDD): en el servidor nuevo si el
+    // cuadre está encendido allá. La respuesta queda igual que la de Google: la caja, su desglose (leído del servidor nuevo) y sus comentarios.
+    async function cuaCorregirApi(p) {
+        const cf = await cfEscribir(Object.assign({}, p, { action: p.action + '_cf', modulo: 'cuadre' }));
+        if (!cf) return llamarApi(p);
+        if (p.action === 'cuadre_borrar') return Object.assign({ ok: true }, cf);   // la caja ya no está: sin fila ni desglose
+        const fila = CAJAFB.mapearFila(cf.filaR, p.fila);
+        // Total, efectivo y fecha: Google tampoco manda el desglose (se vuelve a leer al abrirlo)
+        if (/^cuadre_(total|efectivo|fecha)$/.test(p.action)) return { ok: true, hojas: cf.hojas, fila, comentarios: cf.comentarios, avisos: cf.avisos || [] };
+        const det = (await cfCajaResponder({ action: 'cuadre_detalle', fila: p.fila, control: { tienda: fila.tienda, cajero: fila.cajero, turno: fila.turno, fecha: fila.fecha } }))
+                    || (await llamarApi({ action: 'cuadre_detalle', fila: p.fila, control: { tienda: fila.tienda, cajero: fila.cajero, turno: fila.turno, fecha: fila.fecha } }).catch(() => ({})));
+        return Object.assign({}, det, { ok: true, hojas: cf.hojas, fila, comentarios: cf.comentarios }, cf.externo ? { externo: Object.assign({}, det.externo || {}, cf.externo) } : {});
+    }
+    // Lo que guarda Validar pagos, por el servidor nuevo si está encendido allá (null = que lo haga Google)
+    async function cfPagosEscribir(p) {
+        if (!cfModuloEncendido('pagos')) return null;
+        const base = { modulo: 'pagos', claveAdmin: p.claveAdmin };
+        if (p.action === 'mov_guardar') return cfEscribir(Object.assign(base, { action: 'pagos_mov_guardar', movimientos: p.movimientos, archivo: p.archivo, repetible: true }));
+        if (p.action === 'conc_manual' || p.action === 'conc_manual_lote') {
+            const lote = p.action === 'conc_manual_lote';
+            const r = await cfEscribir(Object.assign(base, { action: 'pagos_validar', lote, nota: p.nota || '', items: lote ? p.items : [{ fila: p.fila, movIds: p.movIds || [], nota: p.nota || '' }] }));
+            if (r && !lote && (r.errores || []).length) throw new Error(String(r.errores[0]).replace(/^Fila \d+: /, ''));
+            return r;
+        }
+        if (p.action === 'conc_desmarcar' || p.action === 'conc_desmarcar_lote')
+            return cfEscribir(Object.assign(base, { action: 'pagos_desmarcar', lote: p.action === 'conc_desmarcar_lote', filas: p.filas || [p.fila], nota: p.nota || '' }));
+        if (p.action === 'conc_aplicar') {
+            // Las coincidencias se calculan aquí con los datos del servidor nuevo (la misma cuenta de Google) y allá se marcan
+            const antes = await cfCajaResponder({ action: 'conc_listar', desde: p.desde, hasta: p.hasta });
+            if (!antes) return null;
+            const items = (antes.filas || []).filter(f => f.estado === 'COINCIDE').map(f => ({ fila: f.fila, movIds: (f.asociados || []).map(m => m.id) }));
+            let aplicadas = 0;
+            if (items.length) { const r = await cfEscribir(Object.assign(base, { action: 'pagos_validar', auto: true, items })); if (!r) return null; aplicadas = r.aplicadas || 0; }
+            const despues = await cfCajaResponder({ action: 'conc_listar', desde: p.desde, hasta: p.hasta });
+            return despues ? Object.assign({}, despues, { aplicadas, porAplicar: 0 }) : { ok: true, aplicadas, filas: antes.filas };
+        }
+        return null;
+    }
+    // Guardar en el servidor nuevo con la sesión: su respuesta; null = que lo haga Google (apagado allá, o sin conexión con él antes de enviar)
+    async function cfEscribir(datos) {
+        if (!cfModuloEncendido(datos.modulo)) return null;
+        let t; try { t = await cfToken(); } catch (e) { return null; }
+        let r;
+        try { r = await cfPedir(Object.assign({}, datos, { token: t })); }
+        catch (e) { if (datos.repetible) { cfSes.roto = Date.now(); return null; } throw new Error('Sin conexión con el servidor nuevo. Revise si quedó guardado antes de repetirlo.'); }   // lo que se puede repetir sin duplicar, va a Google
+        if (r && r.noAqui) { cfSes.modHora = 0; return null; }
+        if (r && r.sesion === false) { cfSes.token = ''; return null; }
+        if (!r || !r.ok) throw new Error((r && r.error) || 'El servidor nuevo no respondió');
+        return r;
     }
     // (15/11) El marcaje con carnet procesado en el servidor nuevo (entrada o salida al instante) o, al volver, en Google como antes
     async function cfMarcajeAbrir(btn) {
@@ -6797,7 +6966,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-16.1';
+    const VERSION_SERVIDOR = '2026-11-16.7';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -7166,6 +7335,7 @@
         if (vista === 'menu' || vista === 'admin') avisarScriptViejo();
 
         if (vista === 'login') setTimeout(() => document.getElementById('loginClave').focus(), 0);
+        if (vista !== 'menu') menuOrdenando = false;   // salir del menú termina de ordenar
         if (vista === 'menu') { renderMenu(); menuVigilarEnLinea(); }
         if (vista === 'admin') admMostrar();
         if (vista === 'pagos') pagIniciar();
@@ -7299,41 +7469,65 @@
         atrasArmar();   // dentro de un área, el atrás del teléfono vuelve a las áreas (antes salía de la aplicación)
     }
 
+    // (16/11) Orden del menú elegido con el lápiz: por persona, en este equipo. { _areas: [ids], <área>: [ids de módulos] }
+    let menuOrdenando = false;
+    const menuOrdenLlave = () => 'menu_orden_' + normalizar(nombreUsuario || 'x');
+    function menuOrden() { try { return JSON.parse(localStorage.getItem(menuOrdenLlave()) || '{}') || {}; } catch (e) { return {}; } }
+    function menuOrdenGuardar(o) { try { localStorage.setItem(menuOrdenLlave(), JSON.stringify(o)); } catch (e) {} }
+    // Lo guardado primero (en su orden) y lo nuevo al final, en el orden de siempre
+    const menuOrdenar = (lista, clave) => { const o = menuOrden()[clave] || []; return lista.slice().sort((a, b) => { const x = o.indexOf(a.id), y = o.indexOf(b.id); return (x < 0 ? 999 : x) - (y < 0 ? 999 : y); }); };
+    let menuVisibles = {};   // clave -> ids en pantalla (para mover con ‹ ›)
+    function menuMover(clave, id, paso) {
+        const ids = (menuVisibles[clave] || []).slice(), i = ids.indexOf(id), j = i + paso;
+        if (i < 0 || j < 0 || j >= ids.length) return;
+        [ids[i], ids[j]] = [ids[j], ids[i]];
+        const o = menuOrden(); o[clave] = ids; menuOrdenGuardar(o);
+        renderMenu();
+    }
+    function menuOrdenarCambiar(on) { menuOrdenando = on; renderMenu(); }
+    function menuOrdenRestablecer(clave) { const o = menuOrden(); delete o[clave]; menuOrdenGuardar(o); renderMenu(); }
+    const menuLapiz = clave => menuOrdenando
+        ? `<span class="menu-lapiz-barra"><button type="button" class="btn-primary btn-mini" onclick="menuOrdenarCambiar(false)">✓ Listo</button><button type="button" class="btn-ghost btn-mini" onclick="menuOrdenRestablecer('${clave}')">Orden de siempre</button></span>`
+        : `<span class="menu-lapiz-barra"><button type="button" class="btn-ghost btn-mini" onclick="menuOrdenarCambiar(true)" title="Cambiar el orden de los cuadros">✎ Ordenar</button></span>`;
+    const menuFlechas = (clave, id, i, n) => `<span class="menu-mover"><button type="button" class="btn-ghost btn-mini" aria-label="Mover antes" ${i === 0 ? 'disabled' : ''} onclick="menuMover('${clave}', '${id}', -1)">‹</button>
+        <button type="button" class="btn-ghost btn-mini" aria-label="Mover después" ${i === n - 1 ? 'disabled' : ''} onclick="menuMover('${clave}', '${id}', 1)">›</button></span>`;
     function renderMenu() {
         const permitidos = MODULOS.filter(moduloPermitido);
-        const areas = AREAS.filter(a => permitidos.some(m => m.area === a.id));
+        const areas = menuOrdenar(AREAS.filter(a => permitidos.some(m => m.area === a.id)), '_areas');
         if (areaActual && !areas.some(a => a.id === areaActual)) areaActual = null;
         const abierta = areas.length === 1 ? areas[0].id : areaActual;   // con una sola área se entra directo
         const sub = document.querySelector('#vistaMenu .menu-sub');
+        // Cuadro: botón normal, o (ordenando) un cuadro quieto con ‹ › para moverlo
+        const cuadro = (onclick, contenido, clave, id, i, n) => menuOrdenando
+            ? `<div class="menu-btn ordenando">${contenido}${menuFlechas(clave, id, i, n)}</div>`
+            : `<button type="button" class="menu-btn" onclick="${onclick}">${contenido}</button>`;
         if (!abierta && areas.length) {
-            sub.textContent = 'Dashboard general · Seleccione un área';
-            document.getElementById('menuModulos').innerHTML = areas.map(a => {
+            sub.innerHTML = 'Dashboard general · Seleccione un área' + (areas.length > 1 ? menuLapiz('_areas') : '');
+            menuVisibles._areas = areas.map(a => a.id);
+            document.getElementById('menuModulos').innerHTML = areas.map((a, i) => {
                 const mods = permitidos.filter(m => m.area === a.id), listos = mods.filter(m => m.listo).length;
-                return `
-                <button type="button" class="menu-btn" onclick="abrirArea('${a.id}')">
+                return cuadro(`abrirArea('${a.id}')`, `
                     <span class="menu-icon">${ICONOS['area_' + a.id]}</span>
                     <span class="m-title">${a.titulo}</span>
                     <span class="m-desc">${a.desc}</span>
                     ${listos ? `<span class="m-estado listo-n">${mods.length} módulo${mods.length === 1 ? '' : 's'}</span>` : '<span class="chip st-pend">En construcción</span>'}
-                    <span class="m-pend" data-pend-area="${a.id}"></span>
-                </button>`; }).join('');
+                    <span class="m-pend" data-pend-area="${a.id}"></span>`, '_areas', a.id, i, areas.length); }).join('');
             pendPintarMenu();
             return;
         }
-        const area = AREAS.find(a => a.id === abierta);
-        sub.innerHTML = areas.length > 1
+        const area = AREAS.find(a => a.id === abierta), clave = area ? area.id : '_todos';
+        const disponibles = menuOrdenar(permitidos.filter(m => !area || m.area === area.id), clave);
+        sub.innerHTML = (areas.length > 1
             ? `<a href="#" class="menu-volver" onclick="abrirArea(null); return false;">← Áreas</a> <b>${area.titulo}</b> · Seleccione un módulo`
-            : 'Seleccione un módulo';
-        const disponibles = permitidos.filter(m => !area || m.area === area.id);
+            : 'Seleccione un módulo') + (disponibles.length > 1 ? menuLapiz(clave) : '');
+        menuVisibles[clave] = disponibles.map(m => m.id);
         document.getElementById('menuModulos').innerHTML = disponibles.length
-            ? disponibles.map(m => `
-                <button type="button" class="menu-btn" onclick="abrirModulo('${m.id}')">
+            ? disponibles.map((m, i) => cuadro(`abrirModulo('${m.id}')`, `
                     <span class="menu-icon">${ICONOS[m.id]}</span>
                     <span class="m-title">${m.titulo}</span>
                     <span class="m-desc">${m.desc}</span>
                     ${m.listo ? `<span class="m-estado" data-mod="${m.id}"></span>` : '<span class="chip st-pend">En construcción</span>'}
-                    <span class="m-pend" data-pend-mod="${m.id}"></span>
-                </button>`).join('')
+                    <span class="m-pend" data-pend-mod="${m.id}"></span>`, clave, m.id, i, disponibles.length)).join('')
             : '<div class="empty">Esta clave no tiene módulos habilitados.</div>';
         pintarEstadoMenu();
         pendPintarMenu();
@@ -7909,12 +8103,12 @@
         mostrarBanner(`Guardando: ${f.tienda} · ${f.turno} · ${f.cajero}...`, 'cargando');
         render();
         try {
-            const data = await llamarApi({
-                action: 'save',
-                fila: f.fila,
-                control: { tienda: f.tienda, cajero: f.cajero, turno: f.turno, fecha: f.fecha },
-                sistema: cambios
-            });
+            const pedido = { action: 'save', fila: f.fila, control: { tienda: f.tienda, cajero: f.cajero, turno: f.turno, fecha: f.fecha }, sistema: cambios };
+            // (16/11) Con el cuadre encendido en el servidor nuevo se guarda allá al instante (guardar otra vez lo mismo no duplica nada)
+            const t0 = performance.now();
+            const cf = await cfEscribir(Object.assign({}, pedido, { action: 'cuadre_save', modulo: 'cuadre', repetible: true }));
+            if (cf) anotarTiempo('save (Cloudflare)', Math.round(performance.now() - t0), 0, true);
+            const data = cf ? { fila: CAJAFB.mapearFila(cf.filaR, f.fila) } : await llamarApi(pedido);
             const i = filas.findIndex(x => x.fila === f.fila);
             if (i !== -1 && data.fila) filas[i] = Object.assign({ comentarios: filas[i].comentarios }, data.fila);   // (sin fila = ya estaba guardado)   // los comentarios no vienen al guardar
             guardandoFilas.delete(f.fila);
@@ -9347,10 +9541,9 @@
     // Validar pagos: un pago móvil o lote que no está en el banco o tiene otro monto
     async function pagAvisar(fila) {
         const f = pagConc.find(x => x.fila === fila); if (!f) return;
-        const banco = f.estado === 'DIFERENCIA' ? ((f.candidatos || [])[0] || {}).credito : 0;
         const datos = { action: 'aviso_tienda', tipo: 'pago', tienda: f.tienda, fecha: f.fecha, turno: f.turno, cajero: f.cajero,
-                        pago: { tipo: f.tipo, estado: f.estado, monto: f.monto, ref: f.ref4, banco: f.banco, titular: f.titular, montoBanco: (f.candidatos || []).length === 1 ? banco : 0 } };
-        if (!confirm(`¿Avisar al grupo "Cuadre de caja ${f.tienda}" que ${f.tipo === 'PM' ? 'el pago móvil' : 'el lote'} de Bs ${fmt(f.monto)} (${f.tipo === 'PM' ? 'ref.' : 'lote'} ${f.ref4}, ${f.banco}, ${f.titular}) ${f.estado === 'DIFERENCIA' ? 'tiene un monto distinto en el banco' : 'no está en el banco'}?\n\nCajero ${f.cajero} · ${fechaBonita(f.fecha)} · turno ${f.turno}. Va firmado con su nombre (${nombreUsuario}), la fecha y la hora.`)) return;
+                        pago: { tipo: f.tipo, estado: f.estado, monto: f.monto, ref: f.ref4, banco: f.banco, titular: f.titular } };
+        if (!confirm(`¿Avisar al grupo "Cuadre de caja ${f.tienda}" que ${f.tipo === 'PM' ? 'el pago móvil' : 'el lote'} de Bs ${fmt(f.monto)} (${f.tipo === 'PM' ? 'ref.' : 'lote'} ${f.ref4}, ${f.banco}, ${f.titular}) no se encuentra en el banco?\n\nCajero ${f.cajero} · ${fechaBonita(f.fecha)} · turno ${f.turno}. Va firmado con su nombre (${nombreUsuario}), la fecha y la hora.`)) return;
         await avisoTiendaEnviar(document.getElementById('pagAviso-' + fila), datos);
     }
     async function avisoTiendaEnviar(btn, datos) {
@@ -10424,7 +10617,7 @@
         const btn = document.getElementById('cuaFaltBtn');
         if (btn) btnCargando(btn, 'Cargando...');
         try {
-            const r = await llamarApi({ action: 'cuadre_agregar', fila: f.fila, tipo: 'credito', claveAdmin: cAdmin, control: cuaControl(f),
+            const r = await cuaCorregirApi({ action: 'cuadre_agregar', fila: f.fila, tipo: 'credito', claveAdmin: cAdmin, control: cuaControl(f),
                 datos: { monto: bs, cliente: f.cajero, descripcion: `FALTANTE DE CAJA ficha ${f.ficha} (${fmtMoneda(usd, '$')})` },
                 motivo: 'Faltante de caja cargado a la nómina del cajero' });
             claveAdmin = cAdmin;
@@ -10455,7 +10648,7 @@
         if (!cAdmin) { mostrarBanner('Escriba la clave de administrador.', 'warn'); return; }
         btnCargando(document.getElementById('cuaa-guardar'), 'Agregando...');
         try {
-            const r = await llamarApi({ action: 'cuadre_agregar', fila: f.fila, tipo, datos, motivo, claveAdmin: cAdmin, control: cuaControl(f) });
+            const r = await cuaCorregirApi({ action: 'cuadre_agregar', fila: f.fila, tipo, datos, motivo, claveAdmin: cAdmin, control: cuaControl(f) });
             claveAdmin = cAdmin;
             const i = filas.findIndex(x => x.fila === f.fila);
             if (i >= 0 && r.fila) filas[i] = Object.assign({ comentarios: r.comentarios || filas[i].comentarios }, r.fila);
@@ -10575,7 +10768,8 @@
         if (!WEB_APP_URL) { mostrarBanner('En modo demostración no se guardan comentarios.', 'error'); return; }
         btnCargando(document.getElementById('cuaComentBtn'), 'Guardando...');
         try {
-            const r = await llamarApi({ action: 'cuadre_coment', fila, texto, control: cuaControl(f) });
+            const pedido = { action: 'cuadre_coment', fila, texto, control: cuaControl(f) };
+            const r = (await cfEscribir(Object.assign({}, pedido, { action: 'cuadre_coment_cf', modulo: 'cuadre' }))) || await llamarApi(pedido);   // (16/11) servidor nuevo si está encendido
             f.comentarios = r.comentarios || [];
             delete cuaComentBorrador[fila];
             mostrarBanner('Comentario agregado.', 'ok');
@@ -10662,7 +10856,7 @@
                 render();
                 return;
             }
-            const r = await llamarApi({ action: 'cuadre_total', fila: f.fila, tipo: key, anterior, nuevo, motivo, claveAdmin: cAdmin,
+            const r = await cuaCorregirApi({ action: 'cuadre_total', fila: f.fila, tipo: key, anterior, nuevo, motivo, claveAdmin: cAdmin,
                                         control: { tienda: f.tienda, cajero: f.cajero, turno: f.turno, fecha: f.fecha } });
             claveAdmin = cAdmin;
             const i = filas.findIndex(x => x.fila === f.fila);
@@ -10679,7 +10873,7 @@
 
     // Guarda el pago externo de TDD de una caja (CUADRE DE CAJA: AO, AP y T) y actualiza todo lo que está en pantalla
     async function guardarExterno(f, anterior, nuevo, comentario, motivo, cAdmin) {
-        const r = await llamarApi({ action: 'cuadre_externo', fila: f.fila, anterior, nuevo, comentario, motivo, claveAdmin: cAdmin, control: cuaControl(f) });
+        const r = await cuaCorregirApi({ action: 'cuadre_externo', fila: f.fila, anterior, nuevo, comentario, motivo, claveAdmin: cAdmin, control: cuaControl(f) });
         claveAdmin = cAdmin;
         const i = filas.findIndex(x => x.fila === f.fila);
         if (i >= 0 && r.fila) filas[i] = Object.assign({ comentarios: r.comentarios || filas[i].comentarios }, r.fila);
@@ -10736,7 +10930,7 @@
         const btn = document.getElementById('cuab-guardar');
         btnCargando(btn, 'Eliminando...');
         try {
-            const r = await llamarApi({ action: 'cuadre_eliminar', fila: f.fila, motivo, claveAdmin: cAdmin, control: cuaControl(f),
+            const r = await cuaCorregirApi({ action: 'cuadre_eliminar', fila: f.fila, motivo, claveAdmin: cAdmin, control: cuaControl(f),
                                         item: { hoja: item.hoja, fila: item.fila, tipo: item.tipo }, anterior: { monto: item.monto, ref: item.ref } });
             claveAdmin = cAdmin;
             const i = filas.findIndex(x => x.fila === f.fila);
@@ -10787,7 +10981,7 @@
         const btn = document.getElementById('cuaf-guardar');
         btnCargando(btn, 'Cambiando...');
         try {
-            const r = await llamarApi({ action: 'cuadre_fecha', fila: f.fila, nueva, motivo, claveAdmin: cAdmin, control: cuaControl(f) });
+            const r = await cuaCorregirApi({ action: 'cuadre_fecha', fila: f.fila, nueva, motivo, claveAdmin: cAdmin, control: cuaControl(f) });
             claveAdmin = cAdmin;
             const i = filas.findIndex(x => x.fila === f.fila);
             if (i >= 0 && r.fila) filas[i] = Object.assign({ comentarios: r.comentarios || filas[i].comentarios }, r.fila);
@@ -10831,7 +11025,7 @@
         const btn = document.getElementById('cuab-borrar');
         btnCargando(btn, 'Eliminando...');
         try {
-            const r = await llamarApi({ action: 'cuadre_borrar', fila: f.fila, motivo, claveAdmin: cAdmin, control: cuaControl(f) });
+            const r = await cuaCorregirApi({ action: 'cuadre_borrar', fila: f.fila, motivo, claveAdmin: cAdmin, control: cuaControl(f) });
             claveAdmin = cAdmin;
             filas = filas.filter(x => x.fila !== f.fila);
             delete cuaItems[f.fila]; delete borradores[f.fila];
@@ -10868,7 +11062,7 @@
         const btn = document.getElementById('cuai-guardar');
         btnCargando(btn, 'Guardando...');
         try {
-            const r = await llamarApi({ action: 'cuadre_item', fila: f.fila, motivo, claveAdmin: cAdmin, anteriores, nuevos,
+            const r = await cuaCorregirApi({ action: 'cuadre_item', fila: f.fila, motivo, claveAdmin: cAdmin, anteriores, nuevos,
                                         item: { hoja: item.hoja, fila: item.fila, tipo: item.tipo },
                                         control: { tienda: f.tienda, cajero: f.cajero, turno: f.turno, fecha: f.fecha } });
             claveAdmin = cAdmin;
@@ -10965,7 +11159,7 @@
         const btn = document.getElementById('cua-guardar');
         btnCargando(btn, 'Guardando...');
         try {
-            const r = await llamarApi({ action: 'cuadre_efectivo', fila, motivo, claveAdmin: cAdmin, anteriores, nuevos,
+            const r = await cuaCorregirApi({ action: 'cuadre_efectivo', fila, motivo, claveAdmin: cAdmin, anteriores, nuevos,
                                         control: { tienda: f.tienda, cajero: f.cajero, turno: f.turno, fecha: f.fecha } });
             claveAdmin = cAdmin;
             const i = filas.findIndex(x => x.fila === fila);
@@ -11387,6 +11581,11 @@
 
     async function apiPagos(payload) {
         if (!WEB_APP_URL) return demoPagos(payload);
+        // (16/11) Lo que se guarda va al servidor nuevo si Validar pagos está encendido allá
+        if (/^(mov_guardar|conc_(aplicar|manual|manual_lote|desmarcar|desmarcar_lote))$/.test(payload.action)) {
+            const t0 = performance.now(), r = await cfPagosEscribir(payload);
+            if (r) { anotarTiempo(payload.action + ' (Cloudflare)', Math.round(performance.now() - t0), 0, true); return r; }
+        }
         return llamarApi(payload);
     }
 
@@ -24059,7 +24258,14 @@ Reglas:
             .map(m => { if (m.pendiente !== 'error') saldos[m.moneda] = centimos((saldos[m.moneda] || 0) + (m.tipo === 'RECARGA' ? m.monto : -m.monto)); return Object.assign({ saldo: saldos[m.moneda] }, m); })
             .filter(m => !fm || m.moneda === fm).reverse();
         // (13/11) Lo eliminado de la caja chica: en su lugar, gris y tachado, sin saldo (no cuenta)
-        const ver = lista.concat((efeDatos.cajaEliminados || []).filter(m => !fm || m.moneda === fm)).sort((a, b) => b.fila - a.fila);
+        // (16/11) Buscador: el saldo de cada fila sigue siendo el real (se calcula antes de filtrar)
+        const palabras = normalizar((document.getElementById('efeCBuscar') || {}).value || '').split(/\s+/).filter(Boolean);
+        const textoDe = m => normalizar([m.concepto, m.responsable, m.tipo === 'RECARGA' ? 'recarga' : 'gasto', m.eliminado ? 'eliminado' : '', efeFecha(m.fecha), m.fecha,
+            fmt(m.monto), String(m.monto), m.moneda === '$' ? 'dolares $' : m.moneda === 'BsE' ? 'electronicos' : 'efectivo'].join(' '));
+        const pasa = m => !palabras.length || palabras.every(p => textoDe(m).includes(p));
+        const todos = lista.concat((efeDatos.cajaEliminados || []).filter(m => !fm || m.moneda === fm));
+        const ver = todos.filter(pasa).sort((a, b) => b.fila - a.fila);
+        const nb = document.getElementById('efeCBuscarN'); if (nb) nb.textContent = palabras.length ? `${ver.length} de ${todos.length} movimientos` : '';
         const borrable = m => !m.pendiente && !m.eliminado && (m.tipo === 'GASTO' || (m.tipo === 'RECARGA' && m.origen === 'externo'));
         document.getElementById('efeCTabla').innerHTML = ver.length ? `<table><thead><tr><th class="izq">Fecha</th><th class="izq">Tipo</th><th class="izq">Concepto</th>
             <th class="izq">Responsable</th><th>Monto</th><th>Saldo</th><th class="efe-c" title="Comprobante">Comp.</th><th class="efe-c" title="Verificado">Verif.</th><th></th></tr></thead><tbody>` +
@@ -24071,7 +24277,7 @@ Reglas:
                 <td class="efe-c">${efeFoto(m.comprobante) || (m.tipo === 'GASTO' ? '<span class="efe-falta" title="Sin comprobante">—</span>' : '')}</td>
                 <td class="efe-c">${m.tipo !== 'GASTO' || m.pendiente || m.eliminado ? '' : efeSwVerif(m.verificado, `efeVerificarCaja(${m.fila})`, `efeDesverificar('caja', ${m.fila})`)}</td>
                 <td class="efe-c">${borrable(m) ? efeBorrar(`efeEliminarCaja(${m.fila})`, 'Eliminar (pide clave de administrador)') : ''}</td></tr>`).join('') +
-            '</tbody></table>' : '<div class="empty">Todavía no hay movimientos de caja chica. Empiece con una recarga.</div>';
+            '</tbody></table>' : palabras.length ? '<div class="empty">Ningún movimiento coincide con la búsqueda.</div>' : '<div class="empty">Todavía no hay movimientos de caja chica. Empiece con una recarga.</div>';
     }
 
     // Verificar un gasto de caja chica. Quien tiene acceso al flujo de caja lo verifica directo; quien solo tiene caja chica, con la clave
