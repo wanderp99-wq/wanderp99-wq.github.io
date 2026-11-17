@@ -6369,7 +6369,7 @@
                     : `<div class="fb-ind"><span>Revisión automática (cada 5 min)</span><b>${rev ? (revHace != null ? `Activa · corrió hace ${revHace} min` : 'Activa · todavía no corre') : 'No activa'}</b><button type="button" class="btn-ghost btn-mini" onclick="fbRevision(this, false)">Pasar a manual</button></div>`}
             </div>
             <div class="tabla-wrap"><table class="req-tabla fb-tabla" data-sin-paginar><thead><tr><th class="izq">Módulo</th><th class="izq">Dónde se guarda</th><th></th></tr></thead><tbody>${filas.map(f => f.html).join('')}</tbody></table></div>
-            <div class="req-acciones" style="justify-content:flex-end;margin:.5rem 0 0"><button type="button" class="btn-ghost btn-mini" onclick="fbHojas(this, 'copiar', 'pagos')">Copiar todo a la hoja ahora</button><button type="button" class="btn-ghost btn-mini" onclick="fbProbar(this)">Probar Firebase</button><button type="button" class="btn-ghost btn-mini" onclick="fbhComparar(this)">Comparar Nómina (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="almfbComparar(this)">Comparar Almacén y compras (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="cajafbComparar(this)">Comparar Cuadre y Validar pagos (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="perfbComparar(this)">Comparar Cuentas por cobrar, asistencia y horarios (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="reqfactComparar(this)">Comparar Requerimientos y Facturar (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="cfAbrir()">Servidor nuevo (Cloudflare)</button><button type="button" class="btn-ghost btn-mini" onclick="tgCuadreVer(this)">Grupos de cuadre en Telegram</button><button type="button" class="btn-ghost btn-mini" onclick="bcrAbrir(this)">Pago móvil Bancrecer</button><button type="button" class="btn-primary btn-mini" onclick="fbRevisarAhora(this)">Actualizar</button></div>
+            <div class="req-acciones" style="justify-content:flex-end;margin:.5rem 0 0"><button type="button" class="btn-ghost btn-mini" onclick="fbHojas(this, 'copiar', 'pagos')">Copiar todo a la hoja ahora</button><button type="button" class="btn-ghost btn-mini" onclick="fbProbar(this)">Probar Firebase</button><button type="button" class="btn-ghost btn-mini" onclick="fbhComparar(this)">Comparar Nómina (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="almfbComparar(this)">Comparar Almacén y compras (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="cajafbComparar(this)">Comparar Cuadre y Validar pagos (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="perfbComparar(this)">Comparar Cuentas por cobrar, asistencia y horarios (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="reqfactComparar(this)">Comparar Requerimientos y Facturar (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="cfAbrir()">Servidor nuevo (Cloudflare)</button><button type="button" class="btn-ghost btn-mini" onclick="tgCuadreVer(this)">Grupos de cuadre en Telegram</button><button type="button" class="btn-ghost btn-mini" onclick="tolCierreVer(this)">Tolerancias del cierre</button><button type="button" class="btn-ghost btn-mini" onclick="bcrAbrir(this)">Pago móvil Bancrecer</button><button type="button" class="btn-primary btn-mini" onclick="fbRevisarAhora(this)">Actualizar</button></div>
             <div class="nota">"En el servidor nuevo": lo de ese módulo se guarda en Cloudflare y la hoja de Google recibe una copia una vez al día (lo que se cambie a mano en la hoja ya no cuenta). "Pasar al servidor nuevo" copia todo, lo compara y solo si queda igual se cambia; cada uno se puede devolver desde su "Detalle".</div>`;
     }
     // (15/11) Pago móvil de Bancrecer leído del correo: correos autorizados para reenviar los avisos, leer ahora y los últimos leídos
@@ -6402,6 +6402,34 @@
             </tbody></table></div>`}
             <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-primary" onclick="document.getElementById('fbhDlg').classList.add('hidden')">Cerrar</button></div></div>`;
         if (!fondo.classList.contains('hidden') && fondo.querySelector('h3') && /Bancrecer/.test(fondo.querySelector('h3').textContent)) pintarVentana(fondo, html); else fondo.innerHTML = html;
+        fondo.classList.remove('hidden');
+    }
+    // (17/11) Tolerancias del aviso de diferencias del cierre de caja (BigSoft contra la ficha), en $
+    async function tolCierreVer(btn, guardar) {
+        const texto = btn ? btn.textContent : ''; if (btn) btnCargando(btn, guardar ? 'Guardando...' : 'Cargando...');
+        let r = null, error = '';
+        const pedido = { action: 'cuadre_tol' };
+        if (guardar) { pedido.tol = {}; ['sobranteEfectivo', 'faltante', 'metodos', 'divisas'].forEach(k => { pedido.tol[k] = (document.getElementById('tolc_' + k) || {}).value; }); }
+        try { r = await DATOS.aGoogle(() => llamarApi(pedido)); } catch (x) { error = x.message; }
+        if (btn) { btn.disabled = false; btn.textContent = texto; }
+        let fondo = document.getElementById('fbhDlg');
+        if (!fondo) { fondo = document.createElement('div'); fondo.id = 'fbhDlg'; fondo.className = 'req-dlg-fondo'; document.body.appendChild(fondo); }
+        fondo.onclick = ev => { if (ev.target === fondo) fondo.classList.add('hidden'); };
+        const t = (r && r.tol) || {}, def = (r && r.def) || {};
+        const campo = (k, titulo, ayuda) => `<div><label for="tolc_${k}">${titulo}</label><input id="tolc_${k}" type="number" step="0.01" min="0" value="${t[k] != null ? t[k] : ''}"><small>${ayuda} (de fábrica: $${fmt(def[k] || 0)})</small></div>`;
+        const html = `<div class="req-dlg" style="max-width:640px"><h3>Tolerancias del cierre</h3>
+            <div class="req-sub">Cuándo se avisa una diferencia entre la ficha y BigSoft al cerrar la caja. Montos en $ (se pasan a Bs con la tasa de la ficha).</div>
+            ${error ? `<div class="banner error" style="display:block">${esc(error)}</div>` : guardar ? '<div class="banner ok" style="display:block">Guardado.</div>' : ''}
+            <div class="filters">
+                ${campo('sobranteEfectivo', 'Sobrante en efectivo Bs que se acepta', 'Vueltos de los pagos en divisas: hasta este monto la caja cuadra')}
+                ${campo('faltante', 'Faltante que se avisa', 'En efectivo Bs, y también en el total de la caja')}
+                ${campo('metodos', 'Punto, pago móvil, biopago y crédito', 'Diferencia mayor a esto se avisa')}
+                ${campo('divisas', 'Divisas', '0 = exacto')}
+            </div>
+            <div class="nota">A la tienda se le avisa sin decir si falta o sobra. Si hay más de 2 métodos con diferencia, solo la diferencia total. El grupo general recibe siempre el resumen, con el sobrante por vueltos.</div>
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-ghost" onclick="document.getElementById('fbhDlg').classList.add('hidden')">Cerrar</button>
+                <button type="button" class="btn-primary" onclick="tolCierreVer(this, true)" ${error && !r ? 'disabled' : ''}>Guardar</button></div></div>`;
+        if (!fondo.classList.contains('hidden') && /Tolerancias del cierre/.test((fondo.querySelector('h3') || {}).textContent || '')) pintarVentana(fondo, html); else fondo.innerHTML = html;
         fondo.classList.remove('hidden');
     }
     // (15/11) Los 5 grupos de Telegram de los cuadres de caja: cuáles encontró el sistema
@@ -7020,7 +7048,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-16.18';
+    const VERSION_SERVIDOR = '2026-11-17.2';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -20692,7 +20720,18 @@ Reglas:
     // ---------- Precios en tiendas › Cargar en tiendas (BigSoft.gs › precios_revisar / precios_cargar, Utilidades › Remoto.ps1) ----------
     // Como "Actualizar precios" en la PC de la tienda, pero desde aquí: la PC revisa las órdenes pendientes contra SU BigSoft,
     // aquí se eligen (y se asigna el producto de BigSoft a las que no existen con su código) y la PC las carga. Cargar pide la clave de administrador.
+    // (17/11) Cada tienda con su propio estado: mientras la PC de una carga precios se puede revisar y cargar en otra
+    // (antes la pantalla era una sola y el selector quedaba bloqueado hasta que terminara). bsp = la tienda que se está viendo.
     let bsp = { tienda: '', paso: 'inicio' };
+    const bspPor = {};
+    function bspCambiarTienda(t) {
+        const clave = bsp.claveAdmin;
+        if (!t) { bsp = { tienda: '', paso: 'inicio' }; almPintar(); return; }
+        bsp = bspPor[t] || (bspPor[t] = { tienda: t, paso: 'inicio' });
+        if (clave && !bsp.claveAdmin) bsp.claveAdmin = clave;
+        almPintar();
+    }
+    const bspOcupada = s => s.paso === 'revisando' || s.paso === 'cargando';
     const BSP_ESTADO = { OK: ['Por cargar', 'st-info'], YA: ['Ya está', 'st-ok'], NOEXISTE: ['No existe en BigSoft', 'st-falta'], SINCODIGO: ['Sin código', 'st-amar'] };
     const bspPintar = () => { if (vistaActual === 'precios' && almTab === 'remoto') almPintar(); };
     const bspF = (v, d = 2) => v == null || v === '' ? '—' : nfVE(d, d).format(v);
@@ -20702,18 +20741,20 @@ Reglas:
             : dormida && bsp.seg ? `<b style="color:var(--warn)">La PC de ${t} no ha respondido ${v.hace == null ? 'hoy' : 'en ' + Math.round(v.hace / 60) + ' min'}.</b> Debe estar encendida, con internet y con el avisador abierto. Se sigue esperando.`
             : `Esperando a la PC de ${t} (responde cada 15 segundos)...`}${bsp.seg ? ` · ${bsp.seg} s` : ''}</div>`;
     }
-    const bspAlEsperar = id => (estado, vivo, seg) => { if (bsp.id !== id) return; Object.assign(bsp, { estadoTarea: estado, vivo, seg }); bspPintar(); };
+    // s = el estado de ESA tienda (aunque mientras tanto se esté viendo otra)
+    const bspAlEsperar = (s, id) => (estado, vivo, seg) => { if (s.id !== id) return; Object.assign(s, { estadoTarea: estado, vivo, seg }); bspPintar(); };
     async function bspRevisar() {
-        if (!bsp.tienda) { mostrarBanner('Elija la tienda.', 'warn'); return; }
+        const s = bsp;
+        if (!s.tienda) { mostrarBanner('Elija la tienda.', 'warn'); return; }
         const id = Date.now();
-        Object.assign(bsp, { id, paso: 'revisando', errorSuave: false, res: null, marcadas: {}, asignar: {}, registrar: {}, registrando: null, eligiendo: null, busqueda: null, final: null, error: '', errClave: '', seg: 0, estadoTarea: 'pendiente' });
+        Object.assign(s, { id, paso: 'revisando', errorSuave: false, res: null, marcadas: {}, asignar: {}, registrar: {}, registrando: null, eligiendo: null, busqueda: null, final: null, error: '', errClave: '', seg: 0, estadoTarea: 'pendiente' });
         bspPintar();
         try {
-            const t = await bsrTarea('precios_revisar', { local: bsp.tienda }, bspAlEsperar(id), 180, bsp.senal = { detenido: false });
-            if (bsp.id !== id) return;
-            bsp.res = t.resultado || { lineas: [] }; bsp.paso = 'lista';
-            bsp.res.lineas.forEach(l => { if (l.estado === 'OK') bsp.marcadas[l.id] = true; });
-        } catch (e) { if (bsp.id !== id) return; bsp.paso = 'error'; bsp.error = e.message; }
+            const t = await bsrTarea('precios_revisar', { local: s.tienda }, bspAlEsperar(s, id), 180, s.senal = { detenido: false });
+            if (s.id !== id) return;
+            s.res = t.resultado || { lineas: [] }; s.paso = 'lista';
+            s.res.lineas.forEach(l => { if (l.estado === 'OK') s.marcadas[l.id] = true; });
+        } catch (e) { if (s.id !== id) return; s.paso = 'error'; s.error = e.message; }
         bspPintar();
     }
     // Se puede cargar: "Por cargar", o "No existe" con un producto de BigSoft elegido aquí
@@ -20774,9 +20815,10 @@ Reglas:
     async function bspBuscar() {
         const txt = (document.getElementById('bspBus') || {}).value || '';
         if (txt.trim().length < 2) return;
-        bsp.busqueda = { texto: txt, cargando: true, productos: [] }; bspPintar();
-        try { const t = await bsrTarea('buscar', { local: bsp.tienda, texto: txt.trim() }, null, 180, bsp.senalBus = { detenido: false }); if (!bsp.busqueda || !bsp.busqueda.cargando) return; bsp.busqueda = { texto: txt, productos: (t.resultado || {}).productos || [] }; }
-        catch (e) { if (e.detenido) return; bsp.busqueda = { texto: txt, error: e.message, productos: [] }; }
+        const s = bsp;
+        s.busqueda = { texto: txt, cargando: true, productos: [] }; bspPintar();
+        try { const t = await bsrTarea('buscar', { local: s.tienda, texto: txt.trim() }, null, 180, s.senalBus = { detenido: false }); if (!s.busqueda || !s.busqueda.cargando) return; s.busqueda = { texto: txt, productos: (t.resultado || {}).productos || [] }; }
+        catch (e) { if (e.detenido) return; s.busqueda = { texto: txt, error: e.message, productos: [] }; }
         bspPintar();
     }
     // Detener: deja de esperar a la PC de la tienda (sin internet o apagada) y libera la pantalla
@@ -20806,25 +20848,29 @@ Reglas:
             if (bsp.asignar[l.clave]) asignar[l.clave] = bsp.asignar[l.clave].codigo;
             else if (bsp.registrar[l.clave]) registrar[l.clave] = Object.assign({}, bsp.registrar[l.clave], { costo: l.costo || 0, detal: l.detal || 0, mayor: l.mayor || 0 });
         });
-        const claveAdmin = bsp.claveAdmin || (esPrincipal ? clave : '');
-        if (!claveAdmin) { bsp.errClave = 'Escriba la clave de administrador para cargar los precios en BigSoft.'; bspPintar(); return; }
+        const s = bsp, claveAdmin = s.claveAdmin || (esPrincipal ? clave : '');
+        if (!claveAdmin) { s.errClave = 'Escriba la clave de administrador para cargar los precios en BigSoft.'; bspPintar(); return; }
         const id = Date.now();
-        Object.assign(bsp, { id, paso: 'cargando', errorSuave: false, seg: 0, estadoTarea: 'pendiente', errClave: '' }); bspPintar();
+        Object.assign(s, { id, paso: 'cargando', errorSuave: false, seg: 0, estadoTarea: 'pendiente', errClave: '' }); bspPintar();
         try {
-            const t = await bsrTarea('precios_cargar', { local: bsp.tienda, ids, asignar, registrar, claveAdmin }, bspAlEsperar(id), 180, bsp.senal = { detenido: false });
-            if (bsp.id !== id) return;
-            bsp.final = t.resultado || {}; bsp.paso = 'listo'; cmpOrd = null;   // las órdenes cambiaron: "Por actualizar" se vuelve a leer
+            const t = await bsrTarea('precios_cargar', { local: s.tienda, ids, asignar, registrar, claveAdmin }, bspAlEsperar(s, id), 180, s.senal = { detenido: false });
+            if (s.id !== id) return;
+            s.final = t.resultado || {}; s.paso = 'listo'; cmpOrd = null;   // las órdenes cambiaron: "Por actualizar" se vuelve a leer
+            if (s !== bsp) mostrarBanner(`Precios cargados en el BigSoft de ${s.tienda}: ${s.final.cargados || 0}.`, 'ok');
         } catch (e) {
-            if (bsp.id !== id) return;
-            if (/^CLAVE_ADMIN|clave de administrador/i.test(e.message)) { bsp.paso = 'lista'; bsp.claveAdmin = ''; bsp.errClave = e.message.replace(/^CLAVE_ADMIN:\s*/, ''); }
-            else { bsp.paso = 'error'; bsp.error = e.message; }
+            if (s.id !== id) return;
+            if (/^CLAVE_ADMIN|clave de administrador/i.test(e.message)) { s.paso = 'lista'; s.claveAdmin = ''; s.errClave = e.message.replace(/^CLAVE_ADMIN:\s*/, ''); }
+            else { s.paso = 'error'; s.error = e.message; }
+            if (s !== bsp) mostrarBanner(`${s.tienda}: ${e.message}`, 'warn');
         }
         bspPintar();
     }
     function bspVista() {
-        const ocupado = bsp.paso === 'revisando' || bsp.paso === 'cargando';
-        const cab = `<div class="filters"><div><label for="bspTienda">Tienda</label><select id="bspTienda" onchange="bsp.tienda=this.value;bsp.paso='inicio';almPintar()" ${ocupado ? 'disabled' : ''}><option value="">Elija la tienda</option>${CMP_TIENDAS.map(t => `<option${t === bsp.tienda ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></div>
-            <div style="align-self:end"><button type="button" class="btn-primary" onclick="bspRevisar()" ${ocupado || !bsp.tienda ? 'disabled' : ''}>${bsp.paso === 'inicio' ? 'Revisar precios en su BigSoft' : 'Revisar de nuevo'}</button></div></div>`;
+        const ocupado = bspOcupada(bsp);
+        const otras = Object.values(bspPor).filter(s => s !== bsp && bspOcupada(s));
+        const cab = `<div class="filters"><div><label for="bspTienda">Tienda</label><select id="bspTienda" onchange="bspCambiarTienda(this.value)"><option value="">Elija la tienda</option>${CMP_TIENDAS.map(t => { const s = bspPor[t]; return `<option value="${esc(t)}"${t === bsp.tienda ? ' selected' : ''}>${esc(t)}${s && bspOcupada(s) ? (s.paso === 'cargando' ? ' · cargando…' : ' · revisando…') : s && s.paso === 'listo' ? ' · listo' : ''}</option>`; }).join('')}</select></div>
+            <div style="align-self:end"><button type="button" class="btn-primary" onclick="bspRevisar()" ${ocupado || !bsp.tienda ? 'disabled' : ''}>${bsp.paso === 'inicio' ? 'Revisar precios en su BigSoft' : 'Revisar de nuevo'}</button></div></div>
+            ${otras.length ? `<div class="nota">Mientras tanto, en otras tiendas: ${otras.map(s => `<b>${esc(s.tienda)}</b> ${s.paso === 'cargando' ? 'cargando' : 'revisando'}${s.seg ? ' (' + s.seg + ' s)' : ''}`).join(' · ')}. Puede elegir otra tienda y trabajar en ella.</div>` : ''}`;
         if (bsp.paso === 'inicio') return cab + `<div class="nota">La PC de la tienda revisa los precios pendientes contra su BigSoft (como "Actualizar precios" en la tienda). Aquí se eligen y ella los carga: detal, mayor y costo en divisas, los bolívares con su tasa, y el nombre de Plaza Valencia. Debe estar encendida, con internet y con el avisador abierto.</div>`;
         const detener = `<div class="req-acciones" style="justify-content:center"><button type="button" class="btn-ghost" onclick="bspDetener()">${ico('detener')}Detener</button></div>`;
         if (bsp.paso === 'revisando') return cab + bspEspera(`Revisando los precios en el BigSoft de ${bsp.tienda}...`) + detener;
@@ -21203,7 +21249,7 @@ Reglas:
             : !cie.cajas.length ? '<div class="empty">No hay cajas abiertas en ' + esc(cie.local) + '.</div>'
             : `<div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Usuario de BigSoft</th><th class="izq">Trabajador</th><th class="izq">Abierta</th><th>Facturas</th><th class="izq">Estado</th><th></th></tr></thead><tbody>
                 ${cie.cajas.map(c => {
-                    const no = c.conectado ? 'Dentro de la caja' : c.enEspera ? c.enEspera + ' en espera' : !c.facturas ? 'Sin ventas' : '';
+                    const no = c.conectado ? (c.motivo || 'Dentro de la caja') :c.enEspera ? c.enEspera + ' en espera' : !c.facturas ? 'Sin ventas' : '';
                     const sel = cieTrabajadorDe(cie.local, c.login);
                     return `<tr><td class="izq"><b>${esc(c.login)}</b>${c.nombre ? `<small>${esc(c.nombre)}</small>` : ''}</td>
                         <td class="izq"><select aria-label="Trabajador de ${esc(c.login)}" data-login="${esc(c.login)}" onchange="cieCajero(this.dataset.login, this.value)">${opciones(sel)}</select></td>
@@ -21212,7 +21258,7 @@ Reglas:
                         <td class="izq">${no ? `<span class="chip ${c.conectado || c.enEspera ? 'st-sobra' : 'st-pend'}">${esc(no)}</span>` : '<span class="chip st-ok">Se puede cerrar</span>'}</td>
                         <td>${no ? '' : `<button type="button" class="btn-primary btn-mini" data-login="${esc(c.login)}" ${cie.cerrando ? 'disabled' : ''} onclick="cieCerrar(this.dataset.login)">${cie.cerrando === c.login ? 'Cerrando...' : 'Cerrar caja'}</button>`}</td></tr>`;
                 }).join('')}</tbody></table></div>
-                ${cie.cajas.some(c => c.conectado) ? '<div class="nota">"Dentro de la caja": el cajero tiene abierto el programa de caja. Para cerrarla debe salir primero (BigSoft tampoco la cierra así).</div>' : ''}`;
+                ${cie.cajas.some(c => c.conectado) ? '<div class="nota">La caja está en uso: el cajero tiene abierto el programa de caja o vendió hace menos de 30 minutos. Para cerrarla debe salir primero de la caja en BigSoft (BigSoft tampoco la cierra así).</div>' : ''}`;
         const res = a ? `<div class="banner ok" style="display:block">Caja de <b>${esc(a.nombre || a.login)}</b> cerrada en BigSoft (cierre N° ${esc(String(a.nroCierre || ''))}, ${fmtNum(a.facturas || 0)} facturas). Total ${fmt(a.total || 0)} Bs ·
                 efectivo ${fmt(a.efectivo || 0)} · punto ${fmt(a.tarjeta || 0)} · pago móvil ${fmt(a.pagoMovil || 0)} · biopago ${fmt(a.biopago || 0)} · divisas ${fmt(a.divisas || 0)} $.
                 ${a.registro && a.registro.error ? `<br><b>No se pudo registrar en Plaza Valencia:</b> ${esc(a.registro.error)}` : a.registro && a.registro.ficha && a.registro.ficha.ficha ? `<br>Ficha ${esc(String(a.registro.ficha.ficha))}: ${esc(a.registro.ficha.estado || '')}${a.registro.ficha.diferencias ? ' (' + esc(a.registro.ficha.diferencias) + ')' : ''}.` : '<br>Su ficha todavía no ha llegado: los montos se pasan solos cuando llegue.'}</div>` : '';
