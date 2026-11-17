@@ -7048,7 +7048,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-17.2';
+    const VERSION_SERVIDOR = '2026-11-17.4';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -21289,10 +21289,22 @@ Reglas:
         if (senal && senal.detenido) throw bsrDetenido();
         if (alEsperar) alEsperar('pendiente', p.vivo, 0, p.local);
         const t0 = Date.now();
+        // (17/11) Si Google lo copió en el servidor nuevo (p.cf), la respuesta se lee allá cada segundo (rápido y sin gastar Google).
+        // El cierre de caja se sigue leyendo en Google (allí se registra y se junta con la ficha). Si el servidor nuevo falla, Google.
+        let enCF = !!p.cf && tipo !== 'cierre', vivoG = p.vivo;
         for (;;) {
-            await new Promise(r => { const t = setTimeout(r, 2500); if (senal) senal.despertar = () => { clearTimeout(t); r(); }; });
+            await new Promise(r => { const t = setTimeout(r, enCF ? 1000 : 2500); if (senal) senal.despertar = () => { clearTimeout(t); r(); }; });
             if (senal && senal.detenido) throw bsrDetenido();
-            let v; try { v = await llamarApi({ action: 'bsr_ver', id: p.id }); } catch (e) { if (Date.now() - t0 > limite * 1000) throw e; continue; }
+            let v;
+            if (enCF) {
+                try {
+                    const r = await cfPedir({ action: 'bsr_ver', id: p.id, token: await cfToken() });
+                    if (r.ok) { v = r; v.vivo = r.vivo || vivoG; }
+                    else if (r.noAqui || r.sesion === false) { enCF = false; if (r.sesion === false) cfSes.token = ''; }
+                    else throw new Error(r.error || 'sin respuesta');
+                } catch (e) { enCF = false; }
+                if (!v) continue;
+            } else { try { v = await llamarApi({ action: 'bsr_ver', id: p.id }); vivoG = v.vivo; } catch (e) { if (Date.now() - t0 > limite * 1000) throw e; continue; } }
             const t = v.tarea;
             if (t.estado === 'hecho' || t.estado === 'atencion') { bsrListas(t.resultado); return t; }
             if (t.estado === 'error') throw new Error(t.error || 'La PC de la tienda no pudo hacerlo');
