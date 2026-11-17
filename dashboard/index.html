@@ -6427,13 +6427,15 @@
         const html = `<div class="req-dlg" style="max-width:720px"><h3>Grupos de cuadre en Telegram</h3>
             ${resumen}
             ${error ? `<div class="banner error" style="display:block">${esc(error)}</div>` : `
-            <div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Grupo</th><th class="izq">Estado</th><th class="izq">ID del grupo (si falta)</th></tr></thead><tbody>
+            <div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Grupo</th><th class="izq">Estado</th><th class="izq">ID del grupo o enlace del tema</th></tr></thead><tbody>
             ${r.grupos.map((g, i) => `<tr><td class="izq"><b>${esc(g.grupo)}</b>${g.titulo && g.titulo !== g.grupo ? `<small>En Telegram: ${esc(g.titulo)}</small>` : ''}</td>
-                <td class="izq">${g.ok ? '<span class="chip st-ok">Listo</span>' : `<span class="chip st-falta">Falta</span>${g.error ? `<small>${esc(g.error.slice(0, 220))}</small>` : ''}`}</td>
-                <td class="izq">${g.ok ? '' : `<input id="tgId${i}" data-local="${esc(g.local)}" placeholder="-100... o la dirección del grupo" style="max-width:16rem">`}</td></tr>`).join('')}
+                <td class="izq">${g.ok ? `<span class="chip st-ok">Listo</span>${g.tema ? `<small>Va al tema N° ${esc(g.tema)}</small>` : '<small>Al chat general del grupo</small>'}` : `<span class="chip st-falta">Falta</span>${g.error ? `<small>${esc(g.error.slice(0, 220))}</small>` : ''}`}</td>
+                <td class="izq"><input id="tgId${i}" data-local="${esc(g.local)}" placeholder="${g.ok ? 'Enlace del tema (opcional)' : '-100... o la dirección del grupo'}" style="max-width:16rem"></td></tr>`).join('')}
             </tbody></table></div>
-            ${faltan.length ? `<div class="nota">Si un grupo no aparece solo, ponga su ID: en <b>web.telegram.org</b> abra el grupo y copie el número que sale al final de la dirección (empieza con -100), o en Telegram de PC active Ajustes › Avanzado › Funciones experimentales › "Mostrar ID" y cópielo de la información del grupo. El bot tiene que estar dentro del grupo.</div>
-                <div class="req-acciones" style="justify-content:flex-end"><button type="button" class="btn-primary btn-mini" onclick="tgCuadreGuardarIds(this)">Guardar los ID</button></div>` : '<div class="banner ok" style="display:block">Listo: el sistema puede avisar en los 5 grupos.</div>'}
+            <div class="nota">${faltan.length ? 'Si un grupo no aparece solo, ponga su ID: en <b>web.telegram.org</b> abra el grupo y copie el número que sale al final de la dirección (empieza con -100), o en Telegram de PC active Ajustes › Avanzado › Funciones experimentales › "Mostrar ID" y cópielo de la información del grupo. El bot tiene que estar dentro del grupo. ' : ''}
+                Para que los avisos lleguen directo a un <b>tema</b> del grupo: en <b>web.telegram.org</b> abra el tema y copie la dirección completa (termina en _ y un número, por ejemplo #-1001234567890_5), o en Telegram toque el tema › Copiar enlace (t.me/c/…/5). Para volver al chat general, pegue solo el ID del grupo.</div>
+            ${faltan.length ? '' : '<div class="banner ok" style="display:block">Listo: el sistema puede avisar en los 5 grupos.</div>'}
+            <div class="req-acciones" style="justify-content:flex-end"><button type="button" class="btn-primary btn-mini" onclick="tgCuadreGuardarIds(this)">Guardar</button></div>
             <div class="banner ${d.bot ? 'ok' : 'warn'}" style="display:block">El bot que usa el sistema es <b>${esc(d.bot || '¿?')}</b>: ese es el que tiene que ser miembro de cada grupo.</div>
             <div class="nota">Lo que dice Telegram: ${d.webhook === 'no' ? 'el sistema recibe los mensajes del bot' : 'los mensajes del bot los recibe otro programa (' + esc(d.webhook || '?') + '), por eso el sistema no ve los /start: ponga los ID a mano'}${d.pendientes != null ? ' · mensajes en espera: ' + esc(String(d.pendientes)) : ''}.
                 ${(d.vistos || []).length ? 'Grupos que el sistema ha visto: ' + esc(d.vistos.join(' · ')) : 'Todavía no ha visto ningún grupo.'}</div>`}
@@ -6443,7 +6445,7 @@
     }
     function tgCuadreGuardarIds(btn) {
         const ids = {}; document.querySelectorAll('#fbhDlg input[id^="tgId"]').forEach(i => { if (i.value.trim()) ids[i.dataset.local] = i.value.trim(); });
-        if (!Object.keys(ids).length) { mostrarBanner('Escriba al menos un ID.', 'warn'); return; }
+        if (!Object.keys(ids).length) { mostrarBanner('Escriba el ID de un grupo o el enlace de un tema.', 'warn'); return; }
         tgCuadreVer(btn, ids);
     }
     // (15/11) La ficha de cuadre procesada en el servidor nuevo (número al instante) o, al volver, en Google como antes
