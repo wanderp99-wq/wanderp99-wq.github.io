@@ -1327,6 +1327,45 @@
         .cmp-agregar:hover { border-color: var(--primary); color: var(--primary); }
         svg.ico { width: 16px; height: 16px; vertical-align: -3px; margin-right: .4rem; flex: none; }
         .cmp-agregar svg.ico { margin: 0; }
+        /* (17/11) Compra con foto en 4 pasos: barra de pasos, foto escaneada, crédito o contado, revisar por secciones */
+        .cmp-pasos-barra { display: flex; gap: .3rem; margin: 0 0 1rem; padding: 0; list-style: none; overflow-x: auto; }
+        @media (max-width: 480px) { .cmp-pasos-barra li { font-size: .68rem !important; min-width: 0 !important; } .cmp-pasos-barra li::before { width: 26px; height: 26px; } }
+        .cmp-pasos-barra li { flex: 1 1 0; min-width: 72px; display: flex; flex-direction: column; align-items: center; gap: .3rem; font-size: .8rem; color: var(--text-muted); text-align: center; }
+        .cmp-pasos-barra li::before { content: attr(data-n); width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; border: 2px solid var(--border); background: var(--card-bg); }
+        .cmp-pasos-barra li.hecho { color: var(--text-main); } .cmp-pasos-barra li.hecho::before { content: '✓'; border-color: var(--ok); color: var(--ok); background: var(--ok-bg); }
+        .cmp-pasos-barra li.actual { color: var(--title); font-weight: 600; } .cmp-pasos-barra li.actual::before { border-color: var(--primary); color: var(--primary); }
+        .cmp-foto-grande { display: flex; align-items: center; justify-content: center; gap: .8rem; width: 100%; min-height: 120px; padding: 1.2rem; border: 2px dashed var(--primary); border-radius: 14px; background: color-mix(in srgb, var(--primary) 6%, transparent); color: var(--primary); font-size: 1.15rem; font-weight: 600; cursor: pointer; }
+        .cmp-foto-grande svg.ico { width: 34px; height: 34px; margin: 0; }
+        .cmp-foto-grande:hover { background: color-mix(in srgb, var(--primary) 12%, transparent); }
+        .cmp-foto-otra { display: inline-flex; align-items: center; gap: .3rem; font-size: .9rem; color: var(--primary); cursor: pointer; }
+        .cmp-foto .cmp-foto-aj { position: absolute; top: auto; left: 4px; right: 4px; bottom: 4px; width: auto; height: auto; border-radius: 8px; padding: .25rem; font-size: .75rem; background: rgba(0,0,0,.62); color: #fff; }
+        .cmp-foto .cmp-foto-esc { position: absolute; left: 4px; top: 4px; padding: .05rem .4rem; border-radius: 999px; font-size: .68rem; background: var(--ok-bg); color: var(--ok); border: 1px solid var(--ok); }
+        .cmp-consejo { display: flex; gap: .5rem; align-items: flex-start; margin: .6rem 0 0; color: var(--text-muted); font-size: .88rem; }
+        .cmp-rec { position: relative; max-width: 100%; margin: .6rem auto; touch-action: none; user-select: none; }
+        .cmp-rec img { display: block; width: 100%; height: auto; border-radius: 8px; }
+        .cmp-rec svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+        .cmp-rec polygon { fill: color-mix(in srgb, var(--primary) 14%, transparent); stroke: var(--primary); stroke-width: 3; vector-effect: non-scaling-stroke; }
+        .cmp-rec circle { fill: var(--card-bg); stroke: var(--primary); stroke-width: 4; vector-effect: non-scaling-stroke; cursor: grab; }
+        .cmp-pago-preg { font-size: 1.25rem; font-weight: 700; color: var(--title); text-align: center; margin: 1.2rem 0 .9rem; }
+        .cmp-pago-op { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .cmp-pago-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .35rem; min-height: 150px; padding: 1rem; border-radius: 16px; border: 2px solid var(--border); background: var(--list-bg); color: var(--text-main); cursor: pointer; font: inherit; }
+        .cmp-pago-btn b { font-size: 1.6rem; color: var(--title); }
+        .cmp-pago-btn span { font-size: .92rem; color: var(--text-muted); }
+        .cmp-pago-btn:hover, .cmp-pago-btn:focus-visible { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 8%, var(--list-bg)); outline: none; }
+        .cmp-pago-btn.elegido { border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 25%, transparent); }
+        @media (max-width: 420px) { .cmp-pago-op { grid-template-columns: 1fr; } .cmp-pago-btn { min-height: 110px; } }
+        .cmp-resumen { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .5rem; }
+        .cmp-resumen > div { padding: .55rem .7rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--list-bg); min-width: 0; }
+        .cmp-resumen small { display: block; color: var(--text-muted); font-size: .76rem; }
+        .cmp-resumen b { display: block; color: var(--text-main); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .cmp-estado-fila { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; font-size: .78rem; font-weight: 700; }
+        .cmp-estado-fila.ok { background: var(--ok-bg); color: var(--ok); }
+        .cmp-estado-fila.ver { background: var(--warn-bg); color: var(--warn); }
+        tr.cmp-revisar td:first-child { box-shadow: inset 4px 0 0 var(--warn); }
+        .cmp-motivo { display: block; color: var(--warn); font-weight: 600; font-size: .8rem; }
+        .cmp-tabla.solo-revisar tr.cmp-listo { display: none; }
+        .cmp-conteo { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin: .2rem 0 .6rem; }
+        .cmp-mas > summary { cursor: pointer; color: var(--primary); font-weight: 600; margin: .4rem 0; }
         .cmp-tabla { min-width: 0; }
         .cmp-tabla.x-c .g-c, .cmp-tabla.x-m .g-m, .cmp-tabla.x-u .g-u, .cmp-tabla.x-b .g-b, .cmp-tabla.x-d .g-d { display: none; }
         .cmp-tabla.solo-SR .g-t:not(.g-t-SR), .cmp-tabla.solo-RU .g-t:not(.g-t-RU), .cmp-tabla.solo-IS .g-t:not(.g-t-IS), .cmp-tabla.solo-PA .g-t:not(.g-t-PA) { display: none; }
@@ -7048,7 +7087,7 @@
         try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
-    const VERSION_SERVIDOR = '2026-11-17.4';
+    const VERSION_SERVIDOR = '2026-11-17.5';
     let scriptViejo = false, servidorVersion = null;
     // Compara versiones "2026-10-27.4" por sus números (así "…27.10" va después de "…27.9"). Negativo: a es anterior a b.
     const compararVersion = (a, b) => { const x = String(a || '').split(/[-.]/).map(Number), y = String(b || '').split(/[-.]/).map(Number);
@@ -17469,6 +17508,14 @@
         cxpPagPintar(true);
     }
     // (15/11) El abono se puede escribir en $ o en Bs: el otro se calcula con la tasa BCV de la fecha del pago
+    // (17/11) Otra fecha = otra tasa BCV. Si el abono se escribió en Bs, los Bs se quedan (es lo que se transfirió) y el abono en $ se
+    // recalcula con la tasa de esa fecha. Antes quedaban los $ de la tasa anterior y "A pagar" mostraba otros Bs (80.000 → 77.633,25).
+    function cxpPagFecha(v) {
+        cxpPag.fecha = v;
+        const t = cxpTasa(v);
+        if (!cxpPag.completo && cxpPag.montoBs > 0 && t) cxpPag.monto = cxpR(cxpPag.montoBs / t);
+        cxpPagPintar();
+    }
     function cxpPagMonto(en, v) {
         const k = cxpPagCalc(), n = Number(v) || 0;
         cxpPag.monto = en === 'bs' ? (k.tasa ? cxpR(n / k.tasa) : 0) : n;
@@ -17502,7 +17549,7 @@
         const html = `<div class="req-dlg cxp-dlg"><h3>Pagar · ${esc(d.banco || d.proveedor)}</h3>
             <div class="req-sub">${esc(d.documento || '')}${k.c ? ' · cuota ' + k.c.n + ' de ' + d.cuotas.length + ' (vence ' + fechaBonita(k.c.vence) + ')' : ' · vence ' + fechaBonita(d.vence)} · saldo <b>${cxpUsd(k.saldo)}</b></div>
             <div class="filters">
-                <div><label for="cgFecha">Fecha del pago</label><input id="cgFecha" type="date" value="${p.fecha}" max="${cxpHoy()}" onchange="cxpPag.fecha=this.value;cxpPagPintar()"></div>
+                <div><label for="cgFecha">Fecha del pago</label><input id="cgFecha" type="date" value="${p.fecha}" max="${cxpHoy()}" onchange="cxpPagFecha(this.value)"></div>
                 <div><label for="cgForma">Forma de pago</label><select id="cgForma" onchange="cxpPag.forma=this.value;cxpPagPintar()">${CXP_FORMAS.map(f => `<option value="${f[0]}" ${p.forma === f[0] ? 'selected' : ''}>${f[1]}</option>`).join('')}</select></div>
                 <div><label for="cgCual">Cuánto</label><select id="cgCual" onchange="cxpPag.completo=this.value==='1';cxpPagPintar()"><option value="1" ${p.completo ? 'selected' : ''}>Todo el saldo</option><option value="0" ${p.completo ? '' : 'selected'}>Un abono</option></select></div>
                 ${p.completo ? '' : `<div><label for="cgMonto">Abono $</label><input id="cgMonto" type="number" step="0.01" min="0.01" max="${k.saldo}" value="${p.monto || ''}" onchange="cxpPagMonto('usd', this.value)"></div>
@@ -19328,9 +19375,37 @@
         // Mientras se escribe en la tabla no se redibuja (se perdería el cursor): solo al cambiar de paso, de renglones o de proveedor
         if (!forzar && out.querySelector('#cmpTabla') && cmp.paso === 'revisar' && out.dataset.cmpPaso === 'revisar') return;
         out.dataset.cmpPaso = cmp.paso;
-        out.innerHTML = cmp.paso === 'revisar' ? cmpRevisarVista() : cmp.paso === 'listo' ? cmpListoVista() : cmpFotoVista();
+        out.innerHTML = cmp.paso === 'revisar' ? cmpRevisarVista() : cmp.paso === 'pago' ? cmpPagoVista() : cmp.paso === 'listo' ? cmpListoVista() : cmpFotoVista();
         if (cmp.paso === 'foto' && !cmpCompras) cmpCargarCompras();
         else if (cmp.paso === 'foto' && Date.now() - cmpListasHora > 10000) cmpRefrescarListas();   // (12/11) lo guardado después (avance automático, otro equipo)
+    }
+    // (17/11) Barra de pasos arriba de la compra: Foto › Leer › Pago › Revisar › Listo
+    function cmpPasosBarraHTML() {
+        const en = cmp.paso === 'listo' ? 4 : cmp.paso === 'revisar' ? 3 : cmp.paso === 'pago' ? 2 : cmp.leyendo ? 1 : 0;
+        return `<ol class="cmp-pasos-barra" aria-label="Pasos de la compra">${['Foto', 'Leer', 'Crédito o contado', 'Revisar', 'Guardada'].map((t, i) => `<li data-n="${i + 1}" class="${i < en ? 'hecho' : i === en ? 'actual' : ''}"${i === en ? ' aria-current="step"' : ''}>${t}</li>`).join('')}</ol>`;
+    }
+    // Paso 3: ¿cómo se pagó? Dos botones grandes. Arriba, lo que se leyó (para confirmar que es la factura correcta).
+    function cmpPagoVista() {
+        const pl = cmp.proveedorLeido || {}, prov = cmp.proveedorId ? almProveedor(cmp.proveedorId) : null, n = cmp.lineas.filter(l => l.codigo || l.descripcion).length;
+        const tot = cmp.leido && cmp.leido.total ? (cmp.leido.moneda === 'BS' ? 'Bs ' : '$ ') + fmt(cmp.leido.total) : '—';
+        return `<div class="grafico-card" data-pantalla>${cmpPasosBarraHTML()}
+            ${cmp.leido ? `<div class="cmp-resumen">
+                <div><small>Proveedor</small><b>${esc(prov ? prov.nombre : pl.nombre || 'No se leyó')}</b></div>
+                <div><small>Factura</small><b>${esc(cmp.factura || 's/n')}</b></div>
+                <div><small>Total de la factura</small><b>${tot}</b></div>
+                <div><small>Productos leídos</small><b>${n}</b></div></div>
+                ${cmp.leido.cuadra === false ? '<div class="banner warn" style="display:block;margin-top:.6rem">La suma de los productos no cuadra con el total de la factura: en el paso siguiente revise cantidades y costos.</div>' : ''}` : ''}
+            <div class="cmp-pago-preg">¿Cómo se pagó esta factura?</div>
+            <div class="cmp-pago-op">
+                <button type="button" class="cmp-pago-btn${cmp.pago === 'credito' ? ' elegido' : ''}" onclick="cmpElegirPago('credito')"><b>Crédito</b><span>Se paga después: va a Cuentas por pagar</span></button>
+                <button type="button" class="cmp-pago-btn${cmp.pago === 'contado' ? ' elegido' : ''}" onclick="cmpElegirPago('contado')"><b>Contado</b><span>Ya está pagada</span></button></div>
+            <div class="req-acciones" style="justify-content:center;margin:1rem 0 0"><button type="button" class="btn-ghost btn-mini" onclick="cmpDescartar()">Descartar esta compra</button></div></div>`;
+    }
+    function cmpElegirPago(p) {
+        cmp.pago = p; cmp.paso = 'revisar';
+        cmpPintarCompra(document.getElementById('almContenido'), true);
+        cmpAvanceProgramar();   // lo leído queda guardado en "Compras en curso"
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
     // ---------- Plan B: transcribir con cualquier IA (ChatGPT, Gemini, Claude...) y pegar el texto ----------
     const CMP_PROMPT = `Transcribe la factura de compra de la foto. Responde SOLO con texto en este formato exacto, sin explicaciones, sin tablas de markdown y sin comillas:
@@ -19436,16 +19511,24 @@ Reglas:
     function cmpFotoVista() {
         const ultimas = cmpCompras ? cmpCompras.slice(0, 15) : null;
         if (cmp.modoTexto) return cmpTextoVista();
-        return `<div class="grafico-card">
+        // (17/11) Más simple: un botón grande para la foto; cada foto se escanea sola (recorte, derecha y blanqueada) y se puede ajustar
+        const n = cmp.fotos.length, origs = cmp.origs || [];
+        const tomar = (txt, cls, multiple) => `<label class="${cls}">${ico('camara', 34)}<span>${txt}</span><input type="file" accept="image/*" capture="environment" hidden onchange="cmpAgregarFotos(this.files); this.value=''"></label>`;
+        const elegir = txt => `<label class="cmp-foto-otra">${ico('imagen')}${txt}<input type="file" accept="image/*" multiple hidden onchange="cmpAgregarFotos(this.files); this.value=''"></label>`;
+        return `<div class="grafico-card" data-pantalla>${cmpPasosBarraHTML()}
                 <h3 style="margin-top:0">Compra con foto de la factura</h3>
-                <div class="nota" style="margin-top:0">Tome la foto derecha, completa y con buena luz. Si la factura tiene varias páginas, una foto por página (hasta 4). Gemini lee proveedor, productos, cantidades y costos; usted revisa todo antes de guardar.</div>
-                ${cmp.leyendo ? cmpEscanerHTML() : ''}<div class="cmp-fotos" ${cmp.leyendo ? 'hidden' : ''}>${cmp.fotos.map((f, i) => `<div class="cmp-foto"><img src="${f}" alt="Página ${i + 1}"><button type="button" title="Quitar" onclick="cmp.fotos.splice(${i},1);almPintar()">✕</button></div>`).join('')}
-                    ${cmp.fotos.length < 4 ? `<label class="cmp-agregar">${ico('camara', 28)}<span>${cmp.fotos.length ? 'Tomar otra página' : 'Tomar foto'}</span><input type="file" accept="image/*" capture="environment" hidden onchange="cmpAgregarFotos(this.files); this.value=''"></label>
-                        <label class="cmp-agregar">${ico('imagen', 28)}<span>${cmp.fotos.length ? 'Elegir otra foto' : 'Elegir foto ya tomada'}</span><input type="file" accept="image/*" multiple hidden onchange="cmpAgregarFotos(this.files); this.value=''"></label>` : ''}</div>
+                ${cmp.leyendo ? cmpEscanerHTML() : !n && !cmpEscaneando ? `${tomar('Tomar foto de la factura', 'cmp-foto-grande')}
+                    <div class="req-acciones" style="justify-content:center;margin:.7rem 0 0">${elegir('Elegir una foto ya tomada')}</div>
+                    <div class="cmp-consejo"><span>•</span><span>Ponga la factura <b>plana sobre una mesa</b>, con buena luz y completa en la foto. El sistema la recorta, la endereza y la deja clara como un escáner. Si tiene varias páginas, una foto por página (hasta 4).</span></div>`
+                : `<div class="cmp-fotos">${cmp.fotos.map((f, i) => `<div class="cmp-foto"><img src="${f}" alt="Página ${i + 1}">${origs[i] && origs[i].auto ? '<span class="cmp-foto-esc">Recortada</span>' : ''}<button type="button" title="Quitar" aria-label="Quitar la página ${i + 1}" onclick="cmpQuitarFoto(${i})">✕</button>${origs[i] ? `<button type="button" class="cmp-foto-aj" onclick="cmpAjustar(${i})">Ajustar</button>` : ''}</div>`).join('')}
+                    ${cmpEscaneando ? `<div class="cmp-foto" style="display:grid;place-items:center;text-align:center"><span class="btn-cargando">${iconoCargando()}<small>Escaneando...</small></span></div>` : ''}
+                    ${n < 4 && !cmpEscaneando ? tomar('Otra página', 'cmp-agregar') : ''}</div>
+                    ${n && !cmpEscaneando ? '<div class="nota" style="margin-top:0">Revise que se lea bien. Si el recorte quedó mal, pulse "Ajustar" en la foto.</div>' : ''}`}
                 <div class="login-error" id="cmpError"></div>
-                <div class="req-acciones cmp-foto-acc" style="margin-bottom:0" ${cmp.leyendo ? 'hidden' : ''}><button type="button" class="btn-ghost" onclick="cmpSinFoto()">Escribir sin foto</button>
-                    <button type="button" class="btn-ghost" onclick="cmp.modoTexto=true;cmpPintarCompra(document.getElementById('almContenido'), true)">Pegar texto de otra IA</button>
-                    <button type="button" class="btn-primary" id="cmpBtnLeer" onclick="cmpLeer()" ${cmp.fotos.length && !cmp.leyendo ? '' : 'disabled'}>${cmp.leyendo ? 'Leyendo la factura...' : 'Leer factura'}</button></div>
+                ${cmp.leyendo ? '' : `<div class="req-acciones cmp-foto-acc" style="margin-bottom:0;justify-content:space-between;align-items:center;flex-wrap:wrap">
+                    <span style="display:flex;gap:.4rem;flex-wrap:wrap"><button type="button" class="btn-ghost btn-mini" onclick="cmpSinFoto()">Escribir sin foto</button>
+                        <button type="button" class="btn-ghost btn-mini" onclick="cmp.modoTexto=true;cmpPintarCompra(document.getElementById('almContenido'), true)">Pegar texto de otra IA</button></span>
+                    ${n ? `<button type="button" class="btn-primary" id="cmpBtnLeer" style="min-width:200px;font-size:1.05rem" onclick="cmpLeer()" ${cmpEscaneando ? 'disabled' : ''}>Leer factura</button>` : ''}</div>`}
             </div>
             ${cmpBorradoresHTML()}
             <div class="grafico-card"><div class="grafico-head"><h3>Compras recientes</h3></div>
@@ -19586,7 +19669,7 @@ Reglas:
         if (btn) btnCargando(btn, 'Abriendo...');
         try {
             const b = (await llamarApi({ action: 'cmp_borrador', id })).borrador, x = b.datos || {};
-            Object.assign(cmp, { paso: 'revisar', fotos: [], leyendo: false, proveedorId: x.proveedorId || '', proveedorLeido: x.proveedorLeido || null, factura: x.factura || '', fechaFactura: x.fechaFactura || '', tasaManual: Number(x.tasaManual) || 0, fiscal: !!x.fiscal, pago: x.pago || '',
+            Object.assign(cmp, { paso: x.pago ? 'revisar' : 'pago', soloRevisar: false, seccion: 'productos', fotos: [], origs: [], leyendo: false, proveedorId: x.proveedorId || '', proveedorLeido: x.proveedorLeido || null, factura: x.factura || '', fechaFactura: x.fechaFactura || '', tasaManual: Number(x.tasaManual) || 0, fiscal: !!x.fiscal, pago: x.pago || '',
                                  enlaces: x.enlaces || [], leido: x.leido || null, lineas: (x.lineas || []).map(l => cmpLineaNueva(Object.assign({}, l, { merma: 0 }))), borradorId: b.id, borradorVer: b.version });
             if (!cmp.lineas.length) cmp.lineas.push(cmpLineaNueva());
             cmpAvanceEstado = `Compra en curso ${b.id} · guardada por ${b.actualizo} a las ${String(b.actualizada).slice(11)}`;
@@ -19613,32 +19696,230 @@ Reglas:
             return c.toDataURL('image/jpeg', 0.82);
         } finally { URL.revokeObjectURL(url); }
     }
+    // ---------- (17/11) Escáner: cada foto se recorta a la hoja, se endereza y se deja blanca y negra con buen contraste ----------
+    // Sin librerías (OpenCV pesa 8 MB): la hoja es la zona clara más grande de la foto; sus 4 esquinas se enderezan con una
+    // transformación de perspectiva y el papel se blanquea dividiendo entre el "fondo" (el papel visto de lejos). Si la hoja llena
+    // la foto o no se distingue del fondo, solo se limpia. "Ajustar" deja mover las esquinas a mano. cmp.origs[i] = { src, esq }.
+    const CMP_ESC_MAX = 2400, CMP_ESC_SAL = 1800;
+    const cmpImg = src => new Promise((ok, mal) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => mal(new Error('No se pudo abrir la imagen')); i.src = src; });
+    function cmpLienzo(img, max, rot) {
+        const k = Math.min(1, max / Math.max(img.width, img.height)), w = Math.max(1, Math.round(img.width * k)), h = Math.max(1, Math.round(img.height * k));
+        const c = document.createElement('canvas'), g = rot % 2 ? [h, w] : [w, h]; c.width = g[0]; c.height = g[1];
+        const x = c.getContext('2d');
+        if (rot) { x.translate(c.width / 2, c.height / 2); x.rotate(rot * Math.PI / 2); x.drawImage(img, -w / 2, -h / 2, w, h); } else x.drawImage(img, 0, 0, w, h);
+        return c;
+    }
+    const cmpAreaPoli = p => Math.abs(p.reduce((s, a, i) => { const b = p[(i + 1) % p.length]; return s + a[0] * b[1] - b[0] * a[1]; }, 0)) / 2;
+    function cmpDetectarHoja(c) {
+        const s = cmpLienzo(c, 480, 0), w = s.width, h = s.height, d = s.getContext('2d').getImageData(0, 0, w, h).data, n = w * h;
+        const g = new Uint8Array(n), hist = new Array(256).fill(0);
+        for (let i = 0, j = 0; i < n; i++, j += 4) { const v = (d[j] * 299 + d[j + 1] * 587 + d[j + 2] * 114) / 1000 | 0; g[i] = v; hist[v]++; }
+        let suma = 0; for (let i = 0; i < 256; i++) suma += i * hist[i];
+        let sB = 0, wB = 0, mejorV = 0, umbral = 128;   // Otsu: el corte entre lo claro (papel) y lo oscuro (mesa)
+        for (let i = 0; i < 256; i++) { wB += hist[i]; if (!wB) continue; const wF = n - wB; if (!wF) break; sB += i * hist[i]; const mB = sB / wB, mF = (suma - sB) / wF, v = wB * wF * (mB - mF) * (mB - mF); if (v > mejorV) { mejorV = v; umbral = i; } }
+        const lab = new Int32Array(n), pila = new Int32Array(n); let etiqueta = 0, mejor = 0, mejorN = 0;
+        for (let p = 0; p < n; p++) {
+            if (g[p] <= umbral || lab[p]) continue;
+            etiqueta++; let tope = 0, cuenta = 0; pila[tope++] = p; lab[p] = etiqueta;
+            while (tope) {
+                const q = pila[--tope]; cuenta++; const x = q % w, y = (q / w) | 0;
+                if (x > 0 && !lab[q - 1] && g[q - 1] > umbral) { lab[q - 1] = etiqueta; pila[tope++] = q - 1; }
+                if (x < w - 1 && !lab[q + 1] && g[q + 1] > umbral) { lab[q + 1] = etiqueta; pila[tope++] = q + 1; }
+                if (y > 0 && !lab[q - w] && g[q - w] > umbral) { lab[q - w] = etiqueta; pila[tope++] = q - w; }
+                if (y < h - 1 && !lab[q + w] && g[q + w] > umbral) { lab[q + w] = etiqueta; pila[tope++] = q + w; }
+            }
+            if (cuenta > mejorN) { mejorN = cuenta; mejor = etiqueta; }
+        }
+        if (mejorN < n * 0.12) return null;
+        let tl = [0, 0, Infinity], br = [0, 0, -Infinity], tr = [0, 0, -Infinity], bl = [0, 0, Infinity];
+        for (let p = 0; p < n; p++) {
+            if (lab[p] !== mejor) continue;
+            const x = p % w, y = (p / w) | 0, a = x + y, b = x - y;
+            if (a < tl[2]) tl = [x, y, a]; if (a > br[2]) br = [x, y, a]; if (b > tr[2]) tr = [x, y, b]; if (b < bl[2]) bl = [x, y, b];
+        }
+        const k = c.width / w, esq = [tl, tr, br, bl].map(q => [q[0] * k, q[1] * k]), area = cmpAreaPoli(esq) / (c.width * c.height);
+        return area > 0.9 || area < 0.12 ? null : esq;   // la hoja llena la foto (no hace falta recortar) o no se encontró
+    }
+    function cmpHomografia(src, dst) {   // la que lleva cada punto de dst a src (4 puntos)
+        const A = [], b = [];
+        for (let i = 0; i < 4; i++) { const [x, y] = dst[i], [u, v] = src[i]; A.push([x, y, 1, 0, 0, 0, -u * x, -u * y]); b.push(u); A.push([0, 0, 0, x, y, 1, -v * x, -v * y]); b.push(v); }
+        for (let c = 0; c < 8; c++) {
+            let p = c; for (let r = c + 1; r < 8; r++) if (Math.abs(A[r][c]) > Math.abs(A[p][c])) p = r;
+            [A[c], A[p]] = [A[p], A[c]]; [b[c], b[p]] = [b[p], b[c]];
+            for (let r = 0; r < 8; r++) { if (r === c) continue; const f = A[r][c] / A[c][c]; for (let k = c; k < 8; k++) A[r][k] -= f * A[c][k]; b[r] -= f * b[c]; }
+        }
+        return b.map((v, i) => v / A[i][i]);
+    }
+    // La hoja enderezada (gris) y blanqueada como un escáner. esq: 4 esquinas en el lienzo c (o null = toda la foto)
+    function cmpEnderezar(c, esq, limpiar) {
+        const sw = c.width, sh = c.height, E = esq || [[0, 0], [sw, 0], [sw, sh], [0, sh]], dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+        let W = Math.max(dist(E[0], E[1]), dist(E[3], E[2])), H = Math.max(dist(E[0], E[3]), dist(E[1], E[2]));
+        const k = Math.min(1, CMP_ESC_SAL / Math.max(W, H)); W = Math.max(1, Math.round(W * k)); H = Math.max(1, Math.round(H * k));
+        const m = cmpHomografia(E, [[0, 0], [W, 0], [W, H], [0, H]]), sd = c.getContext('2d').getImageData(0, 0, sw, sh).data, gris = new Float32Array(W * H);
+        for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+            const z = m[6] * x + m[7] * y + 1, u = (m[0] * x + m[1] * y + m[2]) / z, v = (m[3] * x + m[4] * y + m[5]) / z;
+            const x0 = Math.floor(u), y0 = Math.floor(v), i = y * W + x;
+            if (x0 < 0 || y0 < 0 || x0 >= sw - 1 || y0 >= sh - 1) { gris[i] = 255; continue; }
+            const fx = u - x0, fy = v - y0, a = (y0 * sw + x0) * 4, b = a + 4, cc = a + sw * 4, dd = cc + 4;
+            const L = j => (sd[j] * 299 + sd[j + 1] * 587 + sd[j + 2] * 114) / 1000;
+            gris[i] = (L(a) * (1 - fx) + L(b) * fx) * (1 - fy) + (L(cc) * (1 - fx) + L(dd) * fx) * fy;
+        }
+        let fondo = null, bw = 0, bh = 0, B = 24;
+        if (limpiar) {   // el papel visto de lejos: el más claro de cada cuadro de 24 px, extendido y suavizado
+            bw = Math.ceil(W / B); bh = Math.ceil(H / B); let f = new Float32Array(bw * bh);
+            for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const j = ((y / B) | 0) * bw + ((x / B) | 0); if (gris[y * W + x] > f[j]) f[j] = gris[y * W + x]; }
+            const pasar = (src, max) => { const o = new Float32Array(bw * bh); for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) { let s = max ? 0 : 0, nn = 0; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const yy = y + dy, xx = x + dx; if (yy < 0 || xx < 0 || yy >= bh || xx >= bw) continue; const v = src[yy * bw + xx]; if (max) { if (v > s) s = v; } else { s += v; nn++; } } o[y * bw + x] = max ? s : s / nn; } return o; };
+            f = pasar(f, true); f = pasar(f, false); f = pasar(f, false); fondo = f;
+        }
+        const out = document.createElement('canvas'); out.width = W; out.height = H;
+        const ctx = out.getContext('2d'), od = ctx.createImageData(W, H), o = od.data;
+        for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+            const i = y * W + x; let v = gris[i];
+            if (fondo) {   // interpolado entre los cuadros, para que no se noten
+                const fx = Math.min(bw - 1, Math.max(0, x / B - 0.5)), fy = Math.min(bh - 1, Math.max(0, y / B - 0.5)), x0 = fx | 0, y0 = fy | 0, x1 = Math.min(bw - 1, x0 + 1), y1 = Math.min(bh - 1, y0 + 1), ax = fx - x0, ay = fy - y0;
+                const bg = (fondo[y0 * bw + x0] * (1 - ax) + fondo[y0 * bw + x1] * ax) * (1 - ay) + (fondo[y1 * bw + x0] * (1 - ax) + fondo[y1 * bw + x1] * ax) * ay;
+                const r = bg > 8 ? v / bg : 1;
+                v = r >= 0.93 ? 255 : 255 * Math.pow(Math.max(0, (r - 0.12) / 0.81), 1.35);
+            }
+            o[i * 4] = o[i * 4 + 1] = o[i * 4 + 2] = v; o[i * 4 + 3] = 255;
+        }
+        ctx.putImageData(od, 0, 0);
+        return out.toDataURL('image/jpeg', 0.86);
+    }
+    let cmpEscaneando = 0;
     async function cmpAgregarFotos(files) {
-        try { for (const f of [...files].slice(0, 4 - cmp.fotos.length)) cmp.fotos.push(await cmpComprimir(f)); }
-        catch (e) { mostrarBanner(e.message, 'error'); }
+        cmp.origs = cmp.origs || [];
+        const lista = [...files].slice(0, 4 - cmp.fotos.length);
+        cmpEscaneando = lista.length; cmpPintarCompra(document.getElementById('almContenido'), true);
+        try {
+            for (const f of lista) {
+                await new Promise(r => setTimeout(r, 30));   // que se vea "Escaneando..." antes del cálculo
+                const url = URL.createObjectURL(f);
+                try {
+                    const img = await cmpImg(url), c = cmpLienzo(img, CMP_ESC_MAX, 0), src = c.toDataURL('image/jpeg', 0.9), esq = cmpDetectarHoja(c);
+                    cmp.fotos.push(cmpEnderezar(c, esq, true)); cmp.origs.push({ src, esq, auto: !!esq });
+                } finally { URL.revokeObjectURL(url); }
+                cmpEscaneando--; cmpPintarCompra(document.getElementById('almContenido'), true);
+            }
+        } catch (e) { mostrarBanner('No se pudo preparar la foto: ' + e.message, 'error'); }
+        cmpEscaneando = 0;
         cmpPintarCompra(document.getElementById('almContenido'), true);
+    }
+    function cmpQuitarFoto(i) { cmp.fotos.splice(i, 1); (cmp.origs || []).splice(i, 1); cmpPintarCompra(document.getElementById('almContenido'), true); }
+    // Ajustar el recorte a mano: las 4 esquinas se arrastran sobre la foto original
+    let cmpRec = null;
+    async function cmpAjustar(i) {
+        const o = (cmp.origs || [])[i]; if (!o) return;
+        const img = await cmpImg(o.src);
+        cmpRec = { i, w: img.width, h: img.height, esq: (o.esq || [[0, 0], [img.width, 0], [img.width, img.height], [0, img.height]]).map(p => p.slice()), limpiar: o.limpiar !== false };
+        cmpRecPintar(o.src);
+    }
+    function cmpRecPintar(src) {
+        const r = cmpRec, m = Math.max(r.w, r.h) / 60;
+        almVentana(`<div class="req-dlg alm-dlg-grande"><h3>Ajustar el recorte</h3>
+            <div class="req-sub">Mueva los 4 puntos a las esquinas de la factura. Solo se lee lo que queda dentro.</div>
+            <div class="cmp-rec" id="cmpRec" style="max-width:${Math.round(Math.min(560, 560 * r.w / r.h))}px"><img src="${src}" alt="Foto original" draggable="false">
+                <svg viewBox="0 0 ${r.w} ${r.h}" preserveAspectRatio="none"><polygon id="cmpRecPol" points="${r.esq.map(p => p.join(',')).join(' ')}"></polygon>
+                ${r.esq.map((p, k) => `<circle data-k="${k}" cx="${p[0]}" cy="${p[1]}" r="${m}"></circle>`).join('')}</svg></div>
+            <label class="interruptor"><input type="checkbox" ${r.limpiar ? 'checked' : ''} onchange="cmpRec.limpiar=this.checked"><span class="sw-pista"></span> Blanquear como escáner</label>
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0;flex-wrap:wrap">
+                <button type="button" class="btn-ghost" onclick="cmpRecGirar()">↻ Girar</button>
+                <button type="button" class="btn-ghost" onclick="cmpRecToda()">Toda la foto</button>
+                <button type="button" class="btn-ghost" onclick="almCerrar()">Cancelar</button>
+                <button type="button" class="btn-primary" id="cmpRecOk" onclick="cmpRecListo()">Listo</button></div></div>`);
+        const svg = document.querySelector('#cmpRec svg'); let k = -1;
+        const punto = e => { const b = svg.getBoundingClientRect(); return [Math.max(0, Math.min(r.w, (e.clientX - b.left) / b.width * r.w)), Math.max(0, Math.min(r.h, (e.clientY - b.top) / b.height * r.h))]; };
+        svg.addEventListener('pointerdown', e => {
+            const p = punto(e); k = e.target.dataset && e.target.dataset.k != null ? Number(e.target.dataset.k) : r.esq.reduce((m2, q, j) => Math.hypot(q[0] - p[0], q[1] - p[1]) < Math.hypot(r.esq[m2][0] - p[0], r.esq[m2][1] - p[1]) ? j : m2, 0);
+            svg.setPointerCapture(e.pointerId); e.preventDefault();
+        });
+        svg.addEventListener('pointermove', e => {
+            if (k < 0) return; const p = punto(e); r.esq[k] = p;
+            const c = svg.querySelector(`circle[data-k="${k}"]`); c.setAttribute('cx', p[0]); c.setAttribute('cy', p[1]);
+            document.getElementById('cmpRecPol').setAttribute('points', r.esq.map(q => q.join(',')).join(' '));
+        });
+        ['pointerup', 'pointercancel'].forEach(t => svg.addEventListener(t, () => { k = -1; }));
+    }
+    function cmpRecToda() { const r = cmpRec; r.esq = [[0, 0], [r.w, 0], [r.w, r.h], [0, r.h]]; cmpRecPintar(cmp.origs[r.i].src); }
+    async function cmpRecGirar() {   // la foto original gira 90° y se buscan las esquinas otra vez
+        const o = cmp.origs[cmpRec.i], img = await cmpImg(o.src), c = cmpLienzo(img, CMP_ESC_MAX, 1);
+        o.src = c.toDataURL('image/jpeg', 0.9); o.esq = cmpDetectarHoja(c);
+        cmpRec = Object.assign(cmpRec, { w: c.width, h: c.height, esq: (o.esq || [[0, 0], [c.width, 0], [c.width, c.height], [0, c.height]]).map(p => p.slice()) });
+        cmpRecPintar(o.src);
+    }
+    async function cmpRecListo() {
+        const r = cmpRec, o = cmp.origs[r.i], btn = document.getElementById('cmpRecOk'); btnCargando(btn, 'Preparando...');
+        await new Promise(x => setTimeout(x, 30));
+        const img = await cmpImg(o.src), c = cmpLienzo(img, CMP_ESC_MAX, 0);
+        const toda = r.esq[0][0] < 2 && r.esq[0][1] < 2 && r.esq[2][0] > r.w - 2 && r.esq[2][1] > r.h - 2;
+        o.esq = toda ? null : r.esq.map(p => p.slice()); o.limpiar = r.limpiar; o.auto = false;
+        cmp.fotos[r.i] = cmpEnderezar(c, o.esq, r.limpiar);
+        almCerrar(); cmpPintarCompra(document.getElementById('almContenido'), true);
     }
     // Leer: con reloj en el botón y un límite de 2 minutos; cualquier error (también al armar la tabla) se muestra
     let cmpFotosPromesa = null;   // subida de las fotos a Drive en curso (después de leer)
     // ---- Mientras Gemini lee (11/11): la foto con una línea que la recorre y los pasos de la lectura ----
     // Gemini no avisa por dónde va (responde todo junto al final): los pasos avanzan con el tiempo típico de una lectura, y el último
     // se queda "en curso" hasta que llega la respuesta. Si la conexión se corta, se reintenta solo una vez con las mismas fotos.
-    const CMP_PASOS_LECTURA = [[0, 'Enviando la foto'], [3, 'Leyendo el proveedor y el RIF'], [7, 'Leyendo el número y la fecha de la factura'],
-        [11, 'Leyendo los productos'], [18, 'Leyendo cantidades y costos'], [26, 'Calculando el IVA y el total'], [33, 'Buscando los productos en el catálogo']];
-    let cmpEsc = { desde: 0, reintento: false, pagina: 0 };
+    // (17/11) Los pasos son los de verdad (antes avanzaban con el reloj y confundían): el servidor nuevo avisa lo que Gemini va leyendo.
+    // fase: enviando → leyendo (proveedor y N productos) → revisando (no cuadró con el total: otro modelo) → catalogo; google = sin avisos
+    let cmpEsc = { desde: 0, reintento: false, pagina: 0, fase: 'enviando', renglones: 0, proveedor: '' };
     function cmpEscanerHTML() {
         const n = cmp.fotos.length, i = cmpEsc.pagina % Math.max(1, n);
         return `<div class="cmp-escaner" role="status" aria-live="polite">
             <div class="cmp-escaner-foto"><img id="cmpEscImg" src="${cmp.fotos[i] || ''}" alt="Factura que se está leyendo"><span class="cmp-escaner-linea"></span>
                 ${n > 1 ? `<span class="cmp-escaner-pag" id="cmpEscPag">Página ${i + 1} de ${n}</span>` : ''}</div>
             <div class="cmp-escaner-lado"><div class="cmp-escaner-tit">Leyendo la factura <b id="cmpEscSeg">${Math.round((Date.now() - cmpEsc.desde) / 1000)} s</b></div>
-                <ul class="cmp-escaner-pasos" id="cmpEscPasos">${cmpPasosHTML()}</ul></div></div>`;
+                <ul class="cmp-escaner-pasos" id="cmpEscPasos">${cmpPasosHTML()}</ul>
+                <div class="req-acciones" style="margin:.8rem 0 0"><button type="button" class="btn-ghost btn-mini" onclick="cmpLeerDetener()">${ico('detener')}Detener</button></div></div></div>`;
     }
     function cmpPasosHTML() {
-        const s = (Date.now() - cmpEsc.desde) / 1000, ult = CMP_PASOS_LECTURA.filter(p => s >= p[0]).length - 1;
-        return CMP_PASOS_LECTURA.map((p, i) => `<li class="${i < ult ? 'hecho' : i === ult ? 'actual' : ''}"><span class="cmp-paso-ic">${i < ult ? '✓' : ''}</span>${p[1]}${i === ult ? '...' : ''}</li>`).join('')
-            + (cmpEsc.reintento ? '<li class="aviso"><span class="cmp-paso-ic">!</span>Se cortó la conexión: reintentando (no hace falta tomar la foto otra vez)...</li>'
-                : s > 45 ? '<li class="aviso"><span class="cmp-paso-ic">!</span>JD Solution está tardando en responder... espere un poco más</li>' : '');
+        const e = cmpEsc, s = (Date.now() - e.desde) / 1000, ORDEN = ['enviando', 'leyendo', 'revisando', 'catalogo'];
+        const en = e.fase === 'google' ? 1 : ORDEN.indexOf(e.fase);
+        const li = (k, txt) => { const j = ORDEN.indexOf(k), est = en > j ? 'hecho' : en === j ? 'actual' : ''; return `<li class="${est}"><span class="cmp-paso-ic">${est === 'hecho' ? '✓' : ''}</span>${txt}</li>`; };
+        const leyendo = e.fase === 'google' ? 'Leyendo la factura (puede tardar hasta un minuto)...'
+            : `Leyendo la factura${e.proveedor ? ': <b>' + esc(e.proveedor) + '</b>' : ''}${e.renglones ? ` · <b>${e.renglones}</b> producto${e.renglones === 1 ? '' : 's'}` : ''}${en === 1 ? '...' : ''}`;
+        return li('enviando', en > 0 ? 'Foto enviada' : 'Enviando la foto...') + li('leyendo', leyendo)
+            + (e.fase === 'revisando' || e.revisado ? li('revisando', 'La suma no cuadró con el total: revisando con más detalle' + (en === 2 ? '...' : '')) : '')
+            + li('catalogo', 'Buscando los productos en el catálogo' + (en === 3 ? '...' : ''))
+            + (e.reintento ? '<li class="aviso"><span class="cmp-paso-ic">!</span>Se cortó la conexión: reintentando (no hace falta tomar la foto otra vez)...</li>'
+                : s > 50 ? '<li class="aviso"><span class="cmp-paso-ic">!</span>JD Solution está tardando en responder... espere un poco más</li>' : '');
+    }
+    function cmpLeerDetener() {
+        if (cmpEsc.ctrl) try { cmpEsc.ctrl.abort(); } catch (e) {}
+        cmpEsc.id = 0; cmp.leyendo = false; cmp.paso = 'foto';
+        cmpPintarCompra(document.getElementById('almContenido'), true);
+        mostrarBanner('Se detuvo la lectura. Las fotos siguen aquí: pulse "Leer factura" cuando quiera.', 'warn');
+    }
+    // Lectura en el servidor nuevo con el progreso real. alGoogle = no se pudo allá (sin clave, sin sesión, sin conexión): se lee en Google.
+    const cmpAlGoogle = m => Object.assign(new Error(m), { alGoogle: true });
+    async function cmpLeerVivo(imagenes, est, segunda) {
+        let token; try { token = await cfToken(); } catch (e) { throw cmpAlGoogle('sin sesión en el servidor nuevo'); }
+        let resp;
+        try { resp = await fetch(CF_URL + '/leer', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ empresa: CF_EMPRESA, token, imagenes }), signal: est.ctrl.signal }); }
+        catch (e) { if (e.name === 'AbortError') throw e; throw cmpAlGoogle('sin conexión con el servidor nuevo'); }
+        if (!resp.body) throw cmpAlGoogle('respuesta vacía');
+        const rd = resp.body.getReader(), dec = new TextDecoder(); let resto = '', fin = null, error = null;
+        try {
+            for (;;) {
+                const { value, done } = await rd.read(); if (done) break;
+                resto += dec.decode(value, { stream: true });
+                const ls = resto.split('\n'); resto = ls.pop();
+                for (const l of ls) {
+                    if (!l.trim()) continue; let ev; try { ev = JSON.parse(l); } catch (e) { continue; }
+                    if (ev.tipo === 'avance') { if (ev.fase === 'revisando') est.revisado = true; Object.assign(est, { fase: ev.fase || 'leyendo', renglones: ev.renglones || 0, proveedor: ev.proveedor || est.proveedor }); cmpEscanerTic(); }
+                    else if (ev.tipo === 'fin') fin = ev; else if (ev.tipo === 'error') error = ev;
+                }
+            }
+        } catch (e) { if (e.name === 'AbortError') throw e; if (!fin) throw cmpAlGoogle('se cortó la respuesta'); }
+        if (fin) return fin;
+        if (error && error.sinClave && !segunda) {   // la clave de Gemini todavía no está allá: Google se la manda y se intenta otra vez
+            try { await llamarApi({ action: 'cmp_gemini_cf' }); } catch (e) { throw cmpAlGoogle('sin clave'); }
+            return cmpLeerVivo(imagenes, est, true);
+        }
+        if (error && error.sesion === false) cfSes.token = '';
+        if (!error || error.sinClave || error.sesion === false) throw cmpAlGoogle((error && error.error) || 'sin respuesta');
+        throw new Error(error.error);
     }
     function cmpEscanerTic() {
         if (!cmp.leyendo) return;
@@ -19655,23 +19936,35 @@ Reglas:
     async function cmpLeer() {
         if (!cmp.fotos.length || cmp.leyendo) return;
         const out = () => document.getElementById('almContenido');
-        cmpEsc = { desde: Date.now(), reintento: false, pagina: 0 };
+        const id = Date.now();
+        cmpEsc = { id, desde: Date.now(), reintento: false, pagina: 0, fase: 'enviando', renglones: 0, proveedor: '', ctrl: new AbortController() };
         cmp.leyendo = true; cmpPintarCompra(out(), true);
         const reloj = setInterval(cmpEscanerTic, 1000);
         try {
             const imagenes = cmp.fotos.slice();
             const leer = () => Promise.race([llamarApi({ action: 'cmp_leer', imagenes, fotosAparte: true }),
                 new Promise((_, mal) => setTimeout(() => mal(new Error('JD Solution está tardando en responder... Pasaron más de 2 minutos y medio. Vuelva a intentar en un momento; si se repite, recorte la foto a solo la factura o use "Pegar texto de otra IA".')), 150000))]);
-            let r;
-            // Leer no guarda nada: si la conexión se corta (Google no llegó a responder), se vuelve a pedir una vez, solo
-            try { r = await leer(); }
-            catch (e) {
-                if (!e.sinRespuesta || navigator.onLine === false) throw e;
-                cmpEsc.reintento = true; cmpEscanerTic();
-                await new Promise(ok => setTimeout(ok, 1500));
+            let r = null;
+            // (17/11) Primero en el servidor nuevo, con el progreso real; si allá no se puede, en Google como antes
+            try {
+                const x = await cmpLeerVivo(imagenes, cmpEsc);
+                if (cmpEsc.id !== id) return;
+                cmpEsc.fase = 'catalogo'; cmpEscanerTic();
+                r = Object.assign(await llamarApi({ action: 'cmp_enlazar', factura: x.factura }), { modelo: x.modelo, segundos: x.segundos, cuadra: x.cuadra });
+            } catch (e) { if (e.name === 'AbortError' || cmpEsc.id !== id) return; if (!e.alGoogle) throw e; console.warn('Lectura en Google: ' + e.message); }
+            if (!r) {
+                cmpEsc.fase = 'google'; cmpEscanerTic();
+                // Leer no guarda nada: si la conexión se corta (Google no llegó a responder), se vuelve a pedir una vez, solo
                 try { r = await leer(); }
-                catch (e2) { if (e2.sinRespuesta) throw new Error('Se perdió la conexión con Google mientras leía la factura (se intentó 2 veces). Revise el internet y pulse "Leer factura" otra vez: las fotos siguen aquí.'); throw e2; }
+                catch (e) {
+                    if (!e.sinRespuesta || navigator.onLine === false) throw e;
+                    cmpEsc.reintento = true; cmpEscanerTic();
+                    await new Promise(ok => setTimeout(ok, 1500));
+                    try { r = await leer(); }
+                    catch (e2) { if (e2.sinRespuesta) throw new Error('Se perdió la conexión con Google mientras leía la factura (se intentó 2 veces). Revise el internet y pulse "Leer factura" otra vez: las fotos siguen aquí.'); throw e2; }
+                }
             }
+            if (cmpEsc.id !== id) return;   // se detuvo
             cmp.leyendo = false;
             cmpUsarLectura(r);
             if (r.segundos) cmpAvanceEstadoPintar(`Factura leída en ${String(r.segundos).replace('.', ',')} s` + (r.modelo ? ` · ${r.modelo}` : ''));
@@ -19681,6 +19974,7 @@ Reglas:
                 .catch(e => { console.warn('Fotos de la factura sin guardar en Drive: ' + e.message); return []; })
                 .finally(() => { cmpFotosPromesa = null; });
         } catch (e) {
+            if (cmpEsc.id !== id) return;
             cmp.leyendo = false; cmp.paso = 'foto';
             cmpPintarCompra(out(), true);
             const el = document.getElementById('cmpError'); if (el) el.textContent = 'No se pudo leer la factura: ' + (e && e.message || e);
@@ -19714,8 +20008,9 @@ Reglas:
             cmpAplicarSugerencia(x);
             return x;
         });
-        Object.assign(cmp, { paso: 'revisar', leido: r, fiscal: false, pago: '', proveedorId: r.proveedorId || '', proveedorLeido: r.proveedorLeido || null, factura: r.factura || '', fechaFactura: r.fechaFactura || '', enlaces: r.fotos || [], lineas,
-                             borradorId: null, borradorVer: '' });
+        // (17/11) Antes de revisar, una sola pregunta con dos botones grandes: ¿crédito o contado? (paso "pago")
+        Object.assign(cmp, { paso: 'pago', leido: r, fiscal: false, pago: '', proveedorId: r.proveedorId || '', proveedorLeido: r.proveedorLeido || null, factura: r.factura || '', fechaFactura: r.fechaFactura || '', enlaces: r.fotos || [], lineas,
+                             borradorId: null, borradorVer: '', soloRevisar: false, seccion: 'productos' });
         if (!cmp.lineas.length) cmp.lineas.push(cmpLineaNueva());
         const ivaAuto = cmpIvaDetectar(lineas, r);
         cmpAvanceEstado = '';
@@ -19725,7 +20020,7 @@ Reglas:
         if (r.moneda === 'BS' && cmpTasaCompra() > 0) mostrarBanner(`La factura está en bolívares: los costos se pasaron a $ con la tasa ${fmt(cmpTasaCompra())}. Revíselos.`, 'warn');
     }
     function cmpSinFoto() {
-        Object.assign(cmp, { paso: 'revisar', leido: null, proveedorId: '', proveedorLeido: null, factura: '', fechaFactura: fechaLocalHoy(), tasaManual: 0, fiscal: false, pago: '', enlaces: [], lineas: [cmpLineaNueva()], borradorId: null, borradorVer: '' });
+        Object.assign(cmp, { paso: 'pago', soloRevisar: false, seccion: 'productos', leido: null, proveedorId: '', proveedorLeido: null, factura: '', fechaFactura: fechaLocalHoy(), tasaManual: 0, fiscal: false, pago: '', enlaces: [], lineas: [cmpLineaNueva()], borradorId: null, borradorVer: '' });
         cmpAvanceEstado = '';
         cmpPintarCompra(document.getElementById('almContenido'), true);
     }
@@ -19758,7 +20053,7 @@ Reglas:
         const l = cmp.lineas[i]; if (!l) return;
         cmpIvaPoner(l, l.iva ? 0 : 16);
         const tr = document.getElementById('cmpF' + i); if (tr) tr.outerHTML = cmpFilaHTML(l, i);
-        document.getElementById('cmpPie').innerHTML = cmpPieHTML();
+        cmpPieActualizar();
         cmpAvanceProgramar();
     }
     function cmpIvaTodos(iva) { cmp.lineas.forEach(l => cmpIvaPoner(l, iva)); cmpPintarCompra(document.getElementById('almContenido'), true); cmpAvanceProgramar(); }
@@ -19782,8 +20077,53 @@ Reglas:
             .map(([n, v]) => v <= c + 0.0005 ? `al ${n} es igual o menor que el costo` : `al ${n} está muy cerca del costo (gana ${fmt((1 - c / v) * 100)} %)`);
         return r.length ? `<small class="cmp-aviso-costo">Precio ${r.join(' · ')}</small>` : '';
     }
+    // (17/11) Qué le falta a un renglón para estar listo ('' = listo). Lo que sale aquí se ve en amarillo y no deja guardar.
+    function cmpRevisarMotivo(l) {
+        const p = cmpProd(l);
+        if (l.codigo && !p) return 'El código no existe: elija otro o bórrelo';
+        if (!p) return 'Elija el producto (código) o escriba la descripción';
+        if (!(l.cantidad > 0)) return 'Falta la cantidad';
+        if (!(l.costo > 0)) return 'Falta el costo';
+        if (l.origenCodigo === 'parecido') return 'Producto parecido: confirme que es este';
+        const q = cmpR2(l.cantidad - cmpRepartido(l));
+        if (q < -0.0005) return 'Se reparte más de lo que llegó';
+        if (p.libre && q > 0.0005) return 'Sin código: reparta todo a las tiendas (o regístrelo)';
+        return '';
+    }
+    const cmpEstadoIcono = (l, i) => { const m = cmpRevisarMotivo(l); return `<span id="cmpE${i}" class="cmp-estado-fila ${m ? 'ver' : 'ok'}" title="${esc(m || 'Listo')}">${m ? '!' : '✓'}</span>`; };
+    function cmpConteoHTML() {
+        const ls = cmp.lineas.filter(l => l.codigo || l.descripcion || l.cantidad), mal = ls.filter(l => cmpRevisarMotivo(l)).length;
+        return `<span>${ls.length} producto${ls.length === 1 ? '' : 's'}</span><span class="chip st-ok">✓ ${ls.length - mal} listo${ls.length - mal === 1 ? '' : 's'}</span>`
+            + (mal ? `<span class="chip st-sobra">${mal} por revisar</span><button type="button" class="btn-ghost btn-mini" onclick="cmpSoloRevisar()">${cmp.soloRevisar ? 'Ver todos' : 'Ver solo los que faltan'}</button>`
+                   : `<span class="nota" style="margin:0">Todo listo para guardar</span>${cmp.soloRevisar ? '<button type="button" class="btn-ghost btn-mini" onclick="cmpSoloRevisar()">Ver todos</button>' : ''}`);
+    }
+    function cmpSoloRevisar() {
+        cmp.soloRevisar = !cmp.soloRevisar;
+        const t = document.getElementById('cmpTabla'); if (t) t.classList.toggle('solo-revisar', cmp.soloRevisar);
+        const c = document.getElementById('cmpConteo'); if (c) c.innerHTML = cmpConteoHTML();
+    }
+    function cmpPieActualizar() {
+        const p = document.getElementById('cmpPie'); if (p) p.innerHTML = cmpPieHTML();
+        const c = document.getElementById('cmpConteo'); if (c) c.innerHTML = cmpConteoHTML();
+    }
+    function cmpEstadoFila(i) {
+        const l = cmp.lineas[i], tr = document.getElementById('cmpF' + i); if (!l || !tr) return;
+        const m = cmpRevisarMotivo(l);
+        tr.classList.toggle('cmp-revisar', !!m); tr.classList.toggle('cmp-listo', !m);
+        const e = document.getElementById('cmpE' + i); if (e) e.outerHTML = cmpEstadoIcono(l, i);
+        const mo = document.getElementById('cmpMo' + i); if (mo) mo.textContent = m;
+    }
+    function cmpConfirmar(i) {
+        const l = cmp.lineas[i]; if (!l) return; l.origenCodigo = 'confirmado';
+        const tr = document.getElementById('cmpF' + i); if (tr) tr.outerHTML = cmpFilaHTML(l, i);
+        cmpPieActualizar(); cmpAvanceProgramar();
+    }
+    // Secciones de la revisión: cada una muestra solo sus columnas (las mismas de "Más opciones › columnas")
+    const CMP_SECCIONES = { productos: { c: true, m: false, u: false, b: false, d: false }, precios: { c: true, m: true, u: true, b: true, d: false },
+                            reparto: { c: false, m: false, u: false, b: false, d: true }, todo: { c: true, m: true, u: true, b: true, d: true } };
+    function cmpSeccion(k) { cmp.seccion = k; cmp.verManual = false; cmpPintarCompra(document.getElementById('almContenido'), true); }
     function cmpFilaHTML(l, i) {
-        const p = cmpProd(l), mal = l.codigo && !p, tasa = cmpTasaCompra(), mayor = cmpVendeMayor(p);
+        const p = cmpProd(l), mal = l.codigo && !p, tasa = cmpTasaCompra(), mayor = cmpVendeMayor(p), motivo = cmpRevisarMotivo(l);
         const n = (c, v, cls, extra) => `<input type="number" class="${cls}" step="${c === 'cantidad' ? 'any' : c === 'costo' ? '0.001' : '0.01'}" min="0" value="${v ? v : ''}" data-i="${i}" data-c="${c}" oninput="cmpEntrada(this)" ${extra || ''}>`;
         const queda = cmpR2(l.cantidad - cmpRepartido(l));
         const bs = v => v > 0 && tasa ? fmt(v * tasa) : '—';
@@ -19791,11 +20131,11 @@ Reglas:
         const ant = p ? (almDatos.precios || {})[cmpClaveProd(p)] || null : null, costoAnt = (ant && ant.costo) || (p && !p.libre ? p.costo || 0 : 0);
         const antes = (v, txt) => v > 0 ? `<small class="cmp-ant">Antes ${txt}</small>` : '';
         const varia = (a, b) => !(a > 0) || !(b > 0) || Math.abs(a - b) < 0.00005 ? '' : ` <span class="${b > a ? 'sube' : 'baja'}">${b > a ? '▲' : '▼'} ${fmt(Math.abs(b / a - 1) * 100)} %</span>`;
-        return `<tr id="cmpF${i}" class="${mal ? 'cmp-mal' : ''}">
-            <td>${i + 1}</td>
+        return `<tr id="cmpF${i}" class="${mal ? 'cmp-mal ' : ''}${motivo ? 'cmp-revisar' : 'cmp-listo'}">
+            <td>${cmpEstadoIcono(l, i)}<small>${i + 1}</small></td>
             <td class="izq"><div class="cmp-prod"><input type="text" class="cmp-cod" list="cmpProds" value="${esc(l.codigo)}" placeholder="Código" autocomplete="off" onchange="cmpCodigo(${i}, this.value)">
                 ${p && !p.libre ? `<b>${esc(p.descripcion)}</b>` : `<input type="text" class="cmp-desc" value="${esc(l.descripcion)}" placeholder="Descripción del producto" autocomplete="off" oninput="cmp.lineas[${i}].descripcion=this.value" onchange="cmpDescripcion(${i})">`}</div>
-                ${mal ? '<small style="color:var(--danger)">No existe ese código: bórrelo para trabajar con la descripción</small>' : ''}
+                <small class="cmp-motivo" id="cmpMo${i}">${esc(motivo)}</small>${l.origenCodigo === 'parecido' && p ? `<button type="button" class="btn-ghost btn-mini" style="margin:.2rem 0" onclick="cmpConfirmar(${i})">✓ Sí, es este</button>` : ''}
                 ${p && p.libre ? `<small>Sin código: se reparte completo a las tiendas${queda > 0 ? ' · <a href="#" onclick="event.preventDefault(); almEditarProducto(\'\', \'\')">registrarlo para dejar en el almacén</a>' : ''}</small>` : ''}
                 ${l.leido && l.leido.pe > 1 ? (l.empaque ? `<small>Empaque: ${esc(l.conversion)} · <a href="#" onclick="event.preventDefault(); cmpEmpaque(${i}, false)">la cantidad ya está en unidades</a></small>`
                     : `<small>Tal como la factura: ${fmt(l.leido.cantidad)} ${esc(String(l.leido.unidad || 'und').toLowerCase())} · <a href="#" onclick="event.preventDefault(); cmpEmpaque(${i}, true)">es por bulto de ${l.leido.pe}</a></small>`)
@@ -19830,40 +20170,52 @@ Reglas:
     }
     function cmpAplicarVer() {
         try { localStorage.setItem('cmp_ver', JSON.stringify(cmpVer)); } catch (e) {}
-        const tb = document.getElementById('cmpTabla'); if (tb) tb.className = cmpClaseVer();
+        const tb = document.getElementById('cmpTabla'); if (tb) tb.className = cmpClaseVer() + (cmp.soloRevisar ? ' solo-revisar' : '');
         const v = document.getElementById('cmpVer'); if (v) v.outerHTML = cmpVerHTML();
     }
-    function cmpCambiarVer(k, v) { cmpVer[k] = v; if (k === 't' && v) cmpVer.d = true; cmpAplicarVer(); }
-    function cmpAtajo(i) { Object.assign(cmpVer, CMP_ATAJOS[i][1], { t: '' }); cmpAplicarVer(); }
+    function cmpCambiarVer(k, v) { cmp.verManual = true; cmpVer[k] = v; if (k === 't' && v) cmpVer.d = true; cmpAplicarVer(); }
+    function cmpAtajo(i) { cmp.verManual = true; Object.assign(cmpVer, CMP_ATAJOS[i][1], { t: '' }); cmpAplicarVer(); }
     // Descripción de un renglón sin código: se vuelve a sugerir el precio (por si tiene precio de la última vez)
     function cmpDescripcion(i) {
         const l = cmp.lineas[i]; l.descripcion = String(l.descripcion || '').trim().toUpperCase();
         if (!l.codigo) cmpAplicarSugerencia(l);
         const tr = document.getElementById('cmpF' + i); if (tr) tr.outerHTML = cmpFilaHTML(l, i);
-        document.getElementById('cmpPie').innerHTML = cmpPieHTML();
+        cmpPieActualizar();
     }
     function cmpRevisarVista() {
         const prov = cmp.proveedorId ? almProveedor(cmp.proveedorId) : null, pl = cmp.proveedorLeido;
+        // (17/11) Más simple: los datos de la factura arriba; los productos en 3 secciones (Productos, Precios, Reparto) en vez de una
+        // tabla gigante; cada renglón dice si está listo (✓) o qué le falta (en amarillo). Tasa, moneda y columnas: en "Más opciones".
+        const sec = cmp.seccion || 'productos';
+        if (!cmp.verManual) Object.assign(cmpVer, CMP_SECCIONES[sec] || CMP_SECCIONES.todo, { t: '' });   // las columnas de la sección (salvo que se eligieran a mano)
+        const NOTA_SEC = { productos: 'Revise que cada producto, cantidad y costo sea el de la factura. Lo que está en amarillo necesita su atención. Las cajas y bultos se pasan a unidades.',
+                           precios: 'Escriba el % y el precio de venta sale solo (o escriba el precio y el % se calcula). Sale sugerido según el manual o la última vez.',
+                           reparto: 'Cuánto va a cada tienda. Lo que no se reparte queda en el almacén. Los productos sin código se reparten completos.', todo: 'Todas las columnas juntas.' };
         return `<datalist id="cmpProds">${almDatos.productos.filter(p => p.activo).map(p => `<option value="${esc(p.codigo)}">${esc(p.descripcion)}</option>`).join('')}</datalist>
-            <div class="grafico-card">
+            <div class="grafico-card">${cmpPasosBarraHTML()}
                 <div class="grafico-head"><h3>Revisar la compra</h3><div class="req-acciones" style="margin:0">${cmp.enlaces.map((u, i) => `<a class="btn-ghost btn-mini" href="${esc(u)}" target="_blank" rel="noopener">Ver foto${cmp.enlaces.length > 1 ? ' ' + (i + 1) : ''}</a>`).join('')}
                     <button type="button" class="btn-ghost btn-mini" onclick="cmpDescartar()">Descartar</button></div></div>
                 <div class="filters">
                     <div><label for="cmpProv">Proveedor <a href="#" style="font-weight:400" onclick="event.preventDefault(); cmpNuevoProveedor()">＋ Nuevo proveedor</a></label><select id="cmpProv" onchange="cmp.proveedorId=this.value"><option value="">Elegir...</option>${almDatos.proveedores.map(p => `<option value="${esc(p.id)}"${p.id === cmp.proveedorId ? ' selected' : ''}>${esc(p.nombre)}</option>`).join('')}</select>
-                        ${!prov && pl && pl.nombre ? `<small class="nota">Leído: <b>${esc(pl.nombre)}</b> ${esc(pl.rif || '')} — no está registrado. <a href="#" onclick="event.preventDefault(); cmpRegistrarProveedor()">Registrarlo</a></small>` : ''}</div>
+                        ${!prov && pl && pl.nombre ? `<small class="cmp-motivo">Leído: ${esc(pl.nombre)} ${esc(pl.rif || '')} — no está registrado. <a href="#" onclick="event.preventDefault(); cmpRegistrarProveedor()">Registrarlo</a></small>` : ''}</div>
                     <div><label for="cmpFac">N° de factura</label><input type="text" id="cmpFac" maxlength="40" autocomplete="off" value="${esc(cmp.factura)}" oninput="cmp.factura=this.value"></div>
                     <div><label for="cmpFecha">Fecha de la factura</label><input type="date" id="cmpFecha" value="${esc(cmp.fechaFactura)}" onchange="cmpCambiarFecha(this.value)"></div>
-                    <div><label for="cmpTasa">Tasa (Bs por $)</label><input type="number" id="cmpTasa" min="0" step="0.0001" value="${cmpTasaCompra() || ''}" onchange="cmpCambiarTasaCompra(this.value)">
-                        <small class="nota" style="margin:.25rem 0 0">${cmp.tasaManual > 0 ? `Escrita a mano · <a href="#" onclick="event.preventDefault(); cmp.tasaManual=0; cmpTasaAplicar()">usar la del BCV (${fmt(cmpTasaBcvFecha())})</a>`
-                            : (() => { const t = tasaBCVdel(cmp.fechaFactura || fechaLocalHoy()); return t ? `BCV del ${fechaBonita(t[0])}` : 'Sin tasa del BCV: escríbala'; })()}</small></div>
-                    ${cmp.lineas.some(l => l.leido) ? `<div><label for="cmpMoneda">Costos de la factura en</label><select id="cmpMoneda" onchange="cmpCambiarMoneda(this.value)">
-                        <option value="USD"${cmpMonedaFactura() === 'USD' ? ' selected' : ''}>Dólares ($)</option><option value="BS"${cmpMonedaFactura() === 'BS' ? ' selected' : ''}>Bolívares (Bs): se pasan a $ con la tasa</option></select></div>` : ''}
-                    <div><label for="cmpPago">¿Cómo se paga?</label><select id="cmpPago" onchange="cmp.pago=this.value"><option value="" ${!cmp.pago ? 'selected' : ''}>Elija...</option><option value="credito" ${cmp.pago === 'credito' ? 'selected' : ''}>A crédito (va a Cuentas por pagar)</option><option value="contado" ${cmp.pago === 'contado' ? 'selected' : ''}>Al contado (ya está pagada)</option></select></div>
+                    <div><label>Pago</label><div class="req-acciones" style="margin:0;align-items:center"><span class="chip ${cmp.pago === 'credito' ? 'st-amar' : 'st-ok'}">${cmp.pago === 'credito' ? 'Crédito' : cmp.pago === 'contado' ? 'Contado' : 'Sin elegir'}</span><button type="button" class="btn-ghost btn-mini" onclick="cmp.paso='pago';cmpPintarCompra(document.getElementById('almContenido'), true)">Cambiar</button></div></div>
                     <div style="align-self:end"><label class="interruptor"><input type="checkbox" ${cmp.fiscal ? 'checked' : ''} onchange="cmp.fiscal=this.checked"><span class="sw-pista"></span> Factura fiscal</label></div>
                 </div>
-                <div class="nota">Escriba el <b>%</b> y el precio de venta sale solo (costo ÷ (1 − %)); también puede escribir el precio y el % se calcula. El % sale sugerido según el manual (o el de la última vez). Los productos <b>sin código</b> se trabajan con su descripción y se reparten completos; solo lo que queda en el almacén necesita estar registrado. Las cajas y bultos se pasan a unidades.</div>
-                ${cmpVerHTML()}
-                <div class="tabla-wrap"><table class="${cmpClaseVer()}" id="cmpTabla" data-sin-paginar><thead><tr><th>#</th><th class="izq">Producto</th><th>Cant.</th><th class="g-c">Costo $</th><th class="g-m">% detal</th><th class="g-u">Detal $</th><th class="g-b">Detal Bs</th><th class="g-m">% mayor</th><th class="g-u">Mayor $</th><th class="g-b">Mayor Bs</th>
+                <details class="cmp-mas"${cmp.masAbierto ? ' open' : ''} ontoggle="cmp.masAbierto=this.open"><summary>Más opciones: tasa, moneda y columnas</summary>
+                    <div class="filters">
+                        <div><label for="cmpTasa">Tasa (Bs por $)</label><input type="number" id="cmpTasa" min="0" step="0.0001" value="${cmpTasaCompra() || ''}" onchange="cmpCambiarTasaCompra(this.value)">
+                            <small class="nota" style="margin:.25rem 0 0">${cmp.tasaManual > 0 ? `Escrita a mano · <a href="#" onclick="event.preventDefault(); cmp.tasaManual=0; cmpTasaAplicar()">usar la del BCV (${fmt(cmpTasaBcvFecha())})</a>`
+                                : (() => { const t = tasaBCVdel(cmp.fechaFactura || fechaLocalHoy()); return t ? `BCV del ${fechaBonita(t[0])}` : 'Sin tasa del BCV: escríbala'; })()}</small></div>
+                        ${cmp.lineas.some(l => l.leido) ? `<div><label for="cmpMoneda">Costos de la factura en</label><select id="cmpMoneda" onchange="cmpCambiarMoneda(this.value)">
+                            <option value="USD"${cmpMonedaFactura() === 'USD' ? ' selected' : ''}>Dólares ($)</option><option value="BS"${cmpMonedaFactura() === 'BS' ? ' selected' : ''}>Bolívares (Bs): se pasan a $ con la tasa</option></select></div>` : ''}
+                    </div>
+                    ${cmpVerHTML()}</details>
+                <div class="modo-tabs" role="tablist" style="margin:.6rem 0 .4rem">${[['productos', '1 · Productos'], ['precios', '2 · Precios'], ['reparto', '3 · Reparto a tiendas'], ['todo', 'Todo']].map(([k, t]) => `<button type="button" role="tab" class="tab${sec === k ? ' active' : ''}" aria-selected="${sec === k}" onclick="cmpSeccion('${k}')">${t}</button>`).join('')}</div>
+                <div class="cmp-conteo" id="cmpConteo">${cmpConteoHTML()}</div>
+                <div class="nota" style="margin-top:0">${NOTA_SEC[sec]}${sec === 'precios' ? ` <label class="interruptor" style="margin-left:.4rem"><input type="checkbox" ${cmpPsicoActivo ? 'checked' : ''} onchange="cmpCambiarPsico(this.checked)"><span class="sw-pista"></span> Terminación 7 · ,99</label>` : ''}</div>
+                <div class="tabla-wrap"><table class="${cmpClaseVer()}${cmp.soloRevisar ? ' solo-revisar' : ''}" id="cmpTabla" data-sin-paginar><thead><tr><th>#</th><th class="izq">Producto</th><th>Cant.</th><th class="g-c">Costo $</th><th class="g-m">% detal</th><th class="g-u">Detal $</th><th class="g-b">Detal Bs</th><th class="g-m">% mayor</th><th class="g-u">Mayor $</th><th class="g-b">Mayor Bs</th>
                     ${CMP_TIENDAS.map(t => `<th class="cmp-t g-d g-t g-t-${CMP_SIGLA[t]}" title="${esc(t)}">${CMP_SIGLA[t]}</th>`).join('')}<th class="g-d">Queda</th><th></th></tr></thead>
                     <tbody>${cmp.lineas.map(cmpFilaHTML).join('')}</tbody></table></div>
                 <div class="req-acciones"><button type="button" class="btn-ghost" onclick="cmp.lineas.push(cmpLineaNueva());cmpPintarCompra(document.getElementById('almContenido'), true);cmpAvanceProgramar()">＋ Agregar renglón</button>
@@ -19906,9 +20258,10 @@ Reglas:
     function cmpCodigo(i, v) {
         const l = cmp.lineas[i]; l.codigo = String(v || '').trim().toUpperCase();
         const p = l.codigo ? almProducto(l.codigo) : null; if (p) { l.codigo = p.codigo; l.libre = false; }
+        if (l.origenCodigo === 'parecido') l.origenCodigo = 'manual';   // lo eligió la persona: ya no es "parecido"
         cmpAplicarSugerencia(l);
         const tr = document.getElementById('cmpF' + i); if (tr) tr.outerHTML = cmpFilaHTML(l, i);
-        document.getElementById('cmpPie').innerHTML = cmpPieHTML();
+        cmpPieActualizar();
         const sig = document.querySelector(`#cmpF${i} input[data-c="cantidad"]`); if (sig && p) sig.focus();
     }
     // Un campo de la tabla: se guarda y se recalcula lo que depende de él (sin redibujar: el cursor no se mueve)
@@ -19941,7 +20294,8 @@ Reglas:
         const av = document.getElementById('cmpAv' + i); if (av) av.innerHTML = cmpAvisoCosto(l, cmpVendeMayor(p));
         const q = cmpR2(l.cantidad - cmpRepartido(l)), qe = document.getElementById('cmpQ' + i);
         qe.textContent = almCant(q, p && p.tipo); qe.style.color = q < 0 || (p && p.libre && q > 0) ? 'var(--danger)' : '';
-        document.getElementById('cmpPie').innerHTML = cmpPieHTML();
+        cmpEstadoFila(i);
+        cmpPieActualizar();
     }
     async function cmpGuardar() {
         const err = document.getElementById('cmpError'); err.textContent = '';
@@ -19949,6 +20303,15 @@ Reglas:
         if (!cmp.factura.trim()) { err.textContent = 'Escriba el N° de la factura.'; return; }
         const lineas = cmp.lineas.filter(l => l.codigo || l.descripcion || l.cantidad);
         if (!lineas.length) { err.textContent = 'La compra no tiene productos.'; return; }
+        // (17/11) Ningún renglón en amarillo: se muestran solos los que faltan, para resolverlos uno por uno
+        const faltan = lineas.filter(l => cmpRevisarMotivo(l));
+        if (faltan.length) {
+            const l0 = faltan[0], n0 = cmp.lineas.indexOf(l0) + 1;
+            err.textContent = `Falta revisar ${faltan.length} producto${faltan.length === 1 ? '' : 's'} (en amarillo). Renglón ${n0}: ${cmpRevisarMotivo(l0)}.`;
+            if (!cmp.soloRevisar) cmpSoloRevisar();
+            const tr = document.getElementById('cmpF' + (n0 - 1)); if (tr) tr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            return;
+        }
         const queda = l => l.cantidad - cmpRepartido(l);
         const malo = lineas.find(l => { const p = cmpProd(l); return !p || !(l.cantidad > 0) || queda(l) < -0.0005 || (p.libre && queda(l) > 0.0005); });
         if (malo) {

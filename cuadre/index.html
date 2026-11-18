@@ -1131,9 +1131,26 @@
         document.getElementById('fechaNota').textContent = '';
         if (cambiada) { cargarTasaBCV(); revisarAsistenciaFondo(); }
     }
+    // (17/11) La clave se escribe en un campo de clave (con puntos), no en prompt(), que la dejaba ver. Devuelve la clave o "" si cancela.
+    function pedirClave(titulo, sub) {
+        return new Promise(fin => {
+            const fondo = document.createElement('div');
+            fondo.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:16px';
+            fondo.innerHTML = `<form class="mf-caja" style="box-shadow:0 10px 30px var(--shadow)">
+                <h3 style="margin-top:0">${titulo}</h3>${sub ? `<p class="selector-sub">${sub}</p>` : ''}
+                <input type="password" autocomplete="off" placeholder="Clave" required style="width:100%;box-sizing:border-box">
+                <div class="asis-acciones"><button type="button" class="btn-gris">Cancelar</button><button type="submit" class="btn-add" style="margin-top:0">Aceptar</button></div></form>`;
+            const listo = v => { fondo.remove(); fin(v); };
+            const f = fondo.querySelector('form'), inp = f.querySelector('input');
+            f.addEventListener('submit', e => { e.preventDefault(); listo(inp.value); });
+            f.querySelector('.btn-gris').addEventListener('click', () => listo(''));
+            fondo.addEventListener('keydown', e => { if (e.key === 'Escape') listo(''); });
+            document.body.appendChild(fondo); setTimeout(() => inp.focus(), 50);
+        });
+    }
     async function cambiarFecha() {
         if (cambioFecha) { quitarCambioFecha(); return; }
-        const claveAdm = prompt("Para enviar una ficha de un día anterior escriba la clave de administrador:") || "";
+        const claveAdm = await pedirClave('Ficha de un día anterior', 'Escriba la clave de administrador.');
         if (!claveAdm) return;
         const btn = document.getElementById('btnCambiarFecha');
         btn.disabled = true; btn.textContent = 'Revisando la clave...';
@@ -2582,7 +2599,7 @@
                              "\n\n¿No se pudo marcar (por ejemplo, se dañó el equipo de marcaje)? Pulse Aceptar para enviarla con autorización de un administrador.")) return;
                 const motivo = (prompt("Motivo (por ejemplo: se dañó el equipo de marcaje):") || "").trim();
                 if (!motivo) { alert("Sin motivo no se puede enviar la ficha sin asistencia marcada."); return; }
-                const claveAdm = prompt("Clave de administrador:") || "";
+                const claveAdm = await pedirClave('Autorizar la ficha sin asistencia', 'Escriba la clave de administrador.');
                 if (!claveAdm) return;
                 sinMarcaje = { motivo, claveAdmin: claveAdm };   // el servidor revisa la clave y deja la autorización registrada
             }
@@ -2617,7 +2634,8 @@
             const confirmacion = confirm("¿Estás seguro de que la información está correcta y deseas finalizar la ficha?");
             if (!confirmacion) return;
 
-            const clave = prompt("Ingrese la clave para continuar:");
+            const clave = await pedirClave('Finalizar la ficha', 'Ingrese la clave para continuar.');
+            if (!clave) return;
             if (clave !== "0000") {
                 alert("Clave incorrecta. Operación cancelada.");
                 return;
