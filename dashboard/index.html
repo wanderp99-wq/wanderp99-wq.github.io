@@ -290,6 +290,7 @@
         /* Filtros: el mismo formato en todos los módulos (orden: Buscar · fechas · tienda · estado/tipo), alineados abajo a la misma altura */
         .filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: .9rem; margin-bottom: 1.25rem; align-items: end; }
         .filters > div > label:first-child { display: block; margin-bottom: .3rem; }
+        .filters > div > label.interruptor:first-child { display: inline-flex; margin-bottom: .55rem; }   /* (17/11) el interruptor dentro de los filtros: la perilla tapaba el texto ("Factura fiscal") */
         .act-modulo { display: none !important; }   /* el "⟳ Actualizar" de arriba reemplaza a los de cada módulo */
 
         .banner { padding: 0.75rem 1rem; border-radius: var(--radius); margin-bottom: 1rem; font-size: 0.9rem; border: 1px solid var(--border); background: var(--list-bg); }
@@ -1383,6 +1384,8 @@
         .cmp-tabla td { vertical-align: top; padding: .35rem .3rem; }
         .cmp-tabla td:nth-child(2) { min-width: 240px; }
         .cmp-tabla input { padding: .35rem .4rem; font-size: .88rem; }
+        .cmp-tabla td:not(:first-child):not(:nth-child(2)) { text-align: right; }   /* (17/11) los números a la derecha, bajo su título */
+        .cmp-tabla td.cmp-sub b { font-variant-numeric: tabular-nums; white-space: nowrap; }
         .cmp-tabla .cmp-cod { width: 92px; } .cmp-tabla .cmp-n { width: 74px; text-align: right; } .cmp-tabla .cmp-p { width: 58px; text-align: right; } .cmp-tabla .cmp-d { width: 58px; text-align: right; }
         .cmp-tabla small { display: block; color: var(--text-muted); font-size: .74rem; line-height: 1.25; max-width: 230px; text-align: left; }
         .cmp-tabla small.cmp-ant { white-space: nowrap; text-align: right; margin-top: 2px; }
@@ -1742,7 +1745,7 @@
             .cmp-tabla thead, .cmp-lista thead { display: none; }
             .cmp-tabla tr { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: .5rem .45rem; position: relative; border: 1px solid var(--border); border-radius: 12px; padding: .65rem .65rem .75rem; margin-bottom: .75rem; background: var(--card-bg); }
             .cmp-tabla tr.cmp-mal { border-color: var(--danger); }
-            .cmp-tabla td { display: block; padding: 0 !important; border: 0; min-width: 0 !important; text-align: left; background: none !important; overflow-wrap: anywhere; }
+            .cmp-tabla td, .cmp-tabla td:not(:first-child):not(:nth-child(2)) { display: block; padding: 0 !important; border: 0; min-width: 0 !important; text-align: left; background: none !important; overflow-wrap: anywhere; }
             .vista table.cmp-tabla:not(.hortb) td, .vista table.cmp-lista:not(.hortb) td { white-space: normal !important; }
             .cmp-tabla td:empty { display: none; }
             .cmp-tabla td[data-l]::before { content: attr(data-l); display: block; font-size: .72rem; font-weight: 600; color: var(--text-muted); margin-bottom: .15rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -20090,6 +20093,11 @@ Reglas:
         if (p.libre && q > 0.0005) return 'Sin código: reparta todo a las tiendas (o regístrelo)';
         return '';
     }
+    // (17/11) Subtotal del renglón (cantidad × costo) en $ y, debajo en gris, en Bs con la tasa de la compra: para cotejar con la factura
+    function cmpSubtotalHTML(l, i) {
+        const s = (Number(l.cantidad) || 0) * (Number(l.costo) || 0), t = cmpTasaCompra();
+        return `<span id="cmpSt${i}"><b>${s > 0 ? '$ ' + fmt(s) : '—'}</b>${s > 0 && t ? `<small>Bs ${fmt(s * t)}</small>` : ''}</span>`;
+    }
     const cmpEstadoIcono = (l, i) => { const m = cmpRevisarMotivo(l); return `<span id="cmpE${i}" class="cmp-estado-fila ${m ? 'ver' : 'ok'}" title="${esc(m || 'Listo')}">${m ? '!' : '✓'}</span>`; };
     function cmpConteoHTML() {
         const ls = cmp.lineas.filter(l => l.codigo || l.descripcion || l.cantidad), mal = ls.filter(l => cmpRevisarMotivo(l)).length;
@@ -20145,6 +20153,7 @@ Reglas:
                 <small class="cmp-regla">${esc(l.regla || '')}</small><span id="cmpAv${i}">${cmpAvisoCosto(l, mayor)}</span></td>
             <td data-l="Cantidad">${n('cantidad', l.cantidad, 'cmp-n')}<small>${p ? almUnidad(p.tipo) : ''}</small></td>
             <td class="g-c" data-l="Costo $">${n('costo', cmpR3(l.costo), 'cmp-n')}<small>${l.iva ? `con IVA ${l.iva} % · <a href="#" onclick="event.preventDefault(); cmpIvaCambiar(${i})">quitar</a>` : `sin IVA · <a href="#" onclick="event.preventDefault(); cmpIvaCambiar(${i})">sumar IVA 16 %</a>`}</small>${l.costoBs > 0 ? `<small>Bs ${fmt(l.costoBs)}</small>` : ''}<span id="cmpAc${i}">${antes(costoAnt, '$ ' + fmt3(costoAnt) + varia(costoAnt, l.costo))}</span>${p && !costoAnt && !(ant && ant.detal) ? '<small class="cmp-ant">Sin compra anterior</small>' : ''}</td>
+            <td class="g-c cmp-sub" data-l="Subtotal">${cmpSubtotalHTML(l, i)}</td>
             <td class="g-m" data-l="% detal">${n('margenDetal', l.margenDetal, 'cmp-p')}${antes(ant && ant.margenDetal, fmt(ant && ant.margenDetal) + ' %')}</td>
             <td class="g-u" data-l="Detal $">${n('detal', l.detal, 'cmp-n')}${antes(ant && ant.detal, '$ ' + fmt(ant && ant.detal))}</td>
             <td class="g-b" data-l="Detal Bs"><span id="cmpDb${i}">${bs(l.detal)}</span>${antes(ant && ant.detal && tasa, 'Bs ' + bs(ant && ant.detal))}</td>
@@ -20215,7 +20224,7 @@ Reglas:
                 <div class="modo-tabs" role="tablist" style="margin:.6rem 0 .4rem">${[['productos', '1 · Productos'], ['precios', '2 · Precios'], ['reparto', '3 · Reparto a tiendas'], ['todo', 'Todo']].map(([k, t]) => `<button type="button" role="tab" class="tab${sec === k ? ' active' : ''}" aria-selected="${sec === k}" onclick="cmpSeccion('${k}')">${t}</button>`).join('')}</div>
                 <div class="cmp-conteo" id="cmpConteo">${cmpConteoHTML()}</div>
                 <div class="nota" style="margin-top:0">${NOTA_SEC[sec]}${sec === 'precios' ? ` <label class="interruptor" style="margin-left:.4rem"><input type="checkbox" ${cmpPsicoActivo ? 'checked' : ''} onchange="cmpCambiarPsico(this.checked)"><span class="sw-pista"></span> Terminación 7 · ,99</label>` : ''}</div>
-                <div class="tabla-wrap"><table class="${cmpClaseVer()}${cmp.soloRevisar ? ' solo-revisar' : ''}" id="cmpTabla" data-sin-paginar><thead><tr><th>#</th><th class="izq">Producto</th><th>Cant.</th><th class="g-c">Costo $</th><th class="g-m">% detal</th><th class="g-u">Detal $</th><th class="g-b">Detal Bs</th><th class="g-m">% mayor</th><th class="g-u">Mayor $</th><th class="g-b">Mayor Bs</th>
+                <div class="tabla-wrap"><table class="${cmpClaseVer()}${cmp.soloRevisar ? ' solo-revisar' : ''}" id="cmpTabla" data-sin-paginar><thead><tr><th>#</th><th class="izq">Producto</th><th>Cant.</th><th class="g-c">Costo $</th><th class="g-c">Subtotal</th><th class="g-m">% detal</th><th class="g-u">Detal $</th><th class="g-b">Detal Bs</th><th class="g-m">% mayor</th><th class="g-u">Mayor $</th><th class="g-b">Mayor Bs</th>
                     ${CMP_TIENDAS.map(t => `<th class="cmp-t g-d g-t g-t-${CMP_SIGLA[t]}" title="${esc(t)}">${CMP_SIGLA[t]}</th>`).join('')}<th class="g-d">Queda</th><th></th></tr></thead>
                     <tbody>${cmp.lineas.map(cmpFilaHTML).join('')}</tbody></table></div>
                 <div class="req-acciones"><button type="button" class="btn-ghost" onclick="cmp.lineas.push(cmpLineaNueva());cmpPintarCompra(document.getElementById('almContenido'), true);cmpAvanceProgramar()">＋ Agregar renglón</button>
@@ -20294,6 +20303,7 @@ Reglas:
         const av = document.getElementById('cmpAv' + i); if (av) av.innerHTML = cmpAvisoCosto(l, cmpVendeMayor(p));
         const q = cmpR2(l.cantidad - cmpRepartido(l)), qe = document.getElementById('cmpQ' + i);
         qe.textContent = almCant(q, p && p.tipo); qe.style.color = q < 0 || (p && p.libre && q > 0) ? 'var(--danger)' : '';
+        const st = document.getElementById('cmpSt' + i); if (st) st.outerHTML = cmpSubtotalHTML(l, i);
         cmpEstadoFila(i);
         cmpPieActualizar();
     }
