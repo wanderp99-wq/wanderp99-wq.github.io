@@ -1003,7 +1003,7 @@
         .sw-pista::after { content: ''; position: absolute; top: .12rem; left: .12rem; width: 1.63rem; height: 1.06rem; border-radius: 999px; background-color: #fff;
             box-shadow: 0 1px 3px rgba(0, 0, 0, .22), 0 0 0 .5px rgba(0, 0, 0, .05);
             transition: translate .45s cubic-bezier(.3, 1.3, .5, 1), scale .22s cubic-bezier(.3, 1.4, .5, 1), background-color .22s ease, box-shadow .22s ease; }
-        label.interruptor > input:checked ~ .sw-pista { background-color: var(--sw-encendido, #34c759); }
+        label.interruptor > input:checked ~ .sw-pista { background-color: var(--sw-encendido, #22c55e); }
         label.interruptor > input:checked ~ .sw-pista::after { translate: var(--sw-viaje) 0; }
         /* Cristal: mientras se mantiene presionado y mientras se desliza */
         label.interruptor:active > .sw-pista::after, label.interruptor.sw-moviendo > .sw-pista::after {
@@ -1012,14 +1012,14 @@
         /* Tras repintar una ventana: la perilla del interruptor que se tocó arranca desde donde estaba */
         label.interruptor.sw-desde > .sw-pista, label.interruptor.sw-desde > .sw-pista::after { transition: none; }
         label.interruptor.sw-desde > input:checked ~ .sw-pista { background-color: var(--sw-apagado, #d1d5db); }
-        label.interruptor.sw-desde > input:not(:checked) ~ .sw-pista { background-color: var(--sw-encendido, #34c759); }
+        label.interruptor.sw-desde > input:not(:checked) ~ .sw-pista { background-color: var(--sw-encendido, #22c55e); }
         label.interruptor.sw-desde > input:checked ~ .sw-pista::after { translate: 0 0; }
         label.interruptor.sw-desde > input:not(:checked) ~ .sw-pista::after { translate: var(--sw-viaje) 0; }
         label.interruptor > input:focus-visible ~ .sw-pista { outline: 2px solid var(--primary); outline-offset: 2px; }
         label.interruptor > input:disabled ~ .sw-pista { opacity: .45; filter: grayscale(1); cursor: not-allowed; } label.interruptor:has(input:disabled) { cursor: not-allowed; }
         /* Nómina cerrada: el interruptor muestra cómo quedó (encendido o apagado se debe distinguir bien) */
         label.interruptor.fijo > input:disabled ~ .sw-pista { opacity: .85; filter: grayscale(1); cursor: default; } label.interruptor.fijo { cursor: default; }
-        :root:not([data-theme="light"]) .sw-pista { --sw-apagado: #48484d; }
+        :root:not([data-theme="light"]) .sw-pista { --sw-apagado: #3a4660; }
         /* Ventanas: se abren creciendo desde donde se tocó, con el fondo difuminado */
         .req-dlg-fondo, .asis-fondo { -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
         .dlg-abriendo { animation: anim-fondo .38s ease both; }

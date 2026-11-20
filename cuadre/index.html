@@ -18,43 +18,46 @@
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
     <style>
         :root {
-            --bg-color: #1e293b; /* Fondo general en gris oscuro */
+            --bg-color: #0b1222; /* (20/11) la paleta del panel: azul profundo */
             --card-bg: #0f172a; /* Fondo de la tarjeta en gris/azul oscuro más profundo */
-            --border: #334155;
+            --border: #22304d;
             --primary: #3b82f6;
             --danger: #ef4444;
-            --text-main: #f8fafc; /* Texto principal claro */
-            --text-muted: #94a3b8; /* Texto secundario gris claro */
+            --text-main: #f1f5f9; /* Texto principal claro */
+            --text-muted: #a3b1c6; /* Texto secundario gris claro */
             --title: #f1f5f9;
             --subtitle: #60a5fa;
-            --input-bg: #1e293b;
+            --input-bg: #16213a;
             --input-text: #ffffff;
-            --readonly-bg: #090d16;
-            --list-bg: #111827;
+            --readonly-bg: #0b1222;
+            --list-bg: #121c33;
             --totals-text: #e2e8f0;
-            --total-value: #34d399;
+            --total-value: #22c55e;
             --shadow: rgba(0, 0, 0, 0.3);
-            --radius: 8px;
+            --radius: 10px;
+            /* Estados, los mismos del panel: verde completado, rojo salmón falta, azul pendiente */
+            --ok: #22c55e; --bad: #f87171; --pend: #60a5fa;
             color-scheme: dark;
         }
 
         /* Tema claro */
         :root[data-theme="light"] {
-            --bg-color: #e2e8f0;
+            --bg-color: #eef2f7;
             --card-bg: #ffffff;
-            --border: #cbd5e1;
+            --border: #d5dde8;
             --primary: #2563eb;
             --danger: #dc2626;
             --text-main: #0f172a;
-            --text-muted: #64748b;
+            --text-muted: #5b6b82;
             --title: #0f172a;
             --subtitle: #1d4ed8;
             --input-bg: #ffffff;
             --input-text: #0f172a;
             --readonly-bg: #f1f5f9;
-            --list-bg: #f8fafc;
+            --list-bg: #ffffff;
             --totals-text: #1e293b;
-            --total-value: #047857;
+            --total-value: #15803d;
+            --ok: #15803d; --bad: #dc2626; --pend: #1d4ed8;
             --shadow: rgba(0, 0, 0, 0.1);
             color-scheme: light;
         }
@@ -72,6 +75,15 @@
             white-space: nowrap;
         }
         .btn-theme:hover { border-color: var(--primary); }
+        .btn-icono { display: inline-grid; place-items: center; width: 40px; height: 40px; padding: 0 !important; line-height: 0; border-radius: 8px; flex: none; }
+        .btn-icono svg { width: 20px; height: 20px; }
+        html, body { overflow-x: clip; }
+        /* En el teléfono el título va en su propia línea (sin partirse en cuatro) y debajo Ficha | Asistencia y el sol / luna */
+        @media (max-width: 520px) {
+            .header-bar { flex-wrap: wrap; row-gap: .5rem; padding-bottom: .5rem; }
+            .header-bar h2 { flex: 1 1 100%; }
+            .header-bar .header-acciones { width: 100%; justify-content: space-between; flex-wrap: nowrap; }
+        }
 
         /* ===== Interruptor y animaciones estilo iOS: el mismo bloque en el Dashboard y en la ficha =====
            Interruptor: <label class="interruptor"><input type="checkbox"><span class="sw-pista"></span> Texto</label>
@@ -82,7 +94,7 @@
         .sw-pista::after { content: ''; position: absolute; top: .12rem; left: .12rem; width: 1.63rem; height: 1.06rem; border-radius: 999px; background-color: #fff;
             box-shadow: 0 1px 3px rgba(0, 0, 0, .22), 0 0 0 .5px rgba(0, 0, 0, .05);
             transition: translate .45s cubic-bezier(.3, 1.3, .5, 1), scale .22s cubic-bezier(.3, 1.4, .5, 1), background-color .22s ease, box-shadow .22s ease; }
-        label.interruptor > input:checked ~ .sw-pista { background-color: var(--sw-encendido, #34c759); }
+        label.interruptor > input:checked ~ .sw-pista { background-color: var(--sw-encendido, #22c55e); }
         label.interruptor > input:checked ~ .sw-pista::after { translate: var(--sw-viaje) 0; }
         /* Cristal: mientras se mantiene presionado y mientras se desliza */
         label.interruptor:active > .sw-pista::after, label.interruptor.sw-moviendo > .sw-pista::after {
@@ -91,12 +103,12 @@
         /* Tras repintar una ventana: la perilla del interruptor que se tocó arranca desde donde estaba */
         label.interruptor.sw-desde > .sw-pista, label.interruptor.sw-desde > .sw-pista::after { transition: none; }
         label.interruptor.sw-desde > input:checked ~ .sw-pista { background-color: var(--sw-apagado, #d1d5db); }
-        label.interruptor.sw-desde > input:not(:checked) ~ .sw-pista { background-color: var(--sw-encendido, #34c759); }
+        label.interruptor.sw-desde > input:not(:checked) ~ .sw-pista { background-color: var(--sw-encendido, #22c55e); }
         label.interruptor.sw-desde > input:checked ~ .sw-pista::after { translate: 0 0; }
         label.interruptor.sw-desde > input:not(:checked) ~ .sw-pista::after { translate: var(--sw-viaje) 0; }
         label.interruptor > input:focus-visible ~ .sw-pista { outline: 2px solid var(--primary); outline-offset: 2px; }
-        label.interruptor > input:disabled ~ .sw-pista { opacity: .45; } label.interruptor:has(input:disabled) { cursor: not-allowed; }
-        :root:not([data-theme="light"]) .sw-pista { --sw-apagado: #48484d; }
+        label.interruptor > input:disabled ~ .sw-pista { opacity: .45; filter: grayscale(1); cursor: not-allowed; } label.interruptor:has(input:disabled) { cursor: not-allowed; }
+        :root:not([data-theme="light"]) .sw-pista { --sw-apagado: #3a4660; }
         /* Ventanas: se abren creciendo desde donde se tocó, con el fondo difuminado */
         .req-dlg-fondo, .asis-fondo { -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
         .dlg-abriendo { animation: anim-fondo .38s ease both; }
@@ -114,7 +126,7 @@
         .cola-aviso { position: fixed; left: 12px; bottom: 12px; z-index: 900; display: inline-flex; align-items: center; gap: .45rem; padding: .5rem .85rem; border-radius: 999px;
             border: 1px solid var(--border); background: var(--card-bg); color: var(--text-main); font: inherit; font-size: .85rem; font-weight: 600; cursor: pointer; box-shadow: 0 6px 18px rgba(0, 0, 0, .18); }
         .cola-aviso.error { border-color: #ef4444; color: #ef4444; }
-        .cola-aviso .cola-punto { width: .55rem; height: .55rem; border-radius: 50%; background: #f59e0b; flex: none; }
+        .cola-aviso .cola-punto { width: .55rem; height: .55rem; border-radius: 50%; background: var(--pend); flex: none; }
         .cola-aviso.enviando .cola-punto { background: #3b82f6; animation: cola-latido 1s ease-in-out infinite; } .cola-aviso.error .cola-punto { background: #ef4444; }
         @keyframes cola-latido { 50% { opacity: .3; transform: scale(.7); } }
         .cola-fondo { position: fixed; inset: 0; z-index: 1001; background: rgba(0, 0, 0, .5); display: flex; align-items: center; justify-content: center; padding: 1rem; }
@@ -126,7 +138,7 @@
         .cola-item button, .cola-pie button { font: inherit; font-size: .8rem; padding: .3rem .7rem; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--text-main); cursor: pointer; }
         .cola-pie { display: flex; justify-content: flex-end; gap: .5rem; margin-top: .6rem; }
         .cola-toast { position: fixed; left: 50%; bottom: 64px; transform: translateX(-50%); z-index: 1002; max-width: min(92vw, 520px); padding: .7rem 1rem; border-radius: 12px;
-            background: #111827; color: #fff; font-size: .88rem; box-shadow: 0 8px 24px rgba(0, 0, 0, .3); animation: cola-toast .3s cubic-bezier(.2, .9, .3, 1.1) both; }
+            background: #111827; color: #fff; font-size: .88rem; box-shadow: 0 8px 24px rgba(0, 0, 0, .3); animation: cola-toast .3s cubic-bezier(.2, .8, .2, 1) both; }
         @keyframes cola-toast { from { opacity: 0; transform: translate(-50%, 12px); } }
         label.interruptor.btn-theme { padding: .5rem .85rem; border-radius: 8px; font-size: .95rem; font-weight: 500; }
         .header-acciones { display: flex; flex-wrap: wrap; gap: .5rem; justify-content: flex-end; }
@@ -202,8 +214,8 @@
         /* (15/11) Pago móvil de Bancrecer: si está en la cuenta (debajo de cada renglón) */
         .dynamic-row > .pm-estado { flex-basis: 100%; min-width: 0; font-size: .82rem; margin-top: -.2rem; color: var(--text-muted); }
         .pm-estado:empty { display: none; }
-        .pm-estado.ok { color: #16a34a; } .pm-estado.mal { color: var(--danger); font-weight: 600; } .pm-estado.duda { color: #b45309; }
-        @media (prefers-color-scheme: dark) { .pm-estado.ok { color: #4ade80; } .pm-estado.duda { color: #fbbf24; } }
+        .pm-estado.ok { color: var(--ok); } .pm-estado.mal { color: var(--danger); font-weight: 600; } .pm-estado.duda { color: var(--pend); }
+        
         
         button {
             padding: 0.6rem 1rem;
@@ -221,7 +233,7 @@
         @media (prefers-reduced-motion: reduce) { button { transition: none; } button:not(:disabled):active { transform: none; } }
         .btn-add { background: var(--primary); color: white; margin-top: 0.5rem; }
         .btn-remove { background: var(--danger); color: white; flex: 0 0 auto !important; min-width: 40px !important; padding: 0.6rem; }
-        .btn-submit { background: #10b981; color: white; width: 100%; padding: 1rem; font-size: 1rem; margin-top: 2rem; }
+        .btn-submit { background: #15803d; color: white; white-space: nowrap; width: 100%; padding: 1rem; font-size: 1rem; margin-top: 2rem; }
 
         .totals-box {
             background: var(--list-bg);
@@ -339,7 +351,7 @@
         .mf-form { display: flex; gap: .6rem; } .mf-form input { flex: 1; font-size: 1.15rem; padding: .75rem; text-align: center; letter-spacing: .1em; }
         .mf-video { border-radius: 12px; overflow: hidden; border: 1px solid var(--border); max-width: 420px; width: 100%; justify-self: center; }
         /* ===== Lector de carnets con la cámara (el mismo en el Dashboard, la ficha y la prueba de carnets) ===== */
-        .lector-caja { position: relative; border-radius: 14px; overflow: hidden; background: #000; max-width: 640px; margin: 0 auto; }
+        .lector-caja { position: relative; border-radius: 14px; overflow: hidden; background: #020617; max-width: 640px; margin: 0 auto; }
         .lector-caja video { width: 100%; display: block; max-height: 46vh; object-fit: cover; }   /* el resultado (arriba) siempre a la vista */
         .lector-guia { position: absolute; left: 7%; right: 7%; top: 15%; bottom: 15%; border: 3px solid rgba(255, 255, 255, .9); border-radius: 14px; box-shadow: 0 0 0 999px rgba(0, 0, 0, .35); transition: border-color .15s, transform .15s; }
         .lector-caja.leido .lector-guia { border-color: #22c55e; transform: scale(1.02); }
@@ -768,7 +780,7 @@
         <h2 class="titulo-logo"><svg class="logo-ccpv" viewBox="400 380 1130 1175" aria-hidden="true"><path fill="var(--logo-d, #F2EEE8)" d="M423 398 H950 C1230 398 1400 560 1450 788 L1115 952 C1110 790 1075 655 870 655 H773 V1193 L423 1365 Z"/><path fill="#44AC00" d="M423 1365 L1508 834 V865 L658 1533 H423 Z"/><path fill="#FF3D00" d="M820 1533 L1465 1026 C1460 1140 1448 1225 1420 1295 C1360 1440 1250 1490 1160 1505 C1090 1522 1020 1533 950 1533 Z"/></svg><span>Sistema de Control de Caja</span></h2>
         <div class="header-acciones">
             <label class="interruptor btn-theme modo-vista" title="Cambiar entre la ficha de cuadre y marcar asistencia con carnet"><input type="checkbox" id="swVista" onchange="cambiarVista(this.checked)"><span class="lado lado-ficha">Ficha</span><span class="sw-pista"></span><span class="lado lado-asis">Asistencia</span></label>
-            <label class="interruptor btn-theme" title="Modo oscuro"><input type="checkbox" id="btnTema" onchange="alternarTema()"><span class="sw-pista"></span> Modo oscuro</label>
+            <button type="button" class="btn-theme btn-icono" id="btnTemaIco" onclick="alternarTema()" title="Cambiar a modo claro" aria-label="Cambiar a modo claro"></button>
         </div>
     </div>
     <!-- ============ PASO 1: ELEGIR EL LOCAL ============ -->
@@ -778,13 +790,13 @@
         <div class="locales-grid" id="localesGrid"></div>
         <!-- Asistencia de trabajadores con el carnet (código de barras o QR) -->
         <div class="mf-tarjeta">
-            <span class="local-icono asis-icono mf-icono"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="11" r="2"/><path d="M5.5 16c.6-1.6 1.8-2.4 3-2.4s2.4.8 3 2.4"/><path d="M14 9h4M14 12h4M14 15h2"/></svg></span>
+            <span class="local-icono asis-icono mf-icono"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="11" r="2"/><path d="M5.5 16c.6-1.6 1.8-2.4 3-2.4s2.4.8 3 2.4"/><path d="M14 9h4M14 12h4M14 15h2"/></svg></span>
             <div class="mf-texto"><b>Asistencia de trabajadores</b><span>Cada trabajador pasa su carnet (lector o cámara) y queda marcada su entrada o su salida.</span></div>
             <button type="button" class="btn-cambiar mf-abrir" onclick="mfAbrir()">Marcar asistencia con carnet</button>
         </div>
         <!-- Seguridad: este equipo autorizado para enviar fichas (una sola vez, con la clave de administrador) -->
         <div class="mf-tarjeta" id="feTarjeta">
-            <span class="local-icono asis-icono mf-icono"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 5 6v5c0 4.5 3 8.3 7 9.5 4-1.2 7-5 7-9.5V6z"/><path d="m9 12 2 2 4-4"/></svg></span>
+            <span class="local-icono asis-icono mf-icono"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 5 6v5c0 4.5 3 8.3 7 9.5 4-1.2 7-5 7-9.5V6z"/><path d="m9 12 2 2 4-4"/></svg></span>
             <div class="mf-texto"><b>Equipo de la ficha</b><span id="feEstado">Este equipo todavía no está autorizado para enviar fichas.</span></div>
             <button type="button" class="btn-cambiar mf-abrir" id="feBtn" onclick="feMostrarForm()">Autorizar este equipo</button>
         </div>
@@ -838,7 +850,7 @@
             </div>
             <div class="local-elegido asis-tarjeta" id="asisTarjeta">
                 <span class="local-icono asis-icono">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="17" rx="2"/><path d="M9 2v4M15 2v4M4 10h16"/><path d="m9 15 2 2 4-4"/></svg>
+                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="17" rx="2"/><path d="M9 2v4M15 2v4M4 10h16"/><path d="m9 15 2 2 4-4"/></svg>
                 </span>
                 <div>
                     <div class="local-label">Control de asistencia</div>
@@ -1056,6 +1068,14 @@
     function aplicarTema(tema) {
         document.documentElement.setAttribute('data-theme', tema);
         const sw = document.getElementById('btnTema'); if (sw) sw.checked = tema !== 'light';   // interruptor "Modo oscuro": encendido = oscuro
+        // (20/11) Botón de sol / luna, como en el panel: en oscuro muestra el sol (pasar a claro), en claro la luna
+        const b = document.getElementById('btnTemaIco');
+        if (b) {
+            const claro = tema === 'light', t = claro ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro';
+            b.title = t; b.setAttribute('aria-label', t);
+            b.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' +
+                (claro ? 'M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z' : 'M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4') + '"/></svg>';
+        }
     }
 
     function alternarTema() {
