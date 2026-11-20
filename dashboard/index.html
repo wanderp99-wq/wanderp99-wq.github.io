@@ -1730,8 +1730,21 @@
         .mt-pie .mt-item { font-weight: 500; font-size: .88rem; min-height: 40px; }
         .mt-pie .mt-salir { color: var(--bad); }
         @media (min-width: 1024px) {
-            .nav-abajo { display: none !important; }
+            /* (20/11) En la computadora la barra es una isla flotante centrada abajo, solo en el Inicio
+               (en los módulos ya está la barra de la izquierda) */
+            body:not(.en-inicio) .nav-abajo { display: none !important; }
             body.con-nav-abajo .container { padding-bottom: 2rem !important; }
+            body.en-inicio.con-nav-abajo .container { padding-bottom: 120px !important; }
+            .nav-abajo { left: 50%; right: auto; bottom: 20px; transform: translateX(-50%); height: 76px; padding: 0 14px; grid-auto-columns: 96px; align-items: center;
+                border: 1px solid var(--border); border-radius: 999px; box-shadow: 0 12px 32px var(--shadow), 0 2px 6px var(--shadow); }
+            body.con-lado .nav-abajo { left: calc(50% + 130px); }
+            .nav-abajo button { min-height: 60px; justify-content: center; font-size: .74rem; }
+            .nav-abajo .nav-logo { width: 58px; height: 58px; margin: 0; }
+            .nav-abajo .nav-logo svg { width: 32px; height: 32px; }
+            /* El panel de cada área sale como una tarjeta encima de la isla */
+            body.con-nav-abajo .hoja-fondo { bottom: 0; align-items: center; padding-bottom: 108px; }
+            body.con-lado .hoja-fondo { padding-left: 260px; }
+            .hoja { width: min(440px, 92vw); max-height: 70vh; border-radius: 18px; border-bottom: 1px solid var(--border); }
             .menu-todo.lado { left: 0; right: auto; width: 260px; border-left: 0; border-right: 1px solid var(--border); animation: none; z-index: 30; }
             body.con-lado { padding-left: 260px; }
             body.con-lado .cola-aviso { left: 272px; }
@@ -7973,7 +7986,12 @@
     }
     function navPintarBarra() {
         const areas = navAreas(), areaVista = (MODULOS.find(m => m.id === vistaActual) || {}).area;
-        document.getElementById('navAbajo').innerHTML = NAV_ORDEN.filter(id => id === 'logo' || areas.includes(id)).map(id => {
+        // (20/11) El logo siempre en el centro: las áreas que tiene la persona se reparten a los dos lados y, si son impares,
+        // un espacio vacío a la derecha equilibra la barra (antes, con menos áreas, el logo quedaba corrido a un lado)
+        const mias = NAV_ORDEN.filter(id => id !== 'logo' && areas.includes(id)), k = Math.ceil(mias.length / 2);
+        const der = mias.slice(k); while (der.length < k) der.push('');
+        document.getElementById('navAbajo').innerHTML = mias.slice(0, k).concat(['logo'], der).map(id => {
+            if (!id) return '<span aria-hidden="true"></span>';
             // Resaltado: el panel abierto o, sin panel, el área del módulo en el que está
             const act = (navHoja ? navHoja === id : areaVista === id) ? ' activo' : '';
             return id === 'logo'
