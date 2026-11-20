@@ -27,22 +27,22 @@
             --input-bg: #16213a;
             --input-text: #ffffff;
             --list-bg: #121c33;
-            --ok: #34d399;
-            --ok-bg: rgba(52, 211, 153, 0.12);
+            --ok: #22c55e;
+            --ok-bg: rgba(34, 197, 94, 0.14);
             --warn: #fbbf24;
             --warn-bg: rgba(251, 191, 36, 0.12);
             --bad: #f87171;
-            --bad-bg: rgba(248, 113, 113, 0.12);
+            --bad-bg: rgba(248, 113, 113, 0.14);
             --none: #94a3b8;
             --none-bg: rgba(148, 163, 184, 0.12);
             --shadow: rgba(0, 0, 0, 0.3);
             --radius: 10px;
-            --amar: #facc15; --amar-txt: #facc15; --amar-bg: rgba(250, 204, 21, 0.14);   /* "por pagar" */
+            --amar: #3b82f6; --amar-txt: #60a5fa; --amar-bg: rgba(59, 130, 246, 0.16);   /* "por pagar" / pendiente: azul (20/11, antes amarillo); completado = verde */
             --verde-txt: #6fd13a;   /* verde del logo para TEXTO (compras, precios que bajan): legible sobre fondo oscuro */
             color-scheme: dark;
         }
         :root[data-theme="light"] {
-            --amar: #eab308; --amar-txt: #a16207; --amar-bg: rgba(234, 179, 8, 0.14);
+            --amar: #2563eb; --amar-txt: #1d4ed8; --amar-bg: rgba(37, 99, 235, 0.10);
             --verde-txt: #2b7a00;
             --bg-color: #eef2f7;
             --card-bg: #ffffff;
@@ -56,12 +56,12 @@
             --input-bg: #ffffff;
             --input-text: #0f172a;
             --list-bg: #ffffff;
-            --ok: #047857;
-            --ok-bg: rgba(4, 120, 87, 0.10);
+            --ok: #15803d;
+            --ok-bg: rgba(34, 197, 94, 0.14);
             --warn: #b45309;
             --warn-bg: rgba(180, 83, 9, 0.10);
-            --bad: #b91c1c;
-            --bad-bg: rgba(185, 28, 28, 0.10);
+            --bad: #dc2626;
+            --bad-bg: rgba(248, 113, 113, 0.16);
             --none: #64748b;
             --none-bg: rgba(100, 116, 139, 0.10);
             --shadow: rgba(0, 0, 0, 0.1);
@@ -105,7 +105,7 @@
         .btn-theme:hover, .btn-ghost:hover { border-color: var(--primary); }
         label.interruptor.btn-theme { padding: .5rem .85rem; border-radius: 8px; font-size: .95rem; font-weight: 500; }
         .btn-primary { background: var(--primary); color: white; }
-        .btn-save { background: #10b981; color: white; }
+        .btn-save { background: #15803d; color: white; }   /* (20/11) el verde del sistema (contraste 5:1 con la letra blanca) */
         .btn-danger { background: var(--danger); color: white; }
         /* Respuesta al tocar (como en iPhone): el botón se hunde un poco al presionarlo; en el teléfono sin el destello azul ni el
            zoom por doble toque; con el teclado, un anillo muestra dónde está el foco */
@@ -662,7 +662,7 @@
         /* Estado de cada monto con una bolita de color (leyenda arriba): verde recibido · amarillo por llegar · azul a caja chica · rojo egreso */
         .efe-punto { display: inline-block; width: .62rem; height: .62rem; border-radius: 50%; margin-left: .45rem; vertical-align: middle; flex: none; }   /* a la derecha de la cifra: los montos quedan alineados */
         .efe-cifra { white-space: nowrap; } .cmp-marca-q.efe-firma { display: flex; width: max-content; margin: .15rem 0 0 auto; align-items: flex-end; } .cmp-marca-q.efe-firma small { text-align: right; } .efe-usd { display: block; font-size: .72rem; color: var(--text-muted); white-space: nowrap; margin-top: .05rem; } .efe-usd.con-punto { padding-right: 1.07rem; }
-        .efe-punto.ok { background: var(--ok); } .efe-punto.pend { background: #f59e0b; } .efe-punto.caja { background: #3b82f6; } .efe-punto.egr { background: var(--bad); }
+        .efe-punto.ok { background: var(--ok); } .efe-punto.pend { background: var(--amar); } .efe-punto.caja { background: #3b82f6; } .efe-punto.egr { background: var(--bad); }
         .efe-leyenda span { display: inline-flex; align-items: center; font-size: .8rem; color: var(--text-muted); } .efe-leyenda .efe-punto { margin-right: .3rem; }
         .btn-eliminar { background: none; border: 1px solid transparent; color: var(--danger, #dc2626); font-size: .78rem; font-weight: 600;
                         padding: .15rem .4rem; border-radius: 6px; cursor: pointer; }
@@ -1033,7 +1033,7 @@
         .cola-aviso { position: fixed; left: 12px; bottom: 12px; z-index: 900; display: inline-flex; align-items: center; gap: .45rem; padding: .5rem .85rem; border-radius: 999px;
             border: 1px solid var(--border); background: var(--card-bg); color: var(--text-main); font: inherit; font-size: .85rem; font-weight: 600; cursor: pointer; box-shadow: 0 6px 18px rgba(0, 0, 0, .18); }
         .cola-aviso.error { border-color: var(--bad); color: var(--bad); }
-        .cola-aviso .cola-punto { width: .55rem; height: .55rem; border-radius: 50%; background: #f59e0b; flex: none; }
+        .cola-aviso .cola-punto { width: .55rem; height: .55rem; border-radius: 50%; background: var(--amar); flex: none; }
         .cola-aviso.enviando .cola-punto { background: #3b82f6; animation: cola-latido 1s ease-in-out infinite; } .cola-aviso.error .cola-punto { background: #ef4444; }
         @keyframes cola-latido { 50% { opacity: .3; transform: scale(.7); } }
         .cola-fondo { position: fixed; inset: 0; z-index: 1001; background: rgba(0, 0, 0, .5); display: flex; align-items: center; justify-content: center; padding: 1rem; }
@@ -1470,7 +1470,7 @@
         .alm-marca b { display: block; font-size: .92rem; } .alm-marca small { color: var(--text-muted); font-size: .74rem; }
         .alm-marca-ico { width: 1.6rem; height: 1.6rem; border-radius: 50%; display: grid; place-items: center; font-weight: 800; background: var(--none-bg); color: var(--text-muted); }
         .alm-marca.si { border-color: var(--ok); background: var(--ok-bg); } .alm-marca.si .alm-marca-ico { background: var(--ok); color: var(--card-bg); }
-        .alm-marca.amar { background: var(--amar-bg); } .alm-marca.amar .alm-marca-ico { background: var(--amar); color: #1f2937; }
+        .alm-marca.amar { background: var(--amar-bg); } .alm-marca.amar .alm-marca-ico { background: var(--amar); color: #ffffff; }
         .alm-que-hacer { display: flex; flex-direction: column; gap: .6rem; margin: .9rem 0 .2rem; }
         @media (max-width: 760px) { .alm-ver-top { grid-template-columns: 1fr; } }
         .pnom-grupo { margin-bottom: 1rem; } .pnom-acc { display: flex; gap: .4rem; flex-wrap: wrap; }
@@ -1496,11 +1496,11 @@
         .nom-barra-seg.pag, .nom-sw-pag { background: var(--ok) !important; } .nom-barra-seg.pend, .nom-sw-pend { background: var(--amar) !important; }
         .nom-barra-seg.pend { color: #1f2937; }   /* texto oscuro sobre el amarillo */
         .kpi.amar .k-value { color: var(--amar-txt); } .chip.st-amar { background: var(--amar-bg); color: var(--amar-txt); }
-        /* (15/11) Cuentas por pagar con los colores del usuario: rojo (Rojo Racing #E4002B) para lo vencido, verde para lo vigente o por pagar,
+        /* (15/11, 20/11) Cuentas por pagar: rojo (el salmón del sistema) para lo vencido, verde (el del sistema) para lo vigente o por pagar,
            azul glaciar de apoyo. Se cambian las variables solo dentro del módulo y sus ventanas (el amarillo oliva se veía opaco). */
-        #vistaCxp, .cxp-dlg { --amar-txt: #15803d; --amar-bg: rgba(22, 163, 74, .12); --amar: #16a34a; --bad: #E4002B; --bad-bg: rgba(228, 0, 43, .10);
+        #vistaCxp, .cxp-dlg { --bad: #dc2626; --bad-bg: rgba(248, 113, 113, .16);
                               --cxp-azul: #3d7ea6; --cxp-azul-bg: rgba(123, 167, 194, .18); }
-        :root:not([data-theme="light"]) #vistaCxp, :root:not([data-theme="light"]) .cxp-dlg { --amar-txt: #4ade80; --amar-bg: rgba(74, 222, 128, .14); --amar: #4ade80; --bad: #ff4d6a; --bad-bg: rgba(255, 77, 106, .14);
+        :root:not([data-theme="light"]) #vistaCxp, :root:not([data-theme="light"]) .cxp-dlg { --bad: #f87171; --bad-bg: rgba(248, 113, 113, .14);
                               --cxp-azul: #8fc1de; --cxp-azul-bg: rgba(143, 193, 222, .16); }
         #vistaCxp .chip.st-falta, .cxp-dlg .chip.st-falta { background: var(--bad-bg); color: var(--bad); }
         #vistaCxp .kpi.azul .k-value { color: var(--cxp-azul); } #vistaCxp .chip.st-azul { background: var(--cxp-azul-bg); color: var(--cxp-azul); }
@@ -1637,21 +1637,30 @@
            NAVEGACIÓN (20/11): barra de abajo con las áreas (teléfono, en el inicio), panel azul de cada área,
            menú ⋮ con todos los módulos (en la computadora: barra de la izquierda que se oculta) y tablero con gráficos
            ========================================================== */
-        :root { --nav-azul: #2563eb; --hoja-bg: #0d2457; --graf-linea: #60a5fa; }
+        :root { --nav-azul: #2563eb; --hoja-bg: #0d2457; --graf-linea: #60a5fa;
+            /* Colores de estado de los gráficos, los mismos del boceto en los dos modos: verde vivo, rojo salmón y gris */
+            --graf-verde: #22c55e; --graf-rojo: #f87171; --graf-gris: #64748b; --graf-barra: #3b82f6; --graf-barra2: #93c5fd; --graf-pista: #1b2a4a; }
+        :root[data-theme="light"] { --graf-barra2: #1d4ed8; --graf-pista: #e6edf9; }
         :root[data-theme="light"] { --graf-linea: #2563eb; }
         .btn-icono { display: inline-grid; place-items: center; width: 40px; height: 40px; padding: 0 !important; line-height: 0; }
         .btn-icono svg { width: 20px; height: 20px; }
         .header-actions .btn-icono { flex: none !important; }
         .nav-abajo { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); align-items: end;
-            height: calc(76px + env(safe-area-inset-bottom)); padding: 0 4px calc(8px + env(safe-area-inset-bottom)); background: var(--card-bg); border-top: 1px solid var(--border); box-shadow: 0 -4px 14px var(--shadow); }
-        .nav-abajo button { background: none; border: 0; border-radius: 10px; color: var(--text-muted); display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px;
+            height: calc(76px + env(safe-area-inset-bottom)); padding: 0 4px calc(8px + env(safe-area-inset-bottom)); background: var(--hoja-bg); border-top: 0; box-shadow: 0 -4px 14px rgba(2, 6, 23, .25); }
+        /* (20/11) Azul marino como BNC, en claro y en oscuro: el panel que sube es del mismo azul y se ven como una sola pieza */
+        .nav-abajo button { background: none; border: 0; border-radius: 10px; color: rgba(255, 255, 255, .74); display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px;
             min-height: 56px; min-width: 0; padding: 0 2px; font-size: .68rem; font-weight: 500; line-height: 1.15; text-align: center; }
         .nav-abajo button svg { width: 24px; height: 24px; flex: none; }
-        .nav-abajo button.activo { color: var(--primary); }
-        .nav-abajo .nav-logo { justify-self: center; width: 64px; height: 64px; min-height: 0; margin-bottom: 4px; border-radius: 50%; background: #ffffff; border: 3px solid var(--card-bg);
-            box-shadow: 0 4px 14px var(--shadow); justify-content: center; padding: 0; }
+        .nav-abajo button.activo { color: #ffffff; font-weight: 700; }
+        .nav-abajo button:focus-visible { outline: 2px solid #ffffff; outline-offset: -2px; }
+        .nav-abajo .nav-logo { justify-self: center; width: 64px; height: 64px; min-height: 0; margin-bottom: 4px; border-radius: 50%; background: #ffffff; border: 3px solid var(--hoja-bg);
+            box-shadow: 0 4px 14px rgba(2, 6, 23, .35); justify-content: center; padding: 0; }
         .nav-abajo .nav-logo svg { width: 36px; height: 36px; }
-        .nav-abajo .nav-logo.activo { border-color: var(--primary); }
+        .nav-abajo .nav-logo.activo { border-color: #60a5fa; }
+        @media (max-width: 640px) {
+            body.con-nav-abajo .cmp-guardar { bottom: calc(76px + env(safe-area-inset-bottom)) !important; padding-bottom: .6rem !important; }
+            body.con-nav-abajo .cola-toast { bottom: calc(96px + env(safe-area-inset-bottom)); }
+        }
         body.con-nav-abajo .container { padding-bottom: 100px !important; }
         .hoja-fondo { position: fixed; left: 0; right: 0; top: 0; bottom: 0; z-index: 45; background: rgba(2, 6, 23, .55); display: flex; flex-direction: column; justify-content: flex-end; }
         body.con-nav-abajo .hoja-fondo { bottom: calc(76px + env(safe-area-inset-bottom)); }
@@ -1671,6 +1680,26 @@
         .hoja-vacio { color: #c7d5f2; padding: 18px 0; }
         .nav-n { min-width: 22px; height: 20px; padding: 0 7px; border-radius: 10px; font-size: .72rem; font-weight: 700; display: inline-grid; place-items: center; flex: none; font-variant-numeric: tabular-nums; }
         .hoja .nav-n { background: #ffffff; color: #1e3a8a; }
+        /* (20/11) Pedido del usuario: la barra de abajo y el panel que sube van del color del tema (claro en claro, oscuro en oscuro),
+           sin el azul marino fijo. El azul queda solo para lo activo y los íconos. */
+        .nav-abajo { background: var(--card-bg); border-top: 1px solid var(--border); box-shadow: 0 -4px 14px var(--shadow); }
+        .nav-abajo button { color: var(--text-muted); }
+        .nav-abajo button.activo { color: var(--primary); }
+        .nav-abajo button:focus-visible { outline-color: var(--primary); }
+        .nav-abajo .nav-logo { border-color: var(--card-bg); box-shadow: 0 4px 14px var(--shadow); }
+        .nav-abajo .nav-logo.activo { border-color: var(--primary); }
+        .hoja { background: var(--card-bg); color: var(--text-main); border: 1px solid var(--border); border-bottom: 0; box-shadow: 0 -8px 24px var(--shadow); }
+        .hoja-cab { background: var(--card-bg); border-bottom: 1px solid var(--border); }
+        .hoja-cab > svg { color: var(--primary); }
+        .hoja-cab h3 { color: var(--text-main); }
+        .hoja-cab button { background: var(--list-bg); color: var(--text-main); border: 1px solid var(--border); }
+        .hoja-cab .hoja-x { border: 0; background: none; }
+        .hoja-grupo { color: var(--text-muted); }
+        .hoja-item { color: var(--text-main); }
+        .hoja-item > svg { color: var(--primary); }
+        .hoja-item:hover { background: var(--list-bg); }
+        .hoja-vacio { color: var(--text-muted); }
+        .hoja .nav-n { background: var(--primary); color: #ffffff; }
         .menu-todo .nav-n { background: var(--primary); color: #ffffff; }
         .menu-todo-fondo { position: fixed; inset: 0; z-index: 46; background: rgba(2, 6, 23, .55); }
         .menu-todo { position: fixed; top: 0; bottom: 0; right: 0; width: min(320px, 86vw); z-index: 47; background: var(--card-bg); border-left: 1px solid var(--border);
@@ -1713,7 +1742,12 @@
         #btnSalir { display: none !important; }   /* Salir está en el menú (⋮ o la barra de la izquierda) */
         .bienvenida { display: inline-flex; align-items: center; gap: 8px; font-size: .9rem; order: 5; }
         .bienvenida .avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--list-bg); border: 1px solid var(--border); display: grid; place-items: center; font-weight: 700; flex: none; }
-        #cabFecha { color: var(--text-muted); font-size: .88rem; margin-right: .25rem; white-space: nowrap; order: 0; }
+        #cabFecha { color: var(--text-muted); font-size: .88rem; white-space: nowrap; order: 0; }
+        #cabTasa { color: var(--text-muted); font-size: .88rem; margin-right: .25rem; white-space: nowrap; order: 0; }
+        #cabTasa b { color: var(--text-main); font-variant-numeric: tabular-nums; }
+        #cabFecha:not(.hidden) + #cabTasa:not(.hidden)::before { content: '·'; margin-right: .45rem; }
+        @media (max-width: 1100px) { #cabTasa::before { display: none; } }
+        @media (max-width: 640px) { body #cabTasa { flex: 1 1 100%; order: 9; font-size: .8rem; margin: 0; } }
         #btnActualizar, #btnAtras, #btnAdelante, #btnClaves { order: 1; }
         #btnTemaIco { order: 3; }
         #btnCampana { order: 4; }
@@ -1744,13 +1778,13 @@
         .tab-card.t-asis { align-items: center; justify-content: center; }
         .tab-card.t-asis .tab-cab { justify-content: flex-start; }
         .tab-anillo { width: 140px; height: 140px; }
-        .tab-anillo .ta-pista { fill: none; stroke: var(--none-bg); stroke-width: 10; }
-        .tab-anillo .ta-valor { fill: none; stroke: var(--ok); stroke-width: 10; stroke-linecap: round; }
+        .tab-anillo .ta-pista { fill: none; stroke: var(--graf-pista); stroke-width: 10; }
+        .tab-anillo .ta-valor { fill: none; stroke: var(--graf-verde); stroke-width: 10; stroke-linecap: round; }
         .tab-anillo text { fill: var(--text-main); font-size: 20px; font-weight: 700; }
         .tab-asis-txt { color: var(--text-muted); font-size: .85rem; text-align: center; }
         .tab-columnas { display: flex; align-items: flex-end; gap: 8px; height: 72px; width: 100%; border-bottom: 1px solid var(--border); margin-top: 4px; }
-        .tab-columnas span { flex: 1; background: var(--primary); border-radius: 4px 4px 0 0; min-height: 2px; }
-        .tab-columnas span:first-child { background: var(--graf-linea); }
+        .tab-columnas span { flex: 1; background: var(--graf-barra); border-radius: 4px 4px 0 0; min-height: 2px; }
+        .tab-columnas span:first-child { background: var(--graf-barra2); }
         .tab-col-etq { display: flex; gap: 8px; width: 100%; }
         .tab-col-etq span { flex: 1; text-align: center; font-size: .7rem; color: var(--text-muted); }
         @media (max-width: 899px) {
@@ -1758,6 +1792,8 @@
             .tab-card.ancho, .tab-card.t-cajas, .tab-card.t-pend { grid-column: span 2; }
             .tab-card.t-cajas { order: 1; } .tab-card.t-pend { order: 2; } .tab-card.t-asis { order: 3; } .tab-card.t-fact { order: 4; }
             .tab-anillo { width: 92px; height: 92px; }
+            .t-fact .tab-grande { font-size: 1.15rem; }
+            .tab-col-etq span { font-size: .62rem; white-space: nowrap; }
         }
         .tab-cab { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; width: 100%; }
         .tab-cab b { font-size: .92rem; font-weight: 600; }
@@ -1781,8 +1817,8 @@
         .tab-barra { display: grid; grid-template-columns: minmax(0, 9.5rem) minmax(0, 1fr) 2.4rem; align-items: center; gap: 10px; min-height: 32px; background: none; border: 0; border-radius: 6px;
             padding: 0; color: var(--text-main); text-align: left; width: 100%; font-weight: 400; font-size: .85rem; }
         .tab-barra .tb-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .tab-barra .tb-pista { height: 10px; background: var(--none-bg); border-radius: 0 4px 4px 0; position: relative; overflow: hidden; }
-        .tab-barra .tb-pista i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--primary); border-radius: 0 4px 4px 0; }
+        .tab-barra .tb-pista { height: 10px; background: var(--graf-pista); border-radius: 0 4px 4px 0; position: relative; overflow: hidden; }
+        .tab-barra .tb-pista i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--graf-barra); border-radius: 0 4px 4px 0; }
         .tab-barra b { text-align: right; font-variant-numeric: tabular-nums; }
         .tab-vacio { color: var(--ok); font-weight: 600; padding: 6px 0; }
         .tab-titulo { font-size: 1rem; color: var(--title); margin: 1.25rem 0 .6rem; }
@@ -2334,6 +2370,7 @@
         </div>
         <div class="header-actions">
             <span id="cabFecha" class="hidden"></span>
+            <span id="cabTasa" class="hidden"></span>
             <span class="bienvenida hidden" id="bienvenida"></span>
             <button type="button" class="btn-ghost campana hidden" id="btnCampana" onclick="pendAlternar(event)" title="Pendientes de sus módulos" aria-label="Pendientes" aria-expanded="false">
                 <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
@@ -7898,27 +7935,41 @@
         if (resto.length) grupos.push(['Otros', resto]);
         return grupos;
     }
-    // Se llama al cambiar de pantalla: barra de abajo solo en el inicio; el ⋮ en todas (menos la entrada y el marcaje)
+    // Se llama al cambiar de pantalla: en el teléfono la barra de abajo y el ⋮ están en todas (menos la entrada y el marcaje)
     function navActualizar() {
-        const dentro = navDentro(), conBarra = dentro && vistaActual === 'menu';
+        const dentro = navDentro(), conBarra = dentro;
         document.getElementById('navAbajo').classList.toggle('hidden', !conBarra);
         document.body.classList.toggle('con-nav-abajo', conBarra);
         if (navHoja) navCerrarHoja(); else if (conBarra) navPintarBarra();
         document.getElementById('btnTodo').classList.toggle('hidden', !dentro);
-        document.body.classList.toggle('en-inicio', conBarra || (dentro && vistaActual === 'menu'));
+        document.body.classList.toggle('en-inicio', dentro && vistaActual === 'menu');
         // Fecha arriba a la derecha (como en el boceto): "Viernes 20 de noviembre"
         const cf = document.getElementById('cabFecha');
         if (cf) {
             cf.classList.toggle('hidden', !dentro);
             if (dentro) { const t = new Date().toLocaleDateString('es-VE', { weekday: 'long', day: 'numeric', month: 'long' }); cf.textContent = t.charAt(0).toUpperCase() + t.slice(1).replace(',', ''); }
         }
+        cabTasaPintar(dentro);
+    }
+    // (20/11) La tasa del BCV siempre arriba (la misma que usan los módulos: tasaBCVdel de hoy)
+    function cabTasaPintar(dentro) {
+        const el = document.getElementById('cabTasa');
+        if (!el) return;
+        const pintar = () => {
+            let t = null; try { t = tasaBCVdel(fechaLocalHoy()); } catch (e) {}
+            el.classList.toggle('hidden', !dentro || !t);
+            if (t) { el.innerHTML = `Tasa BCV <b>Bs ${fmt(t[1])}</b>`; el.title = 'Tasa oficial del BCV del ' + fechaBonita(t[0]); }
+        };
+        pintar();
+        if (dentro) cargarTasasBCV().then(pintar);
         navCajon = false;
         navPintarTodo();
     }
     function navPintarBarra() {
-        const areas = navAreas();
+        const areas = navAreas(), areaVista = (MODULOS.find(m => m.id === vistaActual) || {}).area;
         document.getElementById('navAbajo').innerHTML = NAV_ORDEN.filter(id => id === 'logo' || areas.includes(id)).map(id => {
-            const act = navHoja === id ? ' activo' : '';
+            // Resaltado: el panel abierto o, sin panel, el área del módulo en el que está
+            const act = (navHoja ? navHoja === id : areaVista === id) ? ' activo' : '';
             return id === 'logo'
                 ? `<button type="button" class="nav-logo${act}" onclick="navAbrirHoja('logo')" aria-label="Lo que más usa" aria-expanded="${navHoja === id}">${LOGO_SVG}</button>`
                 : `<button type="button" class="${act}" onclick="navAbrirHoja('${id}')" aria-expanded="${navHoja === id}">${ICONOS['area_' + id] || ''}<span>${NAV_NOMBRE[id]}</span></button>`;
@@ -7928,7 +7979,7 @@
     function navCerrarHoja() {
         navHoja = null;
         document.getElementById('hojaFondo').classList.add('hidden');
-        if (navDentro() && vistaActual === 'menu') navPintarBarra();
+        if (navDentro()) navPintarBarra();
     }
     function navPintarHoja() {
         const f = document.getElementById('hojaFondo'), id = navHoja;
@@ -8066,7 +8117,7 @@
             </span></button>`;
     }
     function tabCajas(titulo, n) {
-        const seg = [['Cuadradas', n.ok, 'var(--ok)'], ['Con diferencia', n.dif, 'var(--bad)'], ['Sin sistema', n.pend, 'var(--none)']];
+        const seg = [['Cuadradas', n.ok, 'var(--graf-verde)'], ['Con diferencia', n.dif, 'var(--graf-rojo)'], ['Sin sistema', n.pend, 'var(--graf-gris)']];
         const total = n.ok + n.dif + n.pend, abre = permisos.includes('cuadre') ? `onclick="navIr('cuadre')"` : '';
         return `<button type="button" class="tab-card t-cajas" ${abre}>
             <span class="tab-cab"><b>${esc(titulo)}</b><small>${total} caja${total === 1 ? '' : 's'}</small></span>
@@ -8095,11 +8146,11 @@
     function tabFacturas(renglones) {
         const sem = [0, 0, 0, 0];
         renglones.forEach(x => { const i = x.dias <= 6 ? 0 : Math.floor(x.dias / 7); if (i < 4) sem[i] += x.saldo; });
-        const max = Math.max(...sem, 0.01), etq = ['Esta', 'Próxima', 'En 2', 'En 3'];
+        const max = Math.max(...sem, 0.01), etq = ['Esta', 'Próx.', 'En 2', 'En 3'];
         return `<button type="button" class="tab-card t-fact" onclick="navIr('cxp')">
             <span class="tab-cab"><b>Facturas por pagar</b></span>
             <span class="tab-grande">$ ${fmtNum(sem[0], 2)}</span>
-            <small style="color:var(--text-muted)">vence esta semana (con lo vencido)</small>
+            <small style="color:var(--text-muted)" title="Incluye lo que ya está vencido">vence esta semana</small>
             <span class="tab-columnas">${sem.map((v, i) => `<span title="${etq[i]}: $ ${fmtNum(v, 2)}" style="height:${Math.max(3, Math.round(v / max * 100))}%"></span>`).join('')}</span>
             <span class="tab-col-etq">${etq.map(t => `<span>${t}</span>`).join('')}</span></button>`;
     }
