@@ -31,7 +31,7 @@
             --ok-bg: rgba(34, 197, 94, 0.14);
             --warn: #fbbf24;
             --warn-bg: rgba(251, 191, 36, 0.12);
-            --sobra: #a78bfa; --sobra-bg: rgba(167, 139, 250, 0.16);   /* (20/11) sobrante: violeta (antes ámbar) */
+            --sobra: #fb923c; --sobra-bg: rgba(249, 115, 22, 0.16);   /* (20/11) sobrante: naranja que combina con el verde de los gráficos */
             --bad: #f87171;
             --bad-bg: rgba(248, 113, 113, 0.14);
             --none: #94a3b8;
@@ -61,7 +61,7 @@
             --ok-bg: rgba(34, 197, 94, 0.14);
             --warn: #b45309;
             --warn-bg: rgba(180, 83, 9, 0.10);
-            --sobra: #7c3aed; --sobra-bg: rgba(124, 58, 237, 0.10);
+            --sobra: #c2410c; --sobra-bg: rgba(249, 115, 22, 0.12);
             --bad: #dc2626;
             --bad-bg: rgba(248, 113, 113, 0.16);
             --none: #64748b;
@@ -382,9 +382,9 @@
         .torta-wrap { display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap; justify-content: center; }
         .torta svg { width: 210px; height: 210px; display: block; }
         .torta .slice { stroke: var(--list-bg); stroke-width: 2; cursor: pointer; transition: opacity 0.15s; }
-        .torta .slice.st-ok { fill: var(--ok); }
-        .torta .slice.st-sobra { fill: var(--sobra); }
-        .torta .slice.st-falta { fill: var(--bad); }
+        .torta .slice.st-ok { fill: var(--graf-verde); }
+        .torta .slice.st-sobra { fill: var(--graf-naranja); }
+        .torta .slice.st-falta { fill: var(--graf-rojo); }
         .torta .slice.st-pend { fill: var(--none); fill-opacity: 0.55; }
         .torta .slice.atenuado { opacity: 0.25; }
         .torta .slice:hover { opacity: 0.85; }
@@ -416,9 +416,9 @@
         .leyenda { display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.8rem; color: var(--text-muted); }
         .leyenda span { display: inline-flex; align-items: center; gap: 0.35rem; }
         .sw { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
-        .sw.st-ok, .bar.st-ok { background: var(--ok); fill: var(--ok); }
-        .sw.st-sobra, .bar.st-sobra { background: var(--sobra); fill: var(--sobra); }
-        .sw.st-falta, .bar.st-falta { background: var(--bad); fill: var(--bad); }
+        .sw.st-ok, .bar.st-ok { background: var(--graf-verde); fill: var(--graf-verde); }
+        .sw.st-sobra, .bar.st-sobra { background: var(--graf-naranja); fill: var(--graf-naranja); }
+        .sw.st-falta, .bar.st-falta { background: var(--graf-rojo); fill: var(--graf-rojo); }
         .sw.st-pend, .bar.st-pend { background: var(--none); fill: var(--none); opacity: 0.55; }
         .grafico-wrap svg { width: 100%; height: auto; display: block; }
         .grafico-wrap .grid { stroke: var(--border); stroke-width: 1; }
@@ -879,7 +879,7 @@
         .per-barra-pista { display: flex; gap: 2px; height: 14px; }
         .per-barra-pista i { display: block; height: 100%; min-width: 3px; }
         .per-barra-pista i:first-child { border-radius: 4px 0 0 4px; } .per-barra-pista i:last-child { border-radius: 0 4px 4px 0; } .per-barra-pista i:only-child { border-radius: 4px; }
-        .per-barra-pista .venc { background: var(--bad); } .per-barra-pista .vig { background: var(--c1); } .per-barra-pista .pend { background: var(--warn); } .per-barra-pista .pag { background: var(--ok); }
+        .per-barra-pista .venc { background: var(--graf-rojo); } .per-barra-pista .vig { background: var(--c1); } .per-barra-pista .pend { background: var(--amar); } .per-barra-pista .pag { background: var(--graf-verde); }
         .per-barra-monto small { display: block; font-size: .7rem; font-weight: 600; color: var(--ok); }
         .per-fecha { display: flex; align-items: center; gap: .35rem; margin: 0; font-size: .82rem; } .per-fecha input { width: auto; }
         .per-filtro-activo { margin: -.4rem 0 .75rem; font-size: .85rem; color: var(--text-muted); }
@@ -928,6 +928,33 @@
         /* En Corrido y Libre el nombre va como texto gris (sigue siendo arrastrable) */
         .hor-ficha.texto { background: none; border-color: transparent; color: var(--text-muted); font-weight: 500; padding: .12rem .3rem; border-radius: 6px; }
         .hor-ficha.texto:hover { box-shadow: none; color: var(--text-main); }
+        /* (20/11) Horarios con la estética del sistema: fichas sobrias (una por persona con el número de turnos que le quedan),
+           franjas en tonos de azul y, debajo del tablero, la tabla para tocar y cambiar cada casilla */
+        .hor-ficha { border-radius: 8px; background: var(--card-bg); color: var(--text-main); border: 1px solid var(--border); border-left: 3px solid var(--fc); font-weight: 600; padding: .3rem .55rem; }
+        .hor-ficha:hover { box-shadow: 0 2px 8px var(--shadow); border-color: var(--primary); border-left-color: var(--fc); }
+        .hor-ficha .hor-n { margin-left: .4rem; min-width: 1.25rem; height: 1.25rem; padding: 0 .3rem; border-radius: 999px; background: var(--primary); color: #fff; font-size: .7rem; display: inline-grid; place-items: center; font-variant-numeric: tabular-nums; }
+        .hortb-grupo { border-radius: 10px; box-shadow: none; background: transparent; border-color: transparent; padding: .1rem; }
+        .hortb-pool { border-radius: 12px; }
+        .hortb thead th { background: var(--list-bg); color: var(--text-main); border-bottom: 1px solid var(--border); }
+        .hortb .hortb-sec td { letter-spacing: 0; font-size: .8rem; }
+        .hcel { width: 100%; min-width: 4.6rem; height: 42px; border-radius: 9px; border: 1px dashed var(--border); background: transparent; color: var(--text-muted); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+            font: inherit; font-weight: 700; font-size: .85rem; padding: 0 .2rem; cursor: pointer; line-height: 1.1; }
+        .hcel small { font-weight: 400; font-size: .68rem; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+        .hcel:hover { border-color: var(--primary); }
+        .hcel.M { border: 1px solid transparent; background: var(--amar-bg); color: var(--amar-txt); }
+        .hcel.T { border: 1px solid transparent; background: var(--primary); color: #fff; } .hcel.T small { color: rgba(255, 255, 255, .85); }
+        .hcel.C { border: 1px solid transparent; background: #1e40af; color: #fff; } .hcel.C small { color: rgba(255, 255, 255, .85); }   /* corrido: azul oscuro (mañana y tarde) */
+        .hcel.L { border: 1px solid var(--border); background: var(--list-bg); color: var(--text-muted); }
+        .hcel.fuera { border: 1px dashed var(--border); background: var(--list-bg); color: var(--text-muted); cursor: default; font-weight: 600; }
+        .hcel.no-puede { box-shadow: 0 0 0 2px var(--bad); }
+        .hor-tabla td { vertical-align: middle; padding: .35rem !important; }
+        .hor-cuenta { font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; } .hor-cuenta small { display: block; font-weight: 400; color: var(--text-muted); font-size: .72rem; }
+        .hor-cuenta.ok { color: var(--ok); } .hor-cuenta.falta { color: var(--amar-txt); } .hor-cuenta.sobra { color: var(--bad); }
+        .hor-aviso { display: block; color: var(--bad); font-size: .72rem; font-weight: 600; white-space: normal; }
+        .hor-ley { display: flex; flex-wrap: wrap; gap: .4rem 1rem; align-items: center; font-size: .8rem; color: var(--text-muted); margin: .5rem 0; }
+        .hor-ley span { display: inline-flex; align-items: center; gap: .4rem; } .hor-ley i { width: 22px; height: 14px; border-radius: 4px; display: inline-block; }
+        .hor-todas td { vertical-align: middle; } .hor-todas .hor-loc td { background: var(--list-bg); font-weight: 700; text-align: left; }
+        .hor-choque { box-shadow: 0 0 0 2px var(--bad); }
         .hor-ficha:active { cursor: grabbing; } .hor-ficha.sel { outline: 2px solid var(--primary); outline-offset: 1px; } .hor-ficha.origen { opacity: .35; }
         .hor-fantasma { position: fixed; z-index: 2000; pointer-events: none; transform: translate(-50%, -60%) scale(1.1) rotate(-2deg); box-shadow: 0 10px 24px rgba(0, 0, 0, .3); opacity: .95; }
         body.hor-arrastrando, body.hor-arrastrando * { cursor: grabbing !important; }
@@ -1645,7 +1672,7 @@
            ========================================================== */
         :root { --nav-azul: #2563eb; --hoja-bg: #0d2457; --graf-linea: #60a5fa;
             /* Colores de estado de los gráficos, los mismos del boceto en los dos modos: verde vivo, rojo salmón y gris */
-            --graf-verde: #22c55e; --graf-rojo: #f87171; --graf-gris: #64748b; --graf-barra: #3b82f6; --graf-barra2: #93c5fd; --graf-pista: #1b2a4a; }
+            --graf-verde: #22c55e; --graf-rojo: #f87171; --graf-gris: #64748b; --graf-naranja: #f97316; --graf-barra: #3b82f6; --graf-barra2: #93c5fd; --graf-pista: #1b2a4a; }
         :root[data-theme="light"] { --graf-barra2: #1d4ed8; --graf-pista: #e6edf9; }
         :root[data-theme="light"] { --graf-linea: #2563eb; }
         .btn-icono { display: inline-grid; place-items: center; width: 40px; height: 40px; padding: 0 !important; line-height: 0; }
@@ -1755,6 +1782,24 @@
         .container { max-width: none; background: transparent; box-shadow: none; border-radius: 0; padding: 0 32px 2.5rem; min-height: 100vh; }
         .container > .vista, .container > #banner { max-width: 1116px; margin-left: auto; margin-right: auto; }
         .header-bar { margin: 0 -32px 1.5rem; padding: 10px 24px; min-height: 64px; background: var(--card-bg); border-bottom: 1px solid var(--border); }
+        /* (20/11) Pedido del usuario: la barra de arriba siempre visible (fija al bajar) y más angosta: botones más bajos,
+           así el botón del panel lateral, Atrás e Inicio están a mano en cualquier parte del módulo. En el teléfono no se fija
+           (allí la barra de abajo ya está siempre). */
+        @media (min-width: 641px) {
+            .header-bar { position: sticky; top: 0; z-index: 35; min-height: 52px; padding: 6px 20px; margin-bottom: 1.1rem; gap: .75rem; box-shadow: 0 1px 6px var(--shadow); flex-wrap: nowrap; }
+            .header-bar .header-title { flex: 1 1 0; min-width: 0; }   /* un solo renglón: si falta espacio, se recorta el título */
+            .header-bar .header-actions { flex: none; flex-wrap: nowrap; }
+            .header-title .logo-ccpv { width: 26px; height: 26px; }
+            #tituloVista { font-size: 1rem; }
+            .header-actions { gap: .4rem; }
+            .header-actions > button:not(.btn-icono), .header-actions .btn-ghost:not(.btn-icono) { padding: .3rem .7rem; min-height: 34px; font-size: .82rem; border-radius: 8px; }
+            .header-bar .btn-icono { width: 34px; height: 34px; border-radius: 8px; }
+            .header-bar .btn-icono svg { width: 18px; height: 18px; }
+            #cabFecha, #cabTasa { font-size: .8rem; }
+            .bienvenida { font-size: .82rem; } .bienvenida .avatar { width: 30px; height: 30px; font-size: .8rem; }
+            html { scroll-padding-top: 64px; }   /* lo que se lleva a la vista no queda debajo de la barra */
+            .pag-lote.sel { top: calc(52px + .5rem); }
+        }
         .header-title { flex: 1 1 auto; min-width: 0; flex-wrap: nowrap; gap: .6rem; }
         .header-title .logo-ccpv { width: 30px; height: 30px; }
         #tituloVista { font-size: 1.1rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
@@ -1765,7 +1810,7 @@
         #cabTasa { color: var(--text-muted); font-size: .88rem; margin-right: .25rem; white-space: nowrap; order: 0; }
         #cabTasa b { color: var(--text-main); font-variant-numeric: tabular-nums; }
         #cabFecha:not(.hidden) + #cabTasa:not(.hidden)::before { content: '·'; margin-right: .45rem; }
-        @media (max-width: 1100px) { #cabTasa::before { display: none; } }
+        @media (max-width: 1440px) { #cabTasa::before { display: none; } }
         @media (max-width: 640px) { body #cabTasa { flex: 1 1 100%; order: 9; font-size: .8rem; margin: 0; } }
         #btnActualizar, #btnAtras, #btnAdelante, #btnClaves { order: 1; }
         #btnTemaIco { order: 3; }
@@ -1773,7 +1818,7 @@
         #pendPanel { order: 6; }
         body.con-lado .header-title .logo-ccpv { display: none; }
         body.con-lado.en-inicio #tituloVista { visibility: hidden; }
-        @media (max-width: 1100px) { #cabFecha { display: none !important; } }
+        @media (max-width: 1440px) { #cabFecha { display: none !important; } }   /* en pantallas medianas, la tasa sí y la fecha no: que quepa el nombre del módulo */
         @media (max-width: 640px) {
             body .container { padding: 0 .75rem 1.5rem !important; }
             body .header-bar { margin: 0 -.75rem .85rem; padding: 8px .75rem; }
@@ -15484,6 +15529,11 @@
     }
     function horCambiar(id, i, v) { const p = horPlan(horLocal); p[id] = (p[id] || Array(7).fill('')).slice(); p[id][i] = v; perPintar(); }
     function horElegirLocal(l) { horLocal = l; perPintar(); }
+    // (20/11) Tocar una casilla de la tabla: vacío → mañana → tarde → corrido → libre → vacío
+    function horCiclar(id, i) {
+        const ORD = ['', 'M', 'T', 'C', 'L'], c = (horPlan(horLocal)[id] || [])[i] || '';
+        horCambiar(id, i, ORD[(ORD.indexOf(c) + 1) % ORD.length]);
+    }
     function horMoverSemana(dias) {
         if (horSinGuardar(horLocal) && !confirm('Hay cambios sin guardar en el horario de ' + horLocal + '. ¿Cambiar de semana de todas formas? (se recuerdan mientras no salga del panel)')) return;
         horSemana = sumarDias(horSemana, dias); perPintar();
@@ -15510,7 +15560,11 @@
         const turnos = c => c === 'C' ? ['M', 'T'] : c === 'M' || c === 'T' ? [c] : [];
         horDatos.horarios.filter(x => x.id === w.id && x.local !== horLocal).forEach(x => dias.forEach((c, i) => {
             if (turnos(c).some(tt => turnos((x.dias || [])[i]).includes(tt))) a.push(`choca con ${x.local} el ${HOR_DIAS[i]}`); }));
-        if (horEsPrestado(w)) return a.concat(dias.flatMap((c, i) => turnos(c).filter(tt => !horPuede(w, i, tt)).map(tt => `no puede ${HOR_DIAS[i]} ${HOR_COD[tt].toLowerCase()}`)));
+        // (20/11) El llamado de otra tienda: avisar si aquí trabaja el día que es su libre (o su corrido) en su tienda
+        if (horEsPrestado(w)) {
+            horAfuera(w, horLocal).forEach((f, i) => { if (f && turnos(dias[i]).length && (f.c === 'L' || f.c === 'C')) a.push(`${HOR_DIAS[i]} es su ${f.c === 'L' ? 'día libre' : 'corrido'} en ${f.local}`); });
+            return a.concat(dias.flatMap((c, i) => turnos(c).filter(tt => !horPuede(w, i, tt)).map(tt => `no puede ${HOR_DIAS[i]} ${HOR_COD[tt].toLowerCase()}`)));
+        }
         const fuera = horAfuera(w, horLocal);
         dias = dias.map((c, i) => c || (fuera[i] ? fuera[i].c : ''));   // lo que trabaja en otra tienda cuenta como asignado
         if (dias.some(x => !x)) a.push('días sin asignar');
@@ -15530,10 +15584,11 @@
         const libresDia = i => ws.filter(x => plan[x.id][i] === 'L').length;
         const cajaDia = i => ws.filter(x => horEsCaja(x.cargo) && plan[x.id][i] !== 'L' && plan[x.id][i] !== 'F').length;
         // 1) Días que no puede trabajar ni en la mañana ni en la tarde: libres
-        ws.forEach(w => dias.forEach(i => { if (!plan[w.id][i] && !horPuede(w, i, 'M') && !horPuede(w, i, 'T') && !plan[w.id].includes('L')) plan[w.id][i] = 'L'; }));
+        const libreFuera = w => fueraDe[w.id].some(f => f && f.c === 'L');   // (20/11) ya tiene su día libre en otra tienda
+        ws.forEach(w => dias.forEach(i => { if (!plan[w.id][i] && !horPuede(w, i, 'M') && !horPuede(w, i, 'T') && !plan[w.id].includes('L') && !libreFuera(w)) plan[w.id][i] = 'L'; }));
         // 2) Un día libre por persona: repartidos (no dos del mismo puesto el mismo día) y sin dejar un día sin gente de caja
         ws.slice().sort((a, b) => horEsCaja(b.cargo) - horEsCaja(a.cargo)).forEach((w, idx) => {
-            if (plan[w.id].includes('L')) return;
+            if (plan[w.id].includes('L') || libreFuera(w)) return;
             const mismo = i => ws.filter(x => plan[x.id][i] === 'L' && horNorm(x.cargo) === horNorm(w.cargo)).length;
             let cand = dias.filter(i => !plan[w.id][i] && (!horEsCaja(w.cargo) || cajaDia(i) > 1));
             if (!cand.length) cand = dias.filter(i => !plan[w.id][i]);
@@ -15731,23 +15786,34 @@
                 ${conSemana ? `<div class="nom-semana"><button type="button" class="btn-ghost" title="Semana anterior" onclick="horMoverSemana(-7)">‹</button>
                     <div><b>Semana ${diaSemana(horSemana)} ${fechaBonita(horSemana)} – ${diaSemana(sumarDias(horSemana, 6))} ${fechaBonita(sumarDias(horSemana, 6))}</b><small>${cual}</small></div>
                     <button type="button" class="btn-ghost" title="Semana siguiente" onclick="horMoverSemana(7)">›</button></div>` : '<div></div>'}
-                <div class="segmentado">${(perDatos.locales || []).map(l => `<button type="button" class="${l === horLocal ? 'activo' : ''}" onclick="horElegirLocal('${esc(l)}')">${esc(l)}</button>`).join('')}</div>
+                <div class="segmentado">${(perDatos.locales || []).map(l => `<button type="button" class="${l === horLocal ? 'activo' : ''}" onclick="horElegirLocal('${esc(l)}')">${esc(l)}</button>`).join('')}${conSemana ? `<button type="button" class="${horLocal === '*' ? 'activo' : ''}" onclick="horElegirLocal('*')" title="Ver juntas todas las tiendas: quién trabaja dónde cada día">Todas</button>` : ''}</div>
             </div>`;
     }
     function horVista() {
         if (!horListo()) return horCabecera(true) + cargandoHTML('Cargando el horario...');
         if (horDatos.error) return horCabecera(true) + `<div class="banner error">${esc(horDatos.error)}</div>`;
+        if (horLocal === '*') return horCabecera(true) + horTodasVista();
         horAjustarAfuera(horLocal);
         const local = horLocal, ws = horTrabajadores(local), plan = horPlan(local), actual = inicioSemana(fechaLocalHoy());
         const guardado = horDatos.horarios.filter(x => x.local === local), sinGuardar = horSinGuardar(local), pasada = sumarDias(horSemana, 6) < fechaLocalHoy();
         const enviado = guardado.map(x => x.enviado).filter(Boolean).sort().pop();
-        const sel = (w, i) => { const c = (plan[w.id] || [])[i] || ''; return `<select class="hor-sel hor-${c || 'vacio'}" onchange="horCambiar('${esc(w.id)}', ${i}, this.value)">
-                <option value="" ${c ? '' : 'selected'}>—</option>${Object.entries(HOR_COD).map(([k, n]) => `<option value="${k}" ${c === k ? 'selected' : ''}>${n}</option>`).join('')}</select>`; };
+        // (20/11) Tabla como el boceto: cada casilla se toca para cambiar el turno (vacío, mañana, tarde, corrido, libre).
+        // Si ese día lo tiene en otra tienda (turno o libre), la casilla lo dice y no se cambia aquí.
+        const corta = l => String(l || '').split(/\s+/)[0];
+        const cel = (w, i, d, fuera) => {
+            const c = d[i] || '', f = fuera[i];
+            if (!c && f) return `<button type="button" class="hcel fuera" disabled title="${esc(w.nombre)}: ${HOR_COD[f.c].toLowerCase()} en ${esc(f.local)}">${f.c}<small>en ${esc(corta(f.local))}</small></button>`;
+            const no = (c === 'C' ? ['M', 'T'] : c === 'M' || c === 'T' ? [c] : []).some(x => !horPuede(w, i, x));
+            return `<button type="button" class="hcel ${c}${no ? ' no-puede' : ''}" onclick="horCiclar('${esc(w.id)}', ${i})" title="${no ? 'Según su ficha no puede este turno. ' : ''}Toque para cambiar">${c || '+'}<small>${c ? HOR_COD[c] : ''}</small></button>`;
+        };
         const filas = ws.map(w => {
-            const d = plan[w.id] || Array(7).fill(''), av = horAvisosTrabajador(w, d);
-            return `<tr><td class="izq"><b>${esc(w.nombre)}</b><small>${esc(w.cargo || 'sin cargo')}${horEsCaja(w.cargo) ? ' · caja' : ''}${w.restricciones && w.restricciones.length ? ' · no puede: ' + esc(w.restricciones.join(', ')) : ''}</small></td>
-                ${HOR_DIAS.map((_, i) => `<td>${sel(w, i)}</td>`).join('')}
-                <td class="izq">${av.length ? av.map(a => `<span class="chip st-falta">${esc(a)}</span>`).join(' ') : '<span class="chip st-ok">bien</span>'}</td></tr>`;
+            const d = plan[w.id] || Array(7).fill(''), av = horAvisosTrabajador(w, d), fuera = horAfuera(w, local);
+            const base = horBase(w), usados = horUsados(d) + horUsadosAfuera(w, local), total = base + Math.max(horMasDe(w.id), usados - base);
+            const est = usados === total ? 'ok' : usados < total ? 'falta' : 'sobra';
+            return `<tr><td class="izq"><b>${esc(w.nombre)}</b><small>${esc(w.cargo || 'sin cargo')}${horEsPrestado(w) ? ' · de ' + esc(w.local || 'otra tienda') : ''}${w.restricciones && w.restricciones.length ? ' · no puede: ' + esc(w.restricciones.join(', ')) : ''}</small>
+                    ${av.map(a => `<span class="hor-aviso">${esc(a)}</span>`).join('')}</td>
+                ${HOR_DIAS.map((_, i) => `<td>${cel(w, i, d, fuera)}</td>`).join('')}
+                <td><div class="hor-cuenta ${est}">${usados} de ${total}<small>${est === 'ok' ? 'completo' : est === 'falta' ? 'faltan ' + (total - usados) : 'sobran ' + (usados - total)}</small></div></td></tr>`;
         }).join('');
         // Cobertura de cada turno: gente, faltantes según la composición y si hay caja
         const cob = t => `<tr class="hor-cob"><td class="izq"><b>${HOR_COD[t]}</b></td>${HOR_DIAS.map((_, i) => {
@@ -15770,8 +15836,12 @@
             <div class="per-filtro-activo">${guardado.length ? `Guardado${enviado ? ` · enviado ${esc(enviado)}` : ' · todavía no se ha enviado'}` : 'Todavía no hay horario guardado para esta semana'}${sinGuardar ? ' · <b>hay cambios sin guardar</b>' : ''}
                 ${horSemana === actual ? ' · al enviarlo dirá "vigente a partir de hoy"' : ''}</div>
             ${ws.length ? horTablero(local, ws, plan) : ''}
-            ${ws.length ? `<div class="tabla-wrap"><table class="req-tabla hor-tabla"><thead><tr><th class="izq">Trabajador</th>${HOR_DIAS.map((_, i) => { const f = sumarDias(horSemana, i); return `<th>${diaSemana(f)}<small>${fechaBonita(f).slice(0, 5)}</small></th>`; }).join('')}<th class="izq">Revisión</th></tr></thead>
-                <tbody>${filas}</tbody><tfoot>${cob('M')}${cob('T')}</tfoot></table></div>`
+            ${ws.length ? `<div class="tabla-wrap"><table class="req-tabla hor-tabla"><thead><tr><th class="izq">Trabajador</th>${HOR_DIAS.map((_, i) => { const f = sumarDias(horSemana, i); return `<th>${diaSemana(f)}<small>${fechaBonita(f).slice(0, 5)}</small></th>`; }).join('')}<th>Turnos</th></tr></thead>
+                <tbody>${filas}</tbody><tfoot>${cob('M')}${cob('T')}</tfoot></table></div>
+                <div class="hor-ley"><span><i style="background:var(--amar-bg)"></i>Mañana</span><span><i style="background:var(--primary)"></i>Tarde</span>
+                    <span><i style="background:#1e40af"></i>Corrido (cuenta 2)</span>
+                    <span><i style="background:var(--list-bg);border:1px solid var(--border)"></i>Libre</span><span><i style="border:1px dashed var(--border)"></i>En otra tienda</span>
+                    <span>Toque una casilla para cambiar el turno.</span></div>`
               : `<div class="empty">No hay trabajadores activos de ${esc(local)}. En Talento humano › Trabajadores, elija ${esc(local)} como su local.</div>`}
             ${problemas ? `<div class="banner warn">${problemas} cosa(s) por revisar (en rojo).</div>` : ws.length ? '<div class="banner ok">El horario cumple: todos con un día libre y un día corrido, y caja en cada turno.</div>' : ''}
             ${msj ? `<details class="grafico-card"><summary>Último mensaje enviado</summary><pre class="hor-msj">${esc(msj)}</pre></details>` : ''}
@@ -15779,11 +15849,40 @@
                 pone siempre a alguien de caja (cajero o encargado) en la mañana y en la tarde, respeta los días y turnos que cada uno no puede trabajar (su ficha de trabajador) y llena lo que pide la composición de la tienda.
                 El puesto de cada uno es su Cargo. Para la semana en curso el mensaje dice "a partir de hoy"; para la próxima, "a partir del sábado".</div>`;
     }
+    // ---------- (20/11) Todas las tiendas juntas: cada trabajador en su tienda de origen y, cada día, dónde trabaja (también si está
+    // prestado o libre en otra). Lo que choca (dos turnos a la vez en dos tiendas) sale en rojo. Para cambiar, se abre su tienda.
+    function horTodasVista() {
+        const locales = perDatos.locales || [], corta = l => String(l || '').split(/\s+/)[0];
+        const turnos = c => c === 'C' ? ['M', 'T'] : c === 'M' || c === 'T' ? [c] : [];
+        const planes = {}; locales.forEach(l => { planes[l] = horPlan(l); });
+        let choques = 0;
+        const grupos = locales.map(l => {
+            const ws = horTrabajadores(l).filter(w => w.local === l && w.activo);
+            if (!ws.length) return '';
+            const filas = ws.map(w => {
+                const celdas = HOR_DIAS.map((_, i) => {
+                    const en = locales.map(x => ({ l: x, c: ((planes[x][w.id] || [])[i]) || '' })).filter(e => e.c);
+                    if (!en.length) return '<td><span class="hcel">—</span></td>';
+                    const choca = en.reduce((s, e) => s.concat(turnos(e.c)), []).length > new Set(en.reduce((s, e) => s.concat(turnos(e.c)), [])).size;
+                    if (choca) choques++;
+                    const e = en.find(x => turnos(x.c).length) || en[0];   // manda el turno sobre el libre
+                    const fuera = e.l !== l;
+                    return `<td><span class="hcel ${fuera ? 'fuera' : e.c}${choca ? ' hor-choque' : ''}" title="${esc(en.map(x => HOR_COD[x.c] + ' en ' + x.l).join(' y '))}">${e.c}<small>${fuera ? 'en ' + esc(corta(e.l)) : HOR_COD[e.c]}</small></span></td>`;
+                }).join('');
+                return `<tr><td class="izq"><b>${esc(w.nombre)}</b><small>${esc(w.cargo || 'sin cargo')}</small></td>${celdas}</tr>`;
+            }).join('');
+            return `<tr class="hor-loc"><td colspan="8"><button type="button" class="btn-ghost btn-mini" onclick="horElegirLocal('${esc(l)}')">${esc(l)} ›</button></td></tr>${filas}`;
+        }).join('');
+        return `<div class="per-filtro-activo">Todas las tiendas juntas: cada persona en su tienda y, cada día, dónde trabaja. Para cambiar un horario, toque el nombre de la tienda.</div>
+            ${choques ? `<div class="banner error" style="display:block">${choques} día(s) con la misma persona en dos tiendas al mismo tiempo (en rojo).</div>` : ''}
+            <div class="tabla-wrap"><table class="req-tabla hor-tabla hor-todas"><thead><tr><th class="izq">Trabajador</th>${HOR_DIAS.map((_, i) => { const f = sumarDias(horSemana, i); return `<th>${diaSemana(f)}<small>${fechaBonita(f).slice(0, 5)}</small></th>`; }).join('')}</tr></thead>
+            <tbody>${grupos || '<tr><td colspan="8" class="empty">No hay trabajadores activos.</td></tr>'}</tbody></table></div>`;
+    }
     // ---------- Tablero: fichas con el nombre de cada trabajador (tantas como turnos tiene su perfil) que se arrastran al día y turno ----------
     // Mañana o Tarde = 1 turno · Corrido = 2 turnos (mañana y tarde) · Libre = no usa turnos. Arriba quedan las fichas que faltan por asignar.
     // [código, título, color de la franja, quiénes aparecen]. Mañana y tarde muestran también a los de corrido (trabajan los dos turnos).
-    const HOR_SECCIONES = [['M', 'MAÑANA', '#f59e0b', c => c === 'M' || c === 'C'], ['T', 'TARDE', '#3b82f6', c => c === 'T' || c === 'C'],
-                           ['C', 'CORRIDO', '#8b5cf6', c => c === 'C'], ['L', 'LIBRE', '#94a3b8', c => c === 'L']];
+    const HOR_SECCIONES = [['M', 'Mañana', '#93c5fd', c => c === 'M' || c === 'C'], ['T', 'Tarde', '#2563eb', c => c === 'T' || c === 'C'],
+                           ['C', 'Corrido', '#1e40af', c => c === 'C'], ['L', 'Libre', '#64748b', c => c === 'L']];   // (20/11) tonos de azul, como el resto del sistema
     // Turnos de más (además de los del perfil) por semana, tienda y trabajador: { 'semana|tienda': { id: n } }
     const horMas = {};
     const horMasDe = id => (horMas[horClave(horLocal)] || {})[id] || 0;
@@ -15800,12 +15899,12 @@
     const horColor = cargo => horEsCaja(cargo) ? 'var(--c1)' : 'var(--c3)';
     const horCorto = n => String(n || '').trim().split(/\s+/).slice(0, 2).join(' ');
     let horElegida = null, horSelPintada = false;   // ficha tocada (sin arrastrar): se coloca tocando una celda (se marca solo una)
-    function horFicha(w, dia, cod = '') {
+    function horFicha(w, dia, cod = '', quedan = 0) {
         const sel = !horSelPintada && horElegida && horElegida.id === w.id && horElegida.dia === dia && horElegida.cod === cod;
         if (sel) horSelPintada = true;
         const prest = horEsPrestado(w), texto = cod === 'C' || cod === 'L';
         const noPuede = dia >= 0 && (cod === 'C' ? ['M', 'T'] : cod === 'M' || cod === 'T' ? [cod] : []).some(x => !horPuede(w, dia, x));
-        return `<span class="hor-ficha${sel ? ' sel' : ''}${prest ? ' prestado' : ''}${texto ? ' texto' : ''}${noPuede ? ' no-puede' : ''}" style="--fc:${horColor(w.cargo)}" data-hor-id="${esc(w.id)}" data-hor-dia="${dia}" data-hor-cod="${cod}" title="${esc(w.nombre)} · ${esc(w.cargo || 'sin cargo')}${prest ? ' · de ' + esc(w.local || 'otra tienda') : ''}${noPuede ? ' · su ficha dice que no puede este turno' : ''}">${esc(horCorto(w.nombre))}</span>`;
+        return `<span class="hor-ficha${sel ? ' sel' : ''}${prest ? ' prestado' : ''}${texto ? ' texto' : ''}${noPuede ? ' no-puede' : ''}" style="--fc:${horColor(w.cargo)}" data-hor-id="${esc(w.id)}" data-hor-dia="${dia}" data-hor-cod="${cod}" title="${esc(w.nombre)} · ${esc(w.cargo || 'sin cargo')}${prest ? ' · de ' + esc(w.local || 'otra tienda') : ''}${noPuede ? ' · su ficha dice que no puede este turno' : ''}">${esc(horCorto(w.nombre))}${quedan ? `<b class="hor-n" title="Turnos por asignar">${quedan}</b>` : ''}</span>`;
     }
     // ---------- Turnos que un trabajador hace en otra tienda esta semana (llamado allá): se ven en su tienda y cuentan para sus turnos ----------
     // [7] con { local, c } o null. Toma lo que se está armando en este panel para esa tienda y, si no, lo guardado.
@@ -15814,7 +15913,9 @@
         Object.keys(horBorr).forEach(k => { const [s, l] = k.split('|'); if (s === horSemana && l !== local && horBorr[k][w.id]) otras.add(l); });
         otras.forEach(l => {
             const borr = horBorr[horSemana + '|' + l], dias = borr && borr[w.id] ? borr[w.id] : ((horDatos.horarios.find(x => x.id === w.id && x.local === l) || {}).dias || []);
-            dias.forEach((c, i) => { if (!out[i] && (c === 'M' || c === 'T' || c === 'C')) out[i] = { local: l, c }; });
+            // (20/11) También el día libre que tiene en la otra tienda (antes solo los turnos): así su tienda no lo pone a trabajar ese día
+            // ni le busca otro libre. Si en una tienda trabaja y en otra está libre, manda el turno.
+            dias.forEach((c, i) => { if (c === 'M' || c === 'T' || c === 'C') { if (!out[i] || out[i].c === 'L') out[i] = { local: l, c }; } else if (c === 'L' && !out[i]) out[i] = { local: l, c }; });
         });
         return out;
     }
@@ -15823,7 +15924,7 @@
         const plan = horPlan(local), cambios = [];
         horTrabajadores(local).filter(w => !horEsPrestado(w)).forEach(w => {
             const d = plan[w.id]; if (!d) return;
-            horAfuera(w, local).forEach((f, i) => { if (f && d[i] === 'L') { d[i] = ''; cambios.push(`${horCorto(w.nombre)} el ${diaSemana(sumarDias(horSemana, i))} (${HOR_COD[f.c].toLowerCase()} en ${f.local})`); } });
+            horAfuera(w, local).forEach((f, i) => { if (f && f.c !== 'L' && d[i] === 'L') { d[i] = ''; cambios.push(`${horCorto(w.nombre)} el ${diaSemana(sumarDias(horSemana, i))} (${HOR_COD[f.c].toLowerCase()} en ${f.local})`); } });
         });
         if (cambios.length) mostrarBanner(`Trabaja${cambios.length > 1 ? 'n' : ''} en otra tienda ese día, así que ya no figura${cambios.length > 1 ? 'n' : ''} como libre: ${cambios.join('; ')}. Revise su día libre y pulse Guardar.`, 'warn');
     }
@@ -15874,13 +15975,15 @@
             const d = plan[w.id] || Array(7).fill(''), base = horBase(w), fuera = horUsadosAfuera(w, local), usados = horUsados(d) + fuera, mas = Math.max(horMasDe(w.id), usados - base), total = base + mas, quedan = total - usados, prest = horEsPrestado(w);
             const lugares = [...new Set(horAfuera(w, local).filter(Boolean).map(x => x.local))];
             const txt = (quedan > 0 ? `${quedan} de ${total}` : `${horCorto(w.nombre)} completo`) + (mas && !prest ? ` · <span class="hor-extra">${mas} de más</span>` : '') + (fuera && !prest ? ` · ${fuera} en ${esc(lugares.join(', '))}` : '');
-            return `<span class="hortb-grupo">${prest ? `<span class="hortb-de">de ${esc(w.local || 'otra tienda')}</span>` : ''}${Array.from({ length: quedan }, () => horFicha(w, -1)).join('')}<small>${txt}</small>
+            // (20/11) Una sola ficha por persona con el número de turnos que le quedan (antes se repetía una ficha por turno)
+            return `<span class="hortb-grupo">${prest ? `<span class="hortb-de">de ${esc(w.local || 'otra tienda')}</span>` : ''}${quedan > 0 ? horFicha(w, -1, '', quedan) : ''}<small>${txt}</small>
                 ${mas > 0 && quedan > 0 && !(prest && total <= 1) ? `<button type="button" class="hortb-mas" title="Quitar un turno de más" onclick="horMasTurno('${esc(w.id)}', -1)">−</button>` : ''}
                 <button type="button" class="hortb-mas" title="Agregar un turno más a ${esc(w.nombre)}${prest ? '' : ` (además de los ${base} de su perfil)`}" onclick="horMasTurno('${esc(w.id)}', 1)">+</button>
                 ${prest && !usados ? `<button type="button" class="hortb-mas" title="Ya no llamarlo" onclick="horSoltarPrestado('${esc(w.id)}')">×</button>` : ''}</span>`;
         }).join('');
         const ayuda = { M: '', T: '', C: 'mañana y tarde (usa 2 turnos)', L: 'no usa turnos' };
-        const afuera = ws.filter(w => !horEsPrestado(w)).map(w => ({ w, dias: horAfuera(w, local) })).filter(a => a.dias.some(Boolean));
+        // Lo que cada uno tiene en otra tienda esa semana (turnos y días libres), también de los llamados: se ve en su celda
+        const afuera = ws.map(w => ({ w, dias: horAfuera(w, local) })).filter(a => a.dias.some(Boolean));
         const filas = HOR_SECCIONES.map(([cod, titulo, color, esta]) => `<tr class="hortb-sec" style="--hs:${color}"><td colspan="7">${titulo}${ayuda[cod] ? `<small>${ayuda[cod]}</small>` : ''}</td></tr>
             <tr>${HOR_DIAS.map((_, i) => `<td class="hortb-celda${horElegida ? ' hor-elegible' : ''}" data-hor-drop="${i}|${cod}">${ws.filter(w => esta((plan[w.id] || [])[i])).map(w => horFicha(w, i, cod)).join('')}${
                 afuera.filter(a => a.dias[i] && esta(a.dias[i].c)).map(a => `<span class="hor-afuera" title="${esc(a.w.nombre)} trabaja este turno en ${esc(a.dias[i].local)}"><b>${esc(horCorto(a.w.nombre))}</b>en ${esc(a.dias[i].local)}</span>`).join('')}</td>`).join('')}</tr>`).join('');
@@ -15907,6 +16010,10 @@
         const cod = (cod0 === 'M' && (ya === 'T' || ya === 'C')) || (cod0 === 'T' && (ya === 'M' || ya === 'C')) ? 'C' : cod0;
         const nec = cod === 'C' ? ['M', 'T'] : cod === 'L' ? [] : [cod];
         const no = nec.find(x => !horPuede(w, dia, x));
+        // (20/11) No puede estar en dos tiendas a la vez: si ese día ya tiene ese turno en otra, no se coloca
+        const otra = horAfuera(w, horLocal)[dia], otraT = otra ? (otra.c === 'C' ? ['M', 'T'] : otra.c === 'L' ? [] : [otra.c]) : [];
+        if (nec.some(x => otraT.includes(x))) { mostrarBanner(`${w.nombre} ya tiene ese día ${HOR_COD[otra.c].toLowerCase()} en ${otra.local}. Cámbielo allá primero o elija otro turno.`, 'warn'); perPintar(); return; }
+        if (otra && otra.c === 'L' && nec.length) mostrarBanner(`Atención: el ${diaSemana(sumarDias(horSemana, dia))} es el día libre de ${w.nombre} en ${otra.local}.`, 'warn');
         d[dia] = cod;
         const fuera = horUsadosAfuera(w, horLocal), diasFuera = horAfuera(w, horLocal);
         const n = horBase(w) + Math.max(horMasDe(id), horUsados(plan[id] || []) + fuera - horBase(w));
@@ -16009,6 +16116,7 @@
         perPintar();
     }
     function horComposicionVista() {
+        if (horLocal === '*') horLocal = (perDatos.locales || [])[0] || '';   // "Todas" es solo para ver el horario
         if (!horListo()) return horCabecera(false) + cargandoHTML('Cargando la composición...');
         if (horDatos.error) return horCabecera(false) + `<div class="banner error">${esc(horDatos.error)}</div>`;
         const local = horLocal, puestos = horPuestos(local), comp = horComp[local] || {};
@@ -16598,7 +16706,7 @@
         const filas = [...g.values()].map(p => Object.assign(p, { debe: p.venc + p.vig + p.pend, total: p.venc + p.vig + p.pend + p.pag }))
             .sort((a, b) => b.debe - a.debe || b.total - a.total);
         const max = Math.max(...filas.map(p => p.total), 0.01);
-        const ley = [[!gastos, 'var(--bad)', 'Vencido'], [!gastos, 'var(--c1)', 'Vigente'], [gastos, 'var(--warn)', 'Pendiente'], [perDeudasHist, 'var(--ok)', 'Pagado']]
+        const ley = [[!gastos, 'var(--graf-rojo)', 'Vencido'], [!gastos, 'var(--c1)', 'Vigente'], [gastos, 'var(--amar)', 'Pendiente'], [perDeudasHist, 'var(--graf-verde)', 'Pagado']]
             .filter(x => x[0]).map(([, c, t]) => `<span class="ley-item"><i style="background:${c}"></i>${t}</span>`).join('');
         return `<div class="grafico-card"><div class="grafico-head"><h3>${gastos ? 'Gastos por cuenta' : 'Cuánto debe cada uno'} <small class="nota" style="margin:0">en $</small></h3><div class="leyenda">${ley}</div></div>
             <div class="per-barras">${filas.map(p => {
@@ -24190,7 +24298,7 @@ Reglas:
             return { etiqueta: dias.length > 8 ? fechaCorta(d).slice(0, 2) : DIAS_LARGOS[aFecha(d).getDay()].slice(0, 3), sub: dias.length > 8 ? '' : fechaCorta(d),
                      fecha: d, n: del.length, valores: { ver: suma(del.filter(ok)), pend: suma(del.filter(f => !ok(f))) } };
         });
-        const series = [{ k: 'ver', color: 'var(--ok)' }, { k: 'pend', color: 'var(--bad)' }];
+        const series = [{ k: 'ver', color: 'var(--graf-verde)' }, { k: 'pend', color: 'var(--graf-rojo)' }];
         const tt = g => `<div class="tt-title">${g.fecha ? DIAS_LARGOS[aFecha(g.fecha).getDay()] + ' ' + fechaBonita(g.fecha) : esc(g.etiqueta)}</div>
             <div class="tt-row"><span><i class="sw" style="background:var(--ok)"></i> Verificado</span><b>Bs ${fmt(g.valores.ver)}</b></div>
             <div class="tt-row"><span><i class="sw" style="background:var(--bad)"></i> Pendiente</span><b>Bs ${fmt(g.valores.pend)}</b></div>
@@ -24253,15 +24361,15 @@ Reglas:
         const anillo = color => `<path fill="${color}" fill-rule="evenodd" d="M${c - R},${c} a${R},${R} 0 1,0 ${2 * R},0 a${R},${R} 0 1,0 ${-2 * R},0 M${c - r},${c} a${r},${r} 0 1,0 ${2 * r},0 a${r},${r} 0 1,0 ${-2 * r},0"/>`;
         let svg = `<svg viewBox="0 0 ${S} ${S}" role="img" aria-label="${pct === null ? 'Sin datos' : pct + '% verificado'}">`;
         if (!total) svg += anillo('var(--border)');
-        else if (!p) svg += anillo('var(--ok)');
-        else if (!v) svg += anillo('var(--bad)');
+        else if (!p) svg += anillo('var(--graf-verde)');
+        else if (!v) svg += anillo('var(--graf-rojo)');
         else {
             const a0 = -Math.PI / 2, a1 = a0 + 2 * Math.PI * v / total, a2 = a0 + 2 * Math.PI;
             const seg = (ini, fin, color) => {
                 const grande = fin - ini > Math.PI ? 1 : 0;
                 return `<path fill="${color}" stroke="var(--list-bg)" stroke-width="2" d="M${punto(R, ini)} A${R},${R} 0 ${grande},1 ${punto(R, fin)} L${punto(r, fin)} A${r},${r} 0 ${grande},0 ${punto(r, ini)} Z"/>`;
             };
-            svg += seg(a0, a1, 'var(--ok)') + seg(a1, a2, 'var(--bad)');
+            svg += seg(a0, a1, 'var(--graf-verde)') + seg(a1, a2, 'var(--graf-rojo)');
         }
         svg += `<text class="c-num" x="${c}" y="${c + 6}" text-anchor="middle">${pct === null ? '—' : pct + '%'}</text>
                 <text class="c-txt" x="${c}" y="${c + 20}" text-anchor="middle">${pct === null ? '' : 'verificado'}</text></svg>`;
@@ -24717,6 +24825,11 @@ Reglas:
             .then(r => r.json())
             .then(l => (TASAS_BCV = l.filter(x => Number(x.promedio) > 0 && /^\d{4}-\d{2}-\d{2}/.test(x.fecha))
                                      .map(x => [x.fecha.slice(0, 10), Number(x.promedio)]).sort((a, b) => a[0].localeCompare(b[0]))))
+            // (20/11) La del servidor nuevo, leída de la página del BCV: sale allí antes que en DolarApi (p. ej. la del martes el viernes)
+            .then(l => fetch('https://plaza-software.jdsistemas.workers.dev/tasa', { cache: 'no-store' }).then(r => r.json()).then(t => {
+                if (t && t.ok && Number(t.tasa) > 0 && /^\d{4}-\d{2}-\d{2}$/.test(t.fecha) && (!l.length || t.fecha > l[l.length - 1][0])) l.push([t.fecha, Number(t.tasa)]);
+                return l;
+            }).catch(() => l))
             .catch(() => { tasasPromesa = null; return null; });
         return tasasPromesa;
     }
