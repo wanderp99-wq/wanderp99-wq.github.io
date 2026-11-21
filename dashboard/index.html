@@ -930,7 +930,7 @@
         .hor-ficha.texto:hover { box-shadow: none; color: var(--text-main); }
         /* (20/11) Horarios con la estética del sistema: fichas sobrias (una por persona con el número de turnos que le quedan),
            franjas en tonos de azul y, debajo del tablero, la tabla para tocar y cambiar cada casilla */
-        .hor-ficha { border-radius: 8px; background: var(--card-bg); color: var(--text-main); border: 1px solid var(--border); border-left: 3px solid var(--fc); font-weight: 600; padding: .3rem .55rem; }
+        .hor-ficha { border-radius: 8px; background: color-mix(in srgb, var(--fc) 16%, var(--card-bg)); color: var(--text-main); border: 1px solid color-mix(in srgb, var(--fc) 35%, var(--border)); border-left: 3px solid var(--fc); font-weight: 600; padding: .3rem .55rem; }   /* fondo suave del color de su puesto: el nombre resalta */
         .hor-ficha:hover { box-shadow: 0 2px 8px var(--shadow); border-color: var(--primary); border-left-color: var(--fc); }
         .hor-ficha .hor-n { margin-left: .4rem; min-width: 1.25rem; height: 1.25rem; padding: 0 .3rem; border-radius: 999px; background: var(--primary); color: #fff; font-size: .7rem; display: inline-grid; place-items: center; font-variant-numeric: tabular-nums; }
         .hortb-grupo { border-radius: 10px; box-shadow: none; background: transparent; border-color: transparent; padding: .1rem; }
@@ -1818,7 +1818,9 @@
         #pendPanel { order: 6; }
         body.con-lado .header-title .logo-ccpv { display: none; }
         body.con-lado.en-inicio #tituloVista { visibility: hidden; }
-        @media (max-width: 1440px) { #cabFecha { display: none !important; } }   /* en pantallas medianas, la tasa sí y la fecha no: que quepa el nombre del módulo */
+        @media (max-width: 1440px) { #cabFecha { display: none !important; } }
+        /* Pantallas medianas con la barra lateral abierta: solo la inicial del usuario y el monto de la tasa, para que quepa el título */
+        @media (min-width: 641px) and (max-width: 1280px) { .bienvenida b { display: none; } #cabTasa .ct-l { display: none; } }   /* en pantallas medianas, la tasa sí y la fecha no: que quepa el nombre del módulo */
         @media (max-width: 640px) {
             body .container { padding: 0 .75rem 1.5rem !important; }
             body .header-bar { margin: 0 -.75rem .85rem; padding: 8px .75rem; }
@@ -8022,7 +8024,7 @@
         const pintar = () => {
             let t = null; try { t = tasaBCVdel(fechaLocalHoy()); } catch (e) {}
             el.classList.toggle('hidden', !dentro || !t);
-            if (t) { el.innerHTML = `Tasa BCV <b>Bs ${fmt(t[1])}</b>`; el.title = 'Tasa oficial del BCV del ' + fechaBonita(t[0]); }
+            if (t) { el.innerHTML = `<span class="ct-l">Tasa BCV </span><b>Bs ${fmt(t[1])}</b>`; el.title = 'Tasa oficial del BCV del ' + fechaBonita(t[0]); }
         };
         pintar();
         if (dentro) cargarTasasBCV().then(pintar);
@@ -15677,7 +15679,7 @@
     function horImagen(local) {
         const ws = horTrabajadores(local), plan = horPlan(local), W = 1600, M = 40, colW = (W - 2 * M) / 7, lh = 40;
         const C = { fondo: '#ffffff', texto: '#111827', gris: '#6b7280', borde: '#e5e7eb', suave: '#f8fafc', azul: '#2563eb', caja: '#2a78d6', resto: '#1baf7a' };
-        const SEC = { M: ['MAÑANA', '#f59e0b'], T: ['TARDE', '#3b82f6'], C: ['CORRIDO', '#8b5cf6'], L: ['LIBRE', '#94a3b8'] };
+        const SEC = { M: ['Mañana', '#93c5fd'], T: ['Tarde', '#2563eb'], C: ['Corrido', '#1e40af'], L: ['Libre', '#64748b'] };   // (20/11) los mismos tonos de azul del tablero
         const esta = { M: c => c === 'M' || c === 'C', T: c => c === 'T' || c === 'C', C: c => c === 'C', L: c => c === 'L' };
         const fuente = (px, peso = 500) => `${peso} ${px}px Inter, "Segoe UI", Arial, sans-serif`;
         const nombre = w => horCorto(w.nombre) + (horEsPrestado(w) ? ` (${w.local || 'otra tienda'})` : '');
@@ -15721,9 +15723,11 @@
                 celdas[cod + i].forEach((e, k) => {
                     const py = y + 8 + k * lh, ancho = colW - 16;
                     if (e.tipo === 'ficha') {
-                        x.font = fuente(19, 600); const tx = recorta(e.texto, ancho - 24), tw = Math.min(ancho, x.measureText(tx).width + 24);
-                        pildora(cx + 8, py + 2, tw, 34, 17); x.fillStyle = e.color + '22'; x.fill(); x.strokeStyle = e.color + '88'; x.stroke();
-                        x.fillStyle = e.color; x.fillText(tx, cx + 20, py + 19);
+                        // (20/11) Como las fichas del tablero: esquinas suaves, fondo del color de su puesto, raya a la izquierda y letra oscura
+                        x.font = fuente(19, 600); const tx = recorta(e.texto, ancho - 28), tw = Math.min(ancho, x.measureText(tx).width + 28);
+                        pildora(cx + 8, py + 2, tw, 34, 8); x.fillStyle = e.color + '29'; x.fill(); x.strokeStyle = e.color + '59'; x.lineWidth = 1; x.stroke();
+                        x.fillStyle = e.color; x.fillRect(cx + 8, py + 4, 4, 30);
+                        x.fillStyle = C.texto; x.fillText(tx, cx + 22, py + 19);
                     } else if (e.tipo === 'fuera') {
                         x.font = fuente(15, 600); const tx = recorta(e.texto, ancho - 14), tw = Math.min(ancho, x.measureText(tx).width + 14);
                         pildora(cx + 8, py + 2, tw, 34, 17); x.setLineDash([5, 4]); x.strokeStyle = '#9ca3af'; x.stroke(); x.setLineDash([]);
@@ -15735,7 +15739,7 @@
         });
         // Leyenda
         y += 20; x.font = fuente(18); [[C.caja, 'Caja (cajeros y encargados)'], [C.resto, 'Rebanadores y demás']].forEach(([c, n], k) => {
-            const lx = M + k * 360; pildora(lx, y, 28, 20, 10); x.fillStyle = c + '33'; x.fill(); x.strokeStyle = c; x.stroke(); x.fillStyle = C.gris; x.fillText(n, lx + 38, y + 10); });
+            const lx = M + k * 360; pildora(lx, y, 28, 20, 5); x.fillStyle = c + '29'; x.fill(); x.strokeStyle = c + '59'; x.stroke(); x.fillStyle = c; x.fillRect(lx, y + 2, 4, 16); x.fillStyle = C.gris; x.fillText(n, lx + 38, y + 10); });
         y += 50;
         // Resumen por trabajador
         x.fillStyle = C.azul; x.font = fuente(28, 700); x.fillText('Resumen por trabajador', M, y + 20); y += 52;
@@ -15760,7 +15764,7 @@
         fondo.innerHTML = `<div class="req-dlg hor-img-dlg" role="dialog" aria-label="Enviar horario"><div class="prg-head"><h3>Enviar horario de ${esc(horLocal)}</h3><button type="button" class="prg-x" title="Cerrar" onclick="document.getElementById('horImgDlg').classList.add('hidden')">✕</button></div>
             <div class="req-sub">Así se enviará al grupo de Telegram de la tienda y a sus encargados, ${horSemana === actual ? 'como el horario vigente a partir de hoy' : 'como el horario vigente a partir del sábado ' + fechaBonita(horSemana)}.</div>
             <img id="horImgVista" src="${img}" alt="Horario de ${esc(horLocal)}">
-            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><a class="btn-ghost" href="${img}" download="${esc(archivo)}" style="text-decoration:none">Descargar imagen</a>
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><a class="btn-ghost" href="${img}" download="${esc(archivo)}" style="text-decoration:none;display:inline-flex;align-items:center;padding:.6rem 1rem;border-radius:8px;font-size:.875rem;font-weight:500">Descargar imagen</a>
                 <button type="button" class="btn-ghost" onclick="document.getElementById('horImgDlg').classList.add('hidden')">Cancelar</button>
                 <button type="button" class="btn-primary" id="horImgEnviar" onclick="horEnviarYa(this)">Enviar por Telegram</button></div></div>`;
         fondo.classList.remove('hidden');
