@@ -3895,7 +3895,7 @@
         if (/^cmp_(orden_precio|orden_nueva|orden_avisar|avisar_lista|marcar|marcar_lote|desc_divisas)$/.test(payload.action)) { const r = await cfPreciosEscribir(payload); if (r) return r; }
         if (CF_ALMACEN_ACC.test(payload.action)) { const r = await cfAlmacenEscribir(payload); if (r) return r; }
         if (/^req_(productos_guardar|exhibicion_guardar|variedad_guardar|ventas_guardar|ventas_borrar|guardar|telegram)$/.test(payload.action)) { const r = await cfReqEscribir(payload); if (r) return r; }
-        if (/^(bsr_pedir|bsc_listar|bsc_cajero)$/.test(payload.action)) { const r = await cfBigSoftEscribir(payload); if (r) return r; }
+        if (/^(bsr_pedir|bsc_listar|bsc_cajero)$/.test(payload.action)) { const r = await cfBigSoftEscribir(payload); if (r) { if (payload.action === 'bsr_pedir') r.desdeCF = true; return r; } }
         if (payload.action === 'vx_anular') { const r = await cfVxAnular(payload); if (r) return r; }
         if (/^(cuadre_tol|cuentas_listar|cuentas_guardar)$/.test(payload.action)) { const r = await cfCuadreExtra(payload); if (r) return r; }
         // (15/11) Historial de nóminas: del servidor nuevo (con la Nómina encendida allá)
@@ -4010,13 +4010,14 @@
                 const dc = await rc.json().catch(() => null);
                 if (dc && dc.ok && dc.usuario) {
                     Object.assign(cfSes, { token: dc.token || '', vence: dc.vence || (Date.now() + 3600000), clave, modulos: (dc.empresa || {}).modulos || {}, modHora: Date.now(), mala: '' });
-                    const u = dc.usuario, todos = MODULOS.map(m => m.id).concat(['verexistencia', 'rep_existencia', 'rep_ajustes', 'rep_ventas']);
+                    const u = dc.usuario;
                     anotarTiempo('login (Cloudflare)', performance.now() - t0, typeof dc.ms === 'number' ? dc.ms : null, true);
+                    // Mismo resultado que el login de Google: los permisos tal cual (principal/admin = PERMISOS_CLAVE_PRINCIPAL)
                     return Object.assign({}, dc, {
                         nombre: u.nombre || 'Administrador',
-                        principal: !!u.principal,
+                        principal: !!u.principal || u.id === 'principal',
                         admin: !!u.admin,
-                        permisos: (u.principal || u.admin) ? todos : (u.permisos || []),
+                        permisos: Array.isArray(u.permisos) ? u.permisos : [],
                         version: VERSION_SERVIDOR
                     });
                 }
@@ -6767,7 +6768,7 @@
             <div class="fb-indicadores">
                 <div class="fb-ind"><span>Lecturas de Firebase hoy</span><b>${fmtNum(lect)} <small>de 50.000</small></b><span class="fb-barra"><i style="width:${pct}%" class="${pct > 70 ? 'alto' : ''}"></i></span></div>
                 ${(() => { const u = (r.revision && r.revision.llamadas) || null; if (!u) return ''; const p = Math.min(100, u.total / 200);
-                    return `<div class="fb-ind"><span>Llamadas a internet de Google hoy</span><b>${fmtNum(u.total)} <small>de unas 20.000</small></b><span class="fb-barra"><i style="width:${p}%" class="${p > 70 ? 'alto' : ''}"></i></span>
+                    return `<div class="fb-ind"><span>Llamadas al servidor de respaldo hoy</span><b>${fmtNum(u.total)} <small>de unas 20.000</small></b><span class="fb-barra"><i style="width:${p}%" class="${p > 70 ? 'alto' : ''}"></i></span>
                         ${u.porOrigen.length ? `<small>${u.porOrigen.slice(0, 6).map(([o, n]) => `${esc(o)} ${fmtNum(n)}`).join(' · ')}</small>` : ''}</div>`; })()}
                 ${r.revision && r.revision.manual
                     ? `<div class="fb-ind"><span>Revisión (fichas, marcas, copia a la hoja, avisos)</span><b>Manual · ${revHace != null ? `última hace ${revHace} min` : 'todavía no se ha hecho'}</b><small>Se hace al pulsar "Actualizar" (abajo). No corre sola para no gastar la cuota de Google.</small><button type="button" class="btn-ghost btn-mini" onclick="fbRevision(this, true)">Volver a cada 5 min</button></div>`
@@ -7366,12 +7367,17 @@
             document.body.appendChild(fondo);
         }
         const s = v => v == null ? '—' : (v / 1000).toFixed(1) + ' s';
-        fondo.innerHTML = `<div class="req-dlg" style="width:min(640px,100%)"><h3>Tiempos de respuesta</h3>
-            ${esPrincipal ? '<div id="fbEstado" class="fb-estado"></div><div id="paqEstado" class="fb-estado"></div><h4 class="fb-tit-tiempos">Últimos pedidos a Google</h4>' : ''}
-            <div class="req-sub">Últimos pedidos a Google. "En Google" es lo que tarda el script; el resto es internet y la espera de Google.</div>
-            <div class="tabla-wrap" style="max-height:${esPrincipal ? 40 : 60}vh;overflow:auto;margin-top:.75rem">${TIEMPOS.length ? `<table><thead><tr><th class="izq">Hora</th><th class="izq">Acción</th><th>Total</th><th>En Google</th></tr></thead><tbody>
-            ${TIEMPOS.map(t => `<tr><td class="izq">${t.hora}</td><td class="izq">${esc(NOMBRE_ACCION[t.accion] || t.accion)}${t.ok ? '' : ' <span class="chip st-falta">error</span>'}${t.pasos ? '<small title="Partes del trabajo de Google, en milisegundos">' + esc(t.pasos) + '</small>' : ''}</td>
-                <td><b>${s(t.total)}</b></td><td>${s(t.servidor)}</td></tr>`).join('')}</tbody></table>` : '<div class="empty">Todavía no hay pedidos.</div>'}</div>
+        // (22/11) Dónde se atendió cada pedido: servidor nuevo, este equipo (copia local) o el respaldo de Google
+        const origen = a => { const x = String(a || '');
+            if (/\(Cloudflare\)/.test(x)) return { acc: x.replace(/\s*\(Cloudflare\)/, ''), srv: 'Servidor', cls: 'st-ok' };
+            if (/·\s*copia local/.test(x)) return { acc: x.replace(/\s*·\s*copia local/, ''), srv: 'Este equipo', cls: 'st-info' };
+            return { acc: x, srv: 'Respaldo', cls: 'st-pend' }; };
+        fondo.innerHTML = `<div class="req-dlg" style="width:min(680px,100%)"><h3>Tiempos de respuesta</h3>
+            ${esPrincipal ? '<div id="fbEstado" class="fb-estado"></div><div id="paqEstado" class="fb-estado"></div><h4 class="fb-tit-tiempos">Últimos pedidos al servidor</h4>' : ''}
+            <div class="req-sub">Últimos pedidos al servidor. "Procesado" es lo que tarda el servidor en hacer el trabajo; el resto es internet. "Este equipo" = se respondió al instante con lo guardado en el equipo; "Respaldo" = servidor anterior (solo lo que aún no se ha pasado).</div>
+            <div class="tabla-wrap" style="max-height:${esPrincipal ? 40 : 60}vh;overflow:auto;margin-top:.75rem">${TIEMPOS.length ? `<table><thead><tr><th class="izq">Hora</th><th class="izq">Acción</th><th class="izq">Servidor</th><th>Total</th><th>Procesado</th></tr></thead><tbody>
+            ${TIEMPOS.map(t => { const o = origen(t.accion); return `<tr><td class="izq">${t.hora}</td><td class="izq">${esc(NOMBRE_ACCION[o.acc] || o.acc)}${t.ok ? '' : ' <span class="chip st-falta">error</span>'}${t.pasos ? '<small title="Partes del trabajo del servidor, en milisegundos">' + esc(t.pasos) + '</small>' : ''}</td>
+                <td class="izq"><span class="chip ${o.cls}">${o.srv}</span></td><td><b>${s(t.total)}</b></td><td>${s(t.servidor)}</td></tr>`; }).join('')}</tbody></table>` : '<div class="empty">Todavía no hay pedidos.</div>'}</div>
             <div id="fbPruebaRes" style="margin-top:.6rem"></div>
             <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-primary" onclick="document.getElementById('dlgTiempos').classList.add('hidden')">Cerrar</button></div></div>`;
         fondo.classList.remove('hidden');
@@ -22438,7 +22444,10 @@ Reglas:
         const t0 = Date.now();
         // (17/11) Si Google lo copió en el servidor nuevo (p.cf), la respuesta se lee allá cada segundo (rápido y sin gastar Google).
         // El cierre de caja se sigue leyendo en Google (allí se registra y se junta con la ficha). Si el servidor nuevo falla, Google.
-        let enCF = !!p.cf && tipo !== 'cierre', vivoG = p.vivo;
+        // (22/11) Si el pedido se creó directo en el servidor nuevo (desdeCF), SOLO existe allá: nunca se pregunta a Google
+        // (antes el cierre, o un fallo momentáneo de Cloudflare, mandaba a Google a buscar un pedido que no tenía y daba error).
+        const soloCF = !!p.desdeCF;
+        let enCF = !!p.cf && (tipo !== 'cierre' || soloCF), vivoG = p.vivo;
         for (;;) {
             await new Promise(r => { const t = setTimeout(r, enCF ? 1000 : 2500); if (senal) senal.despertar = () => { clearTimeout(t); r(); }; });
             if (senal && senal.detenido) throw bsrDetenido();
@@ -22447,9 +22456,13 @@ Reglas:
                 try {
                     const r = await cfPedir({ action: 'bsr_ver', id: p.id, token: await cfToken() });
                     if (r.ok) { v = r; v.vivo = r.vivo || vivoG; }
-                    else if (r.noAqui || r.sesion === false) { enCF = false; if (r.sesion === false) cfSes.token = ''; }
+                    else if (r.sesion === false) { cfSes.token = ''; if (!soloCF) enCF = false; }
+                    else if (r.noAqui) { if (soloCF) throw new Error('El pedido ya no está en el servidor. Ábralo de nuevo.'); enCF = false; }
                     else throw new Error(r.error || 'sin respuesta');
-                } catch (e) { enCF = false; }
+                } catch (e) {
+                    if (!soloCF) enCF = false;
+                    else if (/ya no está/.test(e.message) || Date.now() - t0 > limite * 1000) throw e;
+                }
                 if (!v) continue;
             } else { try { v = await llamarApi({ action: 'bsr_ver', id: p.id }); vivoG = v.vivo; } catch (e) { if (Date.now() - t0 > limite * 1000) throw e; continue; } }
             const t = v.tarea;
