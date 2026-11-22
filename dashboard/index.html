@@ -4000,7 +4000,7 @@
                 if (data.empresa && typeof aplicarEmpresaCF === 'function') aplicarEmpresaCF(data.empresa);
                 return Object.assign({}, data, {
                     nombre: u.nombre || 'Administrador',
-                    principal: !!u.principal,
+                    principal: !!(u.principal || u.admin),
                     admin: !!u.admin,
                     permisos: (u.principal || u.admin) ? todos : (u.permisos || []),
                     version: VERSION_SERVIDOR
@@ -4026,10 +4026,10 @@
                     Object.assign(cfSes, { token: dc.token || '', vence: dc.vence || (Date.now() + 3600000), clave, modulos: (dc.empresa || {}).modulos || {}, modHora: Date.now(), mala: '' });
                     const u = dc.usuario;
                     anotarTiempo('login (Cloudflare)', performance.now() - t0, typeof dc.ms === 'number' ? dc.ms : null, true);
-                    // Mismo resultado que el login de Google: los permisos tal cual (principal/admin = PERMISOS_CLAVE_PRINCIPAL)
+                    // Mismo resultado que el login de Google (CuadreSistema.gs:358): principal = clave principal O rol de administrador
                     return Object.assign({}, dc, {
                         nombre: u.nombre || 'Administrador',
-                        principal: !!u.principal || u.id === 'principal',
+                        principal: !!(u.principal || u.admin || u.id === 'principal'),
                         admin: !!u.admin,
                         permisos: Array.isArray(u.permisos) ? u.permisos : [],
                         version: VERSION_SERVIDOR
@@ -5913,7 +5913,15 @@
         const t = await cfToken(), r = await cfPedir({ action: 'docs_leer', token: t, rutas });
         if (!r.ok) { if (r.sesion === false) cfSes.token = ''; throw new Error(r.error || 'sin respuesta'); }
         const D = {};
-        rutas.forEach(ruta => { const s = r.docs[ruta]; if (!s) throw new Error(ruta + ' no está en el servidor nuevo'); D[ruta] = JSON.parse(JSON.parse(s).datos || 'null'); });
+        rutas.forEach(ruta => {
+            const s = r.docs[ruta];
+            if (!s) {
+                if (CF_SOLO) { D[ruta] = null; return; }
+                throw new Error(ruta + ' no está en el servidor nuevo');
+            }
+            const parsed = JSON.parse(s);
+            D[ruta] = parsed && 'datos' in parsed ? JSON.parse(parsed.datos || 'null') : parsed;
+        });
         return D;
     }
     // Hojas (y documentos) del servidor nuevo, esperando como mucho 3 s a que tengan el último cambio que este panel conoce
@@ -11039,7 +11047,7 @@
     const vxDos = (a, b) => { a = String(a); b = String(b); const sp = VX_ANCHO - a.length - b.length; return sp >= 1 ? a + ' '.repeat(sp) + b : a + '\n' + ' '.repeat(Math.max(0, VX_ANCHO - b.length)) + b; };
     const VX_RAYA = '-'.repeat(VX_ANCHO);
     function vxEncabezado() {
-        const t = String((vx.cfg || {}).encabezado || '').trim() || 'DISTRIBUIDORA PLAZA VALENCIA\n' + (vx.equipo ? vx.equipo.local.toUpperCase() : '');
+        const t = String((vx.cfg || {}).encabezado || '').trim() || ((CF_SOLO ? (TITULOS.menu || CF_EMPRESA) : 'DISTRIBUIDORA PLAZA VALENCIA').toUpperCase() + '\n' + (vx.equipo ? vx.equipo.local.toUpperCase() : ''));
         return t.split('\n').map(x => x.trim()).filter(Boolean).reduce((a, x) => a.concat(vxCentro(x.toUpperCase())), []);
     }
     function vxTicketTexto(v, reimp) {
@@ -17571,12 +17579,19 @@
         const MARCA_FRENTE = [[-7, 17, 31, -17, .09], [29, 39, 25, 11, .11], [3, 61, 34, -5, .08]];
         const MARCA_DORSO = [[26, 4, 30, 14, .08], [-8, 33, 27, -21, .10], [22, 58, 33, 6, .09]];
         const marcaAgua = lista => '<div class="marca-agua">' + lista.map(([x, y, tam, giro, op]) =>
-            `<img src="${logo}" alt="" style="width:${tam}mm;height:${tam}mm;left:${x}mm;top:${y}mm;transform:rotate(${giro}deg);opacity:${op}">`).join('') + '</div>';        const empresa = '<div class="empresa"><img src="' + logo + '" alt=""><div><b>Distribuidora Plaza Valencia</b><span>RIF J-50076678-5</span></div></div>';
+            `<img src="${logo}" alt="" style="width:${tam}mm;height:${tam}mm;left:${x}mm;top:${y}mm;transform:rotate(${giro}deg);opacity:${op}">`).join('') + '</div>';        const empC = CF_SOLO ? (cfEmpActual || {}) : null;
+        const empNom = CF_SOLO ? (empC.nombre || TITULOS.menu || CF_EMPRESA) : 'Distribuidora Plaza Valencia';
+        const empCorto = CF_SOLO ? empNom : 'Plaza Valencia';
+        const empRif = CF_SOLO ? (empC.rif || '') : 'RIF J-50076678-5';
+        const empColor = CF_SOLO ? (empC.color || '#1d4ed8') : '#FF4000';
+        const empFrase = CF_SOLO ? (empC.frase_carnet || 'Identificación del personal') : 'Recuerda siempre sonreír';
+        const empresa = '<div class="empresa"><img src="' + logo + '" alt=""><div><b>' + esc(empNom) + '</b>' + (empRif ? '<span>' + esc(empRif) + '</span>' : '') + '</div></div>';
+        const fotoUrl = u => /^https?:\/\/.*\/media\//.test(String(u || '')) ? u : fotoDrive(u, 400);
         // ANVERSO (vertical): empresa y RIF, foto, nombre, cargo, fecha de ingreso e ID del trabajador
         const anverso = (t, k) => `<div class="carnet frente" style="grid-row:${Math.floor(k / 3) + 1};grid-column:${k % 3 + 1}">
             ${empresa}<div class="raya"></div>
             ${marcaAgua(MARCA_FRENTE)}
-            <div class="foto">${t.foto ? `<img src="${fotoDrive(t.foto, 400)}" alt="">` : '<span>Sin foto</span>'}</div>
+            <div class="foto">${t.foto ? `<img src="${fotoUrl(t.foto)}" alt="">` : '<span>Sin foto</span>'}</div>
             <div class="nombre">${esc(t.nombre)}</div>
             <div class="cargo">${esc(t.cargo) || '&nbsp;'}</div>
             <div class="datos"><div><small>Fecha de ingreso</small>${t.ingreso ? fechaBonita(t.ingreso) : '—'}</div><div><small>ID de trabajador</small><b>${esc(t.id)}</b></div></div>
@@ -17584,10 +17599,10 @@
         // REVERSO (vertical, en espejo para doble cara): logo grande, QR, código de barras y la frase. Los códigos van cifrados.
         const reverso = (t, k) => `<div class="carnet dorso" style="grid-row:${Math.floor(k / 3) + 1};grid-column:${3 - k % 3}">
             ${marcaAgua(MARCA_DORSO)}
-            <div class="dorso-logo"><img src="${logo}" alt=""><span>Plaza Valencia</span></div>
+            <div class="dorso-logo"><img src="${logo}" alt=""><span>${esc(empCorto)}</span></div>
             <div class="qr">${svgQR(t.carnet)}</div>
             <div class="barras">${svgBarras(t.carnet)}</div>
-            <div class="frase">Recuerda siempre sonreír</div>
+            <div class="frase">${esc(empFrase)}</div>
             <div class="pie"></div></div>`;
         const estilos = `*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}body{margin:0;font-family:Arial,sans-serif;color:#0f172a;background:#fff}
             /* Hoja horizontal (carta o A4, la que tenga la impresora) con márgenes holgados: 4 carnets completos (2 × 2), cada uno de 108 × 85,6 mm.
@@ -17602,11 +17617,11 @@
             .titulo-hoja{text-align:center;font-size:11px;color:#64748b;margin:6px 0}
             @media print{.ayuda,.titulo-hoja{display:none}}
             .carnet{width:54mm;height:85.6mm;border:.3mm solid #cbd5e1;border-radius:3mm;overflow:hidden;display:flex;flex-direction:column;align-items:center;background:#fff;position:relative}
-            .pie{position:absolute;left:0;right:0;bottom:0;height:3mm;background:#FF4000}
+            .pie{position:absolute;left:0;right:0;bottom:0;height:3mm;background:${empColor}}
             .empresa{display:flex;align-items:center;gap:2mm;padding:3mm 3mm 2mm;width:100%}
-            .empresa img{width:10mm;height:10mm;flex:none}
+            .empresa img{width:10mm;height:10mm;flex:none;object-fit:contain;border-radius:1.5mm}
             .empresa b{display:block;font-size:7.6pt;line-height:1.1}.empresa span{display:block;font-size:6.6pt;color:#475569;margin-top:.6mm}
-            .raya{width:100%;height:1.2mm;background:#FF4000;margin-bottom:3mm}
+            .raya{width:100%;height:1.2mm;background:${empColor};margin-bottom:3mm}
             /* Marca de agua (anverso y reverso): 3 logos en gris con relieve; posición, tamaño, giro y transparencia van en cada logo */
             .marca-agua{position:absolute;inset:0;pointer-events:none;z-index:0;overflow:hidden}
             .marca-agua img{position:absolute;filter:grayscale(1) contrast(1.1) drop-shadow(-.45mm -.45mm 0 rgba(255,255,255,1)) drop-shadow(.5mm .5mm .2mm rgba(15,23,42,.6))}
@@ -17617,15 +17632,15 @@
             .foto{width:30mm;height:37mm;border-radius:2.5mm;overflow:hidden;background:rgba(238,241,245,.25);border:.5mm solid #fff;outline:.3mm solid rgba(148,163,184,.6);display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:7pt;flex:none;box-shadow:0 .6mm 1.6mm rgba(15,23,42,.18)}
             .foto img{width:100%;height:100%;object-fit:cover}
             .nombre{font-weight:800;font-size:10.5pt;line-height:1.15;text-align:center;margin:2.5mm 2.5mm 0}
-            .cargo{font-size:8.5pt;color:#FF4000;font-weight:700;text-align:center;margin-top:.8mm}
+            .cargo{font-size:8.5pt;color:${empColor};font-weight:700;text-align:center;margin-top:.8mm}
             .datos{display:flex;gap:3mm;justify-content:center;margin-top:2mm;font-size:7.5pt;text-align:center}
             .datos small{display:block;font-size:5.6pt;color:#64748b;text-transform:uppercase;letter-spacing:.3pt}
-            .dorso{justify-content:space-between;padding:5mm 3mm 6mm;border-top:3mm solid #FF4000}
-            .dorso-logo{display:flex;flex-direction:column;align-items:center;gap:1mm}.dorso-logo img{width:22mm;height:22mm}.dorso-logo span{font-weight:800;font-size:9pt}
+            .dorso{justify-content:space-between;padding:5mm 3mm 6mm;border-top:3mm solid ${empColor}}
+            .dorso-logo{display:flex;flex-direction:column;align-items:center;gap:1mm}.dorso-logo img{width:22mm;height:22mm;object-fit:contain;border-radius:3mm}.dorso-logo span{font-weight:800;font-size:9pt;text-align:center}
             .qr{width:26mm;height:26mm}.qr svg{width:100%;height:100%}
             .barras{width:52mm;margin:0 -2mm}.barras svg{width:100%;height:13mm;display:block}
             .barras .num{display:none}   /* sin los números debajo del código de barras */
-            .frase{text-align:center;font-size:9pt;font-weight:700;font-style:italic;color:#FF4000}`;
+            .frase{text-align:center;font-size:9pt;font-weight:700;font-style:italic;color:${empColor}}`;
         // Cada carnet completo: anverso y reverso juntos (se recorta, se dobla por la línea y queda de dos caras). 4 por hoja horizontal.
         const completo = t => `<div class="individual">${anverso(t, 0).replace(/style="grid-row:[^"]*"/, '')}<div class="doblez"></div>${reverso(t, 0).replace(/style="grid-row:[^"]*"/, '')}</div>`;
         const individual = lista.length === 1, hojas = [], POR_HOJA = 4, nHojas = Math.ceil(lista.length / POR_HOJA);
@@ -25879,7 +25894,11 @@ Reglas:
             <form onsubmit="miEmpGuardar(event)" style="margin-top:.75rem">
                 <div class="adm-grid">
                     <div><label for="meNombre">Nombre comercial</label><input type="text" id="meNombre" value="${esc(e.nombre || '')}" required maxlength="80"></div>
+                    <div><label for="meRif">RIF (para carnets, opcional)</label><input type="text" id="meRif" value="${esc(e.rif || '')}" placeholder="Ej: RIF J-12345678-9" maxlength="30"></div>
+                </div>
+                <div class="adm-grid" style="margin-top:.65rem">
                     <div><label for="meTiendas">Sedes / tiendas (separadas por coma)</label><input type="text" id="meTiendas" value="${esc((e.tiendas || []).join(', '))}" required></div>
+                    <div><label for="meFrase">Frase del carnet (reverso)</label><input type="text" id="meFrase" value="${esc(e.frase_carnet || '')}" placeholder="Ej: Identificación del personal" maxlength="80"></div>
                 </div>
                 <div class="adm-grid" style="margin-top:.65rem">
                     <div><label for="meTgToken">Token del bot de Telegram (opcional)</label><input type="password" id="meTgToken" placeholder="${e.telegram && e.telegram.bot ? 'Configurado (deje vacío para mantener)' : 'Ej: 123456:ABC...'}" autocomplete="off"></div>
@@ -25890,6 +25909,7 @@ Reglas:
                     <input type="file" id="meLogoFile" accept="image/png,image/jpeg,image/webp,image/svg+xml" class="hidden" onchange="miEmpLogoElegir(this)">
                     <button type="button" class="btn-ghost btn-mini" onclick="document.getElementById('meLogoFile').click()">Subir logo</button>
                     ${lg ? '<button type="button" class="btn-ghost btn-mini" onclick="miEmpLogoB64=\'\';miEmpPintar()">Quitar logo</button>' : ''}
+                    <label style="display:inline-flex;align-items:center;gap:.35rem;font-size:.82rem;margin:0">Color carnet <input type="color" id="meColor" value="${esc(e.color || '#1d4ed8')}" style="width:32px;height:28px;padding:1px;border:1px solid var(--border);border-radius:5px;cursor:pointer"></label>
                     <button type="submit" class="btn-primary btn-mini" id="meBtnGuardar" style="margin-left:auto">Guardar cambios</button>
                 </div>
                 <div id="meMsj" class="adm-hint" style="margin-top:.5rem"></div>
@@ -25919,9 +25939,12 @@ Reglas:
         ev.preventDefault();
         const btn = document.getElementById('meBtnGuardar'), msj = document.getElementById('meMsj');
         const nombre = document.getElementById('meNombre').value.trim();
+        const rif = document.getElementById('meRif').value.trim();
+        const frase_carnet = document.getElementById('meFrase').value.trim();
+        const color = document.getElementById('meColor').value.trim();
         const tiendas = document.getElementById('meTiendas').value.split(',').map(x => x.trim()).filter(Boolean);
         const tk = document.getElementById('meTgToken').value.trim(), gr = document.getElementById('meTgGrupo').value.trim();
-        const empresa = { nombre, tiendas };
+        const empresa = { nombre, rif, frase_carnet, color, tiendas };
         if (miEmpLogoB64 !== null) empresa.logo = miEmpLogoB64;
         if (tk || gr) { empresa.telegram = {}; if (tk) empresa.telegram.token = tk; if (gr) empresa.telegram.grupos = { general: gr }; }
         btn.disabled = true; msj.textContent = 'Guardando...';
