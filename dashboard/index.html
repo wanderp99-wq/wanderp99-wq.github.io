@@ -20055,19 +20055,20 @@
 
 PROVEEDOR: <nombre del proveedor> | RIF: <rif>
 FACTURA: <número de factura o control> | FECHA: <AAAA-MM-DD> | MONEDA: <USD o BS> | TASA: <tasa de cambio si aparece, si no 0>
-TOTAL: <total de la factura, en la misma moneda de los costos>
+TOTAL: <total general a pagar, en la misma moneda de los costos> | SUBTOTAL: <subtotal sin IVA si aparece, si no 0> | EXENTO: <monto exento si aparece, si no 0> | BASE: <base imponible gravada si aparece, si no 0> | IVA_TOTAL: <monto total de IVA si aparece, si no 0>
 CODIGO | BARRAS | DESCRIPCION | CANTIDAD | UNIDAD | UNIDADES_POR_EMPAQUE | COSTO_UNITARIO | IVA | TOTAL
 <un renglón por producto, en el mismo orden de la factura>
 
 Reglas:
 - Una línea por producto, con los campos separados por " | ".
 - Números con punto decimal y sin separador de miles (ejemplo: 1234.50).
-- COSTO_UNITARIO = precio unitario SIN IVA, tal como aparece en la factura.
-- IVA = 16 si el producto es gravado (G) y 0 si es exento (E).
+- Si la factura tiene precios en USD y en Bs, usa los de USD y pon MONEDA: USD y TOTAL en USD.
+- COSTO_UNITARIO = precio unitario SIN IVA tal como aparece en el renglón. Si el renglón ya incluye IVA y la factura NO desglosa IVA aparte al pie, pon IVA = 0.
+- IVA = 16 si el producto es gravado ((G), G16%, T16%) O si la factura cobra IVA al pie (IVA_TOTAL > 0) y EXENTO = 0 (todo gravado). Pon 0 si es exento ((E)) o si la factura no cobra IVA (IVA_TOTAL = 0).
+- En facturas mixtas (algunos (E) y otros (G)), respeta la marca de cada renglón: (E) = 0, (G) o T16% = 16.
 - UNIDAD: UND, KG, CAJA, BULTO, PAQUETE o FARDO, como diga la factura. Si la descripción dice cuántas unidades trae, es BULTO.
 - UNIDADES_POR_EMPAQUE: cuántas unidades trae cada bulto, caja o paquete, según la factura o la descripción. Ejemplos: "SARDINA 170GR X 24" = 24, "DETERGENTE 1KG X 12" = 12, "AZUCAR 30X1K" = 30, "JUGO 12X1.5L" = 12, "GALLETA 6X28G" = 6, "CHUPETA 48 X1" = 48. Si no lo dice, 0.
-- Si el renglón solo muestra el total (sin precio unitario), COSTO_UNITARIO = total ÷ cantidad. La cantidad a veces va al final de la descripción ("... 30X1K 1 (E)" = cantidad 1).
-- (E) = exento (IVA 0); T16,00% o (G) = gravado (IVA 16).
+- Si el renglón solo muestra el total (sin precio unitario), COSTO_UNITARIO = total ÷ cantidad. La cantidad a veces va en la línea de arriba ("2x Bs 8.057,35" o "[ 2 ] x 10.862,07") o al final de la descripción ("... 30X1K 1 (E)" = cantidad 1).
 - CODIGO: el código del producto del proveedor. BARRAS: el código de barras si aparece; si no, déjalo vacío.
 - No inventes datos: si algo no se ve, déjalo vacío.`;
     // Lee el texto que devolvió la IA: el formato de arriba, una tabla con | o el JSON de Gemini
@@ -20089,7 +20090,7 @@ Reglas:
             if (!Array.isArray(j.lineas)) throw new Error('El JSON no trae "lineas"');
             return j;
         }
-        const f = { proveedor: { nombre: '', rif: '' }, factura: '', fecha: '', moneda: 'USD', tasa: 0, total: 0, lineas: [] };
+        const f = { proveedor: { nombre: '', rif: '' }, factura: '', fecha: '', moneda: 'USD', tasa: 0, subtotal: 0, exento: 0, base: 0, iva: 0, total: 0, lineas: [] };
         const clave = k => cmpN(k).replace(/[^A-Z_]/g, '');
         let cab = null;
         const ORDEN = ['CODIGO', 'BARRAS', 'DESCRIPCION', 'CANTIDAD', 'UNIDAD', 'UNIDADES_POR_EMPAQUE', 'COSTO_UNITARIO', 'IVA', 'TOTAL'];
@@ -20109,7 +20110,9 @@ Reglas:
                 celdas.forEach(c => {
                     const i = c.indexOf(':'), k = clave(c.slice(0, i)), v = c.slice(i + 1).trim();
                     if (k === 'PROVEEDOR') f.proveedor.nombre = v; else if (k === 'RIF') f.proveedor.rif = v; else if (k === 'FACTURA' || k === 'NFACTURA') f.factura = v;
-                    else if (k === 'FECHA') f.fecha = fecha(v); else if (k === 'MONEDA') f.moneda = /BS|BOL/i.test(v) ? 'BS' : 'USD'; else if (k === 'TASA') f.tasa = num(v); else if (k === 'TOTAL') f.total = num(v);
+                    else if (k === 'FECHA') f.fecha = fecha(v); else if (k === 'MONEDA') f.moneda = /BS|BOL/i.test(v) ? 'BS' : 'USD'; else if (k === 'TASA') f.tasa = num(v);
+                    else if (k === 'TOTAL') f.total = num(v); else if (k === 'SUBTOTAL') f.subtotal = num(v); else if (k === 'EXENTO') f.exento = num(v);
+                    else if (k === 'BASE' || k === 'BASE_IMPONIBLE') f.base = num(v); else if (k === 'IVA_TOTAL' || k === 'IVA') f.iva = num(v);
                 });
                 return;
             }
@@ -20700,18 +20703,38 @@ Reglas:
         cmpAvanceProgramar();
     }
     function cmpIvaTodos(iva) { cmp.lineas.forEach(l => cmpIvaPoner(l, iva)); cmpPintarCompra(document.getElementById('almContenido'), true); cmpAvanceProgramar(); }
-    // Al leer la factura: si ningún renglón trae IVA pero el total de la factura sí lo incluye, se le suma
-    // (a los marcados (G) o 16 % en la descripción; si no hay marcas, a todos). Devuelve el aviso, o '' si no tocó nada.
+    // Al leer la factura: corrige el IVA usando el total impreso, IVA_TOTAL/EXENTO/BASE y las marcas (G)/(E)
+    // (cubre facturas mixtas donde algunos (G) quedaron sin IVA, 100% gravadas sin marca, y evita doble IVA).
     function cmpIvaDetectar(lineas, r) {
-        const tot = Number(r && r.total) || 0;
-        if (!(tot > 0) || !lineas.length || lineas.some(l => l.iva > 0) || lineas.some(l => !l.leido)) return '';
-        const valor = ls => ls.reduce((s, l) => s + l.leido.cantidad * l.leido.costo, 0), cerca = (a, b) => Math.abs(a - b) <= Math.max(0.05, b * 0.015);
-        const sin = valor(lineas); if (cerca(sin, tot)) return '';
-        const marcados = lineas.filter(l => /\(G\)|\bG\s*$|16[,.]?0*\s*%/i.test(l.descripcionFactura || ''));
-        const cuales = marcados.length && cerca(sin + valor(marcados) * 0.16, tot) ? marcados : cerca(sin * 1.16, tot) ? lineas : null;
-        if (!cuales) return '';
-        cuales.forEach(l => { cmpIvaPoner(l, 16); cmpAplicarSugerencia(l); });
-        return `La factura trae IVA pero los renglones venían sin él: se sumó el 16 % al costo de ${cuales.length === lineas.length ? 'todos los productos' : cuales.length + ' producto(s) marcados (G)'}. Revíselo (en cada renglón: "quitar").`;
+        const tot = Number(r && r.total) || 0, ivaTot = Number(r && r.iva) || 0, exento = Number(r && r.exento) || 0;
+        if (!(tot > 0) || !lineas.length || lineas.some(l => !l.leido)) return '';
+        const valor = ls => ls.reduce((s, l) => s + l.leido.cantidad * l.leido.costo, 0);
+        const tol = ivaTot > 0 ? Math.min(Math.max(0.05, tot * 0.015), Math.max(0.05, ivaTot * 0.4)) : Math.max(0.05, tot * 0.015);
+        const cerca = (a, b, t) => Math.abs(a - b) <= (t != null ? t : tol);
+        const actual = valor(lineas);
+        if (cerca(actual, tot)) return '';
+        const esG = l => /\(\s*G\s*\)|\bG\s*$|16[,.]?0*\s*%/i.test(l.descripcionFactura || '');
+        const esE = l => /\(\s*E\s*\)\s*$/i.test(l.descripcionFactura || '');
+        // 1) Faltó IVA en renglones marcados (G) (incluso en facturas mixtas donde otros ya tenían IVA)
+        const faltanG = lineas.filter(l => !l.iva && esG(l));
+        if (faltanG.length && cerca(actual + valor(faltanG) * 0.16, tot)) {
+            faltanG.forEach(l => { cmpIvaPoner(l, 16); cmpAplicarSugerencia(l); });
+            return `Se sumó el 16 % de IVA a ${faltanG.length} producto(s) marcados (G) para cuadrar con el total de la factura. Revíselo.`;
+        }
+        // 2) Factura 100% gravada sin marcas (G): ningún renglón trajo IVA pero actual * 1.16 == total
+        if (!lineas.some(l => l.iva > 0) && exento === 0 && !lineas.some(esE) && cerca(actual * 1.16, tot)) {
+            lineas.forEach(l => { cmpIvaPoner(l, 16); cmpAplicarSugerencia(l); });
+            return `La factura trae IVA pero los renglones venían sin él: se sumó el 16 % al costo de todos los productos. Revíselo (en cada renglón: "quitar").`;
+        }
+        // 3) Doble IVA o IVA de más: si al quitar el IVA a todos cuadra exactamente con el total
+        if (lineas.some(l => l.iva > 0)) {
+            const sinNada = lineas.reduce((s, l) => s + l.leido.cantidad * l.leido.costo / (1 + (Number(l.iva) || 0) / 100), 0);
+            if (cerca(sinNada, tot, Math.max(0.05, tot * 0.01))) {
+                lineas.forEach(l => { if (l.iva) { cmpIvaPoner(l, 0); cmpAplicarSugerencia(l); } });
+                return `Los costos de la factura ya incluían el IVA (o era exenta): se quitó el 16 % extra para cuadrar con el total. Revíselo.`;
+            }
+        }
+        return '';
     }
     // Aviso informativo: precio de venta igual o muy cerca del costo (gana menos de 5 %)
     function cmpAvisoCosto(l, conMayor) {
