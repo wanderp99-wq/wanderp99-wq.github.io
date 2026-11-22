@@ -3983,11 +3983,7 @@
             if (payload.action === 'login' && data.usuario) {
                 Object.assign(cfSes, { token: data.token || '', vence: data.vence || (Date.now() + 3600000), clave, modulos: (data.empresa || {}).modulos || {}, modHora: Date.now(), mala: '' });
                 const u = data.usuario, todos = MODULOS.map(m => m.id).concat(['verexistencia', 'rep_existencia', 'rep_ajustes', 'rep_ventas']);
-                if (data.empresa && data.empresa.nombre) {
-                    TITULOS.login = TITULOS.menu = data.empresa.nombre;
-                    document.title = data.empresa.nombre;
-                    const tEl = document.getElementById('tituloVista'); if (tEl) tEl.textContent = data.empresa.nombre;
-                }
+                if (data.empresa && typeof aplicarEmpresaCF === 'function') aplicarEmpresaCF(data.empresa);
                 return Object.assign({}, data, {
                     nombre: u.nombre || 'Administrador',
                     principal: !!u.principal,
@@ -8034,14 +8030,15 @@
     // y el tablero con gráficos del inicio. Solo cambia cómo se llega a los módulos: cada uno sigue abriendo con abrirModulo / irA.
     // ==========================================
     const NAV_ORDEN = ['admin', 'almacen', 'logo', 'bigsoft', 'rrhh'];
-    const NAV_NOMBRE = { admin: 'Administración', almacen: 'Almacén', bigsoft: 'BigSoft', rrhh: 'Talento humano', logo: 'Lo que más usa' };
+    const NAV_NOMBRE = { admin: 'Administración', almacen: 'Almacén', bigsoft: CF_SOLO ? 'Sistema de caja' : 'BigSoft', rrhh: 'Talento humano', logo: 'Lo que más usa' };
     const NAV_GRUPOS = {
         admin: [['Cajas y ventas', ['cuadre', 'pagos', 'ventas']], ['Dinero', ['efectivo', 'cajachica', 'gastos']], ['Cuentas', ['cxc', 'cxp']], ['Tiendas', ['ventaexpress']]],
         almacen: [['Mercancía', ['movalmacen', 'inventario', 'facturar']], ['Pedidos de las tiendas', ['reqcharcu']]],
         bigsoft: [['Cajas', ['cierrecaja', 'listasficha']], ['Tiendas', ['precios', 'notasbs', 'reportes']]],
         rrhh: [['Personal', ['talento', 'horarios']], ['Asistencia', ['asistencia', 'asisgestion']], ['Pagos', ['nomina', 'pagonomina']]]
     };
-    const LOGO_SVG = '<svg viewBox="400 380 1130 1175" aria-hidden="true"><path fill="#FF4000" d="M423 398 H950 C1230 398 1400 560 1450 788 L1115 952 C1110 790 1075 655 870 655 H773 V1193 L423 1365 Z"/><path fill="#44AC00" d="M423 1365 L1508 834 V865 L658 1533 H423 Z"/><path fill="#F7931E" d="M820 1533 L1465 1026 C1460 1140 1448 1225 1420 1295 C1360 1440 1250 1490 1160 1505 C1090 1522 1020 1533 950 1533 Z"/></svg>';
+    const LOGO_JD_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#0f172a"/><rect x="3" y="3" width="58" height="58" rx="11" fill="none" stroke="#38bdf8" stroke-width="2.5"/><text x="32" y="42" text-anchor="middle" font-family="system-ui,-apple-system,Segoe UI,sans-serif" font-weight="800" font-size="28" letter-spacing="-1" fill="#f8fafc">JD</text></svg>';
+    const LOGO_SVG = CF_SOLO ? LOGO_JD_SVG : '<svg viewBox="400 380 1130 1175" aria-hidden="true"><path fill="#FF4000" d="M423 398 H950 C1230 398 1400 560 1450 788 L1115 952 C1110 790 1075 655 870 655 H773 V1193 L423 1365 Z"/><path fill="#44AC00" d="M423 1365 L1508 834 V865 L658 1533 H423 Z"/><path fill="#F7931E" d="M820 1533 L1465 1026 C1460 1140 1448 1225 1420 1295 C1360 1440 1250 1490 1160 1505 C1090 1522 1020 1533 950 1533 Z"/></svg>';
     const navSvg = d => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
     const NAV_ICO = {
         inicio: navSvg('M3 11l9-7 9 7M5 10v10h14V10M10 20v-6h4v6'), x: navSvg('M6 6l12 12M18 6 6 18'), flecha: navSvg('m6 9 6 6 6-6'),
@@ -8177,7 +8174,7 @@
         if (!navAbiertas) { navAbiertas = {}; areas.forEach(id => { navAbiertas[id] = true; }); }
         const sub = id => navGruposDe(id).reduce((l, g) => l.concat(g[1]), []).map(m =>
             `<button type="button" class="mt-item${actual === m.id ? ' activo' : ''}" onclick="navIr('${m.id}')"><span class="mt-t">${esc(m.titulo)}</span>${navN(por[m.id])}</button>`).join('');
-        pintarConservando(el, `<div class="mt-cab">${LOGO_SVG}<b>Plaza Software</b>${compu ? '' : `<button type="button" class="btn-ghost btn-icono" onclick="navTodo()" aria-label="Cerrar el menú">${NAV_ICO.x}</button>`}</div>
+        pintarConservando(el, `<div class="mt-cab">${LOGO_SVG}<b>${esc(CF_SOLO ? (TITULOS.menu || 'JD Solution') : 'Plaza Software')}</b>${compu ? '' : `<button type="button" class="btn-ghost btn-icono" onclick="navTodo()" aria-label="Cerrar el menú">${NAV_ICO.x}</button>`}</div>
             <nav class="mt-cuerpo" aria-label="Todos los módulos">
                 <button type="button" class="mt-item${actual === 'menu' ? ' activo' : ''}" onclick="navInicio()">${NAV_ICO.inicio}<span class="mt-t">Inicio</span></button>
                 ${areas.map(id => {
@@ -22367,7 +22364,7 @@ Reglas:
         const cajas = cie.buscando ? bsrEsperaHTML('Preguntando a la PC de ' + cie.local + ' por sus cajas abiertas...')
             : !cie.cajas ? '<div class="nota">Pulse "Ver cajas abiertas": la PC de la tienda responde en unos segundos (debe estar encendida y con el avisador abierto).</div>'
             : !cie.cajas.length ? '<div class="empty">No hay cajas abiertas en ' + esc(cie.local) + '.</div>'
-            : `<div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Usuario de BigSoft</th><th class="izq">Trabajador</th><th class="izq">Abierta</th><th>Facturas</th><th class="izq">Estado</th><th></th></tr></thead><tbody>
+            : `<div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">${CF_SOLO ? 'Usuario de caja' : 'Usuario de BigSoft'}</th><th class="izq">Trabajador</th><th class="izq">Abierta</th><th>Facturas</th><th class="izq">Estado</th><th></th></tr></thead><tbody>
                 ${cie.cajas.map(c => {
                     const no = c.conectado ? (c.motivo || 'Dentro de la caja') :c.enEspera ? c.enEspera + ' en espera' : !c.facturas ? 'Sin ventas' : '';
                     const sel = cieTrabajadorDe(cie.local, c.login);
@@ -22378,10 +22375,10 @@ Reglas:
                         <td class="izq">${no ? `<span class="chip ${c.conectado || c.enEspera ? 'st-sobra' : 'st-pend'}">${esc(no)}</span>` : '<span class="chip st-ok">Se puede cerrar</span>'}</td>
                         <td>${no ? '' : `<button type="button" class="btn-primary btn-mini" data-login="${esc(c.login)}" ${cie.cerrando ? 'disabled' : ''} onclick="cieCerrar(this.dataset.login)">${cie.cerrando === c.login ? 'Cerrando...' : 'Cerrar caja'}</button>`}</td></tr>`;
                 }).join('')}</tbody></table></div>
-                ${cie.cajas.some(c => c.conectado) ? '<div class="nota">La caja está en uso: el cajero tiene abierto el programa de caja o vendió hace menos de 30 minutos. Para cerrarla debe salir primero de la caja en BigSoft (BigSoft tampoco la cierra así).</div>' : ''}`;
-        const res = a ? `<div class="banner ok" style="display:block">Caja de <b>${esc(a.nombre || a.login)}</b> cerrada en BigSoft (cierre N° ${esc(String(a.nroCierre || ''))}, ${fmtNum(a.facturas || 0)} facturas). Total ${fmt(a.total || 0)} Bs ·
+                ${cie.cajas.some(c => c.conectado) ? `<div class="nota">La caja está en uso: el cajero tiene abierto el programa de caja o vendió hace menos de 30 minutos. Para cerrarla debe salir primero de la caja${CF_SOLO ? '' : ' en BigSoft (BigSoft tampoco la cierra así)'}.</div>` : ''}`;
+        const res = a ? `<div class="banner ok" style="display:block">Caja de <b>${esc(a.nombre || a.login)}</b> cerrada${CF_SOLO ? '' : ' en BigSoft'} (cierre N° ${esc(String(a.nroCierre || ''))}, ${fmtNum(a.facturas || 0)} facturas). Total ${fmt(a.total || 0)} Bs ·
                 efectivo ${fmt(a.efectivo || 0)} · punto ${fmt(a.tarjeta || 0)} · pago móvil ${fmt(a.pagoMovil || 0)} · biopago ${fmt(a.biopago || 0)} · divisas ${fmt(a.divisas || 0)} $.
-                ${a.registro && a.registro.error ? `<br><b>No se pudo registrar en Plaza Valencia:</b> ${esc(a.registro.error)}` : a.registro && a.registro.ficha && a.registro.ficha.ficha ? `<br>Ficha ${esc(String(a.registro.ficha.ficha))}: ${esc(a.registro.ficha.estado || '')}${a.registro.ficha.diferencias ? ' (' + esc(a.registro.ficha.diferencias) + ')' : ''}.` : '<br>Su ficha todavía no ha llegado: los montos se pasan solos cuando llegue.'}</div>` : '';
+                ${a.registro && a.registro.error ? `<br><b>No se pudo registrar:</b> ${esc(a.registro.error)}` : a.registro && a.registro.ficha && a.registro.ficha.ficha ? `<br>Ficha ${esc(String(a.registro.ficha.ficha))}: ${esc(a.registro.ficha.estado || '')}${a.registro.ficha.diferencias ? ' (' + esc(a.registro.ficha.diferencias) + ')' : ''}.` : '<br>Su ficha todavía no ha llegado: los montos se pasan solos cuando llegue.'}</div>` : '';
         const lista = cie.cierres.length ? `<div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">Fecha</th><th class="izq">Tienda</th><th class="izq">Cajero</th><th>N°</th><th>Total Bs</th><th class="izq">Ficha</th><th class="izq">Estado</th></tr></thead><tbody>
                 ${cie.cierres.map(x => `<tr><td class="izq">${esc(fecha(x.fecha))}<small>${esc(String(x.hora || '').slice(0, 5))}</small></td><td class="izq">${esc(x.local)}</td>
                     <td class="izq">${esc(x.trabajador || x.nombreBs || x.login)}<small>${esc(x.login)}</small></td><td>${esc(x.nro)}</td><td>${fmt(x.total)}</td><td class="izq">${esc(x.ficha) || '—'}</td>
@@ -22392,7 +22389,7 @@ Reglas:
             ${cie.error ? `<div class="banner error" style="display:block">${esc(cie.error)}</div>` : ''}${res}
             ${cie.cerrando ? bsrEsperaHTML('Cerrando la caja de ' + cie.cerrando + ' en ' + cie.local + '...') : cajas}
             <h4 class="per-sub">Cierres de los últimos días</h4>${lista}
-            <div class="nota">Cada cajero cierra con su propio usuario de BigSoft. Elija una vez qué trabajador es cada usuario: así el cierre se junta con su ficha (misma tienda, fecha y turno), llena los montos del sistema y avisa por Telegram si hay diferencias. Si la ficha ya tenía montos del sistema, no se cambian.</div>`;
+            <div class="nota">Cada cajero cierra con su propio usuario ${CF_SOLO ? 'del sistema de caja del local' : 'de BigSoft'}. Elija una vez qué trabajador es cada usuario: así el cierre se junta con su ficha (misma tienda, fecha y turno), llena los montos del sistema y avisa por Telegram si hay diferencias. Si la ficha ya tenía montos del sistema, no se cambian.</div>`;
     }
     function ciePintar() { const el = document.getElementById('cieContenido'); if (el && vistaActual === 'cierrecaja') pintarConservando(el, cieVista()); }
     function bsrListas(o) {
@@ -22430,13 +22427,13 @@ Reglas:
             if (t.estado === 'error') throw new Error(t.error || 'La PC de la tienda no pudo hacerlo');
             const seg = Math.round((Date.now() - t0) / 1000);
             if (alEsperar) alEsperar(t.estado, v.vivo, seg, p.local, t.avance || null);
-            if (seg > limite) throw new Error(`La PC de ${p.local} no respondió en ${Math.round(limite / 60)} minutos. Debe estar encendida, con internet y con el avisador de Plaza Valencia abierto (el icono junto al reloj de Windows).`);
+            if (seg > limite) throw new Error(`La PC de ${p.local} no respondió en ${Math.round(limite / 60)} minutos. Debe estar encendida, con internet y con el avisador ${CF_SOLO ? 'del conector de caja' : 'de Plaza Valencia'} abierto (el icono junto al reloj de Windows).`);
         }
     }
     function bsrEsperaHTML(texto) {
         const b = bsr || {}, v = b.vivo || {}, dormida = v.hace == null || v.hace > 60;
         return `${cargandoHTML(texto)}<div class="nota" style="text-align:center">${b.estadoTarea === 'curso' ? 'La PC de ' + esc(b.local || 'la tienda') + ' ya lo está haciendo...'
-            : dormida ? `<b style="color:var(--warn)">La PC de ${esc(b.local || 'la tienda')} no ha respondido ${v.hace == null ? 'hoy' : 'en ' + Math.round(v.hace / 60) + ' min'}.</b> Debe estar encendida, con internet y con el avisador abierto (icono de Plaza Valencia junto al reloj). Se sigue esperando.`
+            : dormida ? `<b style="color:var(--warn)">La PC de ${esc(b.local || 'la tienda')} no ha respondido ${v.hace == null ? 'hoy' : 'en ' + Math.round(v.hace / 60) + ' min'}.</b> Debe estar encendida, con internet y con el avisador abierto (${CF_SOLO ? 'icono del conector junto al reloj' : 'icono de Plaza Valencia junto al reloj'}). Se sigue esperando.`
             : 'Esperando a la PC de ' + esc(b.local || 'la tienda') + ' (responde cada 15 segundos)...'}${b.seg ? ` · ${b.seg} s` : ''}</div>`;
     }
     async function bsrAbrir(numero) {
@@ -25780,17 +25777,56 @@ Reglas:
         finally { btn.disabled = false; efeCajaTipo(efeCajaTipoActual, !guardado); }
     }
 
+    function aplicarEmpresaCF(emp, tiendasLista) {
+        if (!CF_SOLO) return;
+        const nom = typeof emp === 'string' ? emp : (emp && emp.nombre);
+        const ts = Array.isArray(tiendasLista) ? tiendasLista : (emp && Array.isArray(emp.tiendas) ? emp.tiendas : null);
+        if (nom) {
+            TITULOS.login = TITULOS.menu = nom;
+            document.title = nom;
+            const tEl = document.getElementById('tituloVista');
+            if (tEl && (vistaActual === 'login' || vistaActual === 'menu')) tEl.textContent = nom;
+        }
+        if (ts && ts.length) {
+            const usados = new Set();
+            const lista = ts.map((nombre, i) => {
+                const limpio = String(nombre || '').trim();
+                const pal = limpio.replace(/[^A-Za-z0-9 ]/g, '').trim().split(/\s+/).filter(Boolean);
+                let cod = (pal.length >= 2 ? (pal[0][0] + pal[1][0]) : limpio.slice(0, 2)).toUpperCase() || ('T' + (i + 1));
+                while (usados.has(cod)) cod = cod.slice(0, 1) + (i + 1);
+                usados.add(cod);
+                return { cod, nombre: limpio };
+            }).filter(x => x.nombre);
+            if (lista.length) {
+                TIENDAS_ORDEN.length = 0; lista.forEach(x => TIENDAS_ORDEN.push(x));
+                ventasTiendas = TIENDAS_ORDEN.map(t => t.cod);
+                REQ_LOCALES.length = 0; lista.forEach(x => REQ_LOCALES.push(x.nombre));
+                CMP_TIENDAS.length = 0; lista.forEach(x => CMP_TIENDAS.push(x.nombre));
+                Object.keys(CMP_SIGLA).forEach(k => delete CMP_SIGLA[k]);
+                lista.forEach(x => { CMP_SIGLA[x.nombre] = x.cod; });
+                const sel = document.getElementById('fTienda');
+                if (sel) sel.innerHTML = '<option value="">Todas</option>' + lista.map(x => `<option value="${esc(x.nombre)}">${esc(x.nombre)}</option>`).join('');
+                if (typeof cie === 'object' && cie && !lista.some(x => x.nombre === cie.local)) cie.local = lista[0].nombre;
+            }
+        }
+        if (typeof navPintarTodo === 'function') navPintarTodo();
+        if (typeof ciePintar === 'function' && vistaActual === 'cierrecaja') ciePintar();
+    }
+
     // Retomar la sesión si la pestaña se recarga (se borra al cerrar la pestaña o pulsar "Salir")
     (function () {
         if (CF_SOLO) {
-            TITULOS.login = TITULOS.menu = CF_EMPRESA;
+            // Identidad JD Solution para empresas cliente (nunca logo ni marcas de Plaza Valencia)
+            const logoCab = document.querySelector('.header-title .logo-ccpv');
+            if (logoCab) logoCab.outerHTML = LOGO_JD_SVG.replace('<svg ', '<svg class="logo-ccpv" ');
+            const fav = document.querySelector('link[rel="icon"]');
+            if (fav) fav.href = 'data:image/svg+xml,' + encodeURIComponent(LOGO_JD_SVG);
+            const areaBs = AREAS.find(a => a.id === 'bigsoft');
+            if (areaBs) { areaBs.titulo = 'Sistema de caja'; areaBs.desc = 'Integración con el sistema POS de cada tienda: cierres de caja, precios, reportes, notas por ingresar y listas de la ficha.'; }
+            MODULOS.forEach(m => { if (m.desc) m.desc = m.desc.replace(/\bBigSoft\b/gi, 'el sistema de caja (POS)'); });
+            aplicarEmpresaCF(CF_EMPRESA);
             cfPedir({ action: 'pub_listas' }).then(r => {
-                const nom = r && r.ok && r.empresa && r.empresa.nombre;
-                if (!nom) return;
-                TITULOS.login = TITULOS.menu = nom;
-                document.title = nom;
-                const tEl = document.getElementById('tituloVista');
-                if (tEl && (vistaActual === 'login' || vistaActual === 'menu')) tEl.textContent = nom;
+                if (r && r.ok) aplicarEmpresaCF(r.empresa, r.tiendas);
             }).catch(() => {});
         }
         try {

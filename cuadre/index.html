@@ -1273,6 +1273,13 @@
     }
     async function traerListasFicha() {
         // (21/11) Solo servidor Cloudflare (Firebase retirado); sin internet siguen las últimas guardadas en el equipo
+        if (CF_EMPRESA !== 'plaza-valencia') {
+            const jdSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#0f172a"/><rect x="3" y="3" width="58" height="58" rx="11" fill="none" stroke="#38bdf8" stroke-width="2.5"/><text x="32" y="42" text-anchor="middle" font-family="system-ui,-apple-system,Segoe UI,sans-serif" font-weight="800" font-size="28" letter-spacing="-1" fill="#f8fafc">JD</text></svg>';
+            const lEl = document.querySelector('.titulo-logo .logo-ccpv');
+            if (lEl) lEl.outerHTML = jdSvg.replace('<svg ', '<svg class="logo-ccpv" ');
+            const fav = document.querySelector('link[rel="icon"]');
+            if (fav) fav.href = 'data:image/svg+xml,' + encodeURIComponent(jdSvg);
+        }
         try {
             const cf = await cfPublico('pub_listas', {}, 8000);
             if (cf && cf.empresa) {
