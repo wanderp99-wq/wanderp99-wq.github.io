@@ -3,95 +3,328 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Plaza Software · Administración de clientes</title>
+<title>JD Solution · Consola de clientes</title>
 <style>
-  :root { --bg:#0f172a; --card:#1e293b; --line:#334155; --txt:#f1f5f9; --muted:#94a3b8; --pri:#44AC00; --ok:#22c55e; --warn:#f59e0b; --err:#ef4444; }
-  * { box-sizing:border-box; }
-  body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--txt); padding:1.2rem; }
-  .wrap { max-width:960px; margin:0 auto; }
-  h1 { font-size:1.35rem; margin:0 0 .25rem; }
-  .sub { color:var(--muted); font-size:.9rem; margin:0 0 1.2rem; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:1.1rem; margin-bottom:1rem; }
-  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:.75rem; }
-  label { display:block; font-size:.82rem; color:var(--muted); margin-bottom:.25rem; }
-  input { width:100%; padding:.6rem .75rem; border-radius:8px; border:1px solid var(--line); background:#0b1220; color:var(--txt); font-size:.95rem; }
-  button { padding:.55rem .9rem; border-radius:8px; border:1px solid var(--line); background:#0b1220; color:var(--txt); font-weight:600; cursor:pointer; font-size:.86rem; }
-  button.pri { background:var(--pri); border-color:var(--pri); color:#fff; }
-  button.err { border-color:var(--err); color:#fca5a5; }
-  button:disabled { opacity:.55; cursor:wait; }
-  .row { display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; }
-  .msj { font-size:.88rem; margin-top:.6rem; min-height:1.2em; }
-  .msj.ok { color:var(--ok); } .msj.err { color:#fca5a5; }
-  table { width:100%; border-collapse:collapse; margin-top:.6rem; font-size:.9rem; }
-  th, td { padding:.65rem .5rem; border-bottom:1px solid var(--line); text-align:left; vertical-align:middle; }
-  th { color:var(--muted); font-size:.78rem; text-transform:uppercase; letter-spacing:.04em; }
-  .chip { display:inline-block; padding:.18rem .55rem; border-radius:999px; font-size:.76rem; font-weight:600; }
-  .chip.on { background:rgba(34,197,94,.16); color:#86efac; }
-  .chip.off { background:rgba(239,68,68,.18); color:#fca5a5; }
-  .hidden { display:none !important; }
-  @media (max-width:640px) { table, thead, tbody, tr, td { display:block; } thead { display:none; } tr { border:1px solid var(--line); border-radius:10px; padding:.5rem; margin-bottom:.6rem; } td { border:none; padding:.3rem 0; } }
+  :root {
+    --desk: #070a0f;
+    --win: #0c0c0c;
+    --bar: #1a1d24;
+    --tab: #0c0c0c;
+    --panel: #11141a;
+    --line: #2a313d;
+    --line-hi: #3f4b5e;
+    --txt: #e6edf3;
+    --muted: #8b949e;
+    --ps: #4ec9b0;
+    --cmd: #dcdcaa;
+    --ok: #3fb950;
+    --err: #f85149;
+    --accent: #38bdf8;
+    --mono: "Cascadia Mono", "Cascadia Code", Consolas, "Courier New", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: var(--mono);
+    background: radial-gradient(circle at top, #101827 0%, var(--desk) 65%);
+    color: var(--txt);
+    padding: 1.25rem;
+    font-size: 13.5px;
+    line-height: 1.45;
+  }
+  .term {
+    max-width: 1020px;
+    margin: 0 auto;
+    background: var(--win);
+    border: 1px solid var(--line-hi);
+    border-radius: 8px;
+    box-shadow: 0 22px 60px rgba(0, 0, 0, .72), 0 0 0 1px rgba(255,255,255,.03) inset;
+    overflow: hidden;
+  }
+  .titlebar {
+    display: flex;
+    align-items: stretch;
+    justify-content: space-between;
+    background: var(--bar);
+    border-bottom: 1px solid var(--line);
+    user-select: none;
+    min-height: 38px;
+  }
+  .tabs { display: flex; align-items: flex-end; gap: 2px; padding: 6px 0 0 8px; min-width: 0; }
+  .tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--tab);
+    color: var(--txt);
+    padding: 6px 14px;
+    border-radius: 6px 6px 0 0;
+    border: 1px solid var(--line);
+    border-bottom: 1px solid var(--win);
+    margin-bottom: -1px;
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .tab svg { width: 14px; height: 14px; flex: 0 0 auto; color: var(--accent); }
+  .win-ctrls { display: flex; align-items: stretch; }
+  .win-btn {
+    width: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    font-size: 12px;
+    border-left: 1px solid rgba(255,255,255,.04);
+  }
+  .win-btn.close:hover { background: #c42b1c; color: #fff; }
+  .screen { padding: 1.15rem 1.25rem 1.35rem; }
+  .banner {
+    color: var(--muted);
+    font-size: 12.5px;
+    margin: 0 0 1rem;
+    padding-bottom: .75rem;
+    border-bottom: 1px dashed var(--line);
+  }
+  .banner b { color: var(--txt); font-weight: 700; }
+  .banner .ver { color: var(--accent); }
+  .prompt {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin: 0 0 .85rem;
+    font-size: 13px;
+  }
+  .prompt .ps { color: var(--accent); font-weight: 700; }
+  .prompt .path { color: var(--ps); }
+  .prompt .cmd { color: var(--cmd); }
+  .cursor {
+    display: inline-block;
+    width: 8px;
+    height: 15px;
+    background: var(--txt);
+    vertical-align: -2px;
+    animation: blink 1.05s steps(1) infinite;
+  }
+  @keyframes blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+  .box {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 1rem 1.05rem;
+    margin-bottom: 1rem;
+  }
+  .box-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem;
+    padding-bottom: .65rem;
+    margin-bottom: .85rem;
+    border-bottom: 1px solid var(--line);
+  }
+  .box-title {
+    color: var(--cmd);
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: .02em;
+  }
+  .box-title::before { content: "> "; color: var(--ok); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: .8rem; }
+  label {
+    display: block;
+    font-size: 11.5px;
+    color: var(--muted);
+    margin-bottom: .3rem;
+  }
+  label::before { content: "--"; color: var(--line-hi); margin-right: 3px; }
+  input {
+    width: 100%;
+    padding: .55rem .7rem;
+    border-radius: 3px;
+    border: 1px solid var(--line);
+    background: #07090d;
+    color: var(--txt);
+    font-family: var(--mono);
+    font-size: 13px;
+    outline: none;
+    transition: border-color .15s;
+  }
+  input:focus { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(56,189,248,.25); }
+  input::placeholder { color: #525d6d; }
+  button {
+    padding: .48rem .82rem;
+    border-radius: 3px;
+    border: 1px solid var(--line-hi);
+    background: #161b22;
+    color: var(--txt);
+    font-family: var(--mono);
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background .12s, border-color .12s;
+  }
+  button:hover { background: #1f2733; border-color: var(--accent); }
+  button.pri {
+    background: #12331b;
+    border-color: var(--ok);
+    color: #7ee787;
+  }
+  button.pri:hover { background: #1a4726; }
+  button.err {
+    background: #2c1215;
+    border-color: var(--err);
+    color: #ffa198;
+  }
+  button.err:hover { background: #3f181c; }
+  button:disabled { opacity: .5; cursor: wait; }
+  .row { display: flex; flex-wrap: wrap; gap: .45rem; align-items: center; }
+  .msj { font-size: 12.5px; margin-top: .65rem; min-height: 1.3em; word-break: break-word; }
+  .msj:not(:empty)::before { content: "[INFO] "; color: var(--accent); font-weight: 700; }
+  .msj.ok { color: #7ee787; }
+  .msj.ok::before { content: "[OK] "; color: var(--ok); }
+  .msj.err { color: #ffa198; }
+  .msj.err::before { content: "[ERR] "; color: var(--err); }
+  .msj code { color: var(--cmd); background: #07090d; padding: 1px 5px; border: 1px solid var(--line); border-radius: 3px; }
+  table { width: 100%; border-collapse: collapse; margin-top: .5rem; font-size: 12.5px; }
+  th, td { padding: .6rem .5rem; border-bottom: 1px dashed var(--line); text-align: left; vertical-align: middle; }
+  th { color: var(--accent); font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; border-bottom: 1px solid var(--line-hi); }
+  tbody tr:hover { background: rgba(56, 189, 248, .04); }
+  .slug { color: var(--ps); }
+  .meta { color: var(--muted); font-size: 11.5px; margin-top: 2px; }
+  .chip { display: inline-block; padding: 2px 7px; border-radius: 3px; font-size: 11px; font-weight: 700; border: 1px solid transparent; }
+  .chip.on { background: rgba(63,185,80,.12); border-color: rgba(63,185,80,.45); color: #7ee787; }
+  .chip.off { background: rgba(248,81,73,.12); border-color: rgba(248,81,73,.45); color: #ffa198; }
+  .statusbar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: .5rem;
+    padding: 6px 14px;
+    background: var(--bar);
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 11.5px;
+  }
+  .statusbar b { color: var(--ok); font-weight: 600; }
+  .hidden { display: none !important; }
+  @media (max-width: 640px) {
+    body { padding: .5rem; }
+    .screen { padding: .85rem; }
+    .win-ctrls { display: none; }
+    table, thead, tbody, tr, td { display: block; }
+    thead { display: none; }
+    tr { border: 1px solid var(--line); border-radius: 4px; padding: .6rem; margin-bottom: .6rem; background: #0b0e13; }
+    td { border: none; padding: .28rem 0; }
+  }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>Plaza Software · Panel de clientes</h1>
-  <p class="sub">Administración multiempresa (JD Sistemas). Crear clientes, copiar enlaces, descargar respaldos y controlar acceso.</p>
+<div class="term">
+  <div class="titlebar">
+    <div class="tabs">
+      <div class="tab">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="2.5,4.5 6.5,8 2.5,11.5"></polyline>
+          <line x1="8" y1="11.5" x2="13.5" y2="11.5"></line>
+        </svg>
+        <span>JD Solution &middot; PowerShell (Panel de clientes)</span>
+      </div>
+    </div>
+    <div class="win-ctrls" aria-hidden="true">
+      <div class="win-btn">&minus;</div>
+      <div class="win-btn">&#9633;</div>
+      <div class="win-btn close">&times;</div>
+    </div>
+  </div>
 
-  <section id="loginCard" class="card">
-    <form onsubmit="entrar(event)">
-      <div class="grid">
-        <div>
-          <label for="apiUrl">Servidor Cloudflare</label>
-          <input id="apiUrl" value="https://plaza-software.jdsistemas.workers.dev" required>
-        </div>
-        <div>
-          <label for="claveDueno">Clave del dueño (DUENO_CLAVE)</label>
-          <input id="claveDueno" type="password" autocomplete="off" placeholder="Escriba su clave maestra" required>
-        </div>
-      </div>
-      <div class="row" style="margin-top:.8rem">
-        <button type="submit" class="pri" id="btnEntrar">Entrar</button>
-      </div>
-      <div id="loginMsj" class="msj"></div>
-    </form>
-  </section>
+  <div class="screen">
+    <div class="banner">
+      <div><b>JD Solution [Consola Multiempresa]</b> <span class="ver">v2.0</span></div>
+      <div>Administraci&oacute;n de clientes &middot; Crear empresas, copiar enlaces, descargar respaldos y controlar acceso.</div>
+    </div>
 
-  <section id="panel" class="hidden">
-    <div class="card">
-      <div class="row" style="justify-content:space-between">
-        <b>Nueva empresa cliente</b>
-        <button type="button" onclick="salir()">Cerrar sesión</button>
+    <div class="prompt">
+      <span class="ps">PS</span>
+      <span class="path">C:\JD-Solution\clientes&gt;</span>
+      <span class="cmd" id="promptCmd">Connect-JDSolution -Modo Administrador</span><span class="cursor" aria-hidden="true"></span>
+    </div>
+
+    <section id="loginCard" class="box">
+      <div class="box-head">
+        <span class="box-title">AUTENTICACION DE ADMINISTRADOR</span>
       </div>
-      <form onsubmit="crearEmpresa(event)" style="margin-top:.75rem">
+      <form onsubmit="entrar(event)">
         <div class="grid">
-          <div><label for="cSlug">Identificador (slug, sin espacios)</label><input id="cSlug" placeholder="ej: super-norte" pattern="[a-z0-9][a-z0-9\-]{1,40}" required></div>
-          <div><label for="cNombre">Nombre comercial</label><input id="cNombre" placeholder="ej: Supermercado Norte C.A." required></div>
-          <div><label for="cTiendas">Sedes / tiendas (separadas por coma)</label><input id="cTiendas" placeholder="Principal, Sucursal 2" required></div>
-          <div><label for="cClave">Clave principal inicial (mín. 6)</label><input id="cClave" minlength="6" placeholder="Clave del dueño del cliente" required></div>
+          <div>
+            <label for="apiUrl">servidor</label>
+            <input id="apiUrl" value="https://plaza-software.jdsistemas.workers.dev" required>
+          </div>
+          <div>
+            <label for="claveDueno">clave-maestra (DUENO_CLAVE)</label>
+            <input id="claveDueno" type="password" autocomplete="off" placeholder="Escriba su clave maestra" required>
+          </div>
         </div>
-        <div class="row" style="margin-top:.8rem">
-          <button type="submit" class="pri" id="btnCrear">Crear empresa lista para usar</button>
+        <div class="row" style="margin-top:.85rem">
+          <button type="submit" class="pri" id="btnEntrar">[Enter] Iniciar sesi&oacute;n</button>
         </div>
-        <div id="crearMsj" class="msj"></div>
+        <div id="loginMsj" class="msj"></div>
       </form>
-    </div>
+    </section>
 
-    <div class="card">
-      <div class="row" style="justify-content:space-between">
-        <b>Empresas registradas</b>
-        <button type="button" onclick="cargar()">Actualizar lista</button>
+    <section id="panel" class="hidden">
+      <div class="box">
+        <div class="box-head">
+          <span class="box-title">NEW-EMPRESA · CREAR CLIENTE</span>
+          <button type="button" onclick="salir()">exit · Cerrar sesi&oacute;n</button>
+        </div>
+        <form onsubmit="crearEmpresa(event)">
+          <div class="grid">
+            <div><label for="cSlug">slug (sin espacios)</label><input id="cSlug" placeholder="ej: super-norte" pattern="[a-z0-9][a-z0-9\-]{1,40}" required></div>
+            <div><label for="cNombre">nombre-comercial</label><input id="cNombre" placeholder="ej: Supermercado Norte C.A." required></div>
+            <div><label for="cTiendas">sedes (separadas por coma)</label><input id="cTiendas" placeholder="Principal, Sucursal 2" required></div>
+            <div><label for="cClave">clave-inicial (m&iacute;n. 6)</label><input id="cClave" minlength="6" placeholder="Clave del due&ntilde;o del cliente" required></div>
+          </div>
+          <div class="row" style="margin-top:.85rem">
+            <button type="submit" class="pri" id="btnCrear">+ Crear empresa lista para usar</button>
+          </div>
+          <div id="crearMsj" class="msj"></div>
+        </form>
       </div>
-      <div id="listaMsj" class="msj"></div>
-      <table>
-        <thead><tr><th>Empresa</th><th>Identificador</th><th>Estado</th><th>Acciones</th></tr></thead>
-        <tbody id="tbody"></tbody>
-      </table>
-    </div>
-  </section>
+
+      <div class="box">
+        <div class="box-head">
+          <span class="box-title">GET-EMPRESAS · CLIENTES REGISTRADOS</span>
+          <button type="button" onclick="cargar()">refresh · Actualizar lista</button>
+        </div>
+        <div id="listaMsj" class="msj"></div>
+        <table>
+          <thead><tr><th>Empresa</th><th>Identificador</th><th>Estado</th><th>Acciones</th></tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <div class="statusbar">
+    <span>JD Solution &middot; Cloudflare Workers</span>
+    <span id="statusTxt">Estado: <b>listo</b></span>
+  </div>
 </div>
+
 <script>
 let DUENO = '', BASE = '';
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+
+function setCmd(txt, estado) {
+  const c = document.getElementById('promptCmd'), s = document.getElementById('statusTxt');
+  if (c && txt) c.textContent = txt;
+  if (s && estado) s.innerHTML = 'Estado: <b>' + esc(estado) + '</b>';
+}
 
 async function llamar(datos) {
   const r = await fetch(BASE.replace(/\/+$/, '') + '/api', {
@@ -108,14 +341,17 @@ async function entrar(ev) {
   const btn = document.getElementById('btnEntrar'), msj = document.getElementById('loginMsj');
   BASE = document.getElementById('apiUrl').value.trim();
   DUENO = document.getElementById('claveDueno').value.trim();
-  btn.disabled = true; msj.textContent = 'Verificando...'; msj.className = 'msj';
+  btn.disabled = true; msj.textContent = 'Verificando credenciales...'; msj.className = 'msj';
+  setCmd('Connect-JDSolution -Verificando', 'conectando...');
   try {
     const r = await llamar({ action: 'empresas_listar' });
     document.getElementById('loginCard').classList.add('hidden');
     document.getElementById('panel').classList.remove('hidden');
     pintar(r.empresas || []);
+    setCmd('Get-Empresas -Todas', 'conectado (' + (r.empresas || []).length + ' empresas)');
   } catch (e) {
     msj.textContent = e.message; msj.className = 'msj err';
+    setCmd('Connect-JDSolution -Modo Administrador', 'error de acceso');
   } finally { btn.disabled = false; }
 }
 
@@ -123,13 +359,22 @@ function salir() {
   DUENO = ''; document.getElementById('claveDueno').value = '';
   document.getElementById('panel').classList.add('hidden');
   document.getElementById('loginCard').classList.remove('hidden');
+  setCmd('Connect-JDSolution -Modo Administrador', 'sesión cerrada');
 }
 
 async function cargar() {
   const msj = document.getElementById('listaMsj');
-  msj.textContent = 'Actualizando...'; msj.className = 'msj';
-  try { const r = await llamar({ action: 'empresas_listar' }); pintar(r.empresas || []); msj.textContent = ''; }
-  catch (e) { msj.textContent = e.message; msj.className = 'msj err'; }
+  msj.textContent = 'Consultando servidor...'; msj.className = 'msj';
+  setCmd('Get-Empresas -Refresh', 'actualizando...');
+  try {
+    const r = await llamar({ action: 'empresas_listar' });
+    pintar(r.empresas || []);
+    msj.textContent = '';
+    setCmd('Get-Empresas -Todas', 'conectado (' + (r.empresas || []).length + ' empresas)');
+  } catch (e) {
+    msj.textContent = e.message; msj.className = 'msj err';
+    setCmd('Get-Empresas -Error', 'error');
+  }
 }
 
 function pintar(lista) {
@@ -139,9 +384,9 @@ function pintar(lista) {
     const act = e.activa !== 0;
     const f = e.creado ? new Date(e.creado).toLocaleDateString('es-VE') : '';
     return `<tr>
-      <td><b>${esc(e.titulo || e.nombre)}</b><div style="color:var(--muted);font-size:.78rem">Creada: ${esc(f)}</div></td>
-      <td><code>${esc(e.nombre)}</code></td>
-      <td><span class="chip ${act ? 'on' : 'off'}">${act ? 'Activa' : 'Suspendida'}</span></td>
+      <td><b>${esc(e.titulo || e.nombre)}</b><div class="meta">Creada: ${esc(f)}</div></td>
+      <td><code class="slug">${esc(e.nombre)}</code></td>
+      <td><span class="chip ${act ? 'on' : 'off'}">${act ? 'ACTIVA' : 'SUSPENDIDA'}</span></td>
       <td><div class="row">
         <button type="button" onclick="copiarLink('${esc(e.nombre)}','dashboard')">Link Panel</button>
         <button type="button" onclick="copiarLink('${esc(e.nombre)}','cuadre')">Link Ficha</button>
@@ -159,7 +404,8 @@ function urlApp(emp, app) {
 
 async function copiarLink(emp, app) {
   const u = urlApp(emp, app), msj = document.getElementById('listaMsj');
-  try { await navigator.clipboard.writeText(u); msj.textContent = 'Enlace copiado: ' + u; msj.className = 'msj ok'; }
+  setCmd(`Copy-Link -Empresa ${emp} -App ${app}`, 'enlace copiado');
+  try { await navigator.clipboard.writeText(u); msj.innerHTML = 'Enlace copiado: <code>' + esc(u) + '</code>'; msj.className = 'msj ok'; }
   catch (e) { prompt('Copie el enlace:', u); }
 }
 
@@ -171,20 +417,23 @@ async function crearEmpresa(ev) {
   const tiendas = document.getElementById('cTiendas').value.split(',').map(x => x.trim()).filter(Boolean);
   const clave = document.getElementById('cClave').value.trim();
   btn.disabled = true; msj.textContent = 'Creando base de datos y módulos...'; msj.className = 'msj';
+  setCmd(`New-Empresa -Slug ${empresa}`, 'creando...');
   try {
     await llamar({ action: 'empresa_crear', empresa, nombre, tiendas, clave });
-    msj.innerHTML = `Empresa creada y lista. Panel: <code>${esc(urlApp(empresa, 'dashboard'))}</code> · Ficha: <code>${esc(urlApp(empresa, 'cuadre'))}</code>`;
+    msj.innerHTML = `Empresa creada y lista. Panel: <code>${esc(urlApp(empresa, 'dashboard'))}</code> &middot; Ficha: <code>${esc(urlApp(empresa, 'cuadre'))}</code>`;
     msj.className = 'msj ok';
     ev.target.reset();
     await cargar();
   } catch (e) {
     msj.textContent = e.message; msj.className = 'msj err';
+    setCmd(`New-Empresa -Slug ${empresa} # error`, 'error');
   } finally { btn.disabled = false; }
 }
 
 async function cambiarEstado(empresa, activar) {
   if (!confirm(`¿${activar ? 'Reactivar' : 'Suspender'} el acceso de "${empresa}"?`)) return;
   const msj = document.getElementById('listaMsj');
+  setCmd(`Set-EmpresaEstado -Slug ${empresa} -Activa:${activar}`, 'actualizando...');
   try {
     await llamar({ action: 'empresa_estado', empresa, activa: activar });
     msj.textContent = `Empresa "${empresa}" ${activar ? 'activada' : 'suspendida'}.`; msj.className = 'msj ok';
@@ -195,6 +444,7 @@ async function cambiarEstado(empresa, activar) {
 async function respaldar(empresa) {
   const msj = document.getElementById('listaMsj');
   msj.textContent = `Generando respaldo de ${empresa}...`; msj.className = 'msj';
+  setCmd(`Export-Respaldo -Empresa ${empresa}`, 'respaldando...');
   try {
     const r = await llamar({ action: 'empresa_respaldo', empresa });
     const blob = new Blob([JSON.stringify(r.respaldo, null, 2)], { type: 'application/json' });
@@ -203,6 +453,7 @@ async function respaldar(empresa) {
     a.download = `respaldo-${empresa}-${new Date().toISOString().slice(0, 10)}.json`;
     document.body.appendChild(a); a.click(); a.remove();
     msj.textContent = `Respaldo de ${empresa} descargado.`; msj.className = 'msj ok';
+    setCmd(`Export-Respaldo -Empresa ${empresa} # OK`, 'respaldo descargado');
   } catch (e) { msj.textContent = e.message; msj.className = 'msj err'; }
 }
 </script>

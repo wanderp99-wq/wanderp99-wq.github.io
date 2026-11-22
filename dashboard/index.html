@@ -3961,6 +3961,44 @@
     // Identificador de este equipo (al azar, queda en el navegador): el servidor cuenta los intentos con clave incorrecta por equipo
     const EQUIPO_ID = (() => { try { let x = localStorage.getItem('panel_eq'); if (!x) { x = nuevoIdem().replace(/-/g, '').slice(0, 24); localStorage.setItem('panel_eq', x); } return x; } catch (e) { return ''; } })();
     async function llamarApiReal(payload, t0) {
+        // (21/11) Empresas cliente multiempresa (CF_SOLO): nunca tocan el Apps Script de Plaza Valencia; todo va directo a Cloudflare
+        if (typeof CF_SOLO !== 'undefined' && CF_SOLO) {
+            if (/^(enlinea|cambios|fb_token|cf_claves)$/.test(payload.action)) return { ok: true, personas: [], cambios: {}, version: VERSION_SERVIDOR };
+            let resp;
+            try {
+                const body = Object.assign({ empresa: CF_EMPRESA, eq: EQUIPO_ID, disp: payload.disp || DISPOSITIVO }, payload);
+                if (payload.action === 'login') body.clave = clave;
+                else body.token = await cfToken();
+                resp = await fetch(CF_URL + '/api', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify(body)
+                });
+            } catch (e) {
+                const err = new Error(navigator.onLine === false ? 'Sin conexión a internet.' : 'No se pudo conectar con el servidor. Intente de nuevo.');
+                err.sinRespuesta = true; throw err;
+            }
+            const data = await resp.json().catch(() => ({ ok: false, error: 'Respuesta inválida del servidor' }));
+            if (!data.ok) throw new Error(data.error || 'Error desconocido');
+            if (payload.action === 'login' && data.usuario) {
+                Object.assign(cfSes, { token: data.token || '', vence: data.vence || (Date.now() + 3600000), clave, modulos: (data.empresa || {}).modulos || {}, modHora: Date.now(), mala: '' });
+                const u = data.usuario, todos = MODULOS.map(m => m.id).concat(['verexistencia', 'rep_existencia', 'rep_ajustes', 'rep_ventas']);
+                if (data.empresa && data.empresa.nombre) {
+                    TITULOS.login = TITULOS.menu = data.empresa.nombre;
+                    document.title = data.empresa.nombre;
+                    const tEl = document.getElementById('tituloVista'); if (tEl) tEl.textContent = data.empresa.nombre;
+                }
+                return Object.assign({}, data, {
+                    nombre: u.nombre || 'Administrador',
+                    principal: !!u.principal,
+                    admin: !!u.admin,
+                    permisos: (u.principal || u.admin) ? todos : (u.permisos || []),
+                    version: VERSION_SERVIDOR
+                });
+            }
+            anotarTiempo(payload.action + ' (Cloudflare)', performance.now() - t0, typeof data.ms === 'number' ? data.ms : null, true);
+            return data;
+        }
         let resp;
         try {
             resp = await fetch(WEB_APP_URL, {
@@ -5729,12 +5767,13 @@
     const CF_EMPRESA = (() => {
         try {
             const p = new URLSearchParams(location.search).get('empresa');
-            if (p && /^[a-z0-9][a-z0-9-]{1,40}$/i.test(p.trim())) { const s = p.trim().toLowerCase(); localStorage.setItem('ps_empresa', s); return s; }
-            const g = localStorage.getItem('ps_empresa');
-            if (g && /^[a-z0-9][a-z0-9-]{1,40}$/.test(g)) return g;
+            if (p && /^[a-z0-9][a-z0-9-]{1,40}$/i.test(p.trim())) return p.trim().toLowerCase();
         } catch (e) {}
         return 'plaza-valencia';
     })();
+    const CF_SOLO = CF_EMPRESA !== 'plaza-valencia';
+    const SESION_LLAVE = CF_SOLO ? 'panel_sesion_' + CF_EMPRESA : 'panel_sesion';
+    const ACTIVIDAD_LLAVE = CF_SOLO ? 'panel_actividad_' + CF_EMPRESA : 'panel_actividad';
     let cfSes = { token: '', vence: 0, clave: '', modulos: null, modHora: 0, roto: 0, pidiendo: null };
     async function cfPedir(b) {
         const r = await fetch(CF_URL + '/api', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(Object.assign({ empresa: CF_EMPRESA }, b)) });
@@ -7414,7 +7453,7 @@
     let cuadreIniciado = false;
 
     function guardarSesion() {
-        try { sessionStorage.setItem('panel_sesion', JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
+        try { sessionStorage.setItem(SESION_LLAVE, JSON.stringify({ clave, permisos, nombre: nombreUsuario, principal: esPrincipal })); } catch (e) {}
     }
     // Versión del script de Google que espera este panel (CuadreSistema.gs · VERSION_SISTEMA). Si el publicado es anterior, se avisa.
     const VERSION_SERVIDOR = '2026-11-17.5';
@@ -7431,7 +7470,7 @@
     }
     // Talento humano salió de Nómina: quien tiene Nómina también lo ve (el servidor le permite lo mismo)
     // Dueño de la copia local de los datos: el nombre y sus permisos (otra clave, u otros permisos, no ve lo de esta)
-    const llaveUsuario = () => nombreUsuario + '#' + (permisos || []).slice().sort().join(',');
+    const llaveUsuario = () => (CF_SOLO ? CF_EMPRESA + ':' : '') + nombreUsuario + '#' + (permisos || []).slice().sort().join(',');
     const normalizarPermisos = p => { p = (p || []).slice(); if (p.includes('nomina') && !p.includes('talento')) p.push('talento'); return p; };
     // Al retomar la sesión (recargar la página) se vuelven a pedir los permisos y la versión del script, por detrás
     async function refrescarSesion() {
@@ -7507,7 +7546,7 @@
     // (Seguridad.gs) que reemplaza a la clave. La llave queda en este equipo: cifrada con la huella si el equipo lo permite (PRF),
     // si no, protegida porque solo se usa después de que el equipo reconoce la huella. Al salir no se borra (es de este equipo).
     // Se quita desde la pantalla de entrada ("Quitar la huella de este equipo") o en Claves y permisos › Seguridad.
-    const HUELLA_LLAVE = 'panel_huella', HUELLA_NO = 'panel_huella_no';
+    const HUELLA_LLAVE = CF_SOLO ? 'panel_huella_' + CF_EMPRESA : 'panel_huella', HUELLA_NO = CF_SOLO ? 'panel_huella_no_' + CF_EMPRESA : 'panel_huella_no';
     const b64u = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
     const deB64u = s => Uint8Array.from(atob(String(s).replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - String(s).length % 4) % 4)), ch => ch.charCodeAt(0));
     const huellaGuardada = () => { try { return JSON.parse(localStorage.getItem(HUELLA_LLAVE) || 'null'); } catch (e) { return null; } };
@@ -7642,7 +7681,7 @@
     let avisosSeguridad = {}, sesionUltimoUso = Date.now();
     function sesionActividad() {
         sesionUltimoUso = Date.now();
-        try { sessionStorage.setItem('panel_actividad', String(sesionUltimoUso)); } catch (e) {}
+        try { sessionStorage.setItem(ACTIVIDAD_LLAVE, String(sesionUltimoUso)); } catch (e) {}
     }
     ['pointerdown', 'keydown', 'wheel', 'touchstart'].forEach(ev => window.addEventListener(ev, () => { if (Date.now() - sesionUltimoUso > 15000) sesionActividad(); }, { capture: true, passive: true }));
     setInterval(() => {
@@ -7694,7 +7733,7 @@
         precargaSesion++; Object.keys(precargaEstado).forEach(k => delete precargaEstado[k]);   // cancela la precarga en curso
         pagCuentasPromesa = null; pagCuentasListas = false; cuadreModoInicial = false; areaActual = null; reqD = null; perDatos = null; perDeudasPend = null; perDeudasHistDatos = null; asisHoyDatos = null; asisHist = null; asisgDatos = null;
         Object.keys(cuaItems).forEach(k => delete cuaItems[k]);
-        try { sessionStorage.removeItem('panel_sesion'); } catch (e) {}
+        try { sessionStorage.removeItem(SESION_LLAVE); } catch (e) {}
         const of = document.getElementById('huellaOferta'); if (of) of.remove();
         irA('login'); huellaPintarLogin();
         document.getElementById('loginError').textContent = typeof mensaje === 'string' ? mensaje : '';
@@ -25743,10 +25782,21 @@ Reglas:
 
     // Retomar la sesión si la pestaña se recarga (se borra al cerrar la pestaña o pulsar "Salir")
     (function () {
+        if (CF_SOLO) {
+            TITULOS.login = TITULOS.menu = CF_EMPRESA;
+            cfPedir({ action: 'pub_listas' }).then(r => {
+                const nom = r && r.ok && r.empresa && r.empresa.nombre;
+                if (!nom) return;
+                TITULOS.login = TITULOS.menu = nom;
+                document.title = nom;
+                const tEl = document.getElementById('tituloVista');
+                if (tEl && (vistaActual === 'login' || vistaActual === 'menu')) tEl.textContent = nom;
+            }).catch(() => {});
+        }
         try {
-            const s = JSON.parse(sessionStorage.getItem('panel_sesion') || 'null');
-            const usoPrevio = Number(sessionStorage.getItem('panel_actividad') || 0);
-            if (s && s.clave && usoPrevio && Date.now() - usoPrevio > SESION_INACTIVA_MIN * 60000) { sessionStorage.removeItem('panel_sesion'); throw new Error('sesión vencida'); }
+            const s = JSON.parse(sessionStorage.getItem(SESION_LLAVE) || 'null');
+            const usoPrevio = Number(sessionStorage.getItem(ACTIVIDAD_LLAVE) || 0);
+            if (s && s.clave && usoPrevio && Date.now() - usoPrevio > SESION_INACTIVA_MIN * 60000) { sessionStorage.removeItem(SESION_LLAVE); throw new Error('sesión vencida'); }
             if (s && s.clave) {
                 sesionActividad();
                 clave = s.clave; permisos = normalizarPermisos(s.permisos); nombreUsuario = s.nombre || ''; esPrincipal = !!s.principal;

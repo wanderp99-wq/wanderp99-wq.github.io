@@ -1302,9 +1302,7 @@
     const CF_EMPRESA = (() => {
         try {
             const p = new URLSearchParams(location.search).get('empresa');
-            if (p && /^[a-z0-9][a-z0-9-]{1,40}$/i.test(p.trim())) { const s = p.trim().toLowerCase(); localStorage.setItem('ps_empresa', s); return s; }
-            const g = localStorage.getItem('ps_empresa');
-            if (g && /^[a-z0-9][a-z0-9-]{1,40}$/.test(g)) return g;
+            if (p && /^[a-z0-9][a-z0-9-]{1,40}$/i.test(p.trim())) return p.trim().toLowerCase();
         } catch (e) {}
         return 'plaza-valencia';
     })();
