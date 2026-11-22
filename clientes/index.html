@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0c0c0c">
+<link rel="icon" type="image/svg+xml" href="icono.svg">
+<link rel="manifest" href="manifest.json">
 <title>JD Solution · Consola de clientes</title>
 <style>
   :root {
@@ -650,14 +653,19 @@ async function respaldar(empresa) {
   setCmd(`Export-Respaldo -Empresa ${empresa}`, 'respaldando...');
   try {
     const r = await llamar({ action: 'empresa_respaldo', empresa });
-    const blob = new Blob([JSON.stringify(r.respaldo, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(r.respaldo)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
+    a.href = url;
     a.download = `respaldo-${empresa}-${new Date().toISOString().slice(0, 10)}.json`;
     document.body.appendChild(a); a.click(); a.remove();
-    msj.textContent = `Respaldo de ${empresa} descargado.`; msj.className = 'msj ok';
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    msj.textContent = `Respaldo de ${empresa} descargado (${(blob.size / 1024).toFixed(0)} KB).`; msj.className = 'msj ok';
     setCmd(`Export-Respaldo -Empresa ${empresa} # OK`, 'respaldo descargado');
-  } catch (e) { msj.textContent = e.message; msj.className = 'msj err'; }
+  } catch (e) { msj.textContent = e.message; msj.className = 'msj err'; setCmd(`Export-Respaldo -Empresa ${empresa} # error`, 'error'); }
+}
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
 }
 </script>
 </body>

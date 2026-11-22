@@ -3850,7 +3850,7 @@
                 let r; try { r = await llamarApiPedido(p); } finally { apiEnCurso--; }
                 await guardar(p, r);
                 if (texto(r) !== antes) redibujar(p.action);
-            } catch (e) {} finally { enCurso.delete(k); }
+            } catch (e) { if (/Cuenta suspendida/i.test(e && e.message)) cerrarSesion(e.message); } finally { enCurso.delete(k); }
         }
         // Redibuja el módulo abierto con lo nuevo (sin molestar: no mientras se escribe ni con una ventana abierta)
         let espera = 0;
@@ -3883,7 +3883,7 @@
             Object.keys(m).forEach(j => { if (!m[j] || ahora - m[j].t > IDEM_VIDA) delete m[j]; });
             if (idem) m[k] = { idem, t: ahora }; else delete m[k];
             localStorage.setItem(IDEM_LS, JSON.stringify(m));
-        } catch (e) {}
+        } catch (e) { if (/Cuenta suspendida/i.test(e && e.message)) cerrarSesion(e.message); }
     }
     async function llamarApiPedido(payload) {
         // (15/11) Efectivo y caja chica: directo al servidor nuevo cuando es el oficial (sin pasar por Google)
@@ -3911,7 +3911,7 @@
                     return r;
                 }
                 if (r && r.sesion === false) cfSes.token = '';
-            } catch (e) {}
+            } catch (e) { if (/Cuenta suspendida/i.test(e && e.message)) cerrarSesion(e.message); }
         }
         // (12/11) Lecturas del almacén con "Usar Firebase en el Almacén" encendido: se responden aquí con lo de Firebase (sin Google)
         if (ALMVIVO_ACC.test(payload.action) && !almVivoSaltar) { const r = await almVivoResponder(payload); if (r) return r; }
@@ -5817,7 +5817,7 @@
         try {
             const p = new URLSearchParams(location.search).get('empresa');
             if (p && /^[a-z0-9][a-z0-9-]{1,40}$/i.test(p.trim())) return p.trim().toLowerCase();
-        } catch (e) {}
+        } catch (e) { if (/Cuenta suspendida/i.test(e && e.message)) cerrarSesion(e.message); }
         return 'plaza-valencia';
     })();
     const CF_SOLO = CF_EMPRESA !== 'plaza-valencia';
@@ -7569,7 +7569,7 @@
             guardarSesion(); mostrarBienvenida();
             if (vistaActual === 'menu') renderMenu();
             avisarScriptViejo();
-        } catch (e) {}
+        } catch (e) { if (/Cuenta suspendida/i.test(e && e.message)) cerrarSesion(e.message); }
     }
     function mostrarBienvenida() {
         const el = document.getElementById('bienvenida');
@@ -8028,7 +8028,7 @@
             if (!nuevas.length || vista !== vistaActual || !vivoPuede()) return;
             await DATOS.aGoogle(ACTUALIZAR[vista]);   // otra persona cambió algo: se lee de Google (y se guarda lo nuevo)
             nuevas.forEach(k => { if (r.ver[k] > (verConocida[k] || '0')) verConocida[k] = r.ver[k]; });
-        } catch (e) {}
+        } catch (e) { if (/Cuenta suspendida/i.test(e && e.message)) cerrarSesion(e.message); }
         finally { vivoOcupado = false; }
     }
     window.addEventListener('input', () => { vivoTecleo = Date.now(); }, true);
@@ -8320,14 +8320,14 @@
                 asisgDatos.locales.forEach(f => { const k = asisgClave(f.trabajador); semana.add(k); if (f.fecha === hoy) deHoy.add(k); });
                 if (semana.size) tarjetas.push(tabAsistencia(deHoy.size, semana.size));
             }
-        } catch (e) {}
+        } catch (e) { if (/Cuenta suspendida/i.test(e && e.message)) cerrarSesion(e.message); }
         // Facturas por pagar (Cuentas por pagar): lo que vence esta semana (con lo vencido) y las 3 siguientes. Se escucha en vivo.
         try {
             if (permisos.includes('cxp')) {
                 if (!cxp.off) cxpEscuchar();
                 if (cxp.cargado && !cxp.error) tarjetas.push(tabFacturas(cxpRenglones()));
             }
-        } catch (e) {}
+        } catch (e) { if (/Cuenta suspendida/i.test(e && e.message)) cerrarSesion(e.message); }
         const usa = navMasUsados(4);
         pintarConservando(el, `<div class="tab-hola"><h3>Hola${nombreUsuario ? ', ' + esc(nombreUsuario.split(' ')[0]) : ''}</h3></div>
             ${tarjetas.length ? `<div class="tab-grid">${tarjetas.join('')}</div>` : ''}
@@ -8494,7 +8494,7 @@
         try {
             if (!(history.state && history.state.panelAtras)) { history.pushState({ panelAtras: 1 }, ''); atrasConGesto = gesto; }
             else if (!atrasConGesto && gesto) { history.pushState({ panelAtras: 2 }, ''); atrasConGesto = true; }
-        } catch (e) {}
+        } catch (e) { if (/Cuenta suspendida/i.test(e && e.message)) cerrarSesion(e.message); }
     }
     ['click', 'touchend', 'keydown'].forEach(tipo => document.addEventListener(tipo, e => { if (e.isTrusted) atrasArmar(); }, true));
     window.addEventListener('popstate', () => {
@@ -10676,7 +10676,7 @@
         try {
             const r = await Promise.race([cfToken().then(t => cfPedir({ action: 'cfg_leer', token: t })), new Promise(ok => setTimeout(() => ok(null), 6000))]);
             if (r && r.ok) { cfSes.modulos = (r.empresa || {}).modulos || {}; cfSes.modHora = Date.now(); si = !!cfSes.modulos.vx; }
-        } catch (e) {}
+        } catch (e) { if (/Cuenta suspendida/i.test(e && e.message)) cerrarSesion(e.message); }
         if (si === null) { try { si = localStorage.getItem('vx_cf') === '1'; } catch (e) { si = false; } }   // sin internet: lo último que se supo
         else { try { localStorage.setItem('vx_cf', si ? '1' : '0'); } catch (e) {} }
         return si;
@@ -19185,7 +19185,7 @@
             const v = JSON.parse(localStorage.getItem('alm_venta_actual') || 'null');
             if (!v || !v.items || !v.items.length || almVenta.items.length) return;
             almVenta = { items: v.items.filter(x => almProducto(x.codigo)).map(x => Object.assign({}, x, { sinExistencia: false })), sel: -1, descuento: 0, claveDesc: '', claveStock: '', ultimo: 'Se recuperó la venta que estaba en pantalla' };
-        } catch (e) {}
+        } catch (e) { if (/Cuenta suspendida/i.test(e && e.message)) cerrarSesion(e.message); }
     }
 
     // ---------- Espacio: totalizar (cliente, contado o crédito) y emitir la nota ----------
@@ -23341,7 +23341,7 @@ Reglas:
             const m = marcaConocidos(); delete m[codigo]; m[codigo] = { n: r.nombre, f: r.foto || '' };
             const k = Object.keys(m); k.slice(0, Math.max(0, k.length - 300)).forEach(x => delete m[x]);
             localStorage.setItem(MARCA_CONOCIDOS, JSON.stringify(m));
-        } catch (e) {}
+        } catch (e) { if (/Cuenta suspendida/i.test(e && e.message)) cerrarSesion(e.message); }
     }
     // Deja el pase en Firestore marcas/{id}. Devuelve la hora "HH:mm" que puso Firebase, o null si no se pudo (sin internet, reglas)
     async function marcaAFirebase(id, eq, codigo) {
@@ -23357,7 +23357,7 @@ Reglas:
                 COLA.horaServidor(j.creado); marcaBandejaCF[id] = true;
                 return new Date(j.creado).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Caracas' });
             }
-        } catch (e) {}
+        } catch (e) { if (/Cuenta suspendida/i.test(e && e.message)) cerrarSesion(e.message); }
         return null;
     }
     // (15/11) El pase marcado en el servidor nuevo. Devuelve su resultado (o { error } si el carnet no vale), o null para seguir como antes:
@@ -26070,7 +26070,7 @@ Reglas:
                 setTimeout(vivoFbIniciar, 1500);   // avisos al instante (Firebase)
                 return;
             }
-        } catch (e) {}
+        } catch (e) { if (/Cuenta suspendida/i.test(e && e.message)) cerrarSesion(e.message); }
         huellaPintarLogin();   // equipo con huella activada: botón "Entrar con huella"
         irA(marcaEquipo() ? 'marcaje' : 'login');   // equipo de marcaje ya autorizado: abre directo en marcar asistencia
     })();
