@@ -7394,17 +7394,19 @@
             if (/\(Cloudflare\)/.test(x)) return { acc: x.replace(/\s*\(Cloudflare\)/, ''), srv: 'Servidor', cls: 'st-ok' };
             if (/·\s*copia local/.test(x)) return { acc: x.replace(/\s*·\s*copia local/, ''), srv: 'Este equipo', cls: 'st-info' };
             return { acc: x, srv: 'Respaldo', cls: 'st-pend' }; };
+        const verFb = esPrincipal && !CF_SOLO;
+        const verPaq = esPrincipal && (!CF_SOLO || moduloEnPlan('cierrecaja'));
         fondo.innerHTML = `<div class="req-dlg" style="width:min(680px,100%)"><h3>Tiempos de respuesta</h3>
-            ${esPrincipal ? '<div id="fbEstado" class="fb-estado"></div><div id="paqEstado" class="fb-estado"></div><h4 class="fb-tit-tiempos">Últimos pedidos al servidor</h4>' : ''}
-            <div class="req-sub">Últimos pedidos al servidor. "Procesado" es lo que tarda el servidor en hacer el trabajo; el resto es internet. "Este equipo" = se respondió al instante con lo guardado en el equipo; "Respaldo" = servidor anterior (solo lo que aún no se ha pasado).</div>
-            <div class="tabla-wrap" style="max-height:${esPrincipal ? 40 : 60}vh;overflow:auto;margin-top:.75rem">${TIEMPOS.length ? `<table><thead><tr><th class="izq">Hora</th><th class="izq">Acción</th><th class="izq">Servidor</th><th>Total</th><th>Procesado</th></tr></thead><tbody>
+            ${verFb ? '<div id="fbEstado" class="fb-estado"></div>' : ''}${verPaq ? '<div id="paqEstado" class="fb-estado"></div>' : ''}${verFb || verPaq ? '<h4 class="fb-tit-tiempos">Últimos pedidos al servidor</h4>' : ''}
+            <div class="req-sub">Últimos pedidos al servidor. "Procesado" es lo que tarda el servidor en hacer el trabajo; el resto es internet. "Este equipo" = se respondió al instante con lo guardado en el equipo${CF_SOLO ? '' : '; "Respaldo" = servidor anterior (solo lo que aún no se ha pasado)'}.</div>
+            <div class="tabla-wrap" style="max-height:${verFb || verPaq ? 40 : 60}vh;overflow:auto;margin-top:.75rem">${TIEMPOS.length ? `<table><thead><tr><th class="izq">Hora</th><th class="izq">Acción</th><th class="izq">Servidor</th><th>Total</th><th>Procesado</th></tr></thead><tbody>
             ${TIEMPOS.map(t => { const o = origen(t.accion); return `<tr><td class="izq">${t.hora}</td><td class="izq">${esc(NOMBRE_ACCION[o.acc] || o.acc)}${t.ok ? '' : ' <span class="chip st-falta">error</span>'}${t.pasos ? '<small title="Partes del trabajo del servidor, en milisegundos">' + esc(t.pasos) + '</small>' : ''}</td>
                 <td class="izq"><span class="chip ${o.cls}">${o.srv}</span></td><td><b>${s(t.total)}</b></td><td>${s(t.servidor)}</td></tr>`; }).join('')}</tbody></table>` : '<div class="empty">Todavía no hay pedidos.</div>'}</div>
             <div id="fbPruebaRes" style="margin-top:.6rem"></div>
             <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-primary" onclick="document.getElementById('dlgTiempos').classList.add('hidden')">Cerrar</button></div></div>`;
         fondo.classList.remove('hidden');
-        if (esPrincipal) fbEstadoCargar();   // qué está en Firebase y qué en la hoja (11/11)
-        if (esPrincipal) paqCargar();        // versión de Utilidades en cada tienda (13/11)
+        if (verFb) fbEstadoCargar();    // estado de migración Google/Cloudflare (solo Plaza Valencia)
+        if (verPaq) paqCargar();        // versión de Utilidades en cada tienda (solo si usa conector POS)
     }
 
     // ==========================================
@@ -10508,10 +10510,12 @@
                abiertas: [], cierres: [], pend: 0, venta: { items: [] }, sug: [], sugIdx: 0, codTxt: '', ultimoTxt: '', offs: [], fbl: null, pagos: [], vueltoEn: 'bs',
                buscaProd: '', cambios: {}, contado: {}, verTicket: null, anulando: null };
     // Este equipo: tienda y número de caja (se eligen una vez)
+    const vxEqKey = () => (typeof CF_SOLO !== 'undefined' && CF_SOLO) ? 'vx_equipo_' + CF_EMPRESA : 'vx_equipo';
+    const vxVnKey = () => (typeof CF_SOLO !== 'undefined' && CF_SOLO) ? 'vx_venta_' + CF_EMPRESA : 'vx_venta';
     function vxEquipoLeer() {
         if (vx.equipo) return;
-        try { const e = JSON.parse(localStorage.getItem('vx_equipo') || 'null'); if (e && e.local && e.caja && e.id) vx.equipo = e; } catch (e) {}
-        try { const v = JSON.parse(localStorage.getItem('vx_venta') || 'null'); if (v && Array.isArray(v.items)) vx.venta = v; } catch (e) {}
+        try { const e = JSON.parse(localStorage.getItem(vxEqKey()) || 'null'); if (e && e.local && e.caja && e.id) vx.equipo = e; } catch (e) {}
+        try { const v = JSON.parse(localStorage.getItem(vxVnKey()) || 'null'); if (v && Array.isArray(v.items)) vx.venta = v; } catch (e) {}
     }
     function vxEquipoGuardar() {
         const local = (document.getElementById('vxLocal') || {}).value, caja = Number((document.getElementById('vxCajaN') || {}).value);
@@ -10520,7 +10524,7 @@
         const id = (vx.equipo && vx.equipo.id) || Math.random().toString(36).slice(2, 6);
         if (vx.equipo && vx.equipo.local !== local) { vx.offs.forEach(o => { try { o(); } catch (e) {} }); vx.offs = []; vx.listo = false; vx.abiertas = []; vx.cierres = []; vx.prods = []; vx.porCod = new Map(); }
         vx.equipo = { local, caja, id }; vx.cambiando = false;
-        try { localStorage.setItem('vx_equipo', JSON.stringify(vx.equipo)); } catch (e) {}
+        try { localStorage.setItem(vxEqKey(), JSON.stringify(vx.equipo)); } catch (e) {}
         vx.tab = 'vender'; vxIniciar();
     }
     const vxL = () => VX_SLUG(vx.equipo.local), vxCajaId = () => String(vx.equipo.caja).padStart(2, '0') + '-' + vx.equipo.id;
@@ -11233,6 +11237,7 @@
                 <div class="grafico-sub">${base ? `Existencia de partida cargada el ${esc(fechaBonita(base.fecha))} por ${esc(base.por || '')}${base.archivo ? ' (' + esc(base.archivo) + ')' : ''}. Lo vendido desde entonces se descuenta solo.` : 'Todavía no se ha cargado la existencia.'}
                     Precios en $ BCV; el mayor aplica desde la cantidad de "Mayor desde".</div>
                 ${esPrincipal ? `<div class="req-acciones"><label class="btn-ghost" style="cursor:pointer">Cargar existencia (Excel)<input type="file" accept=".xlsx,.xls,.csv" hidden onchange="vxImportar(this.files[0]);this.value=''"></label>
+                    <button type="button" class="btn-ghost" onclick="vxDescargarFormato()">Descargar formato (Excel)</button>
                     <span class="nota" style="margin:0">Mayor desde para todos los que tienen precio mayor:</span><input type="number" id="vxMdTodos" min="0" step="1" style="width:6rem" placeholder="Cantidad">
                     <button type="button" class="btn-ghost btn-mini" onclick="vxMdTodos()">Aplicar</button>
                     <button type="button" class="btn-primary" id="vxMdGuardar" onclick="vxGuardarProductos()" ${cambios ? '' : 'disabled'}>Guardar cambios${cambios ? ' (' + cambios + ')' : ''}</button></div>` : ''}
@@ -11294,6 +11299,24 @@
         try { const r = await vxEscribirProductos(p, vx.base); vx.cambios = {}; mostrarBanner(r === 'espera' ? 'Guardado en este equipo: sube solo cuando haya internet.' : 'Cambios guardados.', 'ok'); }
         catch (e) { mostrarBanner('No se pudo guardar: ' + (e.code || e.message), 'error'); }
         vxPintar();
+    }
+    async function vxDescargarFormato() {
+        try {
+            const X = await libXLSX();
+            const cab = ['CÓDIGO', 'DESCRIPCIÓN', 'UNIDAD', 'CATEGORÍA', 'EXISTENCIA', 'COSTO', 'PRECIO DETAL', 'PRECIO MAYOR', 'MAYOR DESDE'];
+            const filas = vx.prods && vx.prods.length
+                ? vx.prods.map(p => [p.c, p.d, p.u || 'UND', p.g || '', Number(p.e) || 0, Number(p.k) || 0, Number(p.pd) || 0, Number(p.pm) || 0, Number(p.md) || 0])
+                : [
+                    ['0001', 'PAN CANILLA (EJEMPLO - BORRAR)', 'UND', 'PANADERÍA', 50, 0.35, 0.60, 0.50, 6],
+                    ['0002', 'QUESO BLANCO (EJEMPLO - BORRAR)', 'KG', 'CHARCUTERÍA', 12.5, 4.80, 6.50, 6.00, 3]
+                ];
+            const ws = X.utils.aoa_to_sheet([cab].concat(filas));
+            ws['!cols'] = [{ wch: 16 }, { wch: 36 }, { wch: 10 }, { wch: 18 }, { wch: 12 }, { wch: 10 }, { wch: 13 }, { wch: 13 }, { wch: 12 }];
+            const wb = X.utils.book_new();
+            X.utils.book_append_sheet(wb, ws, 'Inventario');
+            const loc = (vx.equipo && vx.equipo.local ? vx.equipo.local : 'tienda').replace(/[^a-zA-Z0-9_-]+/g, '_');
+            X.writeFile(wb, `Formato_Inventario_${loc}.xlsx`);
+        } catch (e) { mostrarBanner('No se pudo generar el formato: ' + (e.message || e), 'error'); }
     }
     async function vxImportar(file) {
         if (!file) return;
