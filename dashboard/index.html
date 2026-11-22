@@ -3993,6 +3993,11 @@
                 err.sinRespuesta = true; throw err;
             }
             const data = await resp.json().catch(() => ({ ok: false, error: 'Respuesta inválida del servidor' }));
+            if (data && (data.suspendida || /Cuenta suspendida/i.test(data.error || ''))) {
+                const msg = data.error || 'Cuenta suspendida. Contacte al soporte de JD Solution.';
+                if (payload.action !== 'login' && typeof cerrarSesion === 'function') cerrarSesion(msg);
+                throw new Error(msg);
+            }
             if (!data.ok) throw new Error(data.error || 'Error desconocido');
             if (payload.action === 'login' && data.usuario) {
                 Object.assign(cfSes, { token: data.token || '', vence: data.vence || (Date.now() + 3600000), clave, modulos: (data.empresa || {}).modulos || {}, modHora: Date.now(), mala: '' });
@@ -4022,6 +4027,9 @@
                     signal: ctrl.signal
                 });
                 const dc = await rc.json().catch(() => null);
+                if (dc && (dc.suspendida || /Cuenta suspendida/i.test(dc.error || ''))) {
+                    throw new Error(dc.error || 'Cuenta suspendida. Contacte al soporte de JD Solution.');
+                }
                 if (dc && dc.ok && dc.usuario) {
                     Object.assign(cfSes, { token: dc.token || '', vence: dc.vence || (Date.now() + 3600000), clave, modulos: (dc.empresa || {}).modulos || {}, modHora: Date.now(), mala: '' });
                     const u = dc.usuario;
@@ -4036,7 +4044,7 @@
                     });
                 }
                 cfLoginFallo = true;
-            } catch (e) { cfLoginFallo = true; }
+            } catch (e) { if (/Cuenta suspendida/i.test(e && e.message)) throw e; cfLoginFallo = true; }
             finally { clearTimeout(tm); }
         }
         let resp;
@@ -5818,7 +5826,11 @@
     let cfSes = { token: '', vence: 0, clave: '', modulos: null, modHora: 0, roto: 0, pidiendo: null };
     async function cfPedir(b) {
         const r = await fetch(CF_URL + '/api', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(Object.assign({ empresa: CF_EMPRESA }, b)) });
-        return r.json();
+        const j = await r.json().catch(() => ({ ok: false, error: 'Respuesta inválida' }));
+        if (j && (j.suspendida || /Cuenta suspendida/i.test(j.error || ''))) {
+            if (b.action !== 'login' && typeof cerrarSesion === 'function') cerrarSesion(j.error || 'Cuenta suspendida. Contacte al soporte de JD Solution.');
+        }
+        return j;
     }
     async function cfToken() {
         if (!clave) throw new Error('sin sesión');
