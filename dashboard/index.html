@@ -3892,8 +3892,11 @@
         if (/^(nom_(cerrar|anular|ajuste_guardar)|pnom_(pagar|deshacer))$/.test(payload.action)) { const r = await cfNominaEscribir(payload); if (r) return r; }
         if (CF_PERSONAL_ACC.test(payload.action)) { const r = await cfPersonalEscribir(payload); if (r) return r; }
         if (/^cmp_(leer|enlazar|borrador_guardar|borrador_borrar|guardar|anular|fotos_compra)$/.test(payload.action)) { const r = await cfComprasEscribir(payload); if (r) return r; }
-        if (/^cmp_(orden_precio|orden_nueva|orden_avisar|avisar_lista|marcar|marcar_lote)$/.test(payload.action)) { const r = await cfPreciosEscribir(payload); if (r) return r; }
+        if (/^cmp_(orden_precio|orden_nueva|orden_avisar|avisar_lista|marcar|marcar_lote|desc_divisas)$/.test(payload.action)) { const r = await cfPreciosEscribir(payload); if (r) return r; }
         if (CF_ALMACEN_ACC.test(payload.action)) { const r = await cfAlmacenEscribir(payload); if (r) return r; }
+        if (/^req_(productos_guardar|exhibicion_guardar|variedad_guardar|ventas_guardar|ventas_borrar|guardar|telegram)$/.test(payload.action)) { const r = await cfReqEscribir(payload); if (r) return r; }
+        if (payload.action === 'vx_anular') { const r = await cfVxAnular(payload); if (r) return r; }
+        if (/^(cuadre_tol|cuentas_listar|cuentas_guardar)$/.test(payload.action)) { const r = await cfCuadreExtra(payload); if (r) return r; }
         // (15/11) Historial de nóminas: del servidor nuevo (con la Nómina encendida allá)
         if (payload.action === 'nom_historial') { const r = await cfNomHistorial(payload); if (r) return r; }
         // (12/11) Lecturas del almacén con "Usar Firebase en el Almacén" encendido: se responden aquí con lo de Firebase (sin Google)
@@ -6670,9 +6673,10 @@
          ['almaceng', 'Almacén y Facturar (guardar)', 'notas de entrega, anular y modificar, productos, clientes, proveedores y operaciones de inventario (sin las compras)', 'cfAlmacengAbrir'],
          ['comprasg', 'Compras (guardar)', 'leer la factura (con otro modelo a la vez si tarda), compras en curso, guardar y anular la compra', 'cfComprasgAbrir'],
          ['preciosg', 'Precios en tiendas (guardar)', 'definir precios, cambios sin compra, marcas de cada tienda y avisos por Telegram', 'cfPreciosgAbrir'],
+         ['reqg', 'Requerimientos de charcutería (guardar)', 'catálogo, exhibición, variedad, ventas, generar requerimiento y envío por Telegram', 'cfReqgAbrir'],
          ['tareasg', 'Tareas automáticas', 'avisos de quién no ha llegado a cada tienda y los pagos del día y de la semana de Cuentas por pagar', 'cfTareasAbrir']].forEach(([k, nombre, desc, fn]) => {
             if (!(k in otros)) return;
-            const google = ['facturar', 'ficha', 'marcaje', 'cuadre', 'pagos', 'cobrar', 'nominag', 'asisg', 'horariog', 'talento', 'almaceng', 'comprasg', 'preciosg', 'tareasg'].includes(k);
+            const google = ['facturar', 'ficha', 'marcaje', 'cuadre', 'pagos', 'cobrar', 'nominag', 'asisg', 'horariog', 'talento', 'almaceng', 'comprasg', 'preciosg', 'reqg', 'tareasg'].includes(k);
             const antes = google ? '<span class="chip st-pend">' + (k === 'facturar' ? 'Lee de Google' : 'Lo procesa Google') + '</span>' : '<span class="chip st-info">En Firebase</span>';
             filas.push({ si: !!otros[k], cf: !!otros[k], html: `<tr><td class="izq"><b>${nombre}</b><small>${desc}</small></td><td class="izq">${otros[k] ? chipCF : antes}</td>
                 <td class="fb-acc"><button type="button" class="${otros[k] ? 'btn-ghost' : 'btn-primary'} btn-mini" onclick="${fn}(this)">${otros[k] ? (google ? 'Volver a Google' : 'Detalle') : 'Pasar al servidor nuevo'}</button></td></tr>` });
@@ -6879,7 +6883,7 @@
     }
     // (16/11) Almacén y Facturar en el servidor nuevo (las compras siguen en Google). Lo que en Google traía todo el almacén
     // (productos, clientes, anular, importar) responde corto: el almacén se vuelve a leer del servidor nuevo (o de Google, sin ese permiso).
-    const CF_ALMACEN_ACC = /^alm_(facturar|anular|nota_marcar|ingreso_verificar|ingreso_fiscal|nota_credito|nota_modificar|espera_guardar|espera_retomar|producto_guardar|importar|cliente_guardar|proveedor_guardar|ingresar|tg_imagen)$/;
+    const CF_ALMACEN_ACC = /^alm_(facturar|anular|nota_marcar|ingreso_verificar|ingreso_fiscal|nota_credito|nota_modificar|espera_guardar|espera_retomar|producto_guardar|importar|cliente_guardar|proveedor_guardar|ingresar|tg_imagen|telegram_nota|config)$/;
     async function cfAlmacenEscribir(p) {
         if (!cfModuloEncendido('almaceng')) return null;
         const t0 = performance.now(), r = await cfEscribir(Object.assign({}, p, { modulo: 'almaceng', repetible: /^alm_(espera_guardar|espera_retomar|tg_imagen)$/.test(p.action) }));
@@ -6911,6 +6915,27 @@
         anotarTiempo(p.action + ' (Cloudflare)', Math.round(performance.now() - t0), 0, true);
         return r;
     }
+    // (21/11) Requerimientos de charcutería, anulación de Venta express y ajustes de Cuadre en el servidor nuevo
+    async function cfReqEscribir(p) {
+        if (!cfModuloEncendido('reqg')) return null;
+        const t0 = performance.now(), r = await cfEscribir(Object.assign({}, p, { modulo: 'reqg', repetible: p.action === 'req_telegram' }));
+        if (r) anotarTiempo(p.action + ' (Cloudflare)', Math.round(performance.now() - t0), 0, true);
+        return r;
+    }
+    async function cfVxAnular(p) {
+        if (!cfModuloEncendido('vx')) return null;
+        const t0 = performance.now(), r = await cfEscribir(Object.assign({}, p, { modulo: 'vx', repetible: false }));
+        if (r) anotarTiempo('vx_anular (Cloudflare)', Math.round(performance.now() - t0), 0, true);
+        return r;
+    }
+    async function cfCuadreExtra(p) {
+        if (!cfModuloEncendido('cuadre')) return null;
+        const t0 = performance.now(), r = await cfEscribir(Object.assign({}, p, { modulo: 'cuadre', repetible: p.action === 'cuentas_listar' }));
+        if (r) anotarTiempo(p.action + ' (Cloudflare)', Math.round(performance.now() - t0), 0, true);
+        return r;
+    }
+    function cfReqgAbrir(btn) { return cfModuloSwitch(btn, 'reqg', 'cf_reqg', 'Requerimientos de charcutería',
+        'Requerimientos de charcutería guardará directo en el servidor nuevo: catálogo, exhibición mínima, variedad mínima, períodos de ventas, generar requerimientos y envío al grupo "Actividades y transporte" por Telegram. Si el servidor nuevo no responde, se guarda en Google como antes.'); }
     function cfTareasAbrir(btn) { return cfModuloSwitch(btn, 'tareasg', 'cf_tareas', 'las tareas automáticas',
         'El servidor nuevo enviará solo, cada 5 minutos: a los 5 minutos de la entrada, al grupo de cada tienda quién no ha llegado; a los 15, al grupo "Equipo de información" (o que la tienda no ha abierto), y el personal con su propio horario; y cada mañana desde las 7 (y los lunes, la semana) los pagos de Cuentas por pagar al grupo de Administración. Google deja de enviarlos para que no lleguen dos veces. Las demás tareas (correo de Bancrecer, copia diaria, BigSoft) siguen en Google.'); }
     function cfPreciosgAbrir(btn) { return cfModuloSwitch(btn, 'preciosg', 'cf_preciosg', 'Precios en tiendas',
