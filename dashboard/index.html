@@ -2478,6 +2478,7 @@
             <div id="loginError" class="login-error"></div>
             <button type="submit" class="btn-primary btn-login" id="btnLogin">Entrar</button>
             <button type="button" class="btn-ghost btn-marcaje" onclick="irA('marcaje')">Equipo de marcaje · asistencia con carnet</button>
+            <p style="margin:.85rem 0 0;font-size:.8rem;text-align:center"><a href="#" onclick="cambiarEmpresaLogin();return false;" style="color:var(--muted);text-decoration:none">Cambiar de empresa · <span id="loginEmpSlug"></span></a></p>
         </form>
     </section>
     <!-- ============ EQUIPO DE MARCAJE (asistencia con carnet) ============ -->
@@ -5472,6 +5473,13 @@
             };
             const venceAj = {};
             cxc.filter(m => m.tipo === 'VENCE').forEach(m => { if (/^\d{4}-\d{2}-\d{2}$/.test(m.vence)) venceAj[m.aplicado] = m.vence; });
+            const cajeroPorFicha = new Map();
+            if (H['BASE DE DATOS CUADRE DE CAJA']) {
+                filasHoja(H['BASE DE DATOS CUADRE DE CAJA'], 9).forEach(({ r }) => {
+                    const f = textoCelda(r[0]), caj = textoCelda(r[7]);
+                    if (f && caj) cajeroPorFicha.set(f, caj);
+                });
+            }
             const deudas = [], gastosVerif = [];
             filasHoja(H['BD NOMINA'], 13).forEach(({ r, fila }) => {
                 const pagado = esVerdadero(r[3]), fecha = normalizarFecha(r[1]), nombre = textoCelda(r[5]);
@@ -5486,10 +5494,11 @@
                 if (!fecha || !nombre || (!bs && !usd)) return;
                 const gasto = /^gastos\b/i.test(nombre), quien = gasto ? null : buscarPersona(nombre);
                 const vence = gasto ? '' : (venceAj['N:' + fila] || viernesDeLaSemana(fecha));
+                const ficha = textoCelda(r[11]);
                 deudas.push(conAbonado({
                     ref: 'N:' + fila, num: 'NOM-' + fila, fila, origen: 'BD NOMINA', fecha, nombre, id: quien ? quien.id : '', tipoPersona: gasto ? 'Gasto de tienda' : quien ? quien.tipo : 'Sin registrar',
                     local: textoCelda(r[6]), tipo: textoCelda(r[7]), bs: Math.round(bs * 100) / 100, usd: Math.round(usd * 100) / 100, tasa,
-                    descripcion: textoCelda(r[10]), ficha: textoCelda(r[11]), turno: textoCelda(r[12]),
+                    descripcion: textoCelda(r[10]), ficha, cajero: cajeroPorFicha.get(ficha) || '', turno: textoCelda(r[12]),
                     vence, estado: pagado ? 'pagado' : gasto ? 'pendiente' : vence < hoy ? 'vencido' : 'vigente'
                 }));
             });
@@ -8136,6 +8145,7 @@
         estrella: navSvg('M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6 6.6 19.5l1.2-6L3.3 9.3l6.1-.7z'),
         reloj: navSvg('M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2'), salir: navSvg('M14 4h5v16h-5M10 8l-4 4 4 4M6 12h10'),
         llave: navSvg('M8 19a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM10.8 12.2 20 3M17 6l3 3M14 9l2 2'),
+        empresa: navSvg('M3 21h18M5 21V7l7-4 7 4v14M9 9h2M13 9h2M9 13h2M13 13h2M9 17h6'),
         lado: navSvg('M4 5h16v14H4zM9 5v14'),
         puntos: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>'
     };
@@ -8274,6 +8284,7 @@
                 }).join('')}
             </nav>
             <div class="mt-pie">
+                ${CF_SOLO && esPrincipal ? `<button type="button" class="mt-item" onclick="navCajon = false; navPintarTodo(); miEmpAbrirModal()">${NAV_ICO.empresa}<span class="mt-t">Mi empresa</span></button>` : ''}
                 ${esPrincipal ? `<button type="button" class="mt-item${actual === 'admin' ? ' activo' : ''}" onclick="irA('admin')">${NAV_ICO.llave}<span class="mt-t">Claves y permisos</span></button>` : ''}
                 <button type="button" class="mt-item" onclick="navCajon = false; navPintarTodo(); verTiempos()">${NAV_ICO.reloj}<span class="mt-t">Tiempos de respuesta</span></button>
                 <button type="button" class="mt-item mt-salir" onclick="cerrarSesion()">${NAV_ICO.salir}<span class="mt-t">Salir</span></button>
@@ -15211,6 +15222,22 @@
             ${editable ? `<div class="nom-card-pie">Toque un turno para pagarlo como horas extra (o volverlo normal).<button type="button" class="btn-ghost btn-mini" style="margin-left:auto" onclick="nomAsisAbrir('${id}')" title="${esPrincipal ? 'Corregir entradas y salidas, agregar o quitar días' : 'Requiere la clave de un administrador'}">✎ Modificar días y horas</button></div>` : ''}
         </div>`;
         // ---- Gastos ----
+        const cajeroDeFicha = f => {
+            if (!f) return '';
+            const caja = (typeof filas !== 'undefined' && Array.isArray(filas)) ? filas.find(x => String(x.ficha) === String(f)) : null;
+            return caja ? (caja.cajero || '') : '';
+        };
+        const gastoMeta = (y, numTxt, extra) => {
+            const p = [];
+            if (numTxt) p.push(numTxt);
+            if (y && y.bs > 0) p.push('Bs ' + fmt(y.bs));
+            if (y && y.ficha) p.push('ficha ' + y.ficha);
+            const caj = y ? (y.cajero || cajeroDeFicha(y.ficha)) : '';
+            if (caj) p.push('Cajero: ' + caj);
+            else if (y && y.registradoPor) p.push('Registró: ' + y.registradoPor);
+            if (extra) p.push(extra);
+            return p.map(esc).join(' · ');
+        };
         let gastos;
         if (c) {
             // Los descontados y los excluidos, como antes de cerrar (el interruptor muestra cómo quedó); fecha y descripción desde Cuentas por cobrar
@@ -15219,7 +15246,7 @@
             const filaG = (s, excluida) => {
                 const [num, monto] = s.split(' '), y = mapa && mapa.get(num);
                 return `<tr class="${excluida ? 'nom-excl' : ''}"><td>${perUsd(monto)}</td><td>${y ? fechaBonita(y.fecha).slice(0, 5) : ''}</td>
-                    <td class="izq">${y ? esc([y.local ? nomSigla(y.local) : '', y.tipo === 'DEUDA' ? '' : y.tipo, y.descripcion].filter(Boolean).join(' · ')) : ''}<small>${esc(num)}${excluida ? ' · excluido: sigue pendiente en Cuentas por cobrar' : ''}</small></td>
+                    <td class="izq">${y ? esc([y.local ? nomSigla(y.local) : '', y.tipo === 'DEUDA' ? '' : y.tipo, y.descripcion].filter(Boolean).join(' · ')) : ''}<small>${gastoMeta(y, num, excluida ? 'excluido: sigue pendiente en Cuentas por cobrar' : '')}</small></td>
                     <td><label class="interruptor interruptor-solo fijo" title="Nómina cerrada: no se puede cambiar"><input type="checkbox" disabled ${excluida ? 'checked' : ''}><span class="sw-pista"></span></label></td></tr>`;
             };
             const lista = s => String(s || '').split(' ; ').filter(Boolean);
@@ -15231,7 +15258,7 @@
         } else {
             gastos = (n.deudas.length ? `<table class="nom-gas"><thead><tr><th>Monto $</th><th>Fecha</th><th class="izq">Descripción</th><th></th><th title="No descontarlo en esta nómina: queda pendiente en Cuentas por cobrar">Excluir</th></tr></thead><tbody>
                 ${n.deudas.map(y => `<tr class="${n.excl.has(y.ref) ? 'nom-excl' : ''}"><td>${perUsd(y.usd)}</td><td>${fechaBonita(y.fecha).slice(0, 5)}</td>
-                    <td class="izq">${esc([y.local ? nomSigla(y.local) : '', y.tipo === 'DEUDA' ? '' : y.tipo, y.descripcion].filter(Boolean).join(' · '))}<small>${esc(y.num || '')}${y.ficha ? ' · ficha ' + esc(y.ficha) : ''}</small>${y.abonado ? `<small>ya abonó ${perUsd(y.abonado)}</small>` : ''}${n.posterior.has(y.ref) ? `<small>${n.excl.has(y.ref) ? 'de después de esta semana: excluido solo' : 'de después de esta semana: incluido a mano'}</small>` : ''}</td>
+                    <td class="izq">${esc([y.local ? nomSigla(y.local) : '', y.tipo === 'DEUDA' ? '' : y.tipo, y.descripcion].filter(Boolean).join(' · '))}<small>${gastoMeta(y, y.num || '')}</small>${y.abonado ? `<small>ya abonó ${perUsd(y.abonado)}</small>` : ''}${n.posterior.has(y.ref) ? `<small>${n.excl.has(y.ref) ? 'de después de esta semana: excluido solo' : 'de después de esta semana: incluido a mano'}</small>` : ''}</td>
                     <td><button type="button" class="btn-ghost btn-mini nom-gas-mod" title="Modificar este gasto (monto, descripción, vencimiento o descuento)" aria-label="Modificar" onclick="perCuentaAbrir('${esc(y.ref)}', 'nom')">✎<span> Modificar</span></button></td>
                     <td><label class="interruptor interruptor-solo" title="Excluir de esta nómina (queda pendiente en Cuentas por cobrar)"><input type="checkbox" ${n.excl.has(y.ref) ? 'checked' : ''} onchange="nomExcluir('${id}', '${esc(y.ref)}', this.checked, ${n.posterior.has(y.ref)})"><span class="sw-pista"></span></label></td></tr>`).join('')}
                 </tbody><tfoot><tr><td class="nom-rojo">${perUsd(n.aDebitar)}</td><td colspan="4" class="izq">TOTAL${n.excl.size ? ` · ${n.excl.size} excluido(s), quedan pendientes` : ''}</td></tr></tfoot></table>`
@@ -16981,7 +17008,7 @@
             ${aplic.length ? `<div class="req-sub" style="margin-top:.6rem"><b>Movimientos aplicados</b></div><ul class="per-cuenta-movs">${aplic.map(a => `<li>${fechaBonita(a.fecha)} · ${a.tipo === 'ABONO' ? 'Abono' : 'Descuento'} ${esc(a.id)} · <b>${perUsd(a.usd)}</b>${a.nota ? ' · ' + esc(a.nota) : ''}${a.quien ? ' · ' + esc(a.quien) : ''}</li>`).join('')}</ul>` : ''}
             <div id="pcComCaja">${perCuentaComHTML(x)}</div>
             </div><div>
-            ${pagada ? '<div class="nota">Esta cuenta ya está pagada: no se puede modificar.</div><div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-ghost" onclick="document.getElementById(\'perCuentaDlg\').classList.add(\'hidden\')">Cerrar</button></div>' : `
+            ${pagada ? `<div class="nota">Esta cuenta ya está pagada: no se puede modificar.</div><div class="req-acciones" style="justify-content:space-between;margin-bottom:0"><button type="button" class="btn-ghost" onclick="document.getElementById('perCuentaDlg').classList.add('hidden');perHistAbrir(perCuentaX.nombre)">Ver estado de cuenta</button><button type="button" class="btn-ghost" onclick="document.getElementById('perCuentaDlg').classList.add('hidden')">Cerrar</button></div>` : `
             <div class="req-sub" style="margin-top:.8rem"><b>Modificar</b> (clave de administrador)</div>
             <div class="per-reg">
                 ${panel ? `<label>Fecha de la deuda<input type="date" id="pcFecha" value="${x.fecha}" max="${fechaLocalHoy()}" onchange="perCuentaVence('fechaDeuda', '${x.fecha}')"></label>
@@ -16999,10 +17026,33 @@
                 <label>Clave de administrador<input type="password" id="pcClave" autocomplete="off" value="${esc(perClaveVerif)}" required></label>
                 <div class="per-reg-ancho" id="pcRes"></div>
             </div>
-            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-ghost" onclick="document.getElementById('perCuentaDlg').classList.add('hidden')">Cerrar</button><button type="submit" class="btn-primary" id="pcBtn">Guardar cambios</button></div>`}
+            <div class="req-acciones" style="justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-bottom:0">
+                <div style="display:flex;gap:.45rem;flex-wrap:wrap">
+                    ${gasto ? '' : `<button type="button" class="btn-primary" onclick="perCuentaAbonar('${ref}')">Pagar / Abonar</button>`}
+                    <button type="button" class="btn-ghost" onclick="document.getElementById('perCuentaDlg').classList.add('hidden');perHistAbrir(perCuentaX.nombre)">Ver estado de cuenta</button>
+                </div>
+                <div style="display:flex;gap:.45rem">
+                    <button type="button" class="btn-ghost" onclick="document.getElementById('perCuentaDlg').classList.add('hidden')">Cerrar</button>
+                    <button type="submit" class="btn-primary" id="pcBtn">Guardar cambios</button>
+                </div>
+            </div>`}
             </div></div>
         </form>`;
         fondo.classList.remove('hidden');
+    }
+    function perCuentaAbonar(ref) {
+        const x = perCuentaX && perCuentaX.ref === ref ? perCuentaX : null;
+        if (!x) return;
+        const d = document.getElementById('perCuentaDlg'); if (d) d.classList.add('hidden');
+        perRegTipo = 'ABONO';
+        perRegMoneda = '$';
+        perReg.perRegPersona = x.nombre + (x.id ? ' · ' + x.id : '');
+        perReg.perRegUsd = Number(x.usd || 0) > 0 ? Number(x.usd).toFixed(2) : '';
+        perReg.perRegBs = '';
+        perRegSel = new Set([x.ref]);
+        perRegSelDe = x.id || x.nombre;
+        perRegAbrir();
+        setTimeout(() => { const el = document.getElementById('perRegUsd'); if (el) { el.focus(); el.select(); } }, 80);
     }
     // (15/11) Comentarios de la cuenta: los cambios quedan solos (con quién, cuándo y el motivo) y se pueden agregar a mano sin clave
     function perCuentaComHTML(x) {
@@ -25917,8 +25967,9 @@ Reglas:
         if (typeof LOGO_ACTUAL_CF !== 'undefined') LOGO_ACTUAL_CF = esImg ? `<img src="${logoData}" alt="" style="width:28px;height:28px;object-fit:contain;border-radius:5px">` : LOGO_JD_SVG;
     }
     let LOGO_ACTUAL_CF = LOGO_JD_SVG;
-    function miEmpPintar() {
-        const box = document.getElementById('admMiEmpresa');
+    function miEmpPintar(destino) {
+        const dlg = document.getElementById('miEmpDlg');
+        const box = destino || (dlg && !dlg.classList.contains('hidden') ? document.getElementById('miEmpDlgCaja') : document.getElementById('admMiEmpresa'));
         if (!box) return;
         if (!CF_SOLO || !esPrincipal) { box.classList.add('hidden'); return; }
         box.classList.remove('hidden');
@@ -25984,14 +26035,39 @@ Reglas:
         if (tk || gr) { empresa.telegram = {}; if (tk) empresa.telegram.token = tk; if (gr) empresa.telegram.grupos = { general: gr }; }
         btn.disabled = true; msj.textContent = 'Guardando...';
         try {
-            const r = await llamarApi({ action: 'cfg_guardar', claveAdmin: admClave, empresa });
+            const r = await llamarApi({ action: 'cfg_guardar', claveAdmin: admClave || clave, empresa });
             miEmpLogoB64 = null;
             if (r.empresa) aplicarEmpresaCF(r.empresa);
             msj.textContent = 'Configuración guardada.';
             mostrarBanner('Datos de la empresa actualizados.', 'ok');
             miEmpPintar();
+            const dlg = document.getElementById('miEmpDlg'); if (dlg) dlg.classList.add('hidden');
         } catch (e) { msj.textContent = 'Error: ' + e.message; }
         finally { btn.disabled = false; }
+    }
+    function miEmpAbrirModal() {
+        if (!CF_SOLO || !esPrincipal) return;
+        let fondo = document.getElementById('miEmpDlg');
+        if (!fondo) {
+            fondo = document.createElement('div'); fondo.id = 'miEmpDlg'; fondo.className = 'req-dlg-fondo';
+            fondo.onclick = e => { if (e.target === fondo) fondo.classList.add('hidden'); };
+            document.body.appendChild(fondo);
+        }
+        fondo.innerHTML = `<div class="req-dlg" style="width:min(620px,100%)"><div id="miEmpDlgCaja"></div><div class="req-acciones" style="justify-content:flex-end;margin:.6rem 0 0"><button type="button" class="btn-ghost" onclick="document.getElementById('miEmpDlg').classList.add('hidden')">Cerrar</button></div></div>`;
+        const box = document.getElementById('admMiEmpresa');
+        if (box) box.innerHTML = '';
+        fondo.classList.remove('hidden');
+        miEmpPintar(document.getElementById('miEmpDlgCaja'));
+    }
+    function cambiarEmpresaLogin() {
+        const cur = CF_EMPRESA || 'plaza-valencia';
+        const v = prompt('Escriba el código de empresa (ej: panaderia, super, plaza-valencia):', cur);
+        if (v === null) return;
+        const s = v.trim().toLowerCase();
+        if (!/^[a-z0-9][a-z0-9-]{1,40}$/.test(s)) { alert('Código inválido: use solo minúsculas, números y guiones.'); return; }
+        const u = new URL(location.href);
+        if (s === 'plaza-valencia') u.searchParams.delete('empresa'); else u.searchParams.set('empresa', s);
+        location.href = u.toString();
     }
 
     function aplicarEmpresaCF(emp, tiendasLista, logoOpcional) {
@@ -26038,6 +26114,8 @@ Reglas:
 
     // Retomar la sesión si la pestaña se recarga (se borra al cerrar la pestaña o pulsar "Salir")
     (function () {
+        const slugEl = document.getElementById('loginEmpSlug');
+        if (slugEl) slugEl.textContent = CF_EMPRESA;
         if (CF_SOLO) {
             // Identidad JD Solution para empresas cliente (nunca logo ni marcas de Plaza Valencia)
             const logoCab = document.querySelector('.header-title .logo-ccpv');
