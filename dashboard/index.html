@@ -7560,9 +7560,7 @@
     // Solo se avisa si el script de Google es ANTERIOR al panel (al panel le faltarían funciones). Si el script es más nuevo
     // (se publicó el script y el panel instalado todavía no se actualizó) todo sigue funcionando: el script nuevo atiende al panel viejo.
     function avisarScriptViejo() {
-        if (scriptViejo || !servidorVersion || compararVersion(servidorVersion, VERSION_SERVIDOR) < 0) mostrarBanner('El script publicado en Google es una versión anterior a este panel' + (servidorVersion ? ' (' + servidorVersion + ')' : '') + ': ' +
-            'algunas funciones nuevas no van a responder. En la PC del proyecto haga doble clic en "Publicar Apps Script.cmd" (carpeta AutomatizacionPlaza) ' +
-            'y espere a que diga LISTO; luego Salir y entrar de nuevo. Este panel espera la versión ' + VERSION_SERVIDOR + '.', 'warn');
+        // (22/11) Desactivado: el panel ya trabaja directo contra Cloudflare y este aviso técnico confunde a los usuarios.
     }
     // Talento humano salió de Nómina: quien tiene Nómina también lo ve (el servidor le permite lo mismo)
     // Dueño de la copia local de los datos: el nombre y sus permisos (otra clave, u otros permisos, no ve lo de esta)
@@ -8272,7 +8270,7 @@
         }
         if (!(lado || cajon)) return;
         const por = navPend(), areas = navAreas(), actual = vistaActual;
-        if (!navAbiertas) { navAbiertas = {}; areas.forEach(id => { navAbiertas[id] = true; }); }
+        if (!navAbiertas) { navAbiertas = {}; areas.forEach(id => { navAbiertas[id] = false; }); }
         const sub = id => navGruposDe(id).reduce((l, g) => l.concat(g[1]), []).map(m =>
             `<button type="button" class="mt-item${actual === m.id ? ' activo' : ''}" onclick="navIr('${m.id}')"><span class="mt-t">${esc(m.titulo)}</span>${navN(por[m.id])}</button>`).join('');
         pintarConservando(el, `<div class="mt-cab">${CF_SOLO ? LOGO_ACTUAL_CF : LOGO_SVG}<b>${esc(CF_SOLO ? (TITULOS.menu || 'JD Solution') : 'Plaza Software')}</b>${compu ? '' : `<button type="button" class="btn-ghost btn-icono" onclick="navTodo()" aria-label="Cerrar el menú">${NAV_ICO.x}</button>`}</div>
