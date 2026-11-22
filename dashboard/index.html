@@ -3995,6 +3995,35 @@
             anotarTiempo(payload.action + ' (Cloudflare)', performance.now() - t0, typeof data.ms === 'number' ? data.ms : null, true);
             return data;
         }
+        // (22/11) Ingreso rápido en Plaza Valencia: valida primero en Cloudflare (~0,1 s) y deja cfSes listo;
+        // si la clave aún no se sincronizó o Cloudflare no responde, cae al respaldo de Apps Script sin trabar a nadie.
+        let cfLoginFallo = false;
+        if (payload.action === 'login' && typeof CF_URL === 'string' && CF_URL) {
+            const ctrl = new AbortController(), tm = setTimeout(() => ctrl.abort(), 4500);
+            try {
+                const rc = await fetch(CF_URL + '/api', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify({ empresa: CF_EMPRESA, action: 'login', clave, eq: EQUIPO_ID, disp: payload.disp || DISPOSITIVO }),
+                    signal: ctrl.signal
+                });
+                const dc = await rc.json().catch(() => null);
+                if (dc && dc.ok && dc.usuario) {
+                    Object.assign(cfSes, { token: dc.token || '', vence: dc.vence || (Date.now() + 3600000), clave, modulos: (dc.empresa || {}).modulos || {}, modHora: Date.now(), mala: '' });
+                    const u = dc.usuario, todos = MODULOS.map(m => m.id).concat(['verexistencia', 'rep_existencia', 'rep_ajustes', 'rep_ventas']);
+                    anotarTiempo('login (Cloudflare)', performance.now() - t0, typeof dc.ms === 'number' ? dc.ms : null, true);
+                    return Object.assign({}, dc, {
+                        nombre: u.nombre || 'Administrador',
+                        principal: !!u.principal,
+                        admin: !!u.admin,
+                        permisos: (u.principal || u.admin) ? todos : (u.permisos || []),
+                        version: VERSION_SERVIDOR
+                    });
+                }
+                cfLoginFallo = true;
+            } catch (e) { cfLoginFallo = true; }
+            finally { clearTimeout(tm); }
+        }
         let resp;
         try {
             resp = await fetch(WEB_APP_URL, {
@@ -4019,6 +4048,7 @@
         // "Acción no válida": el panel es más nuevo que el script de Google (falta publicar la versión nueva de Apps Script)
         if (!data.ok && data.error === 'Acción no válida') throw new Error('El servidor de Google todavía no tiene esta función. Publique la versión nueva de Apps Script (CuadreSistema y Personal: Implementar › Gestionar implementaciones › Nueva versión), salga y vuelva a entrar.');
         if (!data.ok) throw new Error(data.error || 'Error desconocido');
+        if (cfLoginFallo && payload.action === 'login') setTimeout(() => { try { llamarApi({ action: 'cf_claves' }).catch(() => {}); } catch (e) {} }, 800);
         anotarTiempo(payload.action, performance.now() - t0, typeof data.ms === 'number' ? data.ms : null, true, data.pasos);
         return data;
     }
