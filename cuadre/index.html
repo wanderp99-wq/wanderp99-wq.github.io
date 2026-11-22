@@ -1275,6 +1275,14 @@
         // (21/11) Solo servidor Cloudflare (Firebase retirado); sin internet siguen las últimas guardadas en el equipo
         try {
             const cf = await cfPublico('pub_listas', {}, 8000);
+            if (cf && cf.empresa) {
+                document.title = 'Control de Caja · ' + cf.empresa;
+                const sp = document.querySelector('.titulo-logo span'); if (sp) sp.textContent = cf.empresa + ' · Control de Caja';
+            }
+            if (cf && Array.isArray(cf.tiendas) && cf.tiendas.length && typeof LOCALES !== 'undefined' && CF_EMPRESA !== 'plaza-valencia') {
+                LOCALES.length = 0; cf.tiendas.forEach(t => LOCALES.push(t));
+                if (typeof pintarLocales === 'function') pintarLocales();
+            }
             if (cf && cf.listas) {
                 const l = {};
                 ['bancosTDD', 'bancosPM', 'titularesTDD', 'titularesPM', 'tiposGasto'].forEach(k => { if (Array.isArray(cf.listas[k])) l[k] = cf.listas[k].filter(x => typeof x === 'string'); });
@@ -1290,7 +1298,16 @@
     // ==========================================
     // SERVIDOR CLOUDFLARE (21/11, Firebase retirado): la ficha y el marcaje van directo a Cloudflare.
     // ==========================================
-    const CF_API = 'https://plaza-software.jdsistemas.workers.dev/api', CF_EMPRESA = 'plaza-valencia';
+    const CF_API = 'https://plaza-software.jdsistemas.workers.dev/api';
+    const CF_EMPRESA = (() => {
+        try {
+            const p = new URLSearchParams(location.search).get('empresa');
+            if (p && /^[a-z0-9][a-z0-9-]{1,40}$/i.test(p.trim())) { const s = p.trim().toLowerCase(); localStorage.setItem('ps_empresa', s); return s; }
+            const g = localStorage.getItem('ps_empresa');
+            if (g && /^[a-z0-9][a-z0-9-]{1,40}$/.test(g)) return g;
+        } catch (e) {}
+        return 'plaza-valencia';
+    })();
     async function cfPublico(action, datos, ms) {
         const c = new AbortController(), t = setTimeout(() => c.abort(), ms || 8000);
         try {

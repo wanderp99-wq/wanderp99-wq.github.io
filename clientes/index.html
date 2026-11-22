@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plaza Software · Administración de clientes</title>
+<style>
+  :root { --bg:#0f172a; --card:#1e293b; --line:#334155; --txt:#f1f5f9; --muted:#94a3b8; --pri:#44AC00; --ok:#22c55e; --warn:#f59e0b; --err:#ef4444; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--txt); padding:1.2rem; }
+  .wrap { max-width:960px; margin:0 auto; }
+  h1 { font-size:1.35rem; margin:0 0 .25rem; }
+  .sub { color:var(--muted); font-size:.9rem; margin:0 0 1.2rem; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:1.1rem; margin-bottom:1rem; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:.75rem; }
+  label { display:block; font-size:.82rem; color:var(--muted); margin-bottom:.25rem; }
+  input { width:100%; padding:.6rem .75rem; border-radius:8px; border:1px solid var(--line); background:#0b1220; color:var(--txt); font-size:.95rem; }
+  button { padding:.55rem .9rem; border-radius:8px; border:1px solid var(--line); background:#0b1220; color:var(--txt); font-weight:600; cursor:pointer; font-size:.86rem; }
+  button.pri { background:var(--pri); border-color:var(--pri); color:#fff; }
+  button.err { border-color:var(--err); color:#fca5a5; }
+  button:disabled { opacity:.55; cursor:wait; }
+  .row { display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; }
+  .msj { font-size:.88rem; margin-top:.6rem; min-height:1.2em; }
+  .msj.ok { color:var(--ok); } .msj.err { color:#fca5a5; }
+  table { width:100%; border-collapse:collapse; margin-top:.6rem; font-size:.9rem; }
+  th, td { padding:.65rem .5rem; border-bottom:1px solid var(--line); text-align:left; vertical-align:middle; }
+  th { color:var(--muted); font-size:.78rem; text-transform:uppercase; letter-spacing:.04em; }
+  .chip { display:inline-block; padding:.18rem .55rem; border-radius:999px; font-size:.76rem; font-weight:600; }
+  .chip.on { background:rgba(34,197,94,.16); color:#86efac; }
+  .chip.off { background:rgba(239,68,68,.18); color:#fca5a5; }
+  .hidden { display:none !important; }
+  @media (max-width:640px) { table, thead, tbody, tr, td { display:block; } thead { display:none; } tr { border:1px solid var(--line); border-radius:10px; padding:.5rem; margin-bottom:.6rem; } td { border:none; padding:.3rem 0; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Plaza Software · Panel de clientes</h1>
+  <p class="sub">Administración multiempresa (JD Sistemas). Crear clientes, copiar enlaces, descargar respaldos y controlar acceso.</p>
+
+  <section id="loginCard" class="card">
+    <form onsubmit="entrar(event)">
+      <div class="grid">
+        <div>
+          <label for="apiUrl">Servidor Cloudflare</label>
+          <input id="apiUrl" value="https://plaza-software.jdsistemas.workers.dev" required>
+        </div>
+        <div>
+          <label for="claveDueno">Clave del dueño (DUENO_CLAVE)</label>
+          <input id="claveDueno" type="password" autocomplete="off" placeholder="Escriba su clave maestra" required>
+        </div>
+      </div>
+      <div class="row" style="margin-top:.8rem">
+        <button type="submit" class="pri" id="btnEntrar">Entrar</button>
+      </div>
+      <div id="loginMsj" class="msj"></div>
+    </form>
+  </section>
+
+  <section id="panel" class="hidden">
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <b>Nueva empresa cliente</b>
+        <button type="button" onclick="salir()">Cerrar sesión</button>
+      </div>
+      <form onsubmit="crearEmpresa(event)" style="margin-top:.75rem">
+        <div class="grid">
+          <div><label for="cSlug">Identificador (slug, sin espacios)</label><input id="cSlug" placeholder="ej: super-norte" pattern="[a-z0-9][a-z0-9\-]{1,40}" required></div>
+          <div><label for="cNombre">Nombre comercial</label><input id="cNombre" placeholder="ej: Supermercado Norte C.A." required></div>
+          <div><label for="cTiendas">Sedes / tiendas (separadas por coma)</label><input id="cTiendas" placeholder="Principal, Sucursal 2" required></div>
+          <div><label for="cClave">Clave principal inicial (mín. 6)</label><input id="cClave" minlength="6" placeholder="Clave del dueño del cliente" required></div>
+        </div>
+        <div class="row" style="margin-top:.8rem">
+          <button type="submit" class="pri" id="btnCrear">Crear empresa lista para usar</button>
+        </div>
+        <div id="crearMsj" class="msj"></div>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <b>Empresas registradas</b>
+        <button type="button" onclick="cargar()">Actualizar lista</button>
+      </div>
+      <div id="listaMsj" class="msj"></div>
+      <table>
+        <thead><tr><th>Empresa</th><th>Identificador</th><th>Estado</th><th>Acciones</th></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </section>
+</div>
+<script>
+let DUENO = '', BASE = '';
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+
+async function llamar(datos) {
+  const r = await fetch(BASE.replace(/\/+$/, '') + '/api', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(Object.assign({ dueno: DUENO }, datos))
+  });
+  const j = await r.json().catch(() => ({ ok: false, error: 'Respuesta inválida' }));
+  if (!j.ok) throw new Error(j.error || 'Error del servidor');
+  return j;
+}
+
+async function entrar(ev) {
+  ev.preventDefault();
+  const btn = document.getElementById('btnEntrar'), msj = document.getElementById('loginMsj');
+  BASE = document.getElementById('apiUrl').value.trim();
+  DUENO = document.getElementById('claveDueno').value.trim();
+  btn.disabled = true; msj.textContent = 'Verificando...'; msj.className = 'msj';
+  try {
+    const r = await llamar({ action: 'empresas_listar' });
+    document.getElementById('loginCard').classList.add('hidden');
+    document.getElementById('panel').classList.remove('hidden');
+    pintar(r.empresas || []);
+  } catch (e) {
+    msj.textContent = e.message; msj.className = 'msj err';
+  } finally { btn.disabled = false; }
+}
+
+function salir() {
+  DUENO = ''; document.getElementById('claveDueno').value = '';
+  document.getElementById('panel').classList.add('hidden');
+  document.getElementById('loginCard').classList.remove('hidden');
+}
+
+async function cargar() {
+  const msj = document.getElementById('listaMsj');
+  msj.textContent = 'Actualizando...'; msj.className = 'msj';
+  try { const r = await llamar({ action: 'empresas_listar' }); pintar(r.empresas || []); msj.textContent = ''; }
+  catch (e) { msj.textContent = e.message; msj.className = 'msj err'; }
+}
+
+function pintar(lista) {
+  const tb = document.getElementById('tbody');
+  if (!lista.length) { tb.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">Sin empresas registradas</td></tr>'; return; }
+  tb.innerHTML = lista.map(e => {
+    const act = e.activa !== 0;
+    const f = e.creado ? new Date(e.creado).toLocaleDateString('es-VE') : '';
+    return `<tr>
+      <td><b>${esc(e.titulo || e.nombre)}</b><div style="color:var(--muted);font-size:.78rem">Creada: ${esc(f)}</div></td>
+      <td><code>${esc(e.nombre)}</code></td>
+      <td><span class="chip ${act ? 'on' : 'off'}">${act ? 'Activa' : 'Suspendida'}</span></td>
+      <td><div class="row">
+        <button type="button" onclick="copiarLink('${esc(e.nombre)}','dashboard')">Link Panel</button>
+        <button type="button" onclick="copiarLink('${esc(e.nombre)}','cuadre')">Link Ficha</button>
+        <button type="button" onclick="respaldar('${esc(e.nombre)}')">Respaldo</button>
+        <button type="button" class="${act ? 'err' : 'pri'}" onclick="cambiarEstado('${esc(e.nombre)}',${act ? 'false' : 'true'})">${act ? 'Suspender' : 'Activar'}</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+function urlApp(emp, app) {
+  const base = location.href.replace(/\/clientes\/.*$/, '/');
+  return `${base}${app}/?empresa=${encodeURIComponent(emp)}`;
+}
+
+async function copiarLink(emp, app) {
+  const u = urlApp(emp, app), msj = document.getElementById('listaMsj');
+  try { await navigator.clipboard.writeText(u); msj.textContent = 'Enlace copiado: ' + u; msj.className = 'msj ok'; }
+  catch (e) { prompt('Copie el enlace:', u); }
+}
+
+async function crearEmpresa(ev) {
+  ev.preventDefault();
+  const btn = document.getElementById('btnCrear'), msj = document.getElementById('crearMsj');
+  const empresa = document.getElementById('cSlug').value.trim().toLowerCase();
+  const nombre = document.getElementById('cNombre').value.trim();
+  const tiendas = document.getElementById('cTiendas').value.split(',').map(x => x.trim()).filter(Boolean);
+  const clave = document.getElementById('cClave').value.trim();
+  btn.disabled = true; msj.textContent = 'Creando base de datos y módulos...'; msj.className = 'msj';
+  try {
+    await llamar({ action: 'empresa_crear', empresa, nombre, tiendas, clave });
+    msj.innerHTML = `Empresa creada y lista. Panel: <code>${esc(urlApp(empresa, 'dashboard'))}</code> · Ficha: <code>${esc(urlApp(empresa, 'cuadre'))}</code>`;
+    msj.className = 'msj ok';
+    ev.target.reset();
+    await cargar();
+  } catch (e) {
+    msj.textContent = e.message; msj.className = 'msj err';
+  } finally { btn.disabled = false; }
+}
+
+async function cambiarEstado(empresa, activar) {
+  if (!confirm(`¿${activar ? 'Reactivar' : 'Suspender'} el acceso de "${empresa}"?`)) return;
+  const msj = document.getElementById('listaMsj');
+  try {
+    await llamar({ action: 'empresa_estado', empresa, activa: activar });
+    msj.textContent = `Empresa "${empresa}" ${activar ? 'activada' : 'suspendida'}.`; msj.className = 'msj ok';
+    await cargar();
+  } catch (e) { msj.textContent = e.message; msj.className = 'msj err'; }
+}
+
+async function respaldar(empresa) {
+  const msj = document.getElementById('listaMsj');
+  msj.textContent = `Generando respaldo de ${empresa}...`; msj.className = 'msj';
+  try {
+    const r = await llamar({ action: 'empresa_respaldo', empresa });
+    const blob = new Blob([JSON.stringify(r.respaldo, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `respaldo-${empresa}-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    msj.textContent = `Respaldo de ${empresa} descargado.`; msj.className = 'msj ok';
+  } catch (e) { msj.textContent = e.message; msj.className = 'msj err'; }
+}
+</script>
+</body>
+</html>

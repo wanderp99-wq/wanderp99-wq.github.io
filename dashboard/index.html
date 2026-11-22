@@ -5726,7 +5726,15 @@
     // Las mismas cuentas de siempre (CAJAFB, copia del Apps Script) sobre las hojas que guarda el servidor nuevo. El servidor solo
     // entrega las hojas (casi no gasta cálculo) y solo las que cambiaron desde la última vez. Se usa si el interruptor "caja" está
     // encendido allá y la copia tiene el último cambio que este panel conoce; si no, sigue como antes (Firebase o Google).
-    const CF_EMPRESA = 'plaza-valencia';
+    const CF_EMPRESA = (() => {
+        try {
+            const p = new URLSearchParams(location.search).get('empresa');
+            if (p && /^[a-z0-9][a-z0-9-]{1,40}$/i.test(p.trim())) { const s = p.trim().toLowerCase(); localStorage.setItem('ps_empresa', s); return s; }
+            const g = localStorage.getItem('ps_empresa');
+            if (g && /^[a-z0-9][a-z0-9-]{1,40}$/.test(g)) return g;
+        } catch (e) {}
+        return 'plaza-valencia';
+    })();
     let cfSes = { token: '', vence: 0, clave: '', modulos: null, modHora: 0, roto: 0, pidiendo: null };
     async function cfPedir(b) {
         const r = await fetch(CF_URL + '/api', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(Object.assign({ empresa: CF_EMPRESA }, b)) });
