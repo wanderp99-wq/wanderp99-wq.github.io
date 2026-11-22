@@ -25878,6 +25878,9 @@ Reglas:
             if (fav) fav.href = 'data:image/svg+xml,' + encodeURIComponent(LOGO_JD_SVG);
             const areaBs = AREAS.find(a => a.id === 'bigsoft');
             if (areaBs) { areaBs.titulo = 'Sistema de caja'; areaBs.desc = 'Integración con el sistema POS de cada tienda: cierres de caja, precios, reportes, notas por ingresar y listas de la ficha.'; }
+            const modReq = MODULOS.find(m => m.id === 'reqcharcu');
+            if (modReq) { modReq.titulo = 'Pedidos a almacén'; modReq.desc = 'Cuánto enviar a cada sede según ventas, exhibición y existencia.'; }
+            TITULOS.reqcharcu = 'Pedidos a Almacén';
             MODULOS.forEach(m => { if (m.desc) m.desc = m.desc.replace(/\bBigSoft\b/gi, 'el sistema de caja (POS)'); });
             aplicarEmpresaCF(CF_EMPRESA);
             cfPedir({ action: 'pub_listas' }).then(r => {

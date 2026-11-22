@@ -1279,6 +1279,7 @@
             if (lEl) lEl.outerHTML = jdSvg.replace('<svg ', '<svg class="logo-ccpv" ');
             const fav = document.querySelector('link[rel="icon"]');
             if (fav) fav.href = 'data:image/svg+xml,' + encodeURIComponent(jdSvg);
+            listaTitulares = ['Empresa']; listaTitularesPM = ['Empresa'];
         }
         try {
             const cf = await cfPublico('pub_listas', {}, 8000);
