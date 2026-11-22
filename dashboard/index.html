@@ -7483,8 +7483,27 @@
         { id: 'notasbs',    area: 'bigsoft', titulo: 'Notas por ingresar',    desc: 'Notas de despacho a las tiendas que faltan por ingresar en su BigSoft. Se ingresan a distancia desde aquí.', listo: true,
           acceso: ['movalmacen', 'facturar'], abrir: () => { irA(permisos.includes('movalmacen') ? 'movalmacen' : 'facturar'); almIrPendiente('notas', 'ingresar'); } }
     ];
-    // Módulo que puede abrir esta clave (un atajo se ve con cualquiera de sus permisos)
-    const moduloPermitido = m => m.acceso ? m.acceso.some(p => permisos.includes(p)) : permisos.includes(m.id);
+    // Módulo que puede abrir esta clave (un atajo se ve con cualquiera de sus permisos). En clientes, respeta los módulos del plan contratado.
+    let cfPlanModulos = null;
+    const PLAN_GRUPOS = {
+        cuadre: ['cuadre', 'pagos', 'ventas', 'listasficha'],
+        efectivo: ['efectivo', 'cajachica', 'gastos'],
+        cxp: ['cxp'],
+        cxc: ['cxc'],
+        almacen: ['movalmacen', 'inventario', 'facturar'],
+        pedidos: ['reqcharcu'],
+        rrhh: ['talento', 'horarios', 'asistencia', 'asisgestion', 'nomina', 'pagonomina'],
+        pos: ['cierrecaja', 'precios', 'notasbs', 'reportes'],
+        ventaexpress: ['ventaexpress']
+    };
+    function moduloEnPlan(id) {
+        if (!CF_SOLO || !cfPlanModulos) return true;
+        for (const k of Object.keys(PLAN_GRUPOS)) {
+            if (PLAN_GRUPOS[k].includes(id)) return cfPlanModulos[k] !== false;
+        }
+        return true;
+    }
+    const moduloPermitido = m => moduloEnPlan(m.id) && (m.acceso ? m.acceso.some(p => permisos.includes(p)) : permisos.includes(m.id));
     function abrirModulo(id) { const m = MODULOS.find(x => x.id === id); if (m && m.abrir) m.abrir(); else irA(id); }
     MODULOS.forEach(m => { if (!m.area) m.area = 'admin'; });
     let areaActual = null;   // área abierta en el menú (null = menú de áreas)
@@ -25836,6 +25855,9 @@ Reglas:
         if (!CF_SOLO) return;
         const nom = typeof emp === 'string' ? emp : (emp && emp.nombre);
         const ts = Array.isArray(tiendasLista) ? tiendasLista : (emp && Array.isArray(emp.tiendas) ? emp.tiendas : null);
+        if (emp && typeof emp === 'object' && 'plan_modulos' in emp) {
+            cfPlanModulos = emp.plan_modulos && typeof emp.plan_modulos === 'object' ? emp.plan_modulos : null;
+        }
         if (nom) {
             TITULOS.login = TITULOS.menu = nom;
             document.title = nom;

@@ -18,6 +18,7 @@
     --ps: #4ec9b0;
     --cmd: #dcdcaa;
     --ok: #3fb950;
+    --warn: #d29922;
     --err: #f85149;
     --accent: #38bdf8;
     --mono: "Cascadia Mono", "Cascadia Code", Consolas, "Courier New", ui-monospace, monospace;
@@ -29,12 +30,12 @@
     font-family: var(--mono);
     background: radial-gradient(circle at top, #101827 0%, var(--desk) 65%);
     color: var(--txt);
-    padding: 1.25rem;
-    font-size: 13.5px;
+    padding: 1.15rem;
+    font-size: 13px;
     line-height: 1.45;
   }
   .term {
-    max-width: 1020px;
+    max-width: 1120px;
     margin: 0 auto;
     background: var(--win);
     border: 1px solid var(--line-hi);
@@ -83,7 +84,7 @@
   .screen { padding: 1.15rem 1.25rem 1.35rem; }
   .banner {
     color: var(--muted);
-    font-size: 12.5px;
+    font-size: 12px;
     margin: 0 0 1rem;
     padding-bottom: .75rem;
     border-bottom: 1px dashed var(--line);
@@ -127,37 +128,49 @@
     margin-bottom: .85rem;
     border-bottom: 1px solid var(--line);
   }
-  .box-title {
-    color: var(--cmd);
-    font-weight: 700;
-    font-size: 13px;
-    letter-spacing: .02em;
-  }
+  .box-title { color: var(--cmd); font-weight: 700; font-size: 13px; letter-spacing: .02em; }
   .box-title::before { content: "> "; color: var(--ok); }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: .8rem; }
-  label {
-    display: block;
-    font-size: 11.5px;
-    color: var(--muted);
-    margin-bottom: .3rem;
-  }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(195px, 1fr)); gap: .75rem; }
+  label { display: block; font-size: 11.5px; color: var(--muted); margin-bottom: .28rem; }
   label::before { content: "--"; color: var(--line-hi); margin-right: 3px; }
-  input {
+  input, select {
     width: 100%;
-    padding: .55rem .7rem;
+    padding: .5rem .65rem;
     border-radius: 3px;
     border: 1px solid var(--line);
     background: #07090d;
     color: var(--txt);
     font-family: var(--mono);
-    font-size: 13px;
+    font-size: 12.5px;
     outline: none;
     transition: border-color .15s;
   }
-  input:focus { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(56,189,248,.25); }
+  input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(56,189,248,.25); }
   input::placeholder { color: #525d6d; }
+  .mods-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: .45rem;
+    margin-top: .75rem;
+    padding: .65rem;
+    background: #07090d;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+  }
+  .mod-chk {
+    display: flex;
+    align-items: center;
+    gap: .45rem;
+    font-size: 12px;
+    color: var(--txt);
+    cursor: pointer;
+    margin: 0;
+  }
+  .mod-chk::before { content: none; }
+  .mod-chk input { width: auto; accent-color: var(--ok); margin: 0; }
+  .mod-chk small { color: var(--muted); font-size: 11px; }
   button {
-    padding: .48rem .82rem;
+    padding: .42rem .72rem;
     border-radius: 3px;
     border: 1px solid var(--line-hi);
     background: #161b22;
@@ -165,39 +178,34 @@
     font-family: var(--mono);
     font-weight: 600;
     cursor: pointer;
-    font-size: 12px;
+    font-size: 11.5px;
     transition: background .12s, border-color .12s;
   }
   button:hover { background: #1f2733; border-color: var(--accent); }
-  button.pri {
-    background: #12331b;
-    border-color: var(--ok);
-    color: #7ee787;
-  }
+  button.pri { background: #12331b; border-color: var(--ok); color: #7ee787; }
   button.pri:hover { background: #1a4726; }
-  button.err {
-    background: #2c1215;
-    border-color: var(--err);
-    color: #ffa198;
-  }
+  button.warn { background: #2c210b; border-color: var(--warn); color: #f2cc60; }
+  button.warn:hover { background: #3f2f10; }
+  button.err { background: #2c1215; border-color: var(--err); color: #ffa198; }
   button.err:hover { background: #3f181c; }
   button:disabled { opacity: .5; cursor: wait; }
-  .row { display: flex; flex-wrap: wrap; gap: .45rem; align-items: center; }
-  .msj { font-size: 12.5px; margin-top: .65rem; min-height: 1.3em; word-break: break-word; }
+  .row { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
+  .msj { font-size: 12px; margin-top: .6rem; min-height: 1.3em; word-break: break-word; }
   .msj:not(:empty)::before { content: "[INFO] "; color: var(--accent); font-weight: 700; }
   .msj.ok { color: #7ee787; }
   .msj.ok::before { content: "[OK] "; color: var(--ok); }
   .msj.err { color: #ffa198; }
   .msj.err::before { content: "[ERR] "; color: var(--err); }
   .msj code { color: var(--cmd); background: #07090d; padding: 1px 5px; border: 1px solid var(--line); border-radius: 3px; }
-  table { width: 100%; border-collapse: collapse; margin-top: .5rem; font-size: 12.5px; }
-  th, td { padding: .6rem .5rem; border-bottom: 1px dashed var(--line); text-align: left; vertical-align: middle; }
-  th { color: var(--accent); font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; border-bottom: 1px solid var(--line-hi); }
+  table { width: 100%; border-collapse: collapse; margin-top: .5rem; font-size: 12px; }
+  th, td { padding: .55rem .45rem; border-bottom: 1px dashed var(--line); text-align: left; vertical-align: middle; }
+  th { color: var(--accent); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; border-bottom: 1px solid var(--line-hi); }
   tbody tr:hover { background: rgba(56, 189, 248, .04); }
   .slug { color: var(--ps); }
-  .meta { color: var(--muted); font-size: 11.5px; margin-top: 2px; }
-  .chip { display: inline-block; padding: 2px 7px; border-radius: 3px; font-size: 11px; font-weight: 700; border: 1px solid transparent; }
+  .meta { color: var(--muted); font-size: 11px; margin-top: 2px; }
+  .chip { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 10.5px; font-weight: 700; border: 1px solid transparent; }
   .chip.on { background: rgba(63,185,80,.12); border-color: rgba(63,185,80,.45); color: #7ee787; }
+  .chip.warn { background: rgba(210,153,34,.14); border-color: rgba(210,153,34,.5); color: #f2cc60; }
   .chip.off { background: rgba(248,81,73,.12); border-color: rgba(248,81,73,.45); color: #ffa198; }
   .statusbar {
     display: flex;
@@ -211,10 +219,20 @@
     font-size: 11.5px;
   }
   .statusbar b { color: var(--ok); font-weight: 600; }
+  .dlg-bg {
+    position: fixed; inset: 0; background: rgba(0, 0, 0, .75);
+    display: flex; align-items: center; justify-content: center; padding: 1rem; z-index: 50;
+  }
+  .dlg {
+    width: min(720px, 100%); max-height: 92vh; overflow: auto;
+    background: var(--win); border: 1px solid var(--accent); border-radius: 6px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, .85);
+  }
+  .dlg .screen { padding: 1rem 1.15rem; }
   .hidden { display: none !important; }
-  @media (max-width: 640px) {
-    body { padding: .5rem; }
-    .screen { padding: .85rem; }
+  @media (max-width: 720px) {
+    body { padding: .45rem; }
+    .screen { padding: .8rem; }
     .win-ctrls { display: none; }
     table, thead, tbody, tr, td { display: block; }
     thead { display: none; }
@@ -232,7 +250,7 @@
           <polyline points="2.5,4.5 6.5,8 2.5,11.5"></polyline>
           <line x1="8" y1="11.5" x2="13.5" y2="11.5"></line>
         </svg>
-        <span>JD Solution &middot; PowerShell (Panel de clientes)</span>
+        <span>JD Solution &middot; PowerShell (Consola comercial)</span>
       </div>
     </div>
     <div class="win-ctrls" aria-hidden="true">
@@ -244,8 +262,8 @@
 
   <div class="screen">
     <div class="banner">
-      <div><b>JD Solution [Consola Multiempresa]</b> <span class="ver">v2.0</span></div>
-      <div>Administraci&oacute;n de clientes &middot; Crear empresas, copiar enlaces, descargar respaldos y controlar acceso.</div>
+      <div><b>JD Solution [Consola Multiempresa]</b> <span class="ver">v3.0</span></div>
+      <div>Crear clientes, controlar planes/m&oacute;dulos, fechas de vencimiento, restablecer claves y descargar respaldos.</div>
     </div>
 
     <div class="prompt">
@@ -279,8 +297,8 @@
     <section id="panel" class="hidden">
       <div class="box">
         <div class="box-head">
-          <span class="box-title">NEW-EMPRESA · CREAR CLIENTE</span>
-          <button type="button" onclick="salir()">exit · Cerrar sesi&oacute;n</button>
+          <span class="box-title">NEW-EMPRESA &middot; CREAR CLIENTE</span>
+          <button type="button" onclick="salir()">exit &middot; Cerrar sesi&oacute;n</button>
         </div>
         <form onsubmit="crearEmpresa(event)">
           <div class="grid">
@@ -288,7 +306,19 @@
             <div><label for="cNombre">nombre-comercial</label><input id="cNombre" placeholder="ej: Supermercado Norte C.A." required></div>
             <div><label for="cTiendas">sedes (separadas por coma)</label><input id="cTiendas" placeholder="Principal, Sucursal 2" required></div>
             <div><label for="cClave">clave-inicial (m&iacute;n. 6)</label><input id="cClave" minlength="6" placeholder="Clave del due&ntilde;o del cliente" required></div>
+            <div>
+              <label for="cPlan">plan</label>
+              <select id="cPlan" onchange="aplicarPreset('c', this.value)">
+                <option value="Full">Full (sin POS)</option>
+                <option value="Básico">B&aacute;sico (Caja + Efectivo + CXP)</option>
+                <option value="Completo + POS">Completo + POS</option>
+                <option value="Prueba">Prueba</option>
+              </select>
+            </div>
+            <div><label for="cVence">vencimiento</label><input id="cVence" type="date"></div>
+            <div><label for="cNotas">notas-internas</label><input id="cNotas" placeholder="ej: Mensualidad $50, contacto..."></div>
           </div>
+          <div class="mods-grid" id="cMods"></div>
           <div class="row" style="margin-top:.85rem">
             <button type="submit" class="pri" id="btnCrear">+ Crear empresa lista para usar</button>
           </div>
@@ -298,12 +328,12 @@
 
       <div class="box">
         <div class="box-head">
-          <span class="box-title">GET-EMPRESAS · CLIENTES REGISTRADOS</span>
-          <button type="button" onclick="cargar()">refresh · Actualizar lista</button>
+          <span class="box-title">GET-EMPRESAS &middot; CLIENTES REGISTRADOS</span>
+          <button type="button" onclick="cargar()">refresh &middot; Actualizar lista</button>
         </div>
         <div id="listaMsj" class="msj"></div>
         <table>
-          <thead><tr><th>Empresa</th><th>Identificador</th><th>Estado</th><th>Acciones</th></tr></thead>
+          <thead><tr><th>Empresa</th><th>Identificador</th><th>Plan / Vence</th><th>Estado</th><th>Acciones</th></tr></thead>
           <tbody id="tbody"></tbody>
         </table>
       </div>
@@ -316,9 +346,82 @@
   </div>
 </div>
 
+<!-- Diálogo Config / Módulos -->
+<div id="dlgCfg" class="dlg-bg hidden" onclick="if (event.target === this) cerrarCfg()">
+  <div class="dlg">
+    <div class="titlebar">
+      <div class="tabs"><div class="tab"><span id="cfgTitulo">Set-EmpresaConfig</span></div></div>
+      <div class="win-ctrls"><div class="win-btn close" style="cursor:pointer" onclick="cerrarCfg()">&times;</div></div>
+    </div>
+    <div class="screen">
+      <form onsubmit="guardarCfg(event)">
+        <input type="hidden" id="eSlug">
+        <div class="grid">
+          <div><label for="eNombre">nombre-comercial</label><input id="eNombre" required></div>
+          <div><label for="eTiendas">sedes (separadas por coma)</label><input id="eTiendas" required></div>
+          <div>
+            <label for="ePlan">plan</label>
+            <input id="ePlan" placeholder="Full, Básico, Prueba...">
+          </div>
+          <div><label for="eVence">vencimiento</label><input id="eVence" type="date"></div>
+        </div>
+        <div style="margin-top:.65rem"><label for="eNotas">notas-internas</label><input id="eNotas" placeholder="Contacto, monto mensual, observaciones..."></div>
+        <div class="row" style="margin-top:.75rem">
+          <span style="font-size:11.5px;color:var(--muted)">Presets r&aacute;pidos:</span>
+          <button type="button" onclick="aplicarPreset('e','Básico')">B&aacute;sico</button>
+          <button type="button" onclick="aplicarPreset('e','Full')">Full (sin POS)</button>
+          <button type="button" onclick="aplicarPreset('e','Completo + POS')">Todo + POS</button>
+        </div>
+        <div class="mods-grid" id="eMods"></div>
+        <div id="cfgMsj" class="msj"></div>
+        <div class="row" style="margin-top:.85rem;justify-content:flex-end">
+          <button type="button" onclick="cerrarCfg()">Cancelar</button>
+          <button type="submit" class="pri" id="btnGuardarCfg">Guardar cambios</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 <script>
-let DUENO = '', BASE = '';
+let DUENO = '', BASE = '', EMPRESAS = [];
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+
+const MODS_DEF = [
+  ['cuadre',       'Cuadre y pagos',     'Cuadre, Validar pagos, Ventas'],
+  ['efectivo',     'Efectivo y caja',    'Flujo efectivo, Caja chica'],
+  ['cxp',          'Cuentas por pagar',  'Facturas y préstamos'],
+  ['cxc',          'Cuentas por cobrar', 'Clientes y gastos tienda'],
+  ['almacen',      'Almacén y compras',  'Inventario, Entradas, Facturar'],
+  ['pedidos',      'Pedidos a almacén',  'Requerimientos por sede'],
+  ['rrhh',         'Talento y nómina',   'Personal, Asistencia, Nómina'],
+  ['ventaexpress', 'Venta express',      'Facturación rápida en tienda'],
+  ['pos',          'Integración POS',    'Cierre cajas, Precios, Reportes']
+];
+const PRESETS = {
+  'Básico':         { cuadre: true, efectivo: true, cxp: true, cxc: false, almacen: false, pedidos: false, rrhh: false, ventaexpress: false, pos: false },
+  'Full':           { cuadre: true, efectivo: true, cxp: true, cxc: true,  almacen: true,  pedidos: false, rrhh: true,  ventaexpress: true,  pos: false },
+  'Completo + POS': { cuadre: true, efectivo: true, cxp: true, cxc: true,  almacen: true,  pedidos: true,  rrhh: true,  ventaexpress: true,  pos: true  },
+  'Prueba':         { cuadre: true, efectivo: true, cxp: true, cxc: true,  almacen: true,  pedidos: false, rrhh: true,  ventaexpress: true,  pos: false }
+};
+
+function pintarChecks(prefijo, vals) {
+  const el = document.getElementById(prefijo + 'Mods');
+  if (!el) return;
+  el.innerHTML = MODS_DEF.map(([k, tit, sub]) => {
+    const on = !vals || vals[k] !== false;
+    return `<label class="mod-chk"><input type="checkbox" data-mod="${k}" ${on ? 'checked' : ''}><span><b>${esc(tit)}</b><br><small>${esc(sub)}</small></span></label>`;
+  }).join('');
+}
+function leerChecks(prefijo) {
+  const out = {};
+  document.querySelectorAll(`#${prefijo}Mods input[data-mod]`).forEach(i => { out[i.dataset.mod] = !!i.checked; });
+  return out;
+}
+function aplicarPreset(prefijo, nombre) {
+  pintarChecks(prefijo, PRESETS[nombre] || PRESETS['Full']);
+}
+pintarChecks('c', PRESETS['Full']);
 
 function setCmd(txt, estado) {
   const c = document.getElementById('promptCmd'), s = document.getElementById('statusTxt');
@@ -377,19 +480,34 @@ async function cargar() {
   }
 }
 
+function chipVence(iso) {
+  if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return '';
+  const hoy = new Date().toISOString().slice(0, 10);
+  const dias = Math.round((new Date(iso + 'T12:00:00Z') - new Date(hoy + 'T12:00:00Z')) / 86400000);
+  const f = iso.slice(8, 10) + '/' + iso.slice(5, 7) + '/' + iso.slice(0, 4);
+  if (dias < 0) return `<span class="chip off" title="Vencida hace ${Math.abs(dias)} día(s)">VENCIDA ${f}</span>`;
+  if (dias <= 5) return `<span class="chip warn" title="Vence en ${dias} día(s)">VENCE ${f}</span>`;
+  return `<span class="meta">Vence: ${f}</span>`;
+}
+
 function pintar(lista) {
+  EMPRESAS = lista;
   const tb = document.getElementById('tbody');
-  if (!lista.length) { tb.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">Sin empresas registradas</td></tr>'; return; }
+  if (!lista.length) { tb.innerHTML = '<tr><td colspan="5" style="color:var(--muted)">Sin empresas registradas</td></tr>'; return; }
   tb.innerHTML = lista.map(e => {
     const act = e.activa !== 0;
     const f = e.creado ? new Date(e.creado).toLocaleDateString('es-VE') : '';
     return `<tr>
-      <td><b>${esc(e.titulo || e.nombre)}</b><div class="meta">Creada: ${esc(f)}</div></td>
+      <td><b>${esc(e.titulo || e.nombre)}</b><div class="meta">Creada: ${esc(f)}${e.notas ? ' &middot; ' + esc(e.notas) : ''}</div></td>
       <td><code class="slug">${esc(e.nombre)}</code></td>
+      <td><div>${esc(e.plan || '—')}</div><div>${chipVence(e.vence)}</div></td>
       <td><span class="chip ${act ? 'on' : 'off'}">${act ? 'ACTIVA' : 'SUSPENDIDA'}</span></td>
       <td><div class="row">
-        <button type="button" onclick="copiarLink('${esc(e.nombre)}','dashboard')">Link Panel</button>
-        <button type="button" onclick="copiarLink('${esc(e.nombre)}','cuadre')">Link Ficha</button>
+        <button type="button" onclick="copiarLink('${esc(e.nombre)}','dashboard')">Panel</button>
+        <button type="button" onclick="copiarLink('${esc(e.nombre)}','cuadre')">Ficha</button>
+        <button type="button" onclick="copiarBienvenida('${esc(e.nombre)}')">Bienvenida</button>
+        <button type="button" class="pri" onclick="abrirCfg('${esc(e.nombre)}')">Config</button>
+        <button type="button" class="warn" onclick="resetClave('${esc(e.nombre)}')">Clave</button>
         <button type="button" onclick="respaldar('${esc(e.nombre)}')">Respaldo</button>
         <button type="button" class="${act ? 'err' : 'pri'}" onclick="cambiarEstado('${esc(e.nombre)}',${act ? 'false' : 'true'})">${act ? 'Suspender' : 'Activar'}</button>
       </div></td>
@@ -402,11 +520,26 @@ function urlApp(emp, app) {
   return `${base}${app}/?empresa=${encodeURIComponent(emp)}`;
 }
 
-async function copiarLink(emp, app) {
-  const u = urlApp(emp, app), msj = document.getElementById('listaMsj');
+async function copiarTexto(txt, aviso) {
+  const msj = document.getElementById('listaMsj');
+  try { await navigator.clipboard.writeText(txt); msj.innerHTML = aviso; msj.className = 'msj ok'; }
+  catch (e) { prompt('Copie el texto:', txt); }
+}
+
+function copiarLink(emp, app) {
+  const u = urlApp(emp, app);
   setCmd(`Copy-Link -Empresa ${emp} -App ${app}`, 'enlace copiado');
-  try { await navigator.clipboard.writeText(u); msj.innerHTML = 'Enlace copiado: <code>' + esc(u) + '</code>'; msj.className = 'msj ok'; }
-  catch (e) { prompt('Copie el enlace:', u); }
+  copiarTexto(u, 'Enlace copiado: <code>' + esc(u) + '</code>');
+}
+
+function copiarBienvenida(emp, claveOpcional) {
+  const obj = EMPRESAS.find(x => x.nombre === emp) || { nombre: emp, titulo: emp };
+  const txt = `Bienvenido a *JD Solution* — *${obj.titulo || emp}*\n\n` +
+    `Panel administrativo:\n${urlApp(emp, 'dashboard')}\n\n` +
+    `Ficha de cuadre (tiendas):\n${urlApp(emp, 'cuadre')}\n` +
+    (claveOpcional ? `\nClave principal inicial: *${claveOpcional}*\n(Recomendamos cambiarla al ingresar en Claves y permisos).` : `\nIngrese con su clave principal asignada.`);
+  setCmd(`Copy-Bienvenida -Empresa ${emp}`, 'mensaje copiado');
+  copiarTexto(txt, 'Mensaje de bienvenida de <code>' + esc(emp) + '</code> copiado (listo para WhatsApp).');
 }
 
 async function crearEmpresa(ev) {
@@ -416,18 +549,88 @@ async function crearEmpresa(ev) {
   const nombre = document.getElementById('cNombre').value.trim();
   const tiendas = document.getElementById('cTiendas').value.split(',').map(x => x.trim()).filter(Boolean);
   const clave = document.getElementById('cClave').value.trim();
+  const plan = document.getElementById('cPlan').value;
+  const vence = document.getElementById('cVence').value;
+  const notas = document.getElementById('cNotas').value.trim();
+  const plan_modulos = leerChecks('c');
   btn.disabled = true; msj.textContent = 'Creando base de datos y módulos...'; msj.className = 'msj';
-  setCmd(`New-Empresa -Slug ${empresa}`, 'creando...');
+  setCmd(`New-Empresa -Slug ${empresa} -Plan "${plan}"`, 'creando...');
   try {
-    await llamar({ action: 'empresa_crear', empresa, nombre, tiendas, clave });
-    msj.innerHTML = `Empresa creada y lista. Panel: <code>${esc(urlApp(empresa, 'dashboard'))}</code> &middot; Ficha: <code>${esc(urlApp(empresa, 'cuadre'))}</code>`;
+    await llamar({ action: 'empresa_crear', empresa, nombre, tiendas, clave, plan, vence, notas, plan_modulos });
+    const btnW = `<button type="button" class="pri" style="margin-left:.5rem" onclick="copiarBienvenida('${esc(empresa)}','${esc(clave)}')">Copiar bienvenida</button>`;
+    msj.innerHTML = `Empresa creada y lista. Panel: <code>${esc(urlApp(empresa, 'dashboard'))}</code> ${btnW}`;
     msj.className = 'msj ok';
     ev.target.reset();
+    pintarChecks('c', PRESETS['Full']);
     await cargar();
   } catch (e) {
     msj.textContent = e.message; msj.className = 'msj err';
     setCmd(`New-Empresa -Slug ${empresa} # error`, 'error');
   } finally { btn.disabled = false; }
+}
+
+async function abrirCfg(empresa) {
+  const dlg = document.getElementById('dlgCfg'), msj = document.getElementById('cfgMsj');
+  const row = EMPRESAS.find(x => x.nombre === empresa) || {};
+  document.getElementById('cfgTitulo').textContent = `Set-EmpresaConfig -Slug ${empresa}`;
+  document.getElementById('eSlug').value = empresa;
+  document.getElementById('eNombre').value = row.titulo || empresa;
+  document.getElementById('ePlan').value = row.plan || '';
+  document.getElementById('eVence').value = row.vence || '';
+  document.getElementById('eNotas').value = row.notas || '';
+  document.getElementById('eTiendas').value = 'Cargando...';
+  msj.textContent = 'Leyendo configuración de la empresa...'; msj.className = 'msj';
+  pintarChecks('e', null);
+  dlg.classList.remove('hidden');
+  setCmd(`Get-EmpresaConfig -Slug ${empresa}`, 'leyendo config...');
+  try {
+    const r = await llamar({ action: 'empresa_config_leer', empresa });
+    const e = r.empresa || {};
+    if (e.nombre) document.getElementById('eNombre').value = e.nombre;
+    document.getElementById('eTiendas').value = (e.tiendas || []).join(', ');
+    pintarChecks('e', e.plan_modulos || null);
+    msj.textContent = '';
+  } catch (err) {
+    msj.textContent = err.message; msj.className = 'msj err';
+  }
+}
+function cerrarCfg() { document.getElementById('dlgCfg').classList.add('hidden'); }
+
+async function guardarCfg(ev) {
+  ev.preventDefault();
+  const btn = document.getElementById('btnGuardarCfg'), msj = document.getElementById('cfgMsj');
+  const empresa = document.getElementById('eSlug').value;
+  const nombre = document.getElementById('eNombre').value.trim();
+  const tiendas = document.getElementById('eTiendas').value.split(',').map(x => x.trim()).filter(Boolean);
+  const plan = document.getElementById('ePlan').value.trim();
+  const vence = document.getElementById('eVence').value;
+  const notas = document.getElementById('eNotas').value.trim();
+  const plan_modulos = leerChecks('e');
+  btn.disabled = true; msj.textContent = 'Guardando...'; msj.className = 'msj';
+  setCmd(`Set-EmpresaConfig -Slug ${empresa}`, 'guardando...');
+  try {
+    await llamar({ action: 'empresa_config_guardar', empresa, nombre, tiendas, plan, vence, notas, plan_modulos });
+    cerrarCfg();
+    const lMsj = document.getElementById('listaMsj');
+    lMsj.textContent = `Configuración de "${empresa}" actualizada.`; lMsj.className = 'msj ok';
+    await cargar();
+  } catch (e) {
+    msj.textContent = e.message; msj.className = 'msj err';
+  } finally { btn.disabled = false; }
+}
+
+async function resetClave(empresa) {
+  const nueva = prompt(`Nueva clave principal para "${empresa}" (mínimo 6 caracteres):`);
+  if (nueva === null) return;
+  if (nueva.trim().length < 6) { alert('La clave debe tener al menos 6 caracteres.'); return; }
+  const msj = document.getElementById('listaMsj');
+  setCmd(`Reset-ClavePrincipal -Slug ${empresa}`, 'actualizando clave...');
+  try {
+    await llamar({ action: 'empresa_clave_reset', empresa, clave: nueva.trim() });
+    msj.innerHTML = `Clave principal de <code>${esc(empresa)}</code> restablecida. Las sesiones anteriores quedaron cerradas.`;
+    msj.className = 'msj ok';
+    setCmd(`Reset-ClavePrincipal -Slug ${empresa} # OK`, 'clave actualizada');
+  } catch (e) { msj.textContent = e.message; msj.className = 'msj err'; }
 }
 
 async function cambiarEstado(empresa, activar) {
