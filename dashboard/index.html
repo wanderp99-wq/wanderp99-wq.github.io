@@ -3900,6 +3900,18 @@
         if (/^(cuadre_tol|cuentas_listar|cuentas_guardar)$/.test(payload.action)) { const r = await cfCuadreExtra(payload); if (r) return r; }
         // (15/11) Historial de nóminas: del servidor nuevo (con la Nómina encendida allá)
         if (payload.action === 'nom_historial') { const r = await cfNomHistorial(payload); if (r) return r; }
+        // (22/11) Campana (pendientes), usuarios en línea, paquete de utilidades y avisos de tienda directo al servidor nuevo
+        if (/^(pendientes|enlinea|paq_estado|paq_subir|aviso_tienda)$/.test(payload.action) && typeof CF_URL === 'string' && CF_URL) {
+            try {
+                const t0c = performance.now(), r = await cfPedir(Object.assign({}, payload, { token: await cfToken(), vista: typeof vistaActual === 'string' ? vistaActual : '', disp: DISPOSITIVO }));
+                if (r && r.ok) {
+                    anotarTiempo(payload.action + ' (Cloudflare)', Math.round(performance.now() - t0c), 0, true);
+                    if (payload.action === 'paq_subir' && !CF_SOLO) llamarApiReal(payload, performance.now()).catch(() => {});
+                    return r;
+                }
+                if (r && r.sesion === false) cfSes.token = '';
+            } catch (e) {}
+        }
         // (12/11) Lecturas del almacén con "Usar Firebase en el Almacén" encendido: se responden aquí con lo de Firebase (sin Google)
         if (ALMVIVO_ACC.test(payload.action) && !almVivoSaltar) { const r = await almVivoResponder(payload); if (r) return r; }
         vivoMotivo = '';
@@ -3963,7 +3975,7 @@
     async function llamarApiReal(payload, t0) {
         // (21/11) Empresas cliente multiempresa (CF_SOLO): nunca tocan el Apps Script de Plaza Valencia; todo va directo a Cloudflare
         if (typeof CF_SOLO !== 'undefined' && CF_SOLO) {
-            if (/^(enlinea|cambios|fb_token|cf_claves)$/.test(payload.action)) return { ok: true, personas: [], cambios: {}, version: VERSION_SERVIDOR };
+            if (/^(cambios|fb_token|cf_claves)$/.test(payload.action)) return { ok: true, personas: [], cambios: {}, version: VERSION_SERVIDOR };
             let resp;
             try {
                 const body = Object.assign({ empresa: CF_EMPRESA, eq: EQUIPO_ID, disp: payload.disp || DISPOSITIVO }, payload);
@@ -6942,12 +6954,12 @@
     }
     // (16/11) Gestión de asistencia, Horarios de trabajo y Talento humano en el servidor nuevo (un interruptor cada uno en Tiempos).
     // La foto de un trabajador la guarda Google en Drive (su carpeta de fotos) y allá va el enlace.
-    const CF_PERSONAL_ACC = /^(asis_corregir|asisg_(oficina_guardar|local_guardar|local_agregar|local_quitar|oficina_quitar)|hor_(guardar|telegram|config_guardar)|per_(trab_guardar|perfil_guardar|cli_guardar|cli_eliminar|carnet_nuevo|config_guardar|horarios_guardar|carnet_desde|asis_pausa|importar))$/;
+    const CF_PERSONAL_ACC = /^(asis_(hoy|listar|corregir)|asisg_(oficina_guardar|local_guardar|local_agregar|local_quitar|oficina_quitar)|hor_(guardar|telegram|config_guardar)|per_(listar|trab_guardar|perfil_guardar|cli_guardar|cli_eliminar|carnet_nuevo|config_guardar|horarios_guardar|carnet_desde|asis_pausa|importar))$/;
     const CF_AJUSTES_ACC = /^(per_(config_guardar|horarios_guardar|carnet_desde|asis_pausa)|hor_config_guardar)$/;
     async function cfPersonalEscribir(p) {
         const k = /^asis/.test(p.action) ? 'asisg' : /^hor_/.test(p.action) ? 'horariog' : 'talento';
         if (!cfModuloEncendido(k)) return null;
-        const t0 = performance.now(), datos = Object.assign({}, p, { modulo: k, repetible: p.action === 'hor_guardar' });
+        const t0 = performance.now(), datos = Object.assign({}, p, { modulo: k, repetible: /^(hor_guardar|per_listar|asis_hoy|asis_listar)$/.test(p.action) });
         delete datos.foto;
         if (p.foto && p.foto.base64) {
             const f = await llamarApiPedido({ action: 'cf_foto', tipoFoto: 'trabajador', nombre: String(p.nombre || '').trim(), comprobante: p.foto });
