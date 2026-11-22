@@ -1287,6 +1287,12 @@
                 document.title = 'Control de Caja · ' + cf.empresa;
                 const sp = document.querySelector('.titulo-logo span'); if (sp) sp.textContent = cf.empresa + ' · Control de Caja';
             }
+            if (cf && cf.logo && CF_EMPRESA !== 'plaza-valencia' && /^data:image\//.test(cf.logo)) {
+                const lEl = document.querySelector('.titulo-logo .logo-ccpv');
+                if (lEl) lEl.outerHTML = `<img class="logo-ccpv" src="${cf.logo}" alt="" style="object-fit:contain;border-radius:6px">`;
+                const fav = document.querySelector('link[rel="icon"]');
+                if (fav) fav.href = cf.logo;
+            }
             if (cf && Array.isArray(cf.tiendas) && cf.tiendas.length && typeof LOCALES !== 'undefined' && CF_EMPRESA !== 'plaza-valencia') {
                 LOCALES.length = 0; cf.tiendas.forEach(t => LOCALES.push(t));
                 if (typeof pintarLocales === 'function') pintarLocales();

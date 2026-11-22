@@ -2523,7 +2523,7 @@
             <div class="grafico-sub">Personas con la sesión abierta en el panel y el módulo en el que están. Se actualiza solo cada 30 segundos.</div>
             <div id="menuEnLinea"></div>
         </div>
-        <p class="menu-sub" style="margin-top:1.25rem;font-size:.85rem"><a href="#" onclick="verTiempos(); return false;">Ver tiempos de respuesta</a><span id="huellaMenu"></span></p>
+        <p class="menu-sub" style="margin-top:1.25rem;font-size:.85rem"><a href="#" onclick="verTiempos(); return false;">Ver tiempos de respuesta</a><span id="huellaMenu"></span><span id="panelVersionPie" style="opacity:.65;margin-left:.5rem">· JD Solution v1.116 (22/11)</span></p>
     </section>
 
     <!-- ============ VALIDAR PAGOS (Fase 1: carga de movimientos bancarios) ============ -->
@@ -2833,6 +2833,7 @@
 
         <!-- Paso 2: administrar -->
         <div id="admPanel" class="hidden">
+            <div id="admMiEmpresa" class="grafico-card hidden"></div>
             <div class="grafico-card">
                 <div class="grafico-head"><h3>En línea</h3><button type="button" class="btn-ghost btn-mini act-modulo" onclick="admCargarEnLinea()">Actualizar</button></div>
                 <div class="grafico-sub">Quién tiene el panel abierto ahora (se actualiza solo cada 30 segundos). Incluye los equipos de marcaje.</div>
@@ -3978,7 +3979,8 @@
             if (/^(cambios|fb_token|cf_claves)$/.test(payload.action)) return { ok: true, personas: [], cambios: {}, version: VERSION_SERVIDOR };
             let resp;
             try {
-                const body = Object.assign({ empresa: CF_EMPRESA, eq: EQUIPO_ID, disp: payload.disp || DISPOSITIVO }, payload);
+                const accReal = /^(cf_foto|cxp_foto)$/.test(payload.action) ? 'media_subir' : payload.action;
+                const body = Object.assign({ empresa: CF_EMPRESA, eq: EQUIPO_ID, disp: payload.disp || DISPOSITIVO }, payload, { action: accReal });
                 if (payload.action === 'login') body.clave = clave;
                 else body.token = await cfToken();
                 resp = await fetch(CF_URL + '/api', {
@@ -8241,7 +8243,7 @@
         if (!navAbiertas) { navAbiertas = {}; areas.forEach(id => { navAbiertas[id] = true; }); }
         const sub = id => navGruposDe(id).reduce((l, g) => l.concat(g[1]), []).map(m =>
             `<button type="button" class="mt-item${actual === m.id ? ' activo' : ''}" onclick="navIr('${m.id}')"><span class="mt-t">${esc(m.titulo)}</span>${navN(por[m.id])}</button>`).join('');
-        pintarConservando(el, `<div class="mt-cab">${LOGO_SVG}<b>${esc(CF_SOLO ? (TITULOS.menu || 'JD Solution') : 'Plaza Software')}</b>${compu ? '' : `<button type="button" class="btn-ghost btn-icono" onclick="navTodo()" aria-label="Cerrar el menú">${NAV_ICO.x}</button>`}</div>
+        pintarConservando(el, `<div class="mt-cab">${CF_SOLO ? LOGO_ACTUAL_CF : LOGO_SVG}<b>${esc(CF_SOLO ? (TITULOS.menu || 'JD Solution') : 'Plaza Software')}</b>${compu ? '' : `<button type="button" class="btn-ghost btn-icono" onclick="navTodo()" aria-label="Cerrar el menú">${NAV_ICO.x}</button>`}</div>
             <nav class="mt-cuerpo" aria-label="Todos los módulos">
                 <button type="button" class="mt-item${actual === 'menu' ? ' activo' : ''}" onclick="navInicio()">${NAV_ICO.inicio}<span class="mt-t">Inicio</span></button>
                 ${areas.map(id => {
@@ -8253,6 +8255,7 @@
                 ${esPrincipal ? `<button type="button" class="mt-item${actual === 'admin' ? ' activo' : ''}" onclick="irA('admin')">${NAV_ICO.llave}<span class="mt-t">Claves y permisos</span></button>` : ''}
                 <button type="button" class="mt-item" onclick="navCajon = false; navPintarTodo(); verTiempos()">${NAV_ICO.reloj}<span class="mt-t">Tiempos de respuesta</span></button>
                 <button type="button" class="mt-item mt-salir" onclick="cerrarSesion()">${NAV_ICO.salir}<span class="mt-t">Salir</span></button>
+                <div style="padding:.45rem .85rem .15rem;font-size:.72rem;color:var(--muted);opacity:.75">JD Solution · v1.116</div>
             </div>`);
     }
     navCompu.addEventListener('change', () => { navCajon = false; navPintarTodo(); });
@@ -12186,6 +12189,7 @@
     }
 
     async function admCargar(lanzarError) {
+        if (typeof miEmpPintar === 'function') miEmpPintar();
         if (!admUsuarios.length) document.getElementById('admTabla').innerHTML = cargandoHTML('Cargando claves...');
         try {
             const r = await apiAdmin({ action: 'adm_listar' });
@@ -25851,10 +25855,94 @@ Reglas:
         finally { btn.disabled = false; efeCajaTipo(efeCajaTipoActual, !guardado); }
     }
 
-    function aplicarEmpresaCF(emp, tiendasLista) {
+    let cfEmpActual = null, miEmpLogoB64 = null;
+    function aplicarLogoCF(logoData) {
+        if (!CF_SOLO) return;
+        const esImg = typeof logoData === 'string' && /^data:image\//.test(logoData);
+        const htmlCab = esImg ? `<img class="logo-ccpv" src="${logoData}" alt="" style="object-fit:contain;border-radius:6px">` : LOGO_JD_SVG.replace('<svg ', '<svg class="logo-ccpv" ');
+        const logoCab = document.querySelector('.header-title .logo-ccpv');
+        if (logoCab) logoCab.outerHTML = htmlCab;
+        const fav = document.querySelector('link[rel="icon"]');
+        if (fav) fav.href = esImg ? logoData : ('data:image/svg+xml,' + encodeURIComponent(LOGO_JD_SVG));
+        if (typeof LOGO_ACTUAL_CF !== 'undefined') LOGO_ACTUAL_CF = esImg ? `<img src="${logoData}" alt="" style="width:28px;height:28px;object-fit:contain;border-radius:5px">` : LOGO_JD_SVG;
+    }
+    let LOGO_ACTUAL_CF = LOGO_JD_SVG;
+    function miEmpPintar() {
+        const box = document.getElementById('admMiEmpresa');
+        if (!box) return;
+        if (!CF_SOLO || !esPrincipal) { box.classList.add('hidden'); return; }
+        box.classList.remove('hidden');
+        const e = cfEmpActual || { nombre: TITULOS.menu || CF_EMPRESA, tiendas: TIENDAS_ORDEN.map(t => t.nombre), logo: '', telegram: {} };
+        const lg = miEmpLogoB64 !== null ? miEmpLogoB64 : (e.logo || '');
+        box.innerHTML = `<div class="grafico-head"><h3>Mi Empresa</h3></div>
+            <div class="grafico-sub">Personalice el nombre comercial, logo, sedes y avisos por Telegram de su empresa.</div>
+            <form onsubmit="miEmpGuardar(event)" style="margin-top:.75rem">
+                <div class="adm-grid">
+                    <div><label for="meNombre">Nombre comercial</label><input type="text" id="meNombre" value="${esc(e.nombre || '')}" required maxlength="80"></div>
+                    <div><label for="meTiendas">Sedes / tiendas (separadas por coma)</label><input type="text" id="meTiendas" value="${esc((e.tiendas || []).join(', '))}" required></div>
+                </div>
+                <div class="adm-grid" style="margin-top:.65rem">
+                    <div><label for="meTgToken">Token del bot de Telegram (opcional)</label><input type="password" id="meTgToken" placeholder="${e.telegram && e.telegram.bot ? 'Configurado (deje vacío para mantener)' : 'Ej: 123456:ABC...'}" autocomplete="off"></div>
+                    <div><label for="meTgGrupo">ID grupo general de Telegram (opcional)</label><input type="text" id="meTgGrupo" value="${esc((e.telegram && e.telegram.general) || '')}" placeholder="Ej: -1001234567890"></div>
+                </div>
+                <div style="display:flex;flex-wrap:wrap;align-items:center;gap:.75rem;margin-top:.8rem">
+                    <div id="meLogoPrev" style="width:44px;height:44px;border-radius:8px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;overflow:hidden;background:var(--bg)">${lg ? `<img src="${lg}" alt="" style="width:100%;height:100%;object-fit:contain">` : LOGO_JD_SVG}</div>
+                    <input type="file" id="meLogoFile" accept="image/png,image/jpeg,image/webp,image/svg+xml" class="hidden" onchange="miEmpLogoElegir(this)">
+                    <button type="button" class="btn-ghost btn-mini" onclick="document.getElementById('meLogoFile').click()">Subir logo</button>
+                    ${lg ? '<button type="button" class="btn-ghost btn-mini" onclick="miEmpLogoB64=\'\';miEmpPintar()">Quitar logo</button>' : ''}
+                    <button type="submit" class="btn-primary btn-mini" id="meBtnGuardar" style="margin-left:auto">Guardar cambios</button>
+                </div>
+                <div id="meMsj" class="adm-hint" style="margin-top:.5rem"></div>
+            </form>`;
+    }
+    function miEmpLogoElegir(input) {
+        const f = input.files && input.files[0]; input.value = '';
+        if (!f) return;
+        const fr = new FileReader();
+        fr.onload = () => {
+            const img = new Image();
+            img.onload = () => {
+                const c = document.createElement('canvas'), sz = 128;
+                c.width = sz; c.height = sz;
+                const ctx = c.getContext('2d');
+                const sc = Math.min(sz / img.width, sz / img.height);
+                const w = img.width * sc, h = img.height * sc;
+                ctx.drawImage(img, (sz - w) / 2, (sz - h) / 2, w, h);
+                miEmpLogoB64 = c.toDataURL('image/png');
+                miEmpPintar();
+            };
+            img.src = String(fr.result);
+        };
+        fr.readAsDataURL(f);
+    }
+    async function miEmpGuardar(ev) {
+        ev.preventDefault();
+        const btn = document.getElementById('meBtnGuardar'), msj = document.getElementById('meMsj');
+        const nombre = document.getElementById('meNombre').value.trim();
+        const tiendas = document.getElementById('meTiendas').value.split(',').map(x => x.trim()).filter(Boolean);
+        const tk = document.getElementById('meTgToken').value.trim(), gr = document.getElementById('meTgGrupo').value.trim();
+        const empresa = { nombre, tiendas };
+        if (miEmpLogoB64 !== null) empresa.logo = miEmpLogoB64;
+        if (tk || gr) { empresa.telegram = {}; if (tk) empresa.telegram.token = tk; if (gr) empresa.telegram.grupos = { general: gr }; }
+        btn.disabled = true; msj.textContent = 'Guardando...';
+        try {
+            const r = await llamarApi({ action: 'cfg_guardar', claveAdmin: admClave, empresa });
+            miEmpLogoB64 = null;
+            if (r.empresa) aplicarEmpresaCF(r.empresa);
+            msj.textContent = 'Configuración guardada.';
+            mostrarBanner('Datos de la empresa actualizados.', 'ok');
+            miEmpPintar();
+        } catch (e) { msj.textContent = 'Error: ' + e.message; }
+        finally { btn.disabled = false; }
+    }
+
+    function aplicarEmpresaCF(emp, tiendasLista, logoOpcional) {
         if (!CF_SOLO) return;
         const nom = typeof emp === 'string' ? emp : (emp && emp.nombre);
         const ts = Array.isArray(tiendasLista) ? tiendasLista : (emp && Array.isArray(emp.tiendas) ? emp.tiendas : null);
+        const lg = typeof logoOpcional === 'string' ? logoOpcional : (emp && typeof emp === 'object' && typeof emp.logo === 'string' ? emp.logo : null);
+        if (emp && typeof emp === 'object') cfEmpActual = Object.assign({}, cfEmpActual || {}, emp);
+        if (lg !== null) aplicarLogoCF(lg);
         if (emp && typeof emp === 'object' && 'plan_modulos' in emp) {
             cfPlanModulos = emp.plan_modulos && typeof emp.plan_modulos === 'object' ? emp.plan_modulos : null;
         }
@@ -25906,7 +25994,10 @@ Reglas:
             MODULOS.forEach(m => { if (m.desc) m.desc = m.desc.replace(/\bBigSoft\b/gi, 'el sistema de caja (POS)'); });
             aplicarEmpresaCF(CF_EMPRESA);
             cfPedir({ action: 'pub_listas' }).then(r => {
-                if (r && r.ok) aplicarEmpresaCF(r.empresa, r.tiendas);
+                if (r && r.ok) {
+                    aplicarEmpresaCF(r.empresa, r.tiendas, r.logo || '');
+                    if (r.plan_modulos && typeof r.plan_modulos === 'object') { cfPlanModulos = r.plan_modulos; if (typeof navPintarTodo === 'function') navPintarTodo(); }
+                }
             }).catch(() => {});
         }
         try {
