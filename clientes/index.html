@@ -398,14 +398,15 @@ const MODS_DEF = [
   ['almacen',      'Almacén y compras',  'Inventario, Entradas, Facturar'],
   ['pedidos',      'Pedidos a almacén',  'Requerimientos por sede'],
   ['rrhh',         'Talento y nómina',   'Personal, Asistencia, Nómina'],
-  ['ventaexpress', 'Venta express',      'Facturación rápida en tienda'],
-  ['pos',          'Integración POS',    'Cierre cajas, Precios, Reportes']
+  ['ventaexpress',  'Venta express',      'Facturación rápida en tienda'],
+  ['multideposito', 'Multi-depósito',     'Stock por sede y traspasos'],
+  ['pos',           'Integración POS',    'Cierre cajas, Precios, Reportes']
 ];
 const PRESETS = {
-  'Básico':         { cuadre: true, efectivo: true, cxp: true, cxc: false, almacen: false, pedidos: false, rrhh: false, ventaexpress: false, pos: false },
-  'Full':           { cuadre: true, efectivo: true, cxp: true, cxc: true,  almacen: true,  pedidos: false, rrhh: true,  ventaexpress: true,  pos: false },
-  'Completo + POS': { cuadre: true, efectivo: true, cxp: true, cxc: true,  almacen: true,  pedidos: true,  rrhh: true,  ventaexpress: true,  pos: true  },
-  'Prueba':         { cuadre: true, efectivo: true, cxp: true, cxc: true,  almacen: true,  pedidos: false, rrhh: true,  ventaexpress: true,  pos: false }
+  'Básico':         { cuadre: true, efectivo: true, cxp: true, cxc: false, almacen: false, pedidos: false, rrhh: false, ventaexpress: false, multideposito: false, pos: false },
+  'Full':           { cuadre: true, efectivo: true, cxp: true, cxc: true,  almacen: true,  pedidos: false, rrhh: true,  ventaexpress: true,  multideposito: false, pos: false },
+  'Completo + POS': { cuadre: true, efectivo: true, cxp: true, cxc: true,  almacen: true,  pedidos: true,  rrhh: true,  ventaexpress: true,  multideposito: true,  pos: true  },
+  'Prueba':         { cuadre: true, efectivo: true, cxp: true, cxc: true,  almacen: true,  pedidos: false, rrhh: true,  ventaexpress: true,  multideposito: false, pos: false }
 };
 
 function pintarChecks(prefijo, vals) {

@@ -2908,6 +2908,7 @@
     <section id="vistaVx" class="vista hidden"><div id="vxContenido"></div></section>
     <section id="vistaCxp" class="vista hidden"><div id="cxpContenido"></div></section>
     <section id="vistaCie" class="vista hidden"><div id="cieContenido"></div></section>
+    <section id="vistaMd" class="vista hidden"><div id="mdContenido"></div></section>
 
     <section id="vistaAlm" class="vista hidden">
         <div class="modo-tabs" role="tablist" id="almTabs"></div>
@@ -7473,6 +7474,7 @@
         reqcharcu: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 3v2h6V3"/><path d="M8.5 10h7M8.5 13.5h7M8.5 17h4"/></svg>',
         precios: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z"/><circle cx="8" cy="8" r="1.5"/><path d="m12 16 1.5 1.5 3-3"/></svg>',
         movalmacen: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h13l-3-3M20 16H7l3 3"/></svg>',
+        multideposito: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 5l9 5.5"/><path d="M5 10v9h14v-9"/><path d="M9 14.5h6m0 0-2-2m2 2-2 2"/></svg>',
         cierrecaja: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="10" width="18" height="10" rx="1.5"/><path d="M7 10V7a5 5 0 0 1 10 0v3"/><path d="M12 14v2"/></svg>',
         reportes: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5"/><path d="M9 17v-3M12 17v-5M15 17v-2"/></svg>',
         facturar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>',
@@ -7510,6 +7512,7 @@
         { id: 'inventario', area: 'almacen', titulo: 'Productos e inventario', desc: 'Catálogo de productos, existencia del almacén y movimientos.', listo: true },
         { id: 'facturar',   area: 'almacen', titulo: 'Facturar',              desc: 'Notas de entrega a clientes y tiendas, y las notas emitidas. Sin acceso al inventario ni a las entradas.', listo: true },
         { id: 'movalmacen', area: 'almacen', titulo: 'Entradas y salidas',    desc: 'Compras con foto de la factura, operaciones de inventario, notas emitidas e inversión por tienda.', listo: true },
+        { id: 'multideposito', area: 'almacen', titulo: 'Depósitos y traspasos', desc: 'Stock independiente por sucursal y traspasos en tránsito entre sedes.', listo: true, acceso: ['movalmacen', 'inventario', 'facturar'] },
         { id: 'precios',    area: 'bigsoft', titulo: 'Precios en tiendas',    desc: 'Lo que entró al almacén: costo y precios nuevos, qué falta en cada tienda y cargarlos en su BigSoft.', listo: true },
         { id: 'reportes',   area: 'bigsoft', titulo: 'Reportes de tiendas',   desc: 'Existencia, ajustes de inventario y ventas del BigSoft de cada tienda, en Excel.', listo: true },
         // Atajo (no es un permiso aparte): las notas emitidas "Por ingresar en tienda", para quien tiene Entradas y salidas o Facturar
@@ -7527,9 +7530,11 @@
         pedidos: ['reqcharcu'],
         rrhh: ['talento', 'horarios', 'asistencia', 'asisgestion', 'nomina', 'pagonomina'],
         pos: ['cierrecaja', 'precios', 'notasbs', 'reportes'],
-        ventaexpress: ['ventaexpress']
+        ventaexpress: ['ventaexpress'],
+        multideposito: ['multideposito']
     };
     function moduloEnPlan(id) {
+        if (id === 'multideposito') return !!(CF_SOLO && cfPlanModulos && cfPlanModulos.multideposito === true);
         if (!CF_SOLO || !cfPlanModulos) return true;
         for (const k of Object.keys(PLAN_GRUPOS)) {
             if (PLAN_GRUPOS[k].includes(id)) return cfPlanModulos[k] !== false;
@@ -7897,8 +7902,8 @@
         claveAdminAuto(document.body);
         // login, menu, cuadre, ventas y admin tienen su propia sección; el resto usa la genérica "en construcción"
         // Caja chica usa la misma sección de Control de efectivo, mostrando solo la caja chica
-        const seccion = vista === 'cierrecaja' ? 'cie' : vista === 'cajachica' ? 'efectivo' : vista === 'reqcharcu' ? 'req' : vista === 'asistencia' ? 'asis' : vista === 'asisgestion' ? 'asisg' : (vista === 'nomina' || vista === 'talento' || vista === 'cxc' || vista === 'horarios') ? 'per' : (vista === 'inventario' || vista === 'movalmacen' || vista === 'precios' || vista === 'facturar' || vista === 'reportes') ? 'alm' : vista === 'pagonomina' ? 'pnom' : vista === 'listasficha' ? 'fl' : vista === 'ventaexpress' ? 'vx' : vista === 'marcaje' ? 'marca' : vista === 'cxp' ? 'cxp' : ['login', 'menu', 'cuadre', 'ventas', 'admin', 'pagos', 'efectivo'].includes(vista) ? vista : 'modulo';
-        ['login', 'menu', 'cuadre', 'ventas', 'admin', 'pagos', 'efectivo', 'req', 'asis', 'asisg', 'per', 'alm', 'pnom', 'fl', 'vx', 'marca', 'cxp', 'cie', 'modulo'].forEach(v => {
+        const seccion = vista === 'multideposito' ? 'md' : vista === 'cierrecaja' ? 'cie' : vista === 'cajachica' ? 'efectivo' : vista === 'reqcharcu' ? 'req' : vista === 'asistencia' ? 'asis' : vista === 'asisgestion' ? 'asisg' : (vista === 'nomina' || vista === 'talento' || vista === 'cxc' || vista === 'horarios') ? 'per' : (vista === 'inventario' || vista === 'movalmacen' || vista === 'precios' || vista === 'facturar' || vista === 'reportes') ? 'alm' : vista === 'pagonomina' ? 'pnom' : vista === 'listasficha' ? 'fl' : vista === 'ventaexpress' ? 'vx' : vista === 'marcaje' ? 'marca' : vista === 'cxp' ? 'cxp' : ['login', 'menu', 'cuadre', 'ventas', 'admin', 'pagos', 'efectivo'].includes(vista) ? vista : 'modulo';
+        ['login', 'menu', 'cuadre', 'ventas', 'admin', 'pagos', 'efectivo', 'req', 'asis', 'asisg', 'per', 'alm', 'pnom', 'fl', 'vx', 'marca', 'cxp', 'cie', 'md', 'modulo'].forEach(v => {
             const el = document.getElementById('vista' + v[0].toUpperCase() + v.slice(1));
             el.dataset.pantalla = '';   // al aparecer entra deslizándose (ANIM)
             el.classList.toggle('hidden', v !== seccion);
@@ -7938,6 +7943,7 @@
         if (vista === 'ventaexpress') vxIniciar();
         if (vista === 'cxp') cxpIniciar();
         if (vista === 'cierrecaja') cieIniciar();
+        if (vista === 'multideposito') mdIniciar();
         if (vista !== 'login' && vista !== 'marcaje') setTimeout(() => avisarEnLinea(true), 500);
         if (vista === 'efectivo' || vista === 'cajachica') efeIniciar(vista === 'cajachica');
         // Cuadre y Visor de ventas comparten los mismos datos (filas de la hoja de cuadres)
@@ -7970,7 +7976,8 @@
         listasficha: () => flCargar(),
         ventaexpress: () => vxPintar(),   // Firebase lo trae en vivo
         cxp: () => { cxp.pagos = null; cxpPintar(); },   // en vivo (Firebase); los pagos hechos se vuelven a leer
-        cierrecaja: () => cieCargar()
+        cierrecaja: () => cieCargar(),
+        multideposito: () => mdCargar()
     };
     // ---------- Cambios en vivo: cada 30 s se pregunta a Google qué áreas cambiaron (respuesta mínima).
     // Si cambió la del módulo abierto, se vuelve a leer solo, sin molestar: no mientras se escribe, hay una ventana abierta o algo se guarda.
@@ -8131,7 +8138,7 @@
     const NAV_NOMBRE = { admin: 'Administración', almacen: 'Almacén', bigsoft: CF_SOLO ? 'Sistema de caja' : 'BigSoft', rrhh: 'Talento humano', logo: 'Lo que más usa' };
     const NAV_GRUPOS = {
         admin: [['Cajas y ventas', ['cuadre', 'pagos', 'ventas']], ['Dinero', ['efectivo', 'cajachica', 'gastos']], ['Cuentas', ['cxc', 'cxp']], ['Tiendas', ['ventaexpress']]],
-        almacen: [['Mercancía', ['movalmacen', 'inventario', 'facturar']], ['Pedidos de las tiendas', ['reqcharcu']]],
+        almacen: [['Mercancía', ['movalmacen', 'inventario', 'facturar', 'multideposito']], ['Pedidos de las tiendas', ['reqcharcu']]],
         bigsoft: [['Cajas', ['cierrecaja', 'listasficha']], ['Tiendas', ['precios', 'notasbs', 'reportes']]],
         rrhh: [['Personal', ['talento', 'horarios']], ['Asistencia', ['asistencia', 'asisgestion']], ['Pagos', ['nomina', 'pagonomina']]]
     };
@@ -17846,10 +17853,11 @@
             const { db, fs } = await cxpDb();
             cxp.enCF = !!fs.cf;
             const err = e => {
-                if (fs.cf && e.code === 'unavailable' && cxp.cargado && !cxp.error) { mostrarBanner('Cuentas por pagar: sin conexión con el servidor; lo que ve puede no estar al día.', 'warn'); return; }   // se sigue intentando cada minuto
+                if (fs.cf && e.code === 'unavailable' && cxp.cargado && !cxp.error) { if (vistaActual === 'cxp') { cxp._sinRed = true; mostrarBanner('Cuentas por pagar: sin conexión con el servidor; lo que ve puede no estar al día.', 'warn'); } return; }   // se sigue intentando cada minuto
                 cxp.error = e.code === 'permission-denied' ? 'El sistema no le da permiso. Pulse Actualizar; si sigue, revise que su clave tenga Cuentas por pagar.' + (FB.problemaReglas && FB.problemaReglas() ? ' ' + FB.problemaReglas() : '') : (fs.cf ? '' : 'Firebase: ') + (fs.cf ? e.message : (e.code || e.message)); cxp.cargado = true; cxpDetener(); cxpPintar(); };
             const offs = [fs.onSnapshot(fs.query(fs.collection(db, 'cxp_docs'), fs.where('abierta', '==', true)), s => {
                 cxp.docs = s.docs.map(x => Object.assign({ id: x.id }, x.data())); cxp.cargado = true; cxp.error = '';
+                if (cxp._sinRed) { cxp._sinRed = false; ocultarBanner(); }
                 // (13/11) El N° del comprobante de retención se pone aparte, cuando Firebase ya confirmó la aprobación (aprobar no lo espera)
                 if (cxpAdmin()) s.docs.forEach(x => { const d = x.data(); if (!x.metadata.hasPendingWrites && d.estado === 'aprobada' && d.retIva > 0 && !d.numRet) cxpNumeroRetencion(x.id); });
                 if (vistaActual === 'cxp') cxpPintar(); else if (vistaActual === 'menu') tableroPintar();   // (20/11) facturas por pagar del inicio
@@ -25951,6 +25959,243 @@ Reglas:
             if (fb) efeCargar(true); else await efeUsarRespuesta(resp);
         } catch (e) { err.textContent = efeSinPrefijo(e.message); }
         finally { btn.disabled = false; efeCajaTipo(efeCajaTipoActual, !guardado); }
+    }
+
+    // =============================================================================================
+    //  (22/11) MULTI-DEPÓSITO Y TRASPASOS ENTRE SUCURSALES (JD Solution)
+    // =============================================================================================
+    let mdData = null, mdTab = 'traspasos', mdCargando = false, mdError = '', mdBusca = '', mdSedeK = '';
+    let mdTrItems = [], mdAjItems = [];
+    function mdIniciar() {
+        mdPintar();
+        mdCargar();
+        if (typeof almDatos === 'undefined' || !almDatos) { try { almCargar(); } catch (e) {} }
+    }
+    async function mdCargar() {
+        mdCargando = true; mdError = ''; mdPintar();
+        try {
+            mdData = await llamarApi({ action: 'md_estado', sede: mdSedeK });
+        } catch (e) { mdError = e.message; }
+        finally { mdCargando = false; mdPintar(); }
+    }
+    function mdCatalogo() {
+        const map = new Map();
+        const prods = (typeof almDatos !== 'undefined' && almDatos && Array.isArray(almDatos.productos)) ? almDatos.productos : [];
+        prods.forEach(p => { if (p && p.codigo) map.set(String(p.codigo).trim(), { codigo: String(p.codigo).trim(), descripcion: String(p.descripcion || p.nombre || '').trim() }); });
+        if (mdData && mdData.stock) {
+            Object.keys(mdData.stock).forEach(cod => {
+                if (!map.has(cod)) map.set(cod, { codigo: cod, descripcion: cod });
+            });
+        }
+        return [...map.values()].sort((a, b) => a.descripcion.localeCompare(b.descripcion, 'es'));
+    }
+    function mdStockDe(cod, sede) {
+        return Number(((mdData && mdData.stock && mdData.stock[cod]) || {})[sede] || 0);
+    }
+    function mdPintar() {
+        const el = document.getElementById('mdContenido');
+        if (!el || vistaActual !== 'multideposito') return;
+        const sedes = (mdData && mdData.sedes && mdData.sedes.length) ? mdData.sedes : TIENDAS_ORDEN.map(t => t.nombre);
+        const trs = (mdData && mdData.traspasos) || [];
+        const enTransito = trs.filter(x => x.estado === 'en_transito').length;
+        const tabs = `<div class="modo-tabs" role="tablist">
+            <button type="button" class="tab${mdTab === 'traspasos' ? ' active' : ''}" onclick="mdTab='traspasos';mdPintar()">Traspasos${enTransito ? ` <span class="chip st-amar" style="margin-left:4px">${enTransito}</span>` : ''}</button>
+            <button type="button" class="tab${mdTab === 'stock' ? ' active' : ''}" onclick="mdTab='stock';mdPintar()">Stock por sede</button>
+            <button type="button" class="tab${mdTab === 'kardex' ? ' active' : ''}" onclick="mdTab='kardex';mdPintar()">Kardex por sede</button>
+        </div>`;
+        if (mdCargando && !mdData) { el.innerHTML = tabs + cargandoHTML('Cargando depósitos y traspasos...'); return; }
+        if (mdError) { el.innerHTML = tabs + `<div class="banner error" style="display:block">${esc(mdError)}</div>`; return; }
+
+        const cat = mdCatalogo();
+        const dl = `<datalist id="mdCatList">${cat.map(p => `<option value="${esc(p.codigo)}">${esc(p.descripcion)}</option>`).join('')}</datalist>`;
+        let cuerpo = '';
+
+        if (mdTab === 'traspasos') {
+            const opts = (sel) => sedes.map(s => `<option value="${esc(s)}"${s === sel ? ' selected' : ''}>${esc(s)}</option>`).join('');
+            const origDef = (document.getElementById('mdTrOrig') || {}).value || sedes[0] || '';
+            const destDef = (document.getElementById('mdTrDest') || {}).value || sedes[1] || sedes[0] || '';
+            const filasForm = mdTrItems.map((it, i) => `<tr><td class="izq"><b>${esc(it.codigo)}</b> · ${esc(it.descripcion)}</td>
+                <td>${fmtNum(mdStockDe(it.codigo, origDef))}</td>
+                <td><b>${fmtNum(it.cantidad)}</b></td>
+                <td><button type="button" class="btn-ghost btn-mini" onclick="mdTrItems.splice(${i},1);mdPintar()">Quitar</button></td></tr>`).join('');
+            const badge = e => e === 'en_transito' ? '<span class="chip st-amar">En tránsito</span>' : e === 'recibido' ? '<span class="chip st-ok">Recibido</span>' : '<span class="chip st-falta">Anulado</span>';
+            const filasTr = trs.map(t => `<tr>
+                <td class="izq"><b>${esc(t.id)}</b><small>${esc(t.creadoEn || t.fecha)}</small></td>
+                <td class="izq">${esc(t.origen)} → <b>${esc(t.destino)}</b>${t.nota ? `<small>${esc(t.nota)}</small>` : ''}</td>
+                <td class="izq">${(t.items || []).map(x => `${esc(x.descripcion || x.codigo)} (<b>${fmtNum(x.cantidad)}</b>${x.recibido != null && x.recibido !== x.cantidad ? ' → rec. ' + fmtNum(x.recibido) : ''})`).join(', ')}${t.diferencias ? `<small style="color:var(--warn)">${esc(t.diferencias)}</small>` : ''}</td>
+                <td class="izq">${badge(t.estado)}${t.recibidoPor ? `<small>${esc(t.recibidoPor)} · ${esc(t.recibidoEn)}</small>` : `<small>Despachó: ${esc(t.creadoPor)}</small>`}</td>
+                <td><div style="display:flex;gap:.35rem;flex-wrap:wrap;justify-content:flex-end">
+                    ${t.estado === 'en_transito' ? `<button type="button" class="btn-primary btn-mini" onclick="mdAbrirRecibir('${esc(t.id)}')">Confirmar recepción</button><button type="button" class="btn-ghost btn-mini" onclick="mdAnularTraspaso('${esc(t.id)}')">Anular</button>` : ''}
+                    <button type="button" class="btn-ghost btn-mini" onclick="mdImprimirTraspaso('${esc(t.id)}')">Imprimir</button>
+                </div></td></tr>`).join('');
+            cuerpo = `<div class="grafico-card">
+                <div class="grafico-head"><h3>Nuevo traspaso entre sucursales</h3></div>
+                <div class="grafico-sub">Descuenta inmediatamente de la sede origen y queda "En tránsito" hasta que la sede destino confirme recepción.</div>
+                <div class="filters" style="margin-top:.65rem">
+                    <div><label for="mdTrOrig">Sede origen (envía)</label><select id="mdTrOrig" onchange="mdPintar()">${opts(origDef)}</select></div>
+                    <div><label for="mdTrDest">Sede destino (recibe)</label><select id="mdTrDest">${opts(destDef)}</select></div>
+                    <div><label for="mdTrNota">Nota / chofer (opcional)</label><input id="mdTrNota" placeholder="Ej: Enviado con transporte..."></div>
+                </div>
+                <div class="filters" style="margin-top:.4rem">
+                    <div><label for="mdTrCod">Código o producto</label><input id="mdTrCod" list="mdCatList" placeholder="Escriba código..." oninput="mdAutocomp('mdTrCod','mdTrDesc')"></div>
+                    <div><label for="mdTrDesc">Descripción</label><input id="mdTrDesc" placeholder="Nombre del producto"></div>
+                    <div><label for="mdTrCant">Cantidad</label><input id="mdTrCant" type="number" step="0.001" min="0.001" placeholder="0"></div>
+                    <div style="display:flex;align-items:flex-end"><button type="button" class="btn-ghost" onclick="mdAgregarItem('tr')">+ Agregar</button></div>
+                </div>
+                ${mdTrItems.length ? `<div class="tabla-wrap" style="margin-top:.6rem"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Producto</th><th>Disp. origen</th><th>Enviar</th><th></th></tr></thead><tbody>${filasForm}</tbody></table></div>
+                <div class="req-acciones" style="justify-content:flex-end;margin-top:.65rem"><button type="button" class="btn-primary" id="mdBtnTr" onclick="mdEnviarTraspaso()">Despachar traspaso (${mdTrItems.length})</button></div>` : ''}
+            </div>
+            <div class="grafico-card" style="margin-top:1rem">
+                <div class="grafico-head"><h3>Traspasos (${trs.length})</h3></div>
+                <div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">N°</th><th class="izq">Ruta</th><th class="izq">Mercancía</th><th class="izq">Estado</th><th></th></tr></thead>
+                <tbody>${filasTr || '<tr><td colspan="5" class="empty">Todavía no hay traspasos registrados.</td></tr>'}</tbody></table></div>
+            </div>`;
+        } else if (mdTab === 'stock') {
+            const q = mdBusca.trim().toLowerCase();
+            const lista = cat.filter(p => !q || p.codigo.toLowerCase().includes(q) || p.descripcion.toLowerCase().includes(q));
+            const filasS = lista.slice(0, 200).map(p => {
+                let tot = 0;
+                const cols = sedes.map(s => { const v = mdStockDe(p.codigo, s); tot += v; return `<td>${v ? `<b>${fmtNum(v)}</b>` : '<span style="opacity:.4">0</span>'}</td>`; }).join('');
+                return `<tr><td class="izq"><b>${esc(p.codigo)}</b></td><td class="izq">${esc(p.descripcion)}</td>${cols}<td><b>${fmtNum(Math.round(tot * 1000) / 1000)}</b></td></tr>`;
+            }).join('');
+            const opts = sedes.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
+            const filasAj = mdAjItems.map((it, i) => `<tr><td class="izq"><b>${esc(it.codigo)}</b> · ${esc(it.descripcion)}</td><td><b>${fmtNum(it.cantidad)}</b></td><td><button type="button" class="btn-ghost btn-mini" onclick="mdAjItems.splice(${i},1);mdPintar()">Quitar</button></td></tr>`).join('');
+            cuerpo = `<div class="grafico-card">
+                <div class="grafico-head"><h3>Entrada, salida o ajuste en una sede</h3></div>
+                <div class="filters" style="margin-top:.5rem">
+                    <div><label for="mdAjSede">Sede / depósito</label><select id="mdAjSede">${opts}</select></div>
+                    <div><label for="mdAjTipo">Movimiento</label><select id="mdAjTipo"><option value="entrada">Entrada (+)</option><option value="salida">Salida (-)</option><option value="ajuste">Ajuste exacto (=)</option></select></div>
+                    <div><label for="mdAjNota">Motivo / factura</label><input id="mdAjNota" placeholder="Ej: Conteo inicial, compra..."></div>
+                </div>
+                <div class="filters" style="margin-top:.4rem">
+                    <div><label for="mdAjCod">Código</label><input id="mdAjCod" list="mdCatList" placeholder="Escriba código..." oninput="mdAutocomp('mdAjCod','mdAjDesc')"></div>
+                    <div><label for="mdAjDesc">Descripción</label><input id="mdAjDesc" placeholder="Nombre del producto"></div>
+                    <div><label for="mdAjCant">Cantidad</label><input id="mdAjCant" type="number" step="0.001" min="0" placeholder="0"></div>
+                    <div style="display:flex;align-items:flex-end"><button type="button" class="btn-ghost" onclick="mdAgregarItem('aj')">+ Agregar</button></div>
+                </div>
+                ${mdAjItems.length ? `<div class="tabla-wrap" style="margin-top:.6rem"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Producto</th><th>Cantidad</th><th></th></tr></thead><tbody>${filasAj}</tbody></table></div>
+                <div class="req-acciones" style="justify-content:flex-end;margin-top:.65rem"><button type="button" class="btn-primary" id="mdBtnAj" onclick="mdEnviarAjuste()">Guardar movimiento (${mdAjItems.length})</button></div>` : ''}
+            </div>
+            <div class="grafico-card" style="margin-top:1rem">
+                <div class="grafico-head"><h3>Existencia por sucursal (${lista.length})</h3></div>
+                <div class="filters"><div><label for="mdBusInp">Buscar producto</label><input type="search" id="mdBusInp" value="${esc(mdBusca)}" placeholder="Código o descripción..." oninput="mdBusca=this.value;mdPintar()"></div></div>
+                <div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">Código</th><th class="izq">Descripción</th>${sedes.map(s => `<th>${esc(s)}</th>`).join('')}<th>Total</th></tr></thead>
+                <tbody>${filasS || '<tr><td colspan="' + (sedes.length + 3) + '" class="empty">Sin existencias registradas todavía. Use el formulario de arriba para cargar stock inicial.</td></tr>'}</tbody></table></div>
+            </div>`;
+        } else {
+            const movs = (mdData && mdData.movs) || [];
+            const opts = '<option value="">Todas las sedes</option>' + sedes.map(s => `<option value="${esc(s)}"${s === mdSedeK ? ' selected' : ''}>${esc(s)}</option>`).join('');
+            const filasM = movs.map(m => `<tr>
+                <td class="izq">${esc(m.fecha)}</td><td class="izq"><b>${esc(m.sede)}</b></td>
+                <td class="izq"><b>${esc(m.codigo)}</b> · ${esc(m.descripcion)}</td>
+                <td class="izq"><span class="chip ${m.cantidad >= 0 ? 'st-ok' : 'st-falta'}">${esc(m.tipo)}</span></td>
+                <td><b>${m.cantidad > 0 ? '+' : ''}${fmtNum(m.cantidad)}</b></td>
+                <td>${fmtNum(m.antes)} → <b>${fmtNum(m.despues)}</b></td>
+                <td class="izq">${esc(m.ref || '')}<small>${esc(m.usuario || '')}${m.nota ? ' · ' + esc(m.nota) : ''}</small></td>
+            </tr>`).join('');
+            cuerpo = `<div class="grafico-card">
+                <div class="grafico-head"><h3>Kardex por sede</h3></div>
+                <div class="filters"><div><label for="mdSedeFil">Filtrar por sede</label><select id="mdSedeFil" onchange="mdSedeK=this.value;mdCargar()">${opts}</select></div></div>
+                <div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">Fecha</th><th class="izq">Sede</th><th class="izq">Producto</th><th class="izq">Tipo</th><th>Cant.</th><th>Stock</th><th class="izq">Ref. / Usuario</th></tr></thead>
+                <tbody>${filasM || '<tr><td colspan="7" class="empty">Sin movimientos todavía.</td></tr>'}</tbody></table></div>
+            </div>`;
+        }
+        el.innerHTML = dl + tabs + cuerpo;
+    }
+    function mdAutocomp(idCod, idDesc) {
+        const cod = String((document.getElementById(idCod) || {}).value || '').trim();
+        const found = mdCatalogo().find(p => p.codigo === cod);
+        const dEl = document.getElementById(idDesc);
+        if (found && dEl) dEl.value = found.descripcion;
+    }
+    function mdAgregarItem(modo) {
+        const p = modo === 'tr' ? 'mdTr' : 'mdAj';
+        const cod = String((document.getElementById(p + 'Cod') || {}).value || '').trim();
+        const desc = String((document.getElementById(p + 'Desc') || {}).value || '').trim() || cod;
+        const cant = Number((document.getElementById(p + 'Cant') || {}).value);
+        if (!cod) { mostrarBanner('Escriba el código del producto.', 'warn'); return; }
+        if (!(cant > 0) && !(modo === 'aj' && cant >= 0)) { mostrarBanner('Escriba una cantidad válida.', 'warn'); return; }
+        const lista = modo === 'tr' ? mdTrItems : mdAjItems;
+        const ya = lista.find(x => x.codigo === cod);
+        if (ya) ya.cantidad = Math.round((ya.cantidad + cant) * 1000) / 1000;
+        else lista.push({ codigo: cod, descripcion: desc, cantidad: cant });
+        mdPintar();
+    }
+    async function mdEnviarTraspaso() {
+        const orig = (document.getElementById('mdTrOrig') || {}).value, dest = (document.getElementById('mdTrDest') || {}).value;
+        const nota = String((document.getElementById('mdTrNota') || {}).value || '').trim();
+        if (orig === dest) { mostrarBanner('La sede de origen y destino no pueden ser la misma.', 'error'); return; }
+        const btn = document.getElementById('mdBtnTr'); if (btn) btnCargando(btn, 'Despachando...');
+        try {
+            const r = await llamarApi({ action: 'md_traspaso_crear', origen: orig, destino: dest, nota, items: mdTrItems });
+            mdData = r; mdTrItems = [];
+            mostrarBanner(`Traspaso ${r.id} despachado de ${orig} hacia ${dest} (en tránsito).`, 'ok');
+            mdPintar();
+        } catch (e) { mostrarBanner(e.message, 'error'); if (btn) { btn.disabled = false; btn.textContent = 'Despachar traspaso'; } }
+    }
+    async function mdEnviarAjuste() {
+        const sede = (document.getElementById('mdAjSede') || {}).value, tipo = (document.getElementById('mdAjTipo') || {}).value;
+        const nota = String((document.getElementById('mdAjNota') || {}).value || '').trim();
+        const btn = document.getElementById('mdBtnAj'); if (btn) btnCargando(btn, 'Guardando...');
+        try {
+            const r = await llamarApi({ action: 'md_ajuste', sede, tipo, nota, items: mdAjItems });
+            mdData = r; mdAjItems = [];
+            mostrarBanner(`Movimiento ${r.ref} guardado en ${sede}.`, 'ok');
+            mdPintar();
+        } catch (e) { mostrarBanner(e.message, 'error'); if (btn) { btn.disabled = false; btn.textContent = 'Guardar movimiento'; } }
+    }
+    function mdAbrirRecibir(id) {
+        const tr = ((mdData && mdData.traspasos) || []).find(x => x.id === id);
+        if (!tr) return;
+        let fondo = document.getElementById('mdRecDlg');
+        if (!fondo) { fondo = document.createElement('div'); fondo.id = 'mdRecDlg'; fondo.className = 'req-dlg-fondo'; fondo.onclick = e => { if (e.target === fondo) fondo.classList.add('hidden'); }; document.body.appendChild(fondo); }
+        const filas = (tr.items || []).map(it => `<tr><td class="izq"><b>${esc(it.codigo)}</b> · ${esc(it.descripcion)}</td><td>${fmtNum(it.cantidad)}</td><td><input type="number" step="0.001" min="0" data-md-rec="${esc(it.codigo)}" value="${it.cantidad}" style="width:6.5rem"></td></tr>`).join('');
+        fondo.innerHTML = `<form class="req-dlg" style="width:min(600px,100%)" onsubmit="mdConfirmarRecibir(event,'${esc(id)}')">
+            <h3>Confirmar recepción · ${esc(tr.id)}</h3>
+            <div class="req-sub">${esc(tr.origen)} → <b>${esc(tr.destino)}</b> · Despachó: ${esc(tr.creadoPor)} (${esc(tr.creadoEn)})</div>
+            <div class="tabla-wrap" style="margin-top:.7rem"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Producto</th><th>Enviado</th><th>Recibido</th></tr></thead><tbody>${filas}</tbody></table></div>
+            <div class="nota" style="margin-top:.5rem">Si llegó la cantidad completa, pulse Confirmar. Si llegó menos, ajuste la columna Recibido para dejar registro de la diferencia.</div>
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-ghost" onclick="document.getElementById('mdRecDlg').classList.add('hidden')">Cancelar</button><button type="submit" class="btn-primary" id="mdRecBtn">Confirmar recepción</button></div>
+        </form>`;
+        fondo.classList.remove('hidden');
+    }
+    async function mdConfirmarRecibir(ev, id) {
+        ev.preventDefault();
+        const btn = document.getElementById('mdRecBtn'); if (btn) btnCargando(btn, 'Confirmando...');
+        const recibidos = {};
+        document.querySelectorAll('#mdRecDlg input[data-md-rec]').forEach(i => { recibidos[i.dataset.mdRec] = Number(i.value); });
+        try {
+            const r = await llamarApi({ action: 'md_traspaso_recibir', id, recibidos });
+            mdData = r;
+            document.getElementById('mdRecDlg').classList.add('hidden');
+            mostrarBanner(r.diferencias && r.diferencias.length ? `Traspaso ${id} recibido con diferencias: ${r.diferencias.join(' · ')}` : `Traspaso ${id} recibido y sumado al inventario.`, r.diferencias && r.diferencias.length ? 'warn' : 'ok');
+            mdPintar();
+        } catch (e) { mostrarBanner(e.message, 'error'); if (btn) { btn.disabled = false; btn.textContent = 'Confirmar recepción'; } }
+    }
+    async function mdAnularTraspaso(id) {
+        const motivo = prompt(`¿Anular el traspaso ${id} y devolver la mercancía a la sede origen? Escriba el motivo:`);
+        if (motivo === null) return;
+        try {
+            mdData = await llamarApi({ action: 'md_traspaso_anular', id, motivo });
+            mostrarBanner(`Traspaso ${id} anulado y devuelto a origen.`, 'ok');
+            mdPintar();
+        } catch (e) { mostrarBanner(e.message, 'error'); }
+    }
+    function mdImprimirTraspaso(id) {
+        const tr = ((mdData && mdData.traspasos) || []).find(x => x.id === id);
+        if (!tr) return;
+        const w = window.open('', '_blank'); if (!w) return;
+        const nom = CF_SOLO ? (TITULOS.menu || CF_EMPRESA) : 'Plaza Software';
+        w.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Traspaso ${esc(tr.id)}</title><style>body{font-family:Arial,sans-serif;padding:18px;color:#0f172a}h2{margin:0 0 4px}table{width:100%;border-collapse:collapse;margin-top:14px}th,td{border:1px solid #cbd5e1;padding:6px 8px;text-align:left;font-size:13px}th{background:#f1f5f9}.firmas{display:flex;gap:40px;margin-top:50px}.firmas div{flex:1;border-top:1px solid #0f172a;padding-top:6px;text-align:center;font-size:12px}</style></head><body>
+            <h2>${esc(nom)} · Nota de Traspaso ${esc(tr.id)}</h2>
+            <div><b>Origen:</b> ${esc(tr.origen)} &nbsp;|&nbsp; <b>Destino:</b> ${esc(tr.destino)} &nbsp;|&nbsp; <b>Fecha:</b> ${esc(tr.creadoEn || tr.fecha)}</div>
+            <div><b>Despachó:</b> ${esc(tr.creadoPor)} &nbsp;|&nbsp; <b>Estado:</b> ${esc(tr.estado)}${tr.nota ? ' &nbsp;|&nbsp; <b>Nota:</b> ' + esc(tr.nota) : ''}</div>
+            <table><thead><tr><th>Código</th><th>Descripción</th><th>Enviado</th><th>Recibido</th></tr></thead><tbody>
+            ${(tr.items || []).map(it => `<tr><td>${esc(it.codigo)}</td><td>${esc(it.descripcion)}</td><td>${fmtNum(it.cantidad)}</td><td>${it.recibido != null ? fmtNum(it.recibido) : ''}</td></tr>`).join('')}
+            </tbody></table>
+            <div class="firmas"><div>Entregado por (${esc(tr.origen)})</div><div>Recibido por (${esc(tr.destino)})</div></div>
+            <script>window.onload=function(){window.print()}<\/script></body></html>`);
+        w.document.close();
     }
 
     let cfEmpActual = null, miEmpLogoB64 = null;
