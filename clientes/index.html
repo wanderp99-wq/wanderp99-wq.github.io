@@ -395,7 +395,7 @@ const MODS_DEF = [
   ['efectivo',     'Efectivo y caja',    'Flujo efectivo, Caja chica'],
   ['cxp',          'Cuentas por pagar',  'Facturas y préstamos'],
   ['cxc',          'Cuentas por cobrar', 'Clientes y gastos tienda'],
-  ['almacen',      'Almacén y compras',  'Inventario, Entradas, Facturar'],
+  ['almacen',      'Almacén y compras',  'Inventario, Entradas, Despacho'],
   ['pedidos',      'Pedidos a almacén',  'Requerimientos por sede'],
   ['rrhh',         'Talento y nómina',   'Personal, Asistencia, Nómina'],
   ['ventaexpress',  'Venta express',      'Facturación rápida en tienda'],
@@ -413,7 +413,7 @@ function pintarChecks(prefijo, vals) {
   const el = document.getElementById(prefijo + 'Mods');
   if (!el) return;
   el.innerHTML = MODS_DEF.map(([k, tit, sub]) => {
-    const on = !vals || vals[k] !== false;
+    const on = k === 'multideposito' ? !!(vals && vals[k] === true) : (!vals || vals[k] !== false);
     return `<label class="mod-chk"><input type="checkbox" data-mod="${k}" ${on ? 'checked' : ''}><span><b>${esc(tit)}</b><br><small>${esc(sub)}</small></span></label>`;
   }).join('');
 }

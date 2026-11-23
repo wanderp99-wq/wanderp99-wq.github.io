@@ -2856,6 +2856,7 @@
                         <div><label for="admNombre">Nombre de la persona</label><input type="text" id="admNombre" required maxlength="60"></div>
                         <div><label for="admClave">Clave</label><input type="password" id="admClave" autocomplete="new-password" minlength="6"></div>
                         <div><label for="admClave2">Repetir clave</label><input type="password" id="admClave2" autocomplete="new-password"></div>
+                        <div><label for="admSede">Sede / Tienda asignada</label><select id="admSede"><option value="">Todas las sedes (sin restricción)</option></select></div>
                     </div>
                     <div class="adm-hint" id="admClaveHint"></div>
                     <label class="adm-check adm-admin interruptor"><input type="checkbox" id="admAdmin" onchange="admToggleAdmin()"><span class="sw-pista"></span>
@@ -2863,7 +2864,7 @@
                     <label>Módulos a los que tiene acceso</label>
                     <div class="adm-modulos" id="admModulos"></div>
                     <label class="adm-check interruptor" style="margin:12px 0"><input type="checkbox" id="admVerExist"><span class="sw-pista"></span>
-                        <span><b>Ver existencia del almacén</b> · en Facturar ve cuánto hay y el costo. Apagado: factura sin ver el inventario.</span></label>
+                        <span><b>Ver existencia del almacén</b> · en Despacho ve cuánto hay y el costo. Apagado: despacha sin ver el inventario.</span></label>
                     <label class="adm-check interruptor"><input type="checkbox" id="admActivo" checked><span class="sw-pista"></span> Clave activa (si se desmarca, no puede entrar)</label>
                     <div class="login-error" id="admFormError"></div>
                     <div class="det-actions">
@@ -3984,7 +3985,7 @@
                 const accReal = /^(cf_foto|cxp_foto)$/.test(payload.action) ? 'media_subir' : payload.action;
                 const body = Object.assign({ empresa: CF_EMPRESA, eq: EQUIPO_ID, disp: payload.disp || DISPOSITIVO }, payload, { action: accReal });
                 if (payload.action === 'login') body.clave = clave;
-                else body.token = await cfToken();
+                else if (!/^(marca_equipo_registrar|marca_estado|marca_registrar)$/.test(payload.action)) body.token = await cfToken();
                 resp = await fetch(CF_URL + '/api', {
                     method: 'POST',
                     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -5928,7 +5929,7 @@
             const r = CAJAFB.responder(p, x.H);
             if (r) anotarTiempo(p.action + ' (Cloudflare)', Math.round(performance.now() - t0), 0, true);
             return r;
-        } catch (e) { cfSes.roto = Date.now(); console.log('Servidor nuevo (Cloudflare): ' + e.message + ' (se usa lo de antes)'); return null; }
+        } catch (e) { if (!CF_SOLO) cfSes.roto = Date.now(); console.log('Servidor nuevo (Cloudflare): ' + e.message + ' (se usa lo de antes)'); return null; }
     }
     // Documentos que publica Google para los paneles (config/nomina, vista/personas, vista/trabajadores): { datos: JSON }
     async function cfDocs(rutas) {
@@ -5961,7 +5962,7 @@
     function cfModuloEncendido(m) {
         if (!clave) return false;
         if (!cfSes.modulos || Date.now() - cfSes.modHora > 300000) { cfModulos(); if (!cfSes.modulos) return false; }
-        if (cfSes.roto && Date.now() - cfSes.roto < 120000) return false;
+        if (!CF_SOLO && cfSes.roto && Date.now() - cfSes.roto < 120000) return false;
         return !!cfSes.modulos[m];
     }
     // Cuentas por cobrar, Gestión de asistencia y Horarios de trabajo (las mismas cuentas NOMFB que con Firebase)
@@ -5974,7 +5975,7 @@
             const r = NOMFB.responder(p, x.H, D['config/nomina'] || {}, D['vista/personas'] || []);
             if (r) anotarTiempo(p.action + ' (Cloudflare)', Math.round(performance.now() - t0), 0, true);
             return r;
-        } catch (e) { cfSes.roto = Date.now(); console.log('Servidor nuevo (Cloudflare): ' + e.message + ' (se usa lo de antes)'); return null; }
+        } catch (e) { if (!CF_SOLO) cfSes.roto = Date.now(); console.log('Servidor nuevo (Cloudflare): ' + e.message + ' (se usa lo de antes)'); return null; }
     }
     // Nómina de la semana (NOMFB.calcular, igual que con Firebase)
     const CF_NOM_AREAS = ['per', 'asis', 'cuadre', 'alm'];
@@ -5984,10 +5985,10 @@
             const t0 = performance.now(), x = await cfLeerAlDia(NOMFB.HOJAS, CF_NOM_AREAS);
             if (!x) return null;
             const D = await cfDocs(['config/nomina', 'vista/trabajadores']);
-            const r = NOMFB.calcular(sem, x.H, D['config/nomina'], D['vista/trabajadores']);
+            const r = NOMFB.calcular(sem, x.H, D['config/nomina'] || {}, D['vista/trabajadores'] || []);
             anotarTiempo('nom_semana (Cloudflare)', Math.round(performance.now() - t0), 0, true);
             return r;
-        } catch (e) { cfSes.roto = Date.now(); console.log('Servidor nuevo (Cloudflare): ' + e.message + ' (se usa lo de antes)'); return null; }
+        } catch (e) { if (!CF_SOLO) cfSes.roto = Date.now(); console.log('Servidor nuevo (Cloudflare): ' + e.message + ' (se usa lo de antes)'); return null; }
     }
     // Almacén y compras (las mismas cuentas ALMFB que con Firebase; cada persona lee solo las hojas de su grupo)
     async function cfAlmResponder(p, grupo) {
@@ -5998,7 +5999,7 @@
             const D = await cfDocs(['config/almacen']), r = ALMFB.responder(p, x.H, D['config/almacen'] || {});
             if (r) anotarTiempo(p.action + ' (Cloudflare)', Math.round(performance.now() - t0), 0, true);
             return r;
-        } catch (e) { cfSes.roto = Date.now(); console.log('Servidor nuevo (Cloudflare): ' + e.message + ' (se usa lo de antes)'); return null; }
+        } catch (e) { if (!CF_SOLO) cfSes.roto = Date.now(); console.log('Servidor nuevo (Cloudflare): ' + e.message + ' (se usa lo de antes)'); return null; }
     }
     // Requerimientos de charcutería (REQFB)
     // (15/11) Quien solo factura, desde el servidor nuevo: vista_facturar (sin existencia, mínimo ni costo) y sus ventas en espera.
@@ -6012,7 +6013,8 @@
             if (espera) {
                 const x = await cfLeerAlDia(['ALM ESPERA'], ['alm']); if (!x) return null;
                 const t = v => String(v == null ? '' : v).trim(), n = v => { const y = Number(String(v).replace(',', '.')); return isFinite(y) ? y : 0; };
-                const r = { ok: true, esperas: x.H['ALM ESPERA'].valores.filter(f => t(f[0]) && !t(f[6])).map(f => {
+                const filasEsp = (x.H['ALM ESPERA'] && x.H['ALM ESPERA'].valores) || [];
+                const r = { ok: true, esperas: filasEsp.filter(f => t(f[0]) && !t(f[6])).map(f => {
                     let items = []; try { items = JSON.parse(String(f[5] || '[]')); } catch (e) {}
                     return { id: t(f[0]), guardada: t(f[1]), usuario: t(f[2]), renglones: n(f[3]), total: n(f[4]), items }; }) };
                 anotarTiempo(p.action + ' (Cloudflare)', Math.round(performance.now() - t0), 0, true);
@@ -6033,7 +6035,7 @@
                 if (Date.now() - desde > 3000) { vivoMotivo = 'Cloudflare sin el último cambio'; return null; }
                 await new Promise(r => setTimeout(r, 600));
             }
-        } catch (e) { cfSes.roto = Date.now(); console.log('Servidor nuevo (Cloudflare): ' + e.message + ' (se usa Google)'); return null; }
+        } catch (e) { if (!CF_SOLO) cfSes.roto = Date.now(); console.log('Servidor nuevo (Cloudflare): ' + e.message + ' (se usa Google)'); return null; }
     }
     async function cfReqResponder(p) {
         if (reqDirecto.s.saltar || !almVivoTiene('reqcharcu') || !cfModuloEncendido('req')) return null;
@@ -6043,7 +6045,7 @@
             const r = REQFB.responder(p, x.H);
             if (r) anotarTiempo(p.action + ' (Cloudflare)', Math.round(performance.now() - t0), 0, true);
             return r;
-        } catch (e) { cfSes.roto = Date.now(); console.log('Servidor nuevo (Cloudflare): ' + e.message + ' (se usa lo de antes)'); return null; }
+        } catch (e) { if (!CF_SOLO) cfSes.roto = Date.now(); console.log('Servidor nuevo (Cloudflare): ' + e.message + ' (se usa lo de antes)'); return null; }
     }
     // Comparar Almacén, Compras y Requerimientos (servidor nuevo vs Google)
     async function cfAlmComparar(btn) {
@@ -6403,7 +6405,7 @@
             const r = NOMFB.historial(x.H, p);
             anotarTiempo('nom_historial (Cloudflare)', Math.round(performance.now() - t0), 0, true);
             return r;
-        } catch (e) { cfSes.roto = Date.now(); console.log('Servidor nuevo (Cloudflare): ' + e.message + ' (se usa lo de antes)'); return null; }
+        } catch (e) { if (!CF_SOLO) cfSes.roto = Date.now(); console.log('Servidor nuevo (Cloudflare): ' + e.message + ' (se usa lo de antes)'); return null; }
     }
     // Después de cada guardado (la respuesta trae _cf): Google envía al servidor nuevo lo que cambió, sin demorar el guardado
     let cfSyncT = 0;
@@ -7415,7 +7417,7 @@
         const origen = a => { const x = String(a || '');
             if (/\(Cloudflare\)/.test(x)) return { acc: x.replace(/\s*\(Cloudflare\)/, ''), srv: 'Servidor', cls: 'st-ok' };
             if (/·\s*copia local/.test(x)) return { acc: x.replace(/\s*·\s*copia local/, ''), srv: 'Este equipo', cls: 'st-info' };
-            return { acc: x, srv: 'Respaldo', cls: 'st-pend' }; };
+            return { acc: x, srv: CF_SOLO ? 'Servidor' : 'Respaldo', cls: CF_SOLO ? 'st-ok' : 'st-pend' }; };
         const verFb = esPrincipal && !CF_SOLO;
         const verPaq = esPrincipal && (!CF_SOLO || moduloEnPlan('cierrecaja'));
         fondo.innerHTML = `<div class="req-dlg" style="width:min(680px,100%)"><h3>Tiempos de respuesta</h3>
@@ -7510,7 +7512,7 @@
         { id: 'horarios',   area: 'rrhh',    titulo: 'Horarios de trabajo',   desc: 'Horario semanal de cada tienda: generarlo, ajustarlo y enviarlo por Telegram.', listo: true },
         { id: 'reqcharcu',  area: 'almacen', titulo: 'Requerimientos de charcutería', desc: 'Cuánto enviar a cada local según ventas, exhibición y la existencia de la cava.', listo: true },
         { id: 'inventario', area: 'almacen', titulo: 'Productos e inventario', desc: 'Catálogo de productos, existencia del almacén y movimientos.', listo: true },
-        { id: 'facturar',   area: 'almacen', titulo: 'Facturar',              desc: 'Notas de entrega a clientes y tiendas, y las notas emitidas. Sin acceso al inventario ni a las entradas.', listo: true },
+        { id: 'facturar',   area: 'almacen', titulo: 'Despacho',              desc: 'Notas de entrega a clientes y tiendas, y las notas emitidas. Sin acceso al inventario ni a las entradas.', listo: true },
         { id: 'movalmacen', area: 'almacen', titulo: 'Entradas y salidas',    desc: 'Compras con foto de la factura, operaciones de inventario, notas emitidas e inversión por tienda.', listo: true },
         { id: 'multideposito', area: 'almacen', titulo: 'Depósitos y traspasos', desc: 'Stock independiente por sucursal y traspasos en tránsito entre sedes.', listo: true, acceso: ['movalmacen', 'inventario', 'facturar'] },
         { id: 'precios',    area: 'bigsoft', titulo: 'Precios en tiendas',    desc: 'Lo que entró al almacén: costo y precios nuevos, qué falta en cada tienda y cargarlos en su BigSoft.', listo: true },
@@ -12188,8 +12190,13 @@
     let admUsuarios = [];
     let admEditando = null;   // id de la clave que se edita (null = nueva)
 
-    // Módulos que se pueden asignar (los del menú)
-    const MODULOS_ASIGNABLES = () => MODULOS.filter(m => !m.acceso).map(m => ({ id: m.id, titulo: m.area === 'admin' ? m.titulo : AREAS.find(a => a.id === m.area).titulo + ' · ' + m.titulo }));
+    // Módulos que se pueden asignar (los del menú activos para esta empresa)
+    const MODULOS_ASIGNABLES = () => MODULOS.filter(m => !m.acceso && moduloEnPlan(m.id)).map(m => {
+        const tit = typeof tituloModulo === 'function' ? tituloModulo(m) : m.titulo;
+        const a = AREAS.find(x => x.id === m.area);
+        const aTit = a ? (typeof tituloArea === 'function' ? tituloArea(a) : a.titulo) : '';
+        return { id: m.id, titulo: (!m.area || m.area === 'admin') ? tit : aTit + ' · ' + tit };
+    });
 
     async function apiAdmin(payload) {
         if (!WEB_APP_URL) return demoAdmin(payload);
@@ -12253,7 +12260,7 @@
         try {
             const r = await apiAdmin({ action: 'adm_listar' });
             admUsuarios = r.usuarios || [];
-            document.getElementById('admPrNombre').value = r.principal.nombre || '';
+            document.getElementById('admPrNombre').value = (r.principal && r.principal.nombre) || '';
             admRenderTabla();
         } catch (e) {
             if (lanzarError) throw e;
@@ -12300,18 +12307,18 @@
                 ${s.huellas.map(h => `<tr><td class="izq"><b>${esc(h.nombre)}</b></td><td class="izq">${esc(h.equipo)}</td><td class="izq">${esc(h.creado)}</td><td class="izq">${esc(h.uso) || '—'}</td>
                     <td><button type="button" class="btn-ghost btn-mini" style="color:var(--danger)" onclick="admSegAccion('adm_huella_quitar', { id: '${esc(h.id)}' }, '${esc(h.nombre)} ya no podrá entrar con la huella en ${esc(h.equipo)}: tendrá que escribir su clave. ¿Quitarla?')">Quitar</button></td></tr>`).join('')}</tbody></table></div>`
                 : '<div class="empty">Nadie ha activado la huella todavía.</div>'}
-            <h4 class="per-sub">Respaldo del libro</h4>
+            ${CF_SOLO ? '' : `<h4 class="per-sub">Respaldo del libro</h4>
             <div class="filters" style="margin-bottom:.5rem">
                 <div><label for="admRespCada">Hacer una copia</label><select id="admRespCada" onchange="admRespConfig()">${[[1, 'Todos los días'], [2, 'Cada 2 días'], [3, 'Cada 3 días'], [7, 'Cada semana'], [15, 'Cada 15 días']].map(([v, x]) => `<option value="${v}"${v === s.respaldo.cada ? ' selected' : ''}>${x}</option>`).join('')}</select></div>
                 <div><label for="admRespGuardar">Guardar las últimas</label><select id="admRespGuardar" onchange="admRespConfig()">${[5, 10, 15, 30].map(v => `<option value="${v}"${v === s.respaldo.guardar ? ' selected' : ''}>${v} copias</option>`).join('')}</select></div>
             </div>
             <div class="nota" style="margin-top:0">Último respaldo: <b>${esc(s.respaldo.ultimo) || 'ninguno'}</b> · ${s.respaldo.programado === true ? 'programado (2 a. m.)' : s.respaldo.programado === false ? '<b style="color:var(--danger)">no está programado</b>: en Apps Script ejecute una vez la función instalarRespaldoDiario' : 'para programarlo, en Apps Script ejecute una vez la función instalarRespaldoDiario'}.
                 Cubre unos <b>${s.respaldo.cada * s.respaldo.guardar} días</b> hacia atrás. Las copias más viejas se borran solas (pasan a la papelera de Drive, que se vacía sola a los 30 días). Carpeta: "Respaldos Plaza Valencia".</div>
-            <div class="req-acciones"><button type="button" class="btn-ghost" id="admBtnResp" onclick="btnCargando(this, 'Copiando...'); admSegAccion('adm_respaldo')">Hacer respaldo ahora</button></div>
+            <div class="req-acciones"><button type="button" class="btn-ghost" id="admBtnResp" onclick="btnCargando(this, 'Copiando...'); admSegAccion('adm_respaldo')">Hacer respaldo ahora</button></div>`}
             <h4 class="per-sub">Últimos accesos</h4>
             ${(s.accesos || []).length ? `<div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">Fecha y hora</th><th class="izq">Evento</th><th class="izq">Persona</th><th class="izq">Dispositivo</th></tr></thead><tbody>
                 ${s.accesos.map(a => `<tr${a.evento === 'Ingreso' ? '' : ' style="color:var(--danger)"'}><td class="izq">${esc(a.fecha)}</td><td class="izq">${esc(a.evento)}</td><td class="izq">${esc(a.persona) || '—'}</td><td class="izq"><small>${esc(a.disp)}</small></td></tr>`).join('')}</tbody></table></div>`
-                : '<div class="empty">Sin registros todavía (hoja BD ACCESOS).</div>'}`;
+                : '<div class="empty">Sin registros todavía.</div>'}`;
     }
 
     // Reportes de tiendas dividido en 3 permisos (10/11): cada uno se habilita aparte
@@ -12328,7 +12335,7 @@
         const lista = admUsuarios.slice().sort((a, b) => a.nombre.localeCompare(b.nombre));
         cont.innerHTML = `<table><thead><tr><th>Persona</th><th>Módulos</th><th>Estado</th><th></th></tr></thead><tbody>` +
             lista.map(u => `<tr>
-                <td><b>${esc(u.nombre)}</b></td>
+                <td><b>${esc(u.nombre)}</b>${u.sede ? ` <span class="chip st-info">${esc(u.sede)}</span>` : ''}</td>
                 <td>${u.admin ? '<span class="chip st-ok">Administrador · acceso a todo</span>' : u.permisos.length ? u.permisos.filter(p => p !== 'reportes').map(p => `<span class="chip-mod">${esc(nombres[p] || p)}</span>`).join('') : '<span class="nota">Ninguno</span>'}</td>
                 <td><span class="chip ${u.activo ? 'st-ok' : 'st-pend'}">${u.activo ? 'Activa' : 'Desactivada'}</span></td>
                 <td><div class="adm-acciones">
@@ -12360,6 +12367,13 @@
             : `<label><input type="checkbox" value="${m.id}" ${marcados.includes(m.id) ? 'checked' : ''}> ${esc(m.titulo)}</label>`).join('');
         document.getElementById('admVerExist').checked = marcados.includes('verexistencia');
         document.getElementById('admAdmin').checked = !!(u && u.admin);
+        const selSede = document.getElementById('admSede');
+        if (selSede) {
+            const listaS = TIENDAS_ORDEN.map(t => t.nombre);
+            if (u && u.sede && !listaS.includes(u.sede)) listaS.push(u.sede);
+            selSede.innerHTML = '<option value="">Todas las sedes (sin restricción)</option>' + listaS.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
+            selSede.value = (u && !u.admin && u.sede) ? u.sede : '';
+        }
         admToggleAdmin();
         document.getElementById('admFormError').textContent = '';
         document.getElementById('admForm').classList.remove('hidden');
@@ -12369,6 +12383,8 @@
     function admToggleAdmin() {
         const admin = document.getElementById('admAdmin').checked;
         document.querySelectorAll('#admModulos input, #admVerExist').forEach(i => { if (admin) i.checked = true; i.disabled = admin; });
+        const selSede = document.getElementById('admSede');
+        if (selSede) { if (admin) selSede.value = ''; selSede.disabled = admin; }
     }
     function admNuevo() { admAbrirForm(null); }
     function admEditar(id) { admAbrirForm(admUsuarios.find(u => u.id === id)); }
@@ -12388,6 +12404,7 @@
             permisos: (l => (l.some(p => /^rep_/.test(p)) ? l.concat(['reportes']) : l).concat(l.includes('cxp_admin') && !l.includes('cxp') ? ['cxp'] : []))([...document.querySelectorAll('#admModulos input:checked')].map(i => i.value))   // con algún reporte, el módulo abre en el menú (y Administración de CxP también paga)
                 .concat(document.getElementById('admVerExist').checked ? ['verexistencia'] : []),
             admin: document.getElementById('admAdmin').checked,
+            sede: document.getElementById('admAdmin').checked ? '' : ((document.getElementById('admSede') || {}).value || ''),
             activo: document.getElementById('admActivo').checked
         };
         const antes = admEditando ? admUsuarios.find(u => u.id === admEditando) : null;
@@ -12411,7 +12428,7 @@
     async function admActivar(id, activo) {
         const u = admUsuarios.find(x => x.id === id);
         try {
-            await apiAdmin({ action: 'adm_guardar', usuario: { id, nombre: u.nombre, permisos: u.permisos, admin: u.admin, activo } });
+            await apiAdmin({ action: 'adm_guardar', usuario: { id, nombre: u.nombre, permisos: u.permisos, admin: u.admin, sede: u.sede || '', activo } });
             await admCargar();
             mostrarBanner(`Clave de ${u.nombre} ${activo ? 'activada' : 'desactivada'}.`, 'ok');
         } catch (e) { mostrarBanner('No se pudo cambiar: ' + e.message, 'error'); }
@@ -14706,7 +14723,7 @@
     // ¿Está encendido "Usar Firebase en la Nómina"? Se lee config/nomina una vez (y cada 5 minutos): 1 lectura. Apagado no se escucha nada.
     let nomVivoDirecta = null, nomVivoDirectaHora = 0, nomVivoUltimaVista = 0, nomVivoAvisado = false, nomVivoRotoHora = 0;
     async function nomVivoActiva() {
-        if (!clave || !permisos.includes('nomina') || typeof FB === 'undefined') return false;
+        if (CF_SOLO || !clave || !permisos.includes('nomina') || typeof FB === 'undefined') return false;
         // Firebase falló: 2 minutos por Google y después se vuelve a intentar
         if (NOMVIVO.estado() === 'roto') { if (!nomVivoRotoHora) nomVivoRotoHora = Date.now(); if (Date.now() - nomVivoRotoHora < 120000) return false; NOMVIVO.reiniciar(); nomVivoRotoHora = 0; nomVivoAvisado = false; }
         if (NOMVIVO.completo()) return NOMVIVO.directa();
@@ -17822,7 +17839,12 @@
         const p = l(provId) || l(prov).slice(0, 30), n = l(doc).replace(/^0+(?=.)/, '');
         return p && n ? ('f_' + p + '_' + n).slice(0, 120) : '';
     }
-    const cxpSaldo = d => Math.max(0, cxpR((Number(d.totalUsd) || 0) - (Number(d.pagado) || 0)));
+    const cxpSaldo = d => d && d.tipo === 'favor' ? 0 : Math.max(0, cxpR((Number(d.totalUsd) || 0) - (Number(d.pagado) || 0)));
+    function cxpFavorDe(prov) {
+        const k = cxpNorm(prov);
+        const docs = (cxp.docs || []).filter(d => d.tipo === 'favor' && d.estado === 'favor' && d.abierta && cxpNorm(d.proveedor) === k && Number(d.saldoFavor) > 0.004);
+        return { total: cxpR(docs.reduce((s, d) => s + Number(d.saldoFavor || 0), 0)), docs };
+    }
     // Descuento por pronto pago si se paga COMPLETA en fechaPago: el mejor de los que todavía aplican
     function cxpDescuento(d, fechaPago) {
         const base = d.fechaFactura || d.fechaRecibida;
@@ -18053,11 +18075,17 @@
     }
     function cxpVistaProveedores(ren) {
         const m = new Map();
-        ren.forEach(x => { const k = x.quien; const p = m.get(k) || (m.set(k, { quien: k, n: 0, saldo: 0, venc: 0, prox: '' }), m.get(k));
+        ren.forEach(x => { const k = x.quien; const p = m.get(k) || (m.set(k, { quien: k, n: 0, saldo: 0, venc: 0, prox: '', favor: 0 }), m.get(k));
             p.n++; p.saldo = cxpR(p.saldo + x.saldo); if (x.dias < 0) p.venc = cxpR(p.venc + x.saldo); if (!p.prox || x.vence < p.prox) p.prox = x.vence; });
-        const l = [...m.values()].filter(p => cxpCoincide(p.quien)).sort((a, b) => b.venc - a.venc || b.saldo - a.saldo);
-        return cxpBuscador('Proveedor o banco') + (l.length ? `<div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Proveedor</th><th>Pendientes</th><th>Saldo $</th><th>Vencido $</th><th class="izq">Próximo vencimiento</th><th></th></tr></thead><tbody>${l.map(p => `
-            <tr><td class="izq"><b>${esc(p.quien)}</b></td><td>${p.n}</td><td><b>${cxpUsd(p.saldo)}</b></td><td>${p.venc ? `<span style="color:var(--bad)">${cxpUsd(p.venc)}</span>` : '—'}</td><td class="izq">${cxpF(p.prox)}</td>
+        (cxp.docs || []).filter(d => d.tipo === 'favor' && d.estado === 'favor' && d.abierta && Number(d.saldoFavor) > 0.004).forEach(d => {
+            const k = d.proveedor || '';
+            let p = [...m.values()].find(x => cxpNorm(x.quien) === cxpNorm(k));
+            if (!p) { p = { quien: k, n: 0, saldo: 0, venc: 0, prox: '', favor: 0 }; m.set(k, p); }
+            p.favor = cxpR(p.favor + Number(d.saldoFavor || 0));
+        });
+        const l = [...m.values()].filter(p => cxpCoincide(p.quien)).sort((a, b) => b.venc - a.venc || b.saldo - a.saldo || b.favor - a.favor);
+        return cxpBuscador('Proveedor o banco') + (l.length ? `<div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Proveedor</th><th>Pendientes</th><th>Saldo $</th><th>A favor $</th><th>Vencido $</th><th class="izq">Próximo vencimiento</th><th></th></tr></thead><tbody>${l.map(p => `
+            <tr><td class="izq"><b>${esc(p.quien)}</b></td><td>${p.n}</td><td><b>${cxpUsd(p.saldo)}</b></td><td>${p.favor ? `<span class="chip st-ok">+ ${cxpUsd(p.favor)}</span>` : '—'}</td><td>${p.venc ? `<span style="color:var(--bad)">${cxpUsd(p.venc)}</span>` : '—'}</td><td class="izq">${cxpF(p.prox)}</td>
             <td><button type="button" class="btn-ghost btn-mini" data-p="${esc(p.quien)}" onclick="cxpEstadoCuenta(this.dataset.p)">Estado de cuenta</button></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">No hay saldos pendientes con proveedores.</div>');
     }
 
@@ -18156,6 +18184,7 @@
             </tbody></table></div>${cuotas}${pagos}</div>
             <div class="cxp-ver-lado" id="cxpComCaja">${cxpComentariosHTML(d)}</div></div>
             <div class="req-acciones cxp-ver-pie">
+                <button type="button" class="btn-ghost" data-p="${esc(d.banco || d.proveedor)}" onclick="almCerrar();cxpEstadoCuenta(this.dataset.p)">Estado de cuenta</button>
                 ${admin && d.estado !== 'anulada' && !(d.pagado > 0) ? `<button type="button" class="btn-ghost" onclick="cxpAnular('${d.id}')">Anular</button>` : ''}
                 ${admin && d.tipo !== 'prestamo' && (d.estado === 'por_revisar' || d.estado === 'aprobada') && !(d.pagado > 0) ? `<button type="button" class="btn-ghost" onclick="cxpSacarContado('${d.id}')">Fue de contado</button>` : ''}
                 ${d.retIva > 0 && d.numRet ? `<button type="button" class="btn-ghost" onclick="cxpImprimirRetencion()">${ico('imprimir')}Comprobante de retención</button>` : ''}
@@ -18225,6 +18254,13 @@
                 <div><button type="button" class="btn-ghost btn-mini" onclick="cxpRevDesc(${i}, null)">Quitar</button></div></div>`).join('')}
             ${r.descuentos.length < 4 ? `<button type="button" class="btn-ghost btn-mini" onclick="cxpRevDesc(-1)">＋ Descuento por pronto pago</button>` : ''}
             <div class="filters" style="margin-top:.6rem"><div style="grid-column:1/-1"><label for="crNota">Nota</label><input id="crNota" value="${esc(r.nota || '')}" oninput="cxpRevCampo('nota', this.value)" maxlength="200"></div></div>
+            <div style="margin:.6rem 0;padding:.65rem;border:1px solid var(--border);border-radius:10px;background:var(--bg)">
+                <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
+                    <label class="btn-ghost btn-mini" style="cursor:pointer;margin:0">${ico('camara')}${r._fotoNueva ? 'Cambiar foto nueva' : ((r.fotos || []).length ? 'Agregar otra foto' : 'Subir foto de la factura')}<input type="file" accept="image/*" capture="environment" style="display:none" onchange="cxpRevFoto(this.files[0])"></label>
+                    ${r._fotoNueva ? `<img src="${r._fotoNueva}" alt="Foto nueva" style="max-height:70px;border-radius:6px;border:1px solid var(--border)"><button type="button" class="btn-ghost btn-mini" onclick="cxpRev._fotoNueva='';cxpRevPintar()">Quitar</button>` : ((r.fotos || []).length ? `<span class="chip st-ok">${r.fotos.length} foto(s) cargada(s)</span>` : '<span class="nota" style="margin:0">La foto de la factura es obligatoria para aprobar.</span>')}
+                </div>
+                ${!(r.fotos || []).length && !r._fotoNueva && esPrincipal ? `<label class="interruptor" style="margin:.5rem 0 0"><input type="checkbox" ${r.sinFotoAdmin ? 'checked' : ''} onchange="cxpRev.sinFotoAdmin=this.checked;cxpRevPintar()"><span class="sw-pista"></span> Aprobar sin foto (solo administrador)</label>` : ''}
+            </div>
             <div class="kpis" style="margin-top:.6rem">
                 <div class="kpi"><div class="k-label">Total factura</div><div class="k-value" style="font-size:1.1rem">${mon(r.montoBruto || 0)}</div></div>
                 ${r.retIva ? `<div class="kpi"><div class="k-label">Retención IVA ${r.retPct} %</div><div class="k-value" style="font-size:1.1rem">− ${mon(r.retIva)}</div><div class="k-label">se entera al SENIAT</div></div>` : ''}
@@ -18256,15 +18292,28 @@
         else { r.descuentos[i][k] = Number(v) || 0; if (k === 'pct' && r.descuentos[i].pct) r.descuentos[i].monto = 0; if (k === 'monto' && r.descuentos[i].monto) r.descuentos[i].pct = 0; }
         cxpRevPintar();
     }
+    async function cxpRevFoto(f) {
+        if (!f || !cxpRev) return;
+        try { cxpRev._fotoNueva = await cmpComprimir(f); cxpRev.sinFotoAdmin = false; cxpRevPintar(); }
+        catch (e) { mostrarBanner('No se pudo cargar la foto: ' + e.message, 'error'); }
+    }
     async function cxpRevGuardar(btn, aprobar) {
         const r = cxpRev, err = document.getElementById('crErr'); err.textContent = '';
         cxpRevCalcular(r);
+        const tieneFoto = !!((r.fotos || []).length || r._fotoNueva);
         const falta = !String(r.proveedor || '').trim() ? 'Escriba el proveedor.' : !String(r.documento || '').trim() ? 'Escriba el N° de la factura.' : !(r.montoBruto > 0) ? 'Escriba el total de la factura.'
             : r.moneda === 'Bs' && !(r.tasaFactura > 0) ? 'Falta la tasa BCV de la fecha de la factura.' : r.fiscal && r.iva > r.montoBruto ? 'El IVA no puede ser mayor que el total.'
-            : r.descuentos.some(x => !(x.dias >= 0) || (!x.pct && !x.monto)) ? 'Cada descuento necesita sus días y un % o un monto.' : '';
+            : r.descuentos.some(x => !(x.dias >= 0) || (!x.pct && !x.monto)) ? 'Cada descuento necesita sus días y un % o un monto.'
+            : (aprobar && !tieneFoto && !(esPrincipal && r.sinFotoAdmin)) ? (esPrincipal ? 'Suba la foto de la factura o marque "Aprobar sin foto (solo administrador)".' : 'Debe subir la foto de la factura para poder aprobarla.') : '';
         if (falta) { err.textContent = falta; return; }
-        btnCargando(btn, 'Guardando...');
+        btnCargando(btn, r._fotoNueva ? 'Subiendo foto...' : 'Guardando...');
         try {
+            let fotosAct = (r.fotos || []).slice();
+            if (r._fotoNueva) {
+                const up = await llamarApi({ action: 'cxp_foto', proveedor: String(r.proveedor).trim(), documento: String(r.documento).trim(), foto: { nombre: 'factura.jpg', tipo: 'image/jpeg', base64: r._fotoNueva.split(',')[1] } });
+                if (up && up.url) fotosAct.push(up.url);
+                btnCargando(btn, 'Guardando...');
+            }
             const { db, fs } = await cxpDb(), quien = nombreUsuario, ahora = cxpHoy() + ' ' + new Date().toTimeString().slice(0, 5);
             const id = r.id || cxpIdFactura(r.proveedorId, r.proveedor, r.documento);
             if (!id) throw new Error('Proveedor o número no válidos.');
@@ -18272,26 +18321,22 @@
                 fechaFactura: r.fechaFactura, fechaRecibida: r.fechaRecibida || cxpHoy(), moneda: r.moneda, montoBruto: cxpR(r.montoBruto), tasaFactura: Number(r.tasaFactura) || cxpTasa(r.fechaFactura) || 0,   // también en $: el comprobante de retención va en Bs
                 fiscal: !!r.fiscal, base: r.fiscal ? cxpR(r.base) : 0, exento: r.fiscal ? cxpR(r.exento) : 0, iva: r.iva, retPct: r.fiscal ? Number(r.retPct) : 0, retIva: r.retIva,
                 totalUsd: r.totalUsd, credito: Number(r.credito) || 0, vence: r.vence, descuentos: r.descuentos.map(x => ({ dias: Number(x.dias), pct: Number(x.pct) || 0, monto: Number(x.monto) || 0 })),
-                nota: String(r.nota || '').slice(0, 200), revisadoPor: quien, revisado: ahora };
+                fotos: fotosAct, nota: String(r.nota || '').slice(0, 200), revisadoPor: quien, revisado: ahora };
             if (aprobar) Object.assign(datos, { estado: 'aprobada', abierta: true });
             const ref = fs.doc(db, 'cxp_docs', id), ya = r.id ? cxp.docs.find(x => x.id === id) : null;
             const listo = () => { almCerrar(); mostrarBanner(aprobar ? `Factura ${datos.documento} de ${datos.proveedor} aprobada: pasa a la Agenda de pagos (vence el ${fechaBonita(datos.vence)}).` : 'Guardada (todavía por revisar).', 'ok'); };
             if (ya) {
-                // (13/11) Al instante: la factura ya está en la lista en vivo, así que se revisa con ella y se guarda sin esperar a Firebase
-                // (antes una transacción con 3 viajes de ida y vuelta: varios segundos en "Guardando..."). La lista cambia en el momento y, si
-                // Firebase lo rechaza, el cambio se deshace solo y sale el aviso. El N° de retención lo pone cxpNumeroRetencion después.
                 if (Number(ya.pagado) > 0 && datos.totalUsd < Number(ya.pagado) - 0.004) throw new Error('Ya tiene pagos por más de la deuda nueva: revise los montos.');
                 fs.updateDoc(ref, datos).catch(e => mostrarBanner(`No se guardó la factura ${datos.documento} de ${datos.proveedor}: ` + (e.code === 'permission-denied' ? 'El sistema no le da permiso (necesita Administración de Cuentas por pagar).' : (e.code || e.message)), 'error'));
                 return listo();
             }
-            // Factura nueva (o que ya no está abierta): se confirma con Firebase que no esté registrada
             await fs.runTransaction(db, async tx => {
                 const s = await tx.get(ref);
                 if (!r.id && s.exists()) throw new Error('Esa factura de ese proveedor ya está registrada.');
                 if (r.id && (!s.exists() || s.data().estado === 'anulada' || s.data().estado === 'pagada')) throw new Error('La factura cambió mientras tanto (pagada o anulada). Ciérrela y vuelva a abrirla.');
                 if (r.id && Number(s.data().pagado) > 0 && datos.totalUsd < Number(s.data().pagado) - 0.004) throw new Error('Ya tiene pagos por más de la deuda nueva: revise los montos.');
                 if (s.exists()) tx.update(ref, datos);
-                else tx.set(ref, Object.assign(datos, { estado: aprobar ? 'aprobada' : 'por_revisar', abierta: true, pagado: 0, fotos: [], origen: 'admin', creadoPor: quien, creado: fs.serverTimestamp(), registro: ahora }));
+                else tx.set(ref, Object.assign(datos, { estado: aprobar ? 'aprobada' : 'por_revisar', abierta: true, pagado: 0, fotos: fotosAct, origen: 'admin', creadoPor: quien, creado: fs.serverTimestamp(), registro: ahora }));
             });
             listo();
         } catch (e) { err.textContent = e.code === 'permission-denied' ? 'El sistema no le da permiso (necesita Administración de Cuentas por pagar).' : e.message; btn.disabled = false; btn.textContent = aprobar ? 'Aprobar para pagar' : 'Guardar sin aprobar'; }
@@ -18405,7 +18450,7 @@
         if (!d || d.estado !== 'aprobada') return mostrarBanner('Ese documento ya no está por pagar.', 'error');
         const c = cuota ? (d.cuotas || []).find(x => x.n === cuota) : null;
         const saldo = c ? cxpR(c.total - (c.pagado || 0)) : cxpSaldo(d);
-        cxpPag = { id, cuota: cuota || 0, fecha: cxpHoy(), forma: 'transferencia', monto: saldo, completo: true, referencia: '', banco: '', nota: '' };
+        cxpPag = { id, cuota: cuota || 0, fecha: cxpHoy(), forma: 'transferencia', monto: saldo, completo: true, usarFavor: false, referencia: '', banco: '', nota: '' };
         cxpPagPintar(true);
     }
     // (15/11) El abono se puede escribir en $ o en Bs: el otro se calcula con la tasa BCV de la fecha del pago
@@ -18438,31 +18483,38 @@
     function cxpPagCalc() {
         const p = cxpPag, d = cxp.docs.find(x => x.id === p.id) || {}, c = p.cuota ? (d.cuotas || []).find(x => x.n === p.cuota) : null;
         const saldo = c ? cxpR(c.total - (c.pagado || 0)) : cxpSaldo(d);
-        const aplicado = p.completo ? saldo : Math.min(saldo, cxpR(p.monto));
+        const fav = cxpFavorDe(d.banco || d.proveedor);
         const desc = !c && p.completo ? cxpDescuento(d, p.fecha) : null;
-        const descuento = desc ? Math.min(desc.usd, aplicado) : 0, pagadoUsd = cxpR(aplicado - descuento);
+        const ingresado = p.completo ? saldo : Math.max(0, cxpR(p.monto));
+        const aplicado = Math.min(saldo, ingresado);
+        const excedente = !p.completo && ingresado > saldo + 0.004 ? cxpR(ingresado - saldo) : 0;
+        const descuento = desc ? Math.min(desc.usd, aplicado) : 0;
+        const favorAplicar = p.usarFavor && fav.total > 0 ? Math.min(fav.total, cxpR(aplicado - descuento)) : 0;
+        const pagadoUsd = cxpR(Math.max(0, aplicado - descuento - favorAplicar) + excedente);
         const forma = CXP_FORMAS.find(f => f[0] === p.forma) || CXP_FORMAS[0], tasa = forma[2] === 'Bs' ? cxpTasa(p.fecha) : 0;
-        const bsEscrito = forma[2] === 'Bs' && !p.completo && p.montoBs > 0 && !descuento && Math.abs(cxpR(p.montoBs / tasa) - aplicado) < 0.006;
-        return { d, c, saldo, aplicado, desc, descuento, pagadoUsd, forma, tasa, montoMoneda: forma[2] === 'Bs' ? (bsEscrito ? p.montoBs : cxpR(pagadoUsd * tasa)) : pagadoUsd };
+        const bsEscrito = forma[2] === 'Bs' && !p.completo && p.montoBs > 0 && !descuento && !favorAplicar && Math.abs(cxpR(p.montoBs / tasa) - ingresado) < 0.006;
+        return { d, c, saldo, fav, favorAplicar, aplicado, excedente, desc, descuento, pagadoUsd, forma, tasa, montoMoneda: forma[2] === 'Bs' ? (bsEscrito ? p.montoBs : cxpR(pagadoUsd * tasa)) : pagadoUsd };
     }
     function cxpPagPintar(nuevo) {
         const p = cxpPag, k = cxpPagCalc(), d = k.d;
         const html = `<div class="req-dlg cxp-dlg"><h3>Pagar · ${esc(d.banco || d.proveedor)}</h3>
             <div class="req-sub">${esc(d.documento || '')}${k.c ? ' · cuota ' + k.c.n + ' de ' + d.cuotas.length + ' (vence ' + fechaBonita(k.c.vence) + ')' : ' · vence ' + fechaBonita(d.vence)} · saldo <b>${cxpUsd(k.saldo)}</b></div>
+            ${k.fav.total > 0 ? `<div style="margin:.45rem 0;padding:.55rem .7rem;border-radius:10px;border:1px solid var(--ok, #16a34a);background:rgba(22,163,74,.08)"><label class="interruptor" style="margin:0"><input type="checkbox" ${p.usarFavor ? 'checked' : ''} onchange="cxpPag.usarFavor=this.checked;cxpPagPintar()"><span class="sw-pista"></span> Aplicar saldo a favor de ${esc(d.banco || d.proveedor)} (<b>+ ${cxpUsd(k.fav.total)}</b>)</label></div>` : ''}
             <div class="filters">
                 <div><label for="cgFecha">Fecha del pago</label><input id="cgFecha" type="date" value="${p.fecha}" max="${cxpHoy()}" onchange="cxpPagFecha(this.value)"></div>
                 <div><label for="cgForma">Forma de pago</label><select id="cgForma" onchange="cxpPag.forma=this.value;cxpPagPintar()">${CXP_FORMAS.map(f => `<option value="${f[0]}" ${p.forma === f[0] ? 'selected' : ''}>${f[1]}</option>`).join('')}</select></div>
                 <div><label for="cgCual">Cuánto</label><select id="cgCual" onchange="cxpPag.completo=this.value==='1';cxpPagPintar()"><option value="1" ${p.completo ? 'selected' : ''}>Todo el saldo</option><option value="0" ${p.completo ? '' : 'selected'}>Un abono</option></select></div>
-                ${p.completo ? '' : `<div><label for="cgMonto">Abono $</label><input id="cgMonto" type="number" step="0.01" min="0.01" max="${k.saldo}" value="${p.monto || ''}" onchange="cxpPagMonto('usd', this.value)"></div>
+                ${p.completo ? '' : `<div><label for="cgMonto">Abono $</label><input id="cgMonto" type="number" step="0.01" min="0.01" value="${p.monto || ''}" onchange="cxpPagMonto('usd', this.value)"></div>
                     ${k.forma[2] === 'Bs' ? `<div><label for="cgMontoBs">o el abono en Bs</label><input id="cgMontoBs" type="number" step="0.01" min="0" value="${p.montoBs || (k.tasa && p.monto ? cxpR(p.monto * k.tasa) : '')}" onchange="cxpPagMonto('bs', this.value)" ${k.tasa ? '' : 'disabled title="No hay tasa BCV de esa fecha"'}></div>` : ''}`}
                 <div><label for="cgRef">Referencia <small>(opcional)</small></label><input id="cgRef" value="${esc(p.referencia)}" oninput="cxpPag.referencia=this.value" maxlength="40"></div>
                 <div><label for="cgBanco">Banco o cuenta de origen <small>(opcional)</small></label><input id="cgBanco" list="cgBancoL" autocomplete="off" value="${esc(p.banco)}" oninput="cxpPag.banco=this.value" maxlength="60"><datalist id="cgBancoL">${cxpBancos().map(b => `<option value="${esc(b)}">`).join('')}</datalist></div>
             </div>
             <div class="kpis">
                 ${k.descuento ? `<div class="kpi ok"><div class="k-label">Descuento por pronto pago</div><div class="k-value" style="font-size:1.1rem">− ${cxpUsd(k.descuento)}</div><div class="k-label">${k.desc.pct ? k.desc.pct + ' %' : 'monto fijo'} · pagando antes del ${cxpF(k.desc.hasta)}</div></div>` : ''}
+                ${k.favorAplicar > 0 ? `<div class="kpi ok"><div class="k-label">Saldo a favor aplicado</div><div class="k-value" style="font-size:1.1rem">− ${cxpUsd(k.favorAplicar)}</div><div class="k-label">descontado de su saldo a favor</div></div>` : ''}
                 <div class="kpi amar"><div class="k-label">A pagar</div><div class="k-value" style="font-size:1.2rem">${k.forma[2] === 'Bs' ? fmtBs(k.montoMoneda) : cxpUsd(k.montoMoneda)}</div>
                     <div class="k-label">${k.forma[2] === 'Bs' ? (k.tasa ? cxpUsd(k.pagadoUsd) + ' · tasa BCV del ' + cxpF(p.fecha) + ': ' + fmt(k.tasa) : 'No hay tasa BCV de esa fecha') : 'en $'}</div></div>
-                <div class="kpi"><div class="k-label">Queda debiendo</div><div class="k-value" style="font-size:1.1rem">${cxpUsd(cxpR(k.saldo - k.aplicado))}</div></div></div>
+                ${k.excedente > 0 ? `<div class="kpi ok"><div class="k-label">Saldo a favor</div><div class="k-value" style="font-size:1.1rem">+ ${cxpUsd(k.excedente)}</div><div class="k-label">queda en positivo para ${esc(d.banco || d.proveedor)}</div></div>` : `<div class="kpi"><div class="k-label">Queda debiendo</div><div class="k-value" style="font-size:1.1rem">${cxpUsd(cxpR(k.saldo - k.aplicado))}</div></div>`}</div>
             <div class="filters"><div style="grid-column:1/-1"><label for="cgNota">Nota del pago <small>(sale en el comprobante)</small></label><input id="cgNota" value="${esc(p.nota)}" oninput="cxpPag.nota=this.value" maxlength="200"></div></div>
             <div id="cxpComCaja">${cxpComentariosHTML(d)}</div>
             <div class="login-error" id="cgErr"></div>
@@ -18473,11 +18525,12 @@
     async function cxpPagGuardar(btn) {
         const p = cxpPag, k = cxpPagCalc(), err = document.getElementById('cgErr');
         if (!(k.aplicado > 0)) { err.textContent = 'Escriba cuánto se paga.'; return; }
-        if (k.forma[2] === 'Bs' && !(k.tasa > 0)) { err.textContent = 'No hay tasa BCV de esa fecha: elija otra fecha o actualice las tasas.'; return; }
+        if (k.pagadoUsd > 0 && k.forma[2] === 'Bs' && !(k.tasa > 0)) { err.textContent = 'No hay tasa BCV de esa fecha: elija otra fecha o actualice las tasas.'; return; }
         if (p.fecha > cxpHoy()) { err.textContent = 'La fecha del pago no puede ser futura.'; return; }
         btnCargando(btn, 'Registrando...');
         try {
             const { db, fs } = await cxpDb(), quien = nombreUsuario, pid = 'pg_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+            const ahora = cxpHoy() + ' ' + new Date().toTimeString().slice(0, 5);
             await fs.runTransaction(db, async tx => {
                 const ref = fs.doc(db, 'cxp_docs', p.id), s = await tx.get(ref);
                 if (!s.exists() || s.data().estado !== 'aprobada') throw new Error('Ese documento ya no está por pagar (lo cambió otra persona).');
@@ -18486,17 +18539,42 @@
                 if (p.cuota) { const c = cuotas.find(x => x.n === p.cuota); if (!c || c.pagada) throw new Error('Esa cuota ya está pagada.'); saldo = cxpR(c.total - (c.pagado || 0));
                                if (k.aplicado > saldo + 0.004) throw new Error('El abono es mayor que lo que falta de la cuota.'); c.pagado = cxpR((c.pagado || 0) + k.aplicado); c.pagada = c.pagado >= c.total - 0.004; }
                 else { saldo = Math.max(0, cxpR((d.totalUsd || 0) - (d.pagado || 0))); if (k.aplicado > saldo + 0.004) throw new Error('El pago es mayor que el saldo (alguien pagó mientras tanto).'); }
+                // Si aplica saldo a favor disponible, consumir los documentos de saldo a favor de este proveedor
+                let restarFav = k.favorAplicar || 0;
+                if (restarFav > 0) {
+                    for (const fd of k.fav.docs) {
+                        if (restarFav <= 0.004) break;
+                        const fref = fs.doc(db, 'cxp_docs', fd.id), fsn = await tx.get(fref);
+                        if (!fsn.exists()) continue;
+                        const fdata = fsn.data(), disp = Number(fdata.saldoFavor) || 0;
+                        if (disp <= 0.004 || fdata.estado !== 'favor') continue;
+                        const toma = Math.min(disp, restarFav), queda = cxpR(disp - toma);
+                        tx.update(fref, { saldoFavor: queda, usado: cxpR((Number(fdata.usado) || 0) + toma), abierta: queda > 0.004, estado: queda > 0.004 ? 'favor' : 'usado', actualizado: ahora });
+                        restarFav = cxpR(restarFav - toma);
+                    }
+                }
                 const pagado = cxpR((Number(d.pagado) || 0) + k.aplicado), cerrada = pagado >= (Number(d.totalUsd) || 0) - 0.004;
-                const cambio = { pagado, descontado: cxpR((Number(d.descontado) || 0) + k.descuento), abierta: !cerrada, estado: cerrada ? 'pagada' : 'aprobada', ultimoPago: p.fecha, actualizado: cxpHoy() + ' ' + new Date().toTimeString().slice(0, 5) };
+                const cambio = { pagado, descontado: cxpR((Number(d.descontado) || 0) + k.descuento), abierta: !cerrada, estado: cerrada ? 'pagada' : 'aprobada', ultimoPago: p.fecha, actualizado: ahora };
                 if (cuotas) { cambio.cuotas = cuotas; const prox = cuotas.find(x => !x.pagada); cambio.vence = prox ? prox.vence : d.vence; }
                 tx.update(ref, cambio);
                 tx.set(fs.doc(db, 'cxp_pagos', pid), { docId: p.id, tipo: d.tipo, proveedor: d.banco || d.proveedor, rif: d.rif || '', documento: d.documento || '', cuota: p.cuota || 0, fecha: p.fecha,
-                    forma: p.forma, moneda: k.forma[2], tasa: k.tasa, montoMoneda: k.montoMoneda, pagadoUsd: k.pagadoUsd, aplicadoUsd: k.aplicado, descuentoUsd: k.descuento,
+                    forma: p.forma, moneda: k.forma[2], tasa: k.tasa, montoMoneda: k.montoMoneda, pagadoUsd: k.pagadoUsd, aplicadoUsd: k.aplicado, descuentoUsd: k.descuento, favorUsadoUsd: k.favorAplicar || 0, excedenteUsd: k.excedente || 0,
                     saldoAntes: saldo, referencia: p.referencia.trim(), banco: p.banco.trim(), nota: p.nota.trim(), quien, uid: fs.cf ? '' : (await FB.listo()).auth.currentUser.uid, creado: fs.serverTimestamp(),
-                    registro: cxpHoy() + ' ' + new Date().toTimeString().slice(0, 5), anulado: false });
+                    registro: ahora, anulado: false });
+                if (k.excedente > 0) {
+                    tx.set(fs.doc(db, 'cxp_docs', 'fav_' + pid), {
+                        tipo: 'favor', estado: 'favor', abierta: true,
+                        proveedorId: d.proveedorId || '', proveedor: d.banco || d.proveedor, rif: d.rif || '',
+                        documento: 'FAVOR-' + (d.documento || pid.slice(-5).toUpperCase()),
+                        origenPagoId: pid, origenDoc: d.documento || '',
+                        fechaFactura: p.fecha, moneda: '$', totalUsd: k.excedente, saldoFavor: k.excedente, usado: 0,
+                        nota: 'Excedente de pago a factura ' + (d.documento || ''),
+                        creadoPor: quien, creado: fs.serverTimestamp(), registro: ahora
+                    });
+                }
             });
             cxp.pagos = null; cxpBancoRecordar(p.banco);
-            almVentana(`<div class="req-dlg cxp-dlg"><h3>Pago registrado</h3><div class="req-sub">${esc(k.d.banco || k.d.proveedor)} · ${k.forma[2] === 'Bs' ? fmtBs(k.montoMoneda) : cxpUsd(k.montoMoneda)}${k.descuento ? ' · ahorró ' + cxpUsd(k.descuento) : ''}</div>
+            almVentana(`<div class="req-dlg cxp-dlg"><h3>Pago registrado</h3><div class="req-sub">${esc(k.d.banco || k.d.proveedor)} · ${k.forma[2] === 'Bs' ? fmtBs(k.montoMoneda) : cxpUsd(k.montoMoneda)}${k.descuento ? ' · ahorró ' + cxpUsd(k.descuento) : ''}${k.favorAplicar ? ' · aplicó ' + cxpUsd(k.favorAplicar) + ' a favor' : ''}${k.excedente ? ' · quedó <b>+' + cxpUsd(k.excedente) + ' a favor</b> del proveedor' : ''}</div>
                 <div class="req-acciones" style="justify-content:flex-end"><button type="button" class="btn-ghost" onclick="almCerrar()">Cerrar</button><button type="button" class="btn-primary" onclick="cxpImprimirPago('${pid}')">${ico('imprimir')}Imprimir comprobante</button></div></div>`);
         } catch (e) { err.textContent = e.code === 'permission-denied' ? 'El sistema no le da permiso para pagar (necesita Tesorería de Cuentas por pagar).' : e.message; btn.disabled = false; btn.textContent = 'Registrar pago'; }
     }
@@ -18510,6 +18588,12 @@
                 const p = ps.data(), ref = fs.doc(db, 'cxp_docs', p.docId), s = await tx.get(ref), d = s.data(), cambio = { pagado: Math.max(0, cxpR((d.pagado || 0) - p.aplicadoUsd)), descontado: Math.max(0, cxpR((d.descontado || 0) - (p.descuentoUsd || 0))), abierta: true, estado: 'aprobada' };
                 if (p.cuota && d.cuotas) { cambio.cuotas = d.cuotas.map(c => c.n === p.cuota ? Object.assign({}, c, { pagado: Math.max(0, cxpR((c.pagado || 0) - p.aplicadoUsd)), pagada: false }) : c); cambio.vence = cambio.cuotas.find(c => !c.pagada).vence; }
                 tx.update(ref, cambio);
+                if (p.excedenteUsd > 0) {
+                    const fref = fs.doc(db, 'cxp_docs', 'fav_' + pid), fsn = await tx.get(fref);
+                    if (fsn.exists() && fsn.data().estado === 'favor' && !(Number(fsn.data().usado) > 0)) {
+                        tx.update(fref, { estado: 'anulada', abierta: false, saldoFavor: 0 });
+                    }
+                }
                 tx.update(pr, { anulado: true, anuladoPor: nombreUsuario, anuladoEn: cxpHoy() + ' ' + new Date().toTimeString().slice(0, 5), motivo: motivo.trim().slice(0, 200) });
             });
             cxp.pagos = null; cxpPintar(); mostrarBanner('Pago anulado: la deuda volvió a quedar pendiente.', 'ok');
@@ -18521,16 +18605,21 @@
         try {
             const { db, fs } = await cxpDb();
             const [ds, ps] = await Promise.all([fs.getDocs(fs.query(fs.collection(db, 'cxp_docs'), fs.where('proveedor', '==', prov))), fs.getDocs(fs.query(fs.collection(db, 'cxp_pagos'), fs.where('proveedor', '==', prov)))]);
-            const docs = ds.docs.map(x => Object.assign({ id: x.id }, x.data())).filter(d => d.estado !== 'anulada').sort((a, b) => String(a.fechaFactura).localeCompare(String(b.fechaFactura)));
+            const todos = ds.docs.map(x => Object.assign({ id: x.id }, x.data())).filter(d => d.estado !== 'anulada');
+            const docs = todos.filter(d => d.tipo !== 'favor').sort((a, b) => String(a.fechaFactura).localeCompare(String(b.fechaFactura)));
+            const favDocs = todos.filter(d => d.tipo === 'favor' && d.estado === 'favor' && Number(d.saldoFavor) > 0.004);
+            const favor = cxpR(favDocs.reduce((s, d) => s + Number(d.saldoFavor || 0), 0));
             const pagos = ps.docs.map(x => x.data()).filter(p => !p.anulado).sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)));
-            cxp._ec = { prov, docs, pagos };
+            cxp._ec = { prov, docs, pagos, favor };
             const saldo = cxpR(docs.reduce((s, d) => s + cxpSaldo(d), 0));
-            almVentana(`<div class="req-dlg cxp-dlg alm-dlg-ancho"><h3>Estado de cuenta · ${esc(prov)}</h3><div class="req-sub">${docs.length} documento(s) · ${pagos.length} pago(s) · saldo <b>${cxpUsd(saldo)}</b></div>
+            const neto = cxpR(saldo - favor);
+            almVentana(`<div class="req-dlg cxp-dlg alm-dlg-ancho"><h3>Estado de cuenta · ${esc(prov)}</h3><div class="req-sub">${docs.length} documento(s) · ${pagos.length} pago(s) · deuda <b>${cxpUsd(saldo)}</b>${favor > 0 ? ` · <span class="chip st-ok">Saldo a favor: + ${cxpUsd(favor)}</span>` : ''}</div>
                 <div class="tabla-wrap" style="max-height:22rem;overflow:auto"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Fecha</th><th class="izq">Movimiento</th><th>Debe $</th><th>Pagó $</th></tr></thead><tbody>
                 ${[...docs.map(d => ({ f: d.fechaFactura, t: (d.tipo === 'prestamo' ? 'Préstamo ' : 'Factura ') + (d.documento || ''), debe: d.totalUsd || 0, haber: 0 })),
-                   ...pagos.map(p => ({ f: p.fecha, t: 'Pago ' + ((CXP_FORMAS.find(f => f[0] === p.forma) || [, p.forma])[1]) + (p.documento ? ' · ' + p.documento : '') + (p.referencia ? ' · ref. ' + p.referencia : '') + (p.descuentoUsd ? ' (desc. ' + cxpUsd(p.descuentoUsd) + ')' : ''), debe: 0, haber: p.aplicadoUsd || 0 }))]
+                   ...pagos.map(p => ({ f: p.fecha, t: 'Pago ' + ((CXP_FORMAS.find(f => f[0] === p.forma) || [, p.forma])[1]) + (p.documento ? ' · ' + p.documento : '') + (p.referencia ? ' · ref. ' + p.referencia : '') + (p.descuentoUsd ? ' (desc. ' + cxpUsd(p.descuentoUsd) + ')' : '') + (p.excedenteUsd ? ' (+' + cxpUsd(p.excedenteUsd) + ' a favor)' : ''), debe: 0, haber: cxpR((p.aplicadoUsd || 0) + (p.excedenteUsd || 0)) }))]
                   .sort((a, b) => String(a.f).localeCompare(String(b.f))).map(m => `<tr><td class="izq">${cxpF(m.f)}</td><td class="izq">${esc(m.t)}</td><td>${m.debe ? cxpUsd(m.debe) : ''}</td><td>${m.haber ? cxpUsd(m.haber) : ''}</td></tr>`).join('')}
-                <tr class="alm-fila-total"><td></td><td class="izq">Saldo</td><td colspan="2"><b>${cxpUsd(saldo)}</b></td></tr></tbody></table></div>
+                ${favor > 0 ? `<tr style="background:rgba(22,163,74,.08)"><td></td><td class="izq"><b>Saldo a favor disponible</b></td><td></td><td><b style="color:var(--ok, #16a34a)">+ ${cxpUsd(favor)}</b></td></tr>` : ''}
+                <tr class="alm-fila-total"><td></td><td class="izq">${neto < 0 ? 'Saldo a favor neto' : 'Saldo neto por pagar'}</td><td colspan="2"><b>${neto < 0 ? '+ ' + cxpUsd(Math.abs(neto)) : cxpUsd(neto)}</b></td></tr></tbody></table></div>
                 <div class="req-acciones" style="justify-content:flex-end"><button type="button" class="btn-ghost" onclick="cxpExcelEstado()">${ico('descargar')}Excel</button><button type="button" class="btn-ghost" onclick="cxpImprimirEstado()">${ico('imprimir')}Imprimir</button><button type="button" class="btn-primary" onclick="almCerrar()">Cerrar</button></div></div>`);
         } catch (e) { mostrarBanner('No se pudo armar el estado de cuenta: ' + (e.code || e.message), 'error'); }
     }
@@ -18727,7 +18816,7 @@
     let almDatos = null, almVista = '', almTab = '', almNotas = null, almIngresos = null;
     let almVenta = { items: [], sel: -1, descuento: 0, claveDesc: '', claveStock: '', ultimo: '' };
     let almIng = { operacion: '', proveedorId: '', documento: '', clienteId: '', nota: '', items: [], sel: -1, listo: false, ultimo: '' };
-    const ALM_TABS = { precios: [['ordenes', 'Por actualizar'], ['completas', 'Historial'], ['remoto', 'Cargar en tiendas']], inventario: [['productos', 'Productos'], ['seguimiento', 'Seguimiento de producto']], facturar: [['facturar', 'Facturar'], ['notas', 'Notas emitidas']], movalmacen: [['compra', 'Compra con foto'], ['ingresar', 'Operaciones de inventario'], ['cxpfactura', 'Registrar factura recibida'], ['notas', 'Notas emitidas'], ['ingresos', 'Historial de operaciones'], ['tiendas', 'Inversión por tienda']], reportes: [['reportes', 'Reportes de tiendas']] };
+    const ALM_TABS = { precios: [['ordenes', 'Por actualizar'], ['completas', 'Historial'], ['remoto', 'Cargar en tiendas']], inventario: [['productos', 'Productos'], ['seguimiento', 'Seguimiento de producto']], facturar: [['facturar', 'Despacho'], ['notas', 'Notas emitidas']], movalmacen: [['compra', 'Compra con foto'], ['ingresar', 'Operaciones de inventario'], ['cxpfactura', 'Registrar factura recibida'], ['notas', 'Notas emitidas'], ['ingresos', 'Historial de operaciones'], ['tiendas', 'Inversión por tienda']], reportes: [['reportes', 'Reportes de tiendas']] };
     // Entradas y salidas: al entrar se elige la operación en cuadros (como los módulos); dentro, "‹ Entradas y salidas" vuelve a los cuadros
     const ALM_OPERACIONES = {
         compra: ['Foto de la factura del proveedor: se lee sola, se calcula el precio y se reparte a las tiendas.', '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>'],
@@ -21335,9 +21424,9 @@ Reglas:
                 return ns.length && ok === ns.length ? `<div class="banner ok" style="display:block">✓ Las ${ns.length} nota(s) se enviaron al grupo "Control de depósito".</div>` : ''; })()}
             ${(r.notas || []).length ? `<h4 class="per-sub">Notas de entrega a las tiendas (se envían solas al grupo "Control de depósito"; imprimir es opcional)</h4>
                 ${(r.notas || []).map((n, i) => `<div class="cmp-marca"><span><b>N° ${esc(n.numero)}</b> · ${esc(n.cliente)} · ${n.renglones} renglón(es)</span><span>${cmpTelegramEstado(n)} <button type="button" class="btn-ghost btn-mini" onclick="almImprimir('nota', cmp.resultado.notas[${i}])">Imprimir</button></span></div>`).join('')}`
-              : '<div class="nota">No se emitieron notas de entrega: no se repartió nada a las tiendas (todo quedó en el almacén), así que no hay nada que enviar a Telegram. Para enviar a una tienda, reparta en las columnas de las tiendas antes de guardar, o facture desde "Facturar".</div>'}
-            ${Object.keys(r.queda || {}).length ? `<h4 class="per-sub">Quedó en el almacén (por distribuir o facturar)</h4><div class="nota" style="margin-top:0">${Object.keys(r.queda).map(k => { const p = almProducto(k); return esc(p ? p.descripcion : k) + ': <b>' + almCant(r.queda[k], p && p.tipo) + ' ' + almUnidad(p && p.tipo) + '</b>'; }).join(' · ')}</div>` : ''}
-            ${(r.errores || []).length ? `<div class="banner error">No se pudo emitir: ${r.errores.map(esc).join(' · ')}. Esa mercancía quedó en el almacén: emita la nota desde Facturar.</div>` : ''}
+              : '<div class="nota">No se emitieron notas de entrega: no se repartió nada a las tiendas (todo quedó en el almacén), así que no hay nada que enviar a Telegram. Para enviar a una tienda, reparta en las columnas de las tiendas antes de guardar, o despache desde "Despacho".</div>'}
+            ${Object.keys(r.queda || {}).length ? `<h4 class="per-sub">Quedó en el almacén (por distribuir o despachar)</h4><div class="nota" style="margin-top:0">${Object.keys(r.queda).map(k => { const p = almProducto(k); return esc(p ? p.descripcion : k) + ': <b>' + almCant(r.queda[k], p && p.tipo) + ' ' + almUnidad(p && p.tipo) + '</b>'; }).join(' · ')}</div>` : ''}
+            ${(r.errores || []).length ? `<div class="banner error">No se pudo emitir: ${r.errores.map(esc).join(' · ')}. Esa mercancía quedó en el almacén: emita la nota desde Despacho.</div>` : ''}
             <div class="req-acciones" style="margin-bottom:0">${permisos.includes('precios') ? `<button type="button" class="btn-ghost" onclick="irA('precios')">Ver precios en tiendas</button>` : ''}<button type="button" class="btn-primary" onclick="cmp.paso='foto';cmp.resultado=null;cmpPintarCompra(document.getElementById('almContenido'), true)">Nueva compra</button></div></div>`;
     }
 
@@ -25996,13 +26085,15 @@ Reglas:
         const el = document.getElementById('mdContenido');
         if (!el || vistaActual !== 'multideposito') return;
         const sedes = (mdData && mdData.sedes && mdData.sedes.length) ? mdData.sedes : TIENDAS_ORDEN.map(t => t.nombre);
+        const miSede = (mdData && mdData.sedeUsuario) || '';
         const trs = (mdData && mdData.traspasos) || [];
         const enTransito = trs.filter(x => x.estado === 'en_transito').length;
+        const avisoSede = miSede ? `<div class="nota" style="margin:.25rem 0 .75rem">Sede asignada: <b>${esc(miSede)}</b> · Solo puede despachar desde esta sede y confirmar recepciones destinadas a esta sede.</div>` : '';
         const tabs = `<div class="modo-tabs" role="tablist">
             <button type="button" class="tab${mdTab === 'traspasos' ? ' active' : ''}" onclick="mdTab='traspasos';mdPintar()">Traspasos${enTransito ? ` <span class="chip st-amar" style="margin-left:4px">${enTransito}</span>` : ''}</button>
             <button type="button" class="tab${mdTab === 'stock' ? ' active' : ''}" onclick="mdTab='stock';mdPintar()">Stock por sede</button>
             <button type="button" class="tab${mdTab === 'kardex' ? ' active' : ''}" onclick="mdTab='kardex';mdPintar()">Kardex por sede</button>
-        </div>`;
+        </div>` + avisoSede;
         if (mdCargando && !mdData) { el.innerHTML = tabs + cargandoHTML('Cargando depósitos y traspasos...'); return; }
         if (mdError) { el.innerHTML = tabs + `<div class="banner error" style="display:block">${esc(mdError)}</div>`; return; }
 
@@ -26011,29 +26102,36 @@ Reglas:
         let cuerpo = '';
 
         if (mdTab === 'traspasos') {
-            const opts = (sel) => sedes.map(s => `<option value="${esc(s)}"${s === sel ? ' selected' : ''}>${esc(s)}</option>`).join('');
-            const origDef = (document.getElementById('mdTrOrig') || {}).value || sedes[0] || '';
-            const destDef = (document.getElementById('mdTrDest') || {}).value || sedes[1] || sedes[0] || '';
+            const opts = (sel, lista = sedes) => lista.map(s => `<option value="${esc(s)}"${s === sel ? ' selected' : ''}>${esc(s)}</option>`).join('');
+            const origDef = miSede || (document.getElementById('mdTrOrig') || {}).value || sedes[0] || '';
+            const destCand = sedes.filter(s => s !== origDef);
+            const prevDest = (document.getElementById('mdTrDest') || {}).value;
+            const destDef = (prevDest && prevDest !== origDef && sedes.includes(prevDest)) ? prevDest : (destCand[0] || sedes[0] || '');
             const filasForm = mdTrItems.map((it, i) => `<tr><td class="izq"><b>${esc(it.codigo)}</b> · ${esc(it.descripcion)}</td>
                 <td>${fmtNum(mdStockDe(it.codigo, origDef))}</td>
                 <td><b>${fmtNum(it.cantidad)}</b></td>
                 <td><button type="button" class="btn-ghost btn-mini" onclick="mdTrItems.splice(${i},1);mdPintar()">Quitar</button></td></tr>`).join('');
             const badge = e => e === 'en_transito' ? '<span class="chip st-amar">En tránsito</span>' : e === 'recibido' ? '<span class="chip st-ok">Recibido</span>' : '<span class="chip st-falta">Anulado</span>';
-            const filasTr = trs.map(t => `<tr>
+            const filasTr = trs.map(t => {
+                const puedeRec = t.estado === 'en_transito' && (!miSede || t.destino === miSede);
+                const puedeAnul = t.estado === 'en_transito' && (!miSede || t.origen === miSede);
+                return `<tr>
                 <td class="izq"><b>${esc(t.id)}</b><small>${esc(t.creadoEn || t.fecha)}</small></td>
                 <td class="izq">${esc(t.origen)} → <b>${esc(t.destino)}</b>${t.nota ? `<small>${esc(t.nota)}</small>` : ''}</td>
                 <td class="izq">${(t.items || []).map(x => `${esc(x.descripcion || x.codigo)} (<b>${fmtNum(x.cantidad)}</b>${x.recibido != null && x.recibido !== x.cantidad ? ' → rec. ' + fmtNum(x.recibido) : ''})`).join(', ')}${t.diferencias ? `<small style="color:var(--warn)">${esc(t.diferencias)}</small>` : ''}</td>
                 <td class="izq">${badge(t.estado)}${t.recibidoPor ? `<small>${esc(t.recibidoPor)} · ${esc(t.recibidoEn)}</small>` : `<small>Despachó: ${esc(t.creadoPor)}</small>`}</td>
                 <td><div style="display:flex;gap:.35rem;flex-wrap:wrap;justify-content:flex-end">
-                    ${t.estado === 'en_transito' ? `<button type="button" class="btn-primary btn-mini" onclick="mdAbrirRecibir('${esc(t.id)}')">Confirmar recepción</button><button type="button" class="btn-ghost btn-mini" onclick="mdAnularTraspaso('${esc(t.id)}')">Anular</button>` : ''}
+                    ${puedeRec ? `<button type="button" class="btn-primary btn-mini" onclick="mdAbrirRecibir('${esc(t.id)}')">Confirmar recepción</button>` : ''}
+                    ${puedeAnul ? `<button type="button" class="btn-ghost btn-mini" onclick="mdAnularTraspaso('${esc(t.id)}')">Anular</button>` : ''}
                     <button type="button" class="btn-ghost btn-mini" onclick="mdImprimirTraspaso('${esc(t.id)}')">Imprimir</button>
-                </div></td></tr>`).join('');
+                </div></td></tr>`;
+            }).join('');
             cuerpo = `<div class="grafico-card">
                 <div class="grafico-head"><h3>Nuevo traspaso entre sucursales</h3></div>
                 <div class="grafico-sub">Descuenta inmediatamente de la sede origen y queda "En tránsito" hasta que la sede destino confirme recepción.</div>
                 <div class="filters" style="margin-top:.65rem">
-                    <div><label for="mdTrOrig">Sede origen (envía)</label><select id="mdTrOrig" onchange="mdPintar()">${opts(origDef)}</select></div>
-                    <div><label for="mdTrDest">Sede destino (recibe)</label><select id="mdTrDest">${opts(destDef)}</select></div>
+                    <div><label for="mdTrOrig">Sede origen (envía)</label><select id="mdTrOrig" ${miSede ? 'disabled' : ''} onchange="mdPintar()">${opts(origDef, miSede ? [miSede] : sedes)}</select></div>
+                    <div><label for="mdTrDest">Sede destino (recibe)</label><select id="mdTrDest">${opts(destDef, destCand.length ? destCand : sedes)}</select></div>
                     <div><label for="mdTrNota">Nota / chofer (opcional)</label><input id="mdTrNota" placeholder="Ej: Enviado con transporte..."></div>
                 </div>
                 <div class="filters" style="margin-top:.4rem">
@@ -26051,19 +26149,20 @@ Reglas:
                 <tbody>${filasTr || '<tr><td colspan="5" class="empty">Todavía no hay traspasos registrados.</td></tr>'}</tbody></table></div>
             </div>`;
         } else if (mdTab === 'stock') {
+            const sedesVer = miSede ? [miSede] : sedes;
             const q = mdBusca.trim().toLowerCase();
             const lista = cat.filter(p => !q || p.codigo.toLowerCase().includes(q) || p.descripcion.toLowerCase().includes(q));
             const filasS = lista.slice(0, 200).map(p => {
                 let tot = 0;
-                const cols = sedes.map(s => { const v = mdStockDe(p.codigo, s); tot += v; return `<td>${v ? `<b>${fmtNum(v)}</b>` : '<span style="opacity:.4">0</span>'}</td>`; }).join('');
-                return `<tr><td class="izq"><b>${esc(p.codigo)}</b></td><td class="izq">${esc(p.descripcion)}</td>${cols}<td><b>${fmtNum(Math.round(tot * 1000) / 1000)}</b></td></tr>`;
+                const cols = sedesVer.map(s => { const v = mdStockDe(p.codigo, s); tot += v; return `<td>${v ? `<b>${fmtNum(v)}</b>` : '<span style="opacity:.4">0</span>'}</td>`; }).join('');
+                return `<tr><td class="izq"><b>${esc(p.codigo)}</b></td><td class="izq">${esc(p.descripcion)}</td>${cols}${sedesVer.length > 1 ? `<td><b>${fmtNum(Math.round(tot * 1000) / 1000)}</b></td>` : ''}</tr>`;
             }).join('');
-            const opts = sedes.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
+            const opts = sedesVer.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
             const filasAj = mdAjItems.map((it, i) => `<tr><td class="izq"><b>${esc(it.codigo)}</b> · ${esc(it.descripcion)}</td><td><b>${fmtNum(it.cantidad)}</b></td><td><button type="button" class="btn-ghost btn-mini" onclick="mdAjItems.splice(${i},1);mdPintar()">Quitar</button></td></tr>`).join('');
             cuerpo = `<div class="grafico-card">
                 <div class="grafico-head"><h3>Entrada, salida o ajuste en una sede</h3></div>
                 <div class="filters" style="margin-top:.5rem">
-                    <div><label for="mdAjSede">Sede / depósito</label><select id="mdAjSede">${opts}</select></div>
+                    <div><label for="mdAjSede">Sede / depósito</label><select id="mdAjSede" ${miSede ? 'disabled' : ''}>${opts}</select></div>
                     <div><label for="mdAjTipo">Movimiento</label><select id="mdAjTipo"><option value="entrada">Entrada (+)</option><option value="salida">Salida (-)</option><option value="ajuste">Ajuste exacto (=)</option></select></div>
                     <div><label for="mdAjNota">Motivo / factura</label><input id="mdAjNota" placeholder="Ej: Conteo inicial, compra..."></div>
                 </div>
@@ -26077,14 +26176,16 @@ Reglas:
                 <div class="req-acciones" style="justify-content:flex-end;margin-top:.65rem"><button type="button" class="btn-primary" id="mdBtnAj" onclick="mdEnviarAjuste()">Guardar movimiento (${mdAjItems.length})</button></div>` : ''}
             </div>
             <div class="grafico-card" style="margin-top:1rem">
-                <div class="grafico-head"><h3>Existencia por sucursal (${lista.length})</h3></div>
+                <div class="grafico-head"><h3>${miSede ? 'Existencia en ' + esc(miSede) : 'Existencia por sucursal'} (${lista.length})</h3></div>
                 <div class="filters"><div><label for="mdBusInp">Buscar producto</label><input type="search" id="mdBusInp" value="${esc(mdBusca)}" placeholder="Código o descripción..." oninput="mdBusca=this.value;mdPintar()"></div></div>
-                <div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">Código</th><th class="izq">Descripción</th>${sedes.map(s => `<th>${esc(s)}</th>`).join('')}<th>Total</th></tr></thead>
-                <tbody>${filasS || '<tr><td colspan="' + (sedes.length + 3) + '" class="empty">Sin existencias registradas todavía. Use el formulario de arriba para cargar stock inicial.</td></tr>'}</tbody></table></div>
+                <div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">Código</th><th class="izq">Descripción</th>${sedesVer.map(s => `<th>${esc(s)}</th>`).join('')}${sedesVer.length > 1 ? '<th>Total</th>' : ''}</tr></thead>
+                <tbody>${filasS || '<tr><td colspan="' + (sedesVer.length + (sedesVer.length > 1 ? 3 : 2)) + '" class="empty">Sin existencias registradas todavía. Use el formulario de arriba para cargar stock inicial.</td></tr>'}</tbody></table></div>
             </div>`;
         } else {
             const movs = (mdData && mdData.movs) || [];
-            const opts = '<option value="">Todas las sedes</option>' + sedes.map(s => `<option value="${esc(s)}"${s === mdSedeK ? ' selected' : ''}>${esc(s)}</option>`).join('');
+            const opts = miSede
+                ? `<option value="${esc(miSede)}" selected>${esc(miSede)}</option>`
+                : '<option value="">Todas las sedes</option>' + sedes.map(s => `<option value="${esc(s)}"${s === mdSedeK ? ' selected' : ''}>${esc(s)}</option>`).join('');
             const filasM = movs.map(m => `<tr>
                 <td class="izq">${esc(m.fecha)}</td><td class="izq"><b>${esc(m.sede)}</b></td>
                 <td class="izq"><b>${esc(m.codigo)}</b> · ${esc(m.descripcion)}</td>
@@ -26095,7 +26196,7 @@ Reglas:
             </tr>`).join('');
             cuerpo = `<div class="grafico-card">
                 <div class="grafico-head"><h3>Kardex por sede</h3></div>
-                <div class="filters"><div><label for="mdSedeFil">Filtrar por sede</label><select id="mdSedeFil" onchange="mdSedeK=this.value;mdCargar()">${opts}</select></div></div>
+                <div class="filters"><div><label for="mdSedeFil">Filtrar por sede</label><select id="mdSedeFil" ${miSede ? 'disabled' : ''} onchange="mdSedeK=this.value;mdCargar()">${opts}</select></div></div>
                 <div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">Fecha</th><th class="izq">Sede</th><th class="izq">Producto</th><th class="izq">Tipo</th><th>Cant.</th><th>Stock</th><th class="izq">Ref. / Usuario</th></tr></thead>
                 <tbody>${filasM || '<tr><td colspan="7" class="empty">Sin movimientos todavía.</td></tr>'}</tbody></table></div>
             </div>`;
