@@ -6893,7 +6893,7 @@
                 ${campo('metodos', 'Punto, pago móvil, biopago y crédito', 'Diferencia mayor a esto se avisa')}
                 ${campo('divisas', 'Divisas', '0 = exacto')}
             </div>
-            <div class="nota">A la tienda se le avisa sin decir si falta o sobra. Si hay más de 2 métodos con diferencia, solo la diferencia total. El grupo general recibe siempre el resumen, con el sobrante por vueltos.</div>
+            <div class="nota">Primero se analiza la caja completa: si cuadra, se avisa a la tienda que cuadró (en espera de revisión); si no cuadra, solo se indican los métodos que no coinciden (sin montos ni si sobra o falta). El grupo general recibe siempre el detalle completo de la caja y el cuadre.</div>
             <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-ghost" onclick="document.getElementById('fbhDlg').classList.add('hidden')">Cerrar</button>
                 <button type="button" class="btn-primary" onclick="tolCierreVer(this, true)" ${error && !r ? 'disabled' : ''}>Guardar</button></div></div>`;
         if (!fondo.classList.contains('hidden') && /Tolerancias del cierre/.test((fondo.querySelector('h3') || {}).textContent || '')) pintarVentana(fondo, html); else fondo.innerHTML = html;
