@@ -8034,6 +8034,7 @@
         if ([...document.querySelectorAll('.req-dlg-fondo')].some(f => !f.classList.contains('hidden'))) return false;   // ventana abierta
         if (Date.now() - vivoTecleo < 8000) return false;                                          // está escribiendo
         const a = document.activeElement;
+        if (typeof selectAbiertoEn === 'function' && selectAbiertoEn()) return false;              // lista desplegable abierta (se cerraría)
         return !(a && /^(INPUT|TEXTAREA)$/.test(a.tagName) && a.type !== 'search' && a.value);    // un campo a medio llenar
     }
     // Avisos al instante (12/11): el servidor deja en Firebase (vivo/versiones) la hora del último cambio de cada área y este
@@ -14521,7 +14522,60 @@
         for (let n = el; n; n = w.nextNode()) l.push(n);
         return l;
     }
-    function pintarConservando(el, html) {
+    // Seguimiento de <select> desplegados: si se repinta el bloque (el.innerHTML = ...) mientras la lista está abierta,
+    // el navegador la cierra de golpe. Se difiere el repintado hasta que se elija opción, salga el foco o se cierre con Esc.
+    let selAbierto = null;
+    function selectAbiertoEn(el) {
+        if (!selAbierto || !selAbierto.isConnected || document.activeElement !== selAbierto) { selAbierto = null; return null; }
+        return el ? (el.contains(selAbierto) ? selAbierto : null) : selAbierto;
+    }
+    function selVaciarPendientes(s, cambiado) {
+        document.querySelectorAll('[data-pend-pintar]').forEach(el => {
+            if (s && !el.contains(s)) return;
+            const p = el._pendPintar, gen = el._pintarGen || 0;
+            el._pendPintar = null; el.removeAttribute('data-pend-pintar');
+            if (!p) return;
+            setTimeout(() => {
+                if (el._pintarGen && el._pintarGen !== gen) return;   // onchange u otra acción ya repintó este bloque
+                if (selectAbiertoEn(el)) return;
+                if (p.fn) { p.fn(); return; }
+                const prev = cambiado && el.contains(cambiado) && cambiado.id ? { id: cambiado.id, v: cambiado.value } : null;
+                pintarConservando(el, p.html);
+                if (prev) { const n = document.getElementById(prev.id); if (n && n.tagName === 'SELECT') n.value = prev.v; }
+            }, 0);
+        });
+    }
+    ['pointerdown', 'mousedown'].forEach(ev => document.addEventListener(ev, e => {
+        const s = e.target && e.target.closest ? e.target.closest('select') : null;
+        if (s) selAbierto = s;
+    }, true));
+    document.addEventListener('keydown', e => {
+        const t = e.target;
+        if (!t || t.tagName !== 'SELECT') return;
+        if (/^( |ArrowDown|ArrowUp|F4)$/.test(e.key) || (e.altKey && /^Arrow/.test(e.key))) selAbierto = t;
+        else if (e.key === 'Escape' || e.key === 'Tab') { const s = selAbierto; selAbierto = null; selVaciarPendientes(s); }
+    }, true);
+    document.addEventListener('change', e => {
+        const t = e.target;
+        if (!t || t.tagName !== 'SELECT') return;
+        if (selAbierto === t) selAbierto = null;
+        selVaciarPendientes(t, t);
+    }, true);
+    document.addEventListener('blur', e => {
+        const t = e.target;
+        if (!selAbierto || t !== selAbierto) return;
+        selAbierto = null;
+        selVaciarPendientes(t);
+    }, true);
+    function pintarConservando(el, html, alDiferir) {
+        if (!el) return;
+        if (selectAbiertoEn(el)) {
+            el._pendPintar = alDiferir ? { fn: alDiferir } : { html };
+            el.setAttribute('data-pend-pintar', '1');
+            return;
+        }
+        el._pintarGen = (el._pintarGen || 0) + 1;
+        el._pendPintar = null; el.removeAttribute('data-pend-pintar');
         const marca = e => e.id || (e.className && String(e.className)) || e.tagName;
         const cajas = elementosVisibles(el).filter(e => e.scrollTop > 0 || e.scrollLeft > 0);
         const vistas = {}; cajas.forEach(e => { const k = marca(e); (vistas[k] = vistas[k] || []).push([e.scrollTop, e.scrollLeft]); });
@@ -19091,7 +19145,7 @@
         almDatosEn = Date.now();
         almDatos = { productos: r.productos || [], clientes: r.clientes || [], categorias: r.categorias || [], proveedores: r.proveedores || [],
                      proximaNota: r.proximaNota || '', proximoIngreso: r.proximoIngreso || '', telegram: !!r.telegram, pendientes: r.pendientes || null, precios: r.precios || {} };
-        almPintar();
+        if (vistaActual !== 'reportes') almPintar();   // Reportes de tiendas no usa almDatos: la precarga no debe repintarlo
     }
     function almModo(t) {
         const cambio = almTab !== t;
@@ -19103,15 +19157,20 @@
     }
     function almPintar() {
         const out = document.getElementById('almContenido');
-        if (vistaActual === 'reportes') { if (almVista === 'reportes') pintarConservando(out, rptVista()); return; }
+        if (out && selectAbiertoEn(out)) {
+            out._pendPintar = { fn: almPintar };
+            out.setAttribute('data-pend-pintar', '1');
+            return;
+        }
+        if (vistaActual === 'reportes') { if (almVista === 'reportes') pintarConservando(out, rptVista(), almPintar); return; }
         if (!almDatos || (vistaActual !== 'inventario' && vistaActual !== 'movalmacen' && vistaActual !== 'precios' && vistaActual !== 'facturar')) return;
-        if (almVista === 'movalmacen' && !almTab) { pintarConservando(out, almPendientesHTML() + almOperacionesHTML()); return; }
+        if (almVista === 'movalmacen' && !almTab) { pintarConservando(out, almPendientesHTML() + almOperacionesHTML(), almPintar); return; }
         if (almTab === 'compra') { cmpPintarCompra(out); return; }   // la compra se dibuja aparte: sus campos se actualizan uno a uno
-        if (almTab === 'ordenes' || almTab === 'completas') { pintarConservando(out, cmpOrdenesVista()); if (!cmpOrd || (cmpOrd.ver !== (almTab === 'completas' ? 'historial' : 'pendientes') && !cmpOrd.cargando)) cmpCargarOrdenes(); return; }
-        if (almTab === 'remoto') { pintarConservando(out, bspVista()); return; }   // cargar los precios en el BigSoft de una tienda desde aquí
-        if (almTab === 'cxpfactura') { pintarConservando(out, cxpRegVista()); return; }   // (13/11) factura recibida -> Cuentas por pagar
+        if (almTab === 'ordenes' || almTab === 'completas') { pintarConservando(out, cmpOrdenesVista(), almPintar); if (!cmpOrd || (cmpOrd.ver !== (almTab === 'completas' ? 'historial' : 'pendientes') && !cmpOrd.cargando)) cmpCargarOrdenes(); return; }
+        if (almTab === 'remoto') { pintarConservando(out, bspVista(), almPintar); return; }   // cargar los precios en el BigSoft de una tienda desde aquí
+        if (almTab === 'cxpfactura') { pintarConservando(out, cxpRegVista(), almPintar); return; }   // (13/11) factura recibida -> Cuentas por pagar
         pintarConservando(out, (almVista === 'movalmacen' ? almPendientesHTML() : '') + (almTab === 'productos' ? almProductosVista() : almTab === 'facturar' ? almFacturarVista() : almTab === 'ingresar' ? almIngresarVista()
-                              : almTab === 'seguimiento' ? almSeguimientoVista() : almTab === 'notas' ? almNotasVista() : almTab === 'tiendas' ? almTiendasVista() : almIngresosVista()));
+                              : almTab === 'seguimiento' ? almSeguimientoVista() : almTab === 'notas' ? almNotasVista() : almTab === 'tiendas' ? almTiendasVista() : almIngresosVista()), almPintar);
         if (almTab === 'notas' && !almNotas) almCargarNotas();
         if (almTab === 'tiendas' && !almTiendas) almCargarTiendas();
         if (almTab === 'ingresos' && !almIngresos) almCargarIngresos();
@@ -22393,14 +22452,33 @@ Reglas:
     const BSP_ESTADO = { OK: ['Por cargar', 'st-info'], YA: ['Ya está', 'st-ok'], NOEXISTE: ['No existe en BigSoft', 'st-falta'], SINCODIGO: ['Sin código', 'st-amar'] };
     const bspPintar = () => { if (vistaActual === 'precios' && almTab === 'remoto') almPintar(); };
     const bspF = (v, d = 2) => v == null || v === '' ? '—' : nfVE(d, d).format(v);
-    function bspEspera(texto) {
+    function bspEsperaNotaHTML() {
         const v = bsp.vivo || {}, dormida = v.hace == null || v.hace > 60, t = esc(bsp.tienda);
-        return `${cargandoHTML(texto)}<div class="nota" style="text-align:center">${bsp.estadoTarea === 'curso' ? `La PC de ${t} ya lo está haciendo...`
+        return `${bsp.estadoTarea === 'curso' ? `La PC de ${t} ya lo está haciendo...`
             : dormida && bsp.seg ? `<b style="color:var(--warn)">La PC de ${t} no ha respondido ${v.hace == null ? 'hoy' : 'en ' + Math.round(v.hace / 60) + ' min'}.</b> Debe estar encendida, con internet y con el avisador abierto. Se sigue esperando.`
-            : `Esperando a la PC de ${t} (responde cada 15 segundos)...`}${bsp.seg ? ` · ${bsp.seg} s` : ''}</div>`;
+            : `Esperando a la PC de ${t} (responde cada 15 segundos)...`}${bsp.seg ? ` · ${bsp.seg} s` : ''}`;
+    }
+    function bspEspera(texto) {
+        return `${cargandoHTML(texto)}<div class="nota" id="bspEsperaNota" style="text-align:center">${bspEsperaNotaHTML()}</div>`;
+    }
+    const bspOtrasHTML = otras => otras.length ? `<div class="nota">Mientras tanto, en otras tiendas: ${otras.map(s => `<b>${esc(s.tienda)}</b> ${s.paso === 'cargando' ? 'cargando' : 'revisando'}${s.seg ? ' (' + s.seg + ' s)' : ''}`).join(' · ')}. Puede elegir otra tienda y trabajar en ella.</div>` : '';
+    // Solo refresca la línea de progreso sin recrear el selector #bspTienda ni botones cada segundo
+    function bspActualizarProgreso() {
+        if (vistaActual !== 'precios' || almTab !== 'remoto') return;
+        const n = document.getElementById('bspEsperaNota');
+        if (n && (bsp.paso === 'revisando' || bsp.paso === 'cargando')) n.innerHTML = bspEsperaNotaHTML();
+        const o = document.getElementById('bspOtras'), otras = Object.values(bspPor).filter(s => s !== bsp && bspOcupada(s));
+        if (o) { const html = bspOtrasHTML(otras); if (o.innerHTML !== html) o.innerHTML = html; }
+        if (!n && !o) bspPintar();
     }
     // s = el estado de ESA tienda (aunque mientras tanto se esté viendo otra)
-    const bspAlEsperar = (s, id) => (estado, vivo, seg) => { if (s.id !== id) return; Object.assign(s, { estadoTarea: estado, vivo, seg }); bspPintar(); };
+    const bspAlEsperar = (s, id) => (estado, vivo, seg) => {
+        if (s.id !== id) return;
+        const antes = s.estadoTarea;
+        Object.assign(s, { estadoTarea: estado, vivo, seg });
+        if (vistaActual === 'precios' && almTab === 'remoto' && document.getElementById('bspTienda')) bspActualizarProgreso();
+        else if (antes !== estado) bspPintar();
+    };
     async function bspRevisar() {
         const s = bsp;
         if (!s.tienda) { mostrarBanner('Elija la tienda.', 'warn'); return; }
@@ -22528,7 +22606,7 @@ Reglas:
         const otras = Object.values(bspPor).filter(s => s !== bsp && bspOcupada(s));
         const cab = `<div class="filters"><div><label for="bspTienda">Tienda</label><select id="bspTienda" onchange="bspCambiarTienda(this.value)"><option value="">Elija la tienda</option>${CMP_TIENDAS.map(t => { const s = bspPor[t]; return `<option value="${esc(t)}"${t === bsp.tienda ? ' selected' : ''}>${esc(t)}${s && bspOcupada(s) ? (s.paso === 'cargando' ? ' · cargando…' : ' · revisando…') : s && s.paso === 'listo' ? ' · listo' : ''}</option>`; }).join('')}</select></div>
             <div style="align-self:end"><button type="button" class="btn-primary" onclick="bspRevisar()" ${ocupado || !bsp.tienda ? 'disabled' : ''}>${bsp.paso === 'inicio' ? 'Revisar precios en su BigSoft' : 'Revisar de nuevo'}</button></div></div>
-            ${otras.length ? `<div class="nota">Mientras tanto, en otras tiendas: ${otras.map(s => `<b>${esc(s.tienda)}</b> ${s.paso === 'cargando' ? 'cargando' : 'revisando'}${s.seg ? ' (' + s.seg + ' s)' : ''}`).join(' · ')}. Puede elegir otra tienda y trabajar en ella.</div>` : ''}`;
+            <div id="bspOtras">${bspOtrasHTML(otras)}</div>`;
         if (bsp.paso === 'inicio') return cab + `<div class="nota">La PC de la tienda revisa los precios pendientes contra su BigSoft (como "Actualizar precios" en la tienda). Aquí se eligen y ella los carga: detal, mayor y costo en divisas, los bolívares con su tasa, y el nombre de Plaza Valencia. Debe estar encendida, con internet y con el avisador abierto.</div>`;
         const detener = `<div class="req-acciones" style="justify-content:center"><button type="button" class="btn-ghost" onclick="bspDetener()">${ico('detener')}Detener</button></div>`;
         if (bsp.paso === 'revisando') return cab + bspEspera(`Revisando los precios en el BigSoft de ${bsp.tienda}...`) + detener;
@@ -22660,7 +22738,7 @@ Reglas:
         await Promise.all(correr.map(async local => {
             const e = c.est[local];
             try {
-                const t = await bsrTarea('reporte', Object.assign({ local }, datos), (estado, vivo, seg, l, avance) => { if (e.detenido) return; Object.assign(e, { paso: estado, vivo, seg, avance: avance || e.avance }); if (rpt.corrida === c) rptRepintar(); }, 300, e.senal);
+                const t = await bsrTarea('reporte', Object.assign({ local }, datos), (estado, vivo, seg, l, avance) => { if (e.detenido) return; Object.assign(e, { paso: estado, vivo, seg, avance: avance || e.avance }); rptRepintarEstados(c); }, 300, e.senal);
                 if (e.detenido) return;
                 e.paso = 'listo'; e.res = t.resultado || {};
             } catch (err) {
@@ -22689,11 +22767,9 @@ Reglas:
         c.fin = true; c.vuelta = (c.vuelta || 0) + 1;
         rptRepintar();
     }
-    function rptResultadoHTML() {
-        const c = rpt.corrida;
-        if (!c) return `<div class="nota">La PC de cada tienda saca el reporte de su BigSoft en ese momento (solo lee, no cambia nada) y aquí se descarga en Excel. La PC debe estar encendida, con internet y con el avisador de Plaza Valencia abierto (el icono junto al reloj). Tarda unos segundos por tienda.</div>`;
-        const filasHoja = r => (r.hojas || []).reduce((s, h) => s + (h.filas || []).length, 0);
-        const estados = c.tiendas.map(t => {
+    const rptFilasHoja = r => (r.hojas || []).reduce((s, h) => s + (h.filas || []).length, 0);
+    function rptEstadosHTML(c) {
+        return c.tiendas.map(t => {
             const e = c.est[t], v = e.vivo || {}, dormida = v.hace == null || v.hace > 60;
             const txt = e.paso === 'listo' ? `<span class="chip st-ok">Listo</span><small>${(e.res.hojas || []).map(h => `${esc(h.nombre)}: ${(h.filas || []).length}`).join(' · ')}${e.res.generado ? ' · sacado ' + esc(e.res.generado.slice(11)) : ''}</small>`
                 : e.paso === 'error' ? (e.detenido ? `<span class="chip st-pend">Detenido</span><small>${esc(e.error)}</small>` : `<span class="chip st-falta">No se pudo</span><small class="rpt-mal">${esc(e.error)}</small>`)
@@ -22705,9 +22781,19 @@ Reglas:
                 : `<span class="rpt-esp">${iconoCargando()}<small>${e.seg && dormida ? `<b style="color:var(--warn)">La PC de ${esc(t)} no ha respondido ${v.hace == null ? 'hoy' : 'en ' + Math.round(v.hace / 60) + ' min'}.</b> Debe estar encendida, con internet y con el avisador abierto. Se sigue esperando.` : `Esperando a que la PC de ${esc(t)} tome el pedido (pregunta cada 15 s)...`}${e.seg ? ' ' + e.seg + ' s' : ''}</small></span>`;
             return `<div class="rpt-estado"><b>${esc(t)}</b>${txt}</div>`;
         }).join('');
-        const listos = c.tiendas.filter(t => c.est[t].paso === 'listo'), fallas = c.tiendas.filter(t => c.est[t].paso === 'error');
+    }
+    // Solo actualiza la caja de progreso sin reconstruir los <select> de reportes cada segundo
+    function rptRepintarEstados(c) {
+        if (vistaActual !== 'reportes' || rpt.corrida !== c) return;
+        const box = document.getElementById('rptEstados');
+        if (box) box.innerHTML = rptEstadosHTML(c); else rptRepintar();
+    }
+    function rptResultadoHTML() {
+        const c = rpt.corrida;
+        if (!c) return `<div class="nota">La PC de cada tienda saca el reporte de su BigSoft en ese momento (solo lee, no cambia nada) y aquí se descarga en Excel. La PC debe estar encendida, con internet y con el avisador de Plaza Valencia abierto (el icono junto al reloj). Tarda unos segundos por tienda.</div>`;
         const titulo = `${RPT_TIPOS[c.reporte][0]}${c.desde ? ` del ${fechaBonita(c.desde)} al ${fechaBonita(c.hasta)}` : ''}`;
-        let h = `<h3 class="per-sub">${esc(titulo)}</h3><div class="rpt-estados">${estados}</div>`;
+        let h = `<h3 class="per-sub">${esc(titulo)}</h3><div class="rpt-estados" id="rptEstados">${rptEstadosHTML(c)}</div>`;
+        const listos = c.tiendas.filter(t => c.est[t].paso === 'listo'), fallas = c.tiendas.filter(t => c.est[t].paso === 'error');
         if (c.fin && (listos.length || fallas.length)) h += `<div class="req-acciones">${listos.length ? `<button type="button" class="btn-primary" onclick="rptExcel()">Descargar Excel${c.tiendas.length > 1 ? ` (${listos.length} tienda${listos.length > 1 ? 's' : ''})` : ''}</button>` : ''}
             ${fallas.length ? `<button type="button" class="btn-ghost" onclick="rptGenerar(true)">Intentar de nuevo ${fallas.length > 1 ? 'las que fallaron' : fallas[0]}</button>` : ''}</div>`;
         if (!listos.length) return h;
@@ -22716,7 +22802,7 @@ Reglas:
         listos.forEach(t => (c.est[t].res.resumen || []).forEach(r => { if (!etiquetas.some(x => x.t === r.t)) etiquetas.push(r); }));
         const valor = (t, et) => ((c.est[t].res.resumen || []).find(r => r.t === et.t) || {}).v;
         h += `<div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Tienda</th>${etiquetas.map(e => `<th>${esc(e.t)}</th>`).join('')}</tr></thead><tbody>
-            ${listos.map(t => `<tr><td class="izq"><b>${esc(t)}</b>${filasHoja(c.est[t].res) ? '' : '<small>sin datos</small>'}</td>${etiquetas.map(e => `<td>${rptValor(valor(t, e), e.f)}</td>`).join('')}</tr>`).join('')}
+            ${listos.map(t => `<tr><td class="izq"><b>${esc(t)}</b>${rptFilasHoja(c.est[t].res) ? '' : '<small>sin datos</small>'}</td>${etiquetas.map(e => `<td>${rptValor(valor(t, e), e.f)}</td>`).join('')}</tr>`).join('')}
             ${listos.length > 1 ? `<tr class="alm-fila-total"><td class="izq"><b>Total</b></td>${etiquetas.map(e => `<td><b>${rptValor(listos.reduce((s, t) => s + (Number(valor(t, e)) || 0), 0), e.f)}</b></td>`).join('')}</tr>` : ''}
             </tbody></table></div>`;
         const notas = listos.flatMap(t => (c.est[t].res.notas || []).filter(Boolean).map(n => (c.tiendas.length > 1 ? t + ': ' : '') + n));
