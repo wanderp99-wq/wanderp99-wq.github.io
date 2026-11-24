@@ -22163,10 +22163,11 @@ Reglas:
         const p = almProducto(o.codigo) || (!o.codigo ? { codigo: '', descripcion: o.descripcion, categoria: o.categoria, tipo: o.tipo, iva: 'Exento', libre: true } : null);
         const s = p ? cmpSugerir(p, o.costo) : null;
         cmpCalc = { id, prod: p, codigo: o.codigo, costo: o.costo, merma: o.detal ? o.merma : (s ? s.merma : 0), libre: !!o.detal || !!(s && s.libre),
-                    detal: o.detal || (s ? s.detal : 0), mayor: o.mayor || (s ? s.mayor : 0), gran: o.gran || 0, margenDetal: 0, margenMayor: 0 };
+                    detal: o.detal || (s ? s.detal : 0), mayor: o.mayor || (s ? s.mayor : 0), gran: o.gran || 0, margenDetal: 0, margenMayor: 0, margenGran: 0 };
         const cr = cmpCalc.costo * (1 + cmpCalc.merma / 100);
         cmpCalc.margenDetal = cmpCalc.detal > 0 ? cmpR2((1 - cr / cmpCalc.detal) * 100) : 0;
         cmpCalc.margenMayor = cmpCalc.mayor > 0 ? cmpR2((1 - cmpCalc.costo / cmpCalc.mayor) * 100) : 0;
+        cmpCalc.margenGran = cmpCalc.gran > 0 && cmpCalc.costo > 0 ? cmpR2((1 - cmpCalc.costo / cmpCalc.gran) * 100) : 0;
         const n = c => `<input type="number" step="0.01" min="0" id="cmpK_${c}" value="${cmpCalc[c] ? cmpCalc[c] : ''}" oninput="cmpCalcEntrada('${c}', this.value)">`;
         almVentana(`<form class="req-dlg" onsubmit="cmpGuardarPrecio(event)">
             <h3>Precio en tiendas · ${esc(o.descripcion)}</h3>
@@ -22182,9 +22183,10 @@ Reglas:
                 <div><label for="cmpK_detal">Precio al detal $</label>${n('detal')}</div>
                 ${cmpVendeMayor(p) || o.mayor ? `<div><label for="cmpK_margenMayor">Margen mayor %</label>${n('margenMayor')}</div>
                 <div><label for="cmpK_mayor">Precio al mayor $</label>${n('mayor')}</div>` : ''}
-                <div><label for="cmpK_gran">Precio gran mayor $ <small>(Precio B)</small></label><input type="number" step="0.01" min="0" id="cmpK_gran" value="${cmpCalc.gran || ''}" oninput="cmpCalc.gran = Number(this.value) || 0"></div>
+                <div><label for="cmpK_margenGran">Margen gran mayor %</label>${n('margenGran')}</div>
+                <div><label for="cmpK_gran">Precio gran mayor $ <small>(Precio B)</small></label>${n('gran')}</div>
             </div>
-            <div class="nota">Precio = costo ÷ (1 − margen), redondeado al centavo (o terminado en 7 / ,99 con la terminación psicológica). Al mayor (solo charcutería) sobre el costo de la factura, sin merma. Si cambia el precio y alguna tienda ya lo había actualizado, se le quita la marca para que lo cambie de nuevo. Si corrige el costo, cambia también en el almacén (queda registrado quién y el de antes).</div>
+            <div class="nota">Precio = costo ÷ (1 − margen), redondeado al centavo (o terminado en 7 / ,99 con la terminación psicológica). Al mayor (solo charcutería) y gran mayor sobre el costo de la factura, sin merma. Si cambia el precio y alguna tienda ya lo había actualizado, se le quita la marca para que lo cambie de nuevo. Si corrige el costo, cambia también en el almacén (queda registrado quién y el de antes).</div>
             <div class="login-error" id="cmpKError"></div>
             <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0">${o.detal > 0 || o.mayor > 0 ? `<button type="button" class="btn-ghost" style="margin-right:auto" onclick="cmpAvisarOrden('${esc(o.id)}', this)" title="Envía el precio de esta orden al grupo de Telegram &quot;Equipo de información&quot;">${ico('avisar')}Avisar por Telegram</button>` : ''}<button type="button" class="btn-ghost" onclick="almCerrar()">Cancelar</button><button type="submit" class="btn-primary" id="cmpBtnK">Guardar precio</button></div></form>`);
     }
@@ -22218,21 +22220,23 @@ Reglas:
         if (!p) { if (cmpCalc) { cmpCalc = null; caja.innerHTML = ''; } btn.disabled = true; return; }
         if (cmpCalc && cmpCalc.codigo === p.codigo) return;
         const ant = (almDatos.precios || {})[p.codigo] || {}, costo = p.costo || ant.costo || 0, s = cmpSugerir(p, costo);
-        cmpCalc = { id: null, prod: p, codigo: p.codigo, costo, merma: ant.merma || 0, libre: true, detal: ant.detal || (s ? s.detal : 0), mayor: ant.mayor || (s ? s.mayor : 0), gran: ant.gran || 0, margenDetal: 0, margenMayor: 0 };
+        cmpCalc = { id: null, prod: p, codigo: p.codigo, costo, merma: ant.merma || 0, libre: true, detal: ant.detal || (s ? s.detal : 0), mayor: ant.mayor || (s ? s.mayor : 0), gran: ant.gran || 0, margenDetal: 0, margenMayor: 0, margenGran: 0 };
         const cr = costo * (1 + cmpCalc.merma / 100);
         cmpCalc.margenDetal = cmpCalc.detal > 0 ? cmpR2((1 - cr / cmpCalc.detal) * 100) : 0;
         cmpCalc.margenMayor = cmpCalc.mayor > 0 ? cmpR2((1 - costo / cmpCalc.mayor) * 100) : 0;
+        cmpCalc.margenGran = cmpCalc.gran > 0 && costo > 0 ? cmpR2((1 - costo / cmpCalc.gran) * 100) : 0;
         const n = c => `<input type="number" step="0.01" min="0" id="cmpK_${c}" value="${cmpCalc[c] ? cmpCalc[c] : ''}" oninput="cmpCalcEntrada('${c}', this.value)">`;
         caja.innerHTML = `<div class="nota" style="margin:.5rem 0">${esc(p.codigo)} · ${esc(p.categoria || '')}${ant.detal ? ' · detal actual $ ' + fmt(ant.detal) : ''}${ant.mayor ? ' · mayor actual $ ' + fmt(ant.mayor) : ''}${ant.actualizado ? ' (desde ' + esc(ant.actualizado) + ')' : ''}</div>
             <div class="per-grid">
-                <div><label for="cmpK_costo">Costo $</label><input type="number" step="0.0001" min="0" id="cmpK_costo" value="${costo || ''}" oninput="cmpCalc.costo=Number(this.value)||0;cmpCalcEntrada('margenDetal', cmpCalc.margenDetal);if(cmpCalc.margenMayor)cmpCalcEntrada('margenMayor', cmpCalc.margenMayor)"></div>
+                <div><label for="cmpK_costo">Costo $</label><input type="number" step="0.0001" min="0" id="cmpK_costo" value="${costo || ''}" oninput="cmpCalc.costo=Number(this.value)||0;cmpCalcEntrada('margenDetal', cmpCalc.margenDetal);if(cmpCalc.margenMayor)cmpCalcEntrada('margenMayor', cmpCalc.margenMayor);if(cmpCalc.margenGran)cmpCalcEntrada('margenGran', cmpCalc.margenGran)"></div>
                 <div><label for="cmpK_merma">Merma y gastos %</label>${n('merma')}</div>
                 <div><label>Costo real</label><div style="padding:.55rem 0"><b id="cmpKcr">$ ${fmt(cr)}</b></div></div>
                 <div><label for="cmpK_margenDetal">Margen detal %</label>${n('margenDetal')}</div>
                 <div><label for="cmpK_detal">Precio al detal $</label>${n('detal')}</div>
                 ${cmpVendeMayor(p) || cmpCalc.mayor ? `<div><label for="cmpK_margenMayor">Margen mayor %</label>${n('margenMayor')}</div>
                 <div><label for="cmpK_mayor">Precio al mayor $</label>${n('mayor')}</div>` : ''}
-                <div><label for="cmpK_gran">Precio gran mayor $ <small>(Precio B)</small></label><input type="number" step="0.01" min="0" id="cmpK_gran" value="${cmpCalc.gran || ''}" oninput="cmpCalc.gran = Number(this.value) || 0"></div>
+                <div><label for="cmpK_margenGran">Margen gran mayor %</label>${n('margenGran')}</div>
+                <div><label for="cmpK_gran">Precio gran mayor $ <small>(Precio B)</small></label>${n('gran')}</div>
             </div>`;
         btn.disabled = false;
     }
@@ -22265,10 +22269,14 @@ Reglas:
             if (c === 'margenMayor') k.mayor = pr.mayor;
             else { k.detal = pr.detal; if (c === 'merma') k.margenDetal = pr.margenDetal; }
         }
+        if (c === 'margenGran') {
+            k.gran = valor === '' || v >= 100 ? 0 : (k.costo > 0 ? Math.round(k.costo / (1 - v / 100) * 100 + 1e-6) / 100 : 0);
+        }
         const cr = k.costo * (1 + k.merma / 100);
         if (c === 'detal') k.margenDetal = k.detal > 0 ? cmpR2((1 - cr / k.detal) * 100) : 0;
         if (c === 'mayor') k.margenMayor = k.mayor > 0 ? cmpR2((1 - k.costo / k.mayor) * 100) : 0;
-        ['detal', 'mayor', 'margenDetal', 'margenMayor'].filter(x => x !== c).forEach(x => { const el = document.getElementById('cmpK_' + x); if (el) el.value = k[x] || ''; });
+        if (c === 'gran') k.margenGran = k.gran > 0 && k.costo > 0 ? cmpR2((1 - k.costo / k.gran) * 100) : 0;
+        ['detal', 'mayor', 'gran', 'margenDetal', 'margenMayor', 'margenGran'].filter(x => x !== c).forEach(x => { const el = document.getElementById('cmpK_' + x); if (el) el.value = k[x] || ''; });
         document.getElementById('cmpKcr').textContent = '$ ' + fmt(cr);
     }
     // Costo corregido en la ventana del precio: los precios se recalculan con los márgenes que tiene
@@ -22277,6 +22285,7 @@ Reglas:
         k.costo = Number(v) || 0;
         if (k.margenDetal) cmpCalcEntrada('margenDetal', k.margenDetal); else cmpCalcEntrada('merma', k.merma);
         if (k.margenMayor && document.getElementById('cmpK_margenMayor')) cmpCalcEntrada('margenMayor', k.margenMayor);
+        if (k.margenGran && document.getElementById('cmpK_margenGran')) cmpCalcEntrada('margenGran', k.margenGran);
     }
     // Guardar: la ventana se cierra al instante y el precio se ve ya en la lista; Google lo guarda en segundo plano (si falla, avisa y se vuelve a leer)
     function cmpGuardarPrecio(ev) {
