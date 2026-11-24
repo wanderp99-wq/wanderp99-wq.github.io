@@ -612,7 +612,7 @@
         .huella-oferta .huella-txt { flex: 1 1 220px; font-size: .9rem; } .huella-oferta .huella-txt small { display: block; color: var(--text-muted); font-size: .78rem; }
         .huella-oferta .huella-bts { display: flex; gap: .5rem; flex-wrap: wrap; }
         /* Almacén: se ve en mayúsculas mientras el teclado de la tablet compone la palabra (el texto se pasa a mayúsculas al terminarla) */
-        #almContenido input[type=text]:not([inputmode=decimal]), #almContenido input[type=search], #almDlg input[type=text]:not([inputmode=decimal]), #almDlg input[type=search] { text-transform: uppercase; }
+        #almContenido input[type=text]:not([inputmode=decimal]):not([data-sin-mayus]), #almContenido input[type=search], #almDlg input[type=text]:not([inputmode=decimal]):not([data-sin-mayus]), #almDlg input[type=search] { text-transform: uppercase; }
         #almContenido input::placeholder, #almDlg input::placeholder { text-transform: none; }
         /* Aviso flotante: abajo a la derecha (en el teléfono, arriba: abajo están las barras de guardar). No recibe clics. */
         .carga-flotante { position: fixed; right: 16px; bottom: 16px; z-index: 1003; pointer-events: none; opacity: 0; visibility: hidden; transform: translateY(10px);
@@ -1240,7 +1240,7 @@
         :root { --alm-verde: #44AC00; --alm-verde-claro: #6EBE39; --alm-verde-oscuro: #3A9300; }   /* oscuro: bajo los números blancos del total, para que se lean bien */
         .alm-pos { display: flex; flex-direction: column; gap: .75rem; }
         .alm-pos-top { display: grid; grid-template-columns: minmax(180px, 260px) 1fr minmax(200px, 280px); gap: .75rem; align-items: stretch; }
-        #almContenido input[type=text], #almContenido input[type=search], #almDlg input[type=text], #almDlg input[type=search] { text-transform: uppercase; }
+        #almContenido input[type=text]:not([data-sin-mayus]), #almContenido input[type=search], #almDlg input[type=text]:not([data-sin-mayus]), #almDlg input[type=search] { text-transform: uppercase; }
         #almContenido input::placeholder, #almDlg input::placeholder { text-transform: none; }
         .alm-cod { position: relative; }
         .alm-sug { position: absolute; left: 0; top: 100%; margin-top: .3rem; z-index: 20; width: min(560px, calc(100vw - 2rem)); display: flex; flex-direction: column; gap: .25rem; padding: .35rem; max-height: 340px; overflow-y: auto;
@@ -1495,6 +1495,17 @@
         .alm-ver-num { font-weight: 700; color: var(--subtitle); display: flex; gap: .4rem; align-items: center; flex-wrap: wrap; }
         .alm-ver-cli { font-size: 1.25rem; font-weight: 800; color: var(--title); } .alm-ver-info small { color: var(--text-muted); }
         .alm-ver-com { margin-top: .2rem; font-size: .9rem; }
+        .alm-notas-tabla tbody tr { transition: background-color .14s ease; }
+        .alm-notas-tabla tbody tr:hover td { background: color-mix(in srgb, var(--primary) 13%, var(--card-bg)); }
+        .alm-notas-tabla tbody tr:hover td:first-child { box-shadow: inset 4px 0 0 var(--primary); }
+        :root:not([data-theme="light"]) .alm-notas-tabla tbody tr:hover td { background: color-mix(in srgb, var(--primary) 22%, var(--card-bg)); }
+        .alm-nota-com-badge { display: inline-block; margin-top: .22rem; padding: .12rem .45rem; border-radius: 6px; background: color-mix(in srgb, var(--primary) 11%, var(--list-bg)); border-left: 3px solid var(--primary); color: var(--text-main); font-size: .78rem; line-height: 1.3; max-width: 340px; white-space: normal; }
+        .alm-nota-com-badge small { display: inline; color: var(--text-muted); margin-left: .25rem; }
+        .alm-ver-coms { margin-top: .75rem; padding: .65rem .8rem; background: var(--list-bg); border: 1px solid var(--border); border-radius: 12px; }
+        .alm-ver-coms h4 { margin: 0 0 .45rem; font-size: .88rem; color: var(--title); display: flex; align-items: center; gap: .4rem; }
+        .alm-ver-coms-lista { max-height: 160px; overflow-y: auto; }
+        .alm-ver-com-form { display: flex; gap: .45rem; margin-top: .5rem; }
+        .alm-ver-com-form input { flex: 1; min-width: 0; }
         .alm-ver-tabla { max-height: 46vh; } .alm-ver-tabla tr { cursor: default; }
         .alm-ver-mod { max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .alm-marcas-fila { display: flex; gap: .6rem; flex-wrap: wrap; margin-top: .7rem; }
@@ -3907,6 +3918,7 @@
         if (payload.action === 'nom_historial') { const r = await cfNomHistorial(payload); if (r) return r; }
         // (22/11) Campana (pendientes), usuarios en línea, paquete de utilidades y avisos de tienda directo al servidor nuevo
         if (/^(pendientes|enlinea|paq_estado|paq_subir|aviso_tienda)$/.test(payload.action) && typeof CF_URL === 'string' && CF_URL) {
+            let cfErr = '';
             try {
                 const t0c = performance.now(), r = await cfPedir(Object.assign({}, payload, { token: await cfToken(), vista: typeof vistaActual === 'string' ? vistaActual : '', disp: DISPOSITIVO }));
                 if (r && r.ok) {
@@ -3915,7 +3927,9 @@
                     return r;
                 }
                 if (r && r.sesion === false) cfSes.token = '';
+                else if (payload.action === 'aviso_tienda' && r && !r.noAqui && r.error) cfErr = r.error;
             } catch (e) { if (/Cuenta suspendida/i.test(e && e.message)) cerrarSesion(e.message); }
+            if (cfErr) throw new Error(cfErr);
         }
         // (12/11) Lecturas del almacén con "Usar Firebase en el Almacén" encendido: se responden aquí con lo de Firebase (sin Google)
         if (ALMVIVO_ACC.test(payload.action) && !almVivoSaltar) { const r = await almVivoResponder(payload); if (r) return r; }
@@ -4079,7 +4093,7 @@
         anotarTiempo(payload.action, performance.now() - t0, typeof data.ms === 'number' ? data.ms : null, true, data.pasos);
         return data;
     }
-    const NOMBRE_ACCION = { login: 'Entrar', list: 'Cargar cajas', save: 'Guardar sistema', cuadre_detalle: 'Detalle de caja', cuadre_coment: 'Comentario',
+    const NOMBRE_ACCION = { login: 'Entrar', list: 'Cargar cajas', save: 'Guardar sistema', cuadre_detalle: 'Detalle de caja', cuadre_coment: 'Comentario', alm_nota_comentar: 'Comentario en nota',
         conc_listar: 'Cargar conciliación', conc_manual: 'Validar pago', conc_manual_lote: 'Validar varios', conc_desmarcar: 'Quitar validación', mov_guardar: 'Subir banco',
         efe_listar: 'Cargar efectivo', efe_marcar: 'Marcar recibido', efe_egreso: 'Registrar gasto', cc_registrar: 'Caja chica', cc_listar: 'Cargar caja chica',
         req_datos: 'Cargar catálogo', req_ventas: 'Leer ventas', req_historial: 'Historial', req_guardar: 'Guardar requerimiento', req_productos_guardar: 'Guardar catálogo' };
@@ -5997,7 +6011,7 @@
         try {
             const t0 = performance.now(), x = await cfLeerAlDia(ALMVIVO_HOJAS_DE[grupo], ['alm', 'per']);
             if (!x) return null;
-            const D = await cfDocs(['config/almacen']), r = ALMFB.responder(p, x.H, D['config/almacen'] || {});
+            const D = await cfDocs(['config/almacen']).catch(() => ({})), r = ALMFB.responder(p, x.H, D['config/almacen'] || {});
             if (r) anotarTiempo(p.action + ' (Cloudflare)', Math.round(performance.now() - t0), 0, true);
             return r;
         } catch (e) { if (!CF_SOLO) cfSes.roto = Date.now(); console.log('Servidor nuevo (Cloudflare): ' + e.message + ' (se usa lo de antes)'); return null; }
@@ -7027,7 +7041,7 @@
     }
     // (16/11) Almacén y Facturar en el servidor nuevo (las compras siguen en Google). Lo que en Google traía todo el almacén
     // (productos, clientes, anular, importar) responde corto: el almacén se vuelve a leer del servidor nuevo (o de Google, sin ese permiso).
-    const CF_ALMACEN_ACC = /^alm_(facturar|anular|nota_marcar|ingreso_verificar|ingreso_fiscal|nota_credito|nota_modificar|espera_guardar|espera_retomar|producto_guardar|importar|cliente_guardar|proveedor_guardar|ingresar|tg_imagen|telegram_nota|config)$/;
+    const CF_ALMACEN_ACC = /^alm_(facturar|anular|nota_marcar|nota_comentar|ingreso_verificar|ingreso_fiscal|nota_credito|nota_modificar|espera_guardar|espera_retomar|producto_guardar|importar|cliente_guardar|proveedor_guardar|ingresar|tg_imagen|telegram_nota|config)$/;
     async function cfAlmacenEscribir(p) {
         if (!cfModuloEncendido('almaceng')) return null;
         const t0 = performance.now(), r = await cfEscribir(Object.assign({}, p, { modulo: 'almaceng', repetible: /^alm_(espera_guardar|espera_retomar|tg_imagen)$/.test(p.action) }));
@@ -7035,7 +7049,7 @@
         if (r.releerAlmacen) {
             let datos = null;
             try { datos = await almVivoResponder({ action: 'alm_datos' }); } catch (e) { datos = null; }
-            if (!datos) { try { datos = await DATOS.aGoogle(() => llamarApi({ action: 'alm_datos' })); } catch (e) { datos = null; } }
+            if (!datos && !CF_SOLO && !cfModuloEncendido('almacen')) { try { datos = await DATOS.aGoogle(() => llamarApi({ action: 'alm_datos' })); } catch (e) { datos = null; } }
             if (datos) { const x = Object.assign({}, datos, r); delete x.releerAlmacen; anotarTiempo(p.action + ' (Cloudflare)', Math.round(performance.now() - t0), 0, true); return x; }
         }
         anotarTiempo(p.action + ' (Cloudflare)', Math.round(performance.now() - t0), 0, true);
@@ -19069,6 +19083,7 @@
     }
     let almDatosEn = 0;   // cuándo se leyó el almacén (al entrar no se vuelve a leer si tiene menos de 2 minutos)
     function almUsar(r) {
+        if (!r || !Array.isArray(r.productos)) return;
         almDatosEn = Date.now();
         almDatos = { productos: r.productos || [], clientes: r.clientes || [], categorias: r.categorias || [], proveedores: r.proveedores || [],
                      proximaNota: r.proximaNota || '', proximoIngreso: r.proximoIngreso || '', telegram: !!r.telegram, pendientes: r.pendientes || null, precios: r.precios || {} };
@@ -19127,6 +19142,7 @@
     }
     const almDlgAbierta = () => { const d = document.getElementById('almDlg'); return !!d && !d.classList.contains('hidden'); };
     function almCerrar() {
+        almEditarCompraIdx = -1;
         const d = document.getElementById('almDlg'); if (d) d.classList.add('hidden');
         const f = almAlCerrar; almAlCerrar = null; if (f) f();
         if (!almDlgAbierta()) almEnfocar();
@@ -19135,7 +19151,7 @@
     // En la tablet / teléfono (también con teclado externo) el teclado va "componiendo" la palabra: si se cambia el texto mientras
     // compone, repite letras ("jamon" salía "JAJAMJAMO"). Entonces: mientras compone solo se VE en mayúsculas (CSS) y el texto se
     // pasa a mayúsculas al terminar la palabra (compositionend). Con teclado de PC no hay composición y se hace al instante.
-    const almMayus = el => !!el && el.tagName === 'INPUT' && !el._num && /^(text|search|tel)$/.test(el.type) && !!el.closest('#almContenido, #almDlg');
+    const almMayus = el => !!el && el.tagName === 'INPUT' && !el._num && !el.hasAttribute('data-sin-mayus') && /^(text|search|tel)$/.test(el.type) && !!el.closest('#almContenido, #almDlg');
     function almAMayusculas(el) {
         const v = el.value, m = v.toUpperCase();
         if (v === m) return;
@@ -20109,6 +20125,52 @@
             <div><label for="almListaBus">Buscar</label><input type="search" id="almListaBus" autocomplete="off" placeholder="N°, nombre, documento..." oninput="almPintar()" value="${esc((document.getElementById('almListaBus') || {}).value || '')}"></div></div>`;
     }
     const almChipMarca = (v, si, no, cls) => v ? `<span class="chip st-ok" title="${esc(v)}">${si}</span>` : `<span class="chip ${cls || 'st-pend'}">${no}</span>`;
+    function almParsearComentarios(txt) {
+        const base = [], anexos = [];
+        String(txt || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean).forEach(line => {
+            const m = /^\[(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})\s+·\s+([^\]]+)\]\s*(.+)$/.exec(line);
+            if (m) anexos.push({ cuando: m[1], autor: m[2].trim(), texto: m[3].trim() });
+            else base.push(line);
+        });
+        return { base, anexos };
+    }
+    function almNotaComsHTML(n) {
+        const { anexos } = almParsearComentarios(n.comentario);
+        const lista = anexos.length
+            ? `<div class="alm-ver-coms-lista">${anexos.map(c => `<div class="cxp-com"><div>${esc(c.texto)}</div><small>${esc(c.autor)} · ${fechaBonita(c.cuando.slice(0, 10))} ${esc(c.cuando.slice(11, 16))}</small></div>`).join('')}</div>`
+            : '<div class="nota" style="margin:0">Sin comentarios adicionales todavía.</div>';
+        const form = `<form class="alm-ver-com-form" onsubmit="almComentarNota(event, '${esc(n.numero)}')">
+            <input type="text" id="almNotaComIn" data-sin-mayus data-enter-propio maxlength="300" autocomplete="off" placeholder="Ej.: pendiente por despachar 2 cajas...">
+            <button type="submit" class="btn-primary btn-mini" id="almNotaComBtn">Agregar</button></form>
+            <div class="login-error" id="almNotaComErr"></div>`;
+        return `<h4>Comentarios${anexos.length ? ` <span class="chip st-info">${anexos.length}</span>` : ''}</h4>${lista}${form}`;
+    }
+    async function almComentarNota(ev, numero) {
+        ev.preventDefault();
+        const inp = document.getElementById('almNotaComIn'), btn = document.getElementById('almNotaComBtn'), err = document.getElementById('almNotaComErr');
+        const texto = inp ? inp.value.trim() : '';
+        if (err) err.textContent = '';
+        if (!texto) { if (err) err.textContent = 'Escriba el comentario'; if (inp) inp.focus(); return; }
+        btnCargando(btn, 'Guardando...');
+        try {
+            const r = await llamarApi({ action: 'alm_nota_comentar', numero, texto });
+            const n = (r && r.nota) || almNotaDe(numero);
+            if (n) {
+                almReemplazarNota(n);
+                if (almUltimaNota && almUltimaNota.numero === n.numero) almUltimaNota = n;
+            }
+            const caja = document.getElementById('almNotaComs');
+            if (caja && n && caja.dataset.num === numero && caja.closest('#almDlg:not(.hidden)')) {
+                caja.innerHTML = almNotaComsHTML(n);
+                const i2 = document.getElementById('almNotaComIn'); if (i2) i2.focus();
+            }
+            almPintar();
+            mostrarBanner(`Comentario guardado en la nota N° ${numero}.`, 'ok');
+        } catch (e) {
+            if (err) err.textContent = e.message || String(e);
+            if (btn) { btn.disabled = false; btn.textContent = 'Agregar'; }
+        }
+    }
     function almNotasFiltradas() {
         const f = almNotasF;
         return (almNotas || []).filter(n => (!f.cliente || n.clienteId === f.cliente) && almPasaLista(n.numero, n.cliente, n.clienteId, n.cedula, n.comentario) && almTieneProducto(n.detalle, f.producto)
@@ -20129,26 +20191,28 @@
                 <div class="kpi"><div class="k-label">Total $</div><div class="k-value">${fmt(vig.reduce((s, n) => s + n.total, 0))}</div></div>
                 <div class="kpi amar"><div class="k-label">Por ingresar en tienda</div><div class="k-value">${vig.filter(n => n.condicion === 'Tienda' && !n.ingresada).length}</div></div>
                 <div class="kpi"><div class="k-label">Por verificar</div><div class="k-value">${vig.filter(n => !n.verificada).length}</div></div></div>
-            ${l.length ? `<div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">N°</th><th class="izq">Fecha</th><th class="izq">Cliente</th><th class="izq">Condición</th><th>Total $</th><th class="izq">Tienda</th><th class="izq">Verificada</th><th></th></tr></thead><tbody>
-            ${l.map(n => `<tr class="${n.estado === 'Anulada' ? 'alm-anulada' : ''}"><td class="izq"><b>${esc(n.numero)}</b>${n.modificaciones ? '<small>modificada</small>' : ''}</td><td class="izq">${fechaCorta(n.fecha)}<small>${esc(n.hora)}</small></td>
-                <td class="izq">${esc(n.cliente)}<small>${esc(n.comentario || n.usuario)}</small></td><td class="izq">${n.condicion === 'Tienda' ? 'Despacho a tienda' : esc(n.condicion)}${n.vence ? `<small>vence ${fechaCorta(n.vence)}</small>` : ''}</td>
+            ${l.length ? `<div class="tabla-wrap"><table class="req-tabla alm-notas-tabla"><thead><tr><th class="izq">N°</th><th class="izq">Fecha</th><th class="izq">Cliente</th><th class="izq">Condición</th><th>Total $</th><th class="izq">Tienda</th><th class="izq">Verificada</th><th></th></tr></thead><tbody>
+            ${l.map(n => { const com = almParsearComentarios(n.comentario), baseTxt = com.base.join(' · '), ult = com.anexos[com.anexos.length - 1];
+                return `<tr class="${n.estado === 'Anulada' ? 'alm-anulada' : ''}"><td class="izq"><b>${esc(n.numero)}</b>${n.modificaciones ? '<small>modificada</small>' : ''}</td><td class="izq">${fechaCorta(n.fecha)}<small>${esc(n.hora)}</small></td>
+                <td class="izq">${esc(n.cliente)}<small>${esc(baseTxt || n.usuario)}</small>${ult ? `<div class="alm-nota-com-badge" title="${esc(com.anexos.map(c => c.autor + ': ' + c.texto).join('\n'))}">${esc(ult.texto)}${com.anexos.length > 1 ? ` <small>(+${com.anexos.length - 1})</small>` : ''}</div>` : ''}</td><td class="izq">${n.condicion === 'Tienda' ? 'Despacho a tienda' : esc(n.condicion)}${n.vence ? `<small>vence ${fechaCorta(n.vence)}</small>` : ''}</td>
                 <td>${fmt(n.total)}${n.totalBs ? `<small>Bs ${fmt(n.totalBs)}</small>` : ''}</td>
                 <td class="izq">${n.estado === 'Anulada' ? '<span class="chip st-sobra">Anulada</span>' : n.condicion === 'Tienda' ? almChipMarca(n.ingresada, 'Ingresada', 'Por ingresar', 'st-amar') : '—'}</td>
                 <td class="izq">${n.estado === 'Anulada' ? '' : almChipMarca(n.verificada, 'Verificada', 'Sin verificar')}</td>
-                <td class="alm-acc"><button type="button" class="btn-ghost btn-mini" onclick="almVerNota('${esc(n.numero)}')">Ver</button><button type="button" class="btn-ghost btn-mini" onclick="almImprimir('nota', almNotaDe('${esc(n.numero)}'))">Imprimir</button>${n.estado !== 'Anulada' && n.condicion === 'Tienda' && !n.ingresada ? `<button type="button" class="btn-ghost btn-mini" onclick="bsrAbrir('${esc(n.numero)}')" title="Ingresarla en el BigSoft de la tienda desde aquí">Ingresar en BigSoft</button>` : ''}</td></tr>`).join('')}
+                <td class="alm-acc"><button type="button" class="btn-ghost btn-mini" onclick="almVerNota('${esc(n.numero)}')">Ver</button><button type="button" class="btn-ghost btn-mini" onclick="almVerNota('${esc(n.numero)}', true)" title="Ver o agregar comentarios a esta nota">Comentar</button><button type="button" class="btn-ghost btn-mini" onclick="almImprimir('nota', almNotaDe('${esc(n.numero)}'))">Imprimir</button>${n.estado !== 'Anulada' && n.condicion === 'Tienda' && !n.ingresada ? `<button type="button" class="btn-ghost btn-mini" onclick="bsrAbrir('${esc(n.numero)}')" title="Ingresarla en el BigSoft de la tienda desde aquí">Ingresar en BigSoft</button>` : ''}</td></tr>`; }).join('')}
             </tbody></table></div>` : '<div class="empty">No hay notas con estos filtros.</div>'}`;
     }
     const almNotaDe = numero => (almNotas || []).find(x => x.numero === numero) || (almUltimaNota && almUltimaNota.numero === numero ? almUltimaNota : null);
     // Ver una nota: detalle, comentario, cambios, marcas y acciones
-    function almVerNota(numero) {
+    function almVerNota(numero, enfocarCom) {
         const n = almNotaDe(numero); if (!n) return;
         const anulada = n.estado === 'Anulada', tienda = n.condicion === 'Tienda', und = n.detalle.reduce((s, x) => s + (x.tipo === 'Unidad' ? x.cantidad : 0), 0), kg = n.detalle.reduce((s, x) => s + (x.tipo === 'Pesado' ? x.cantidad : 0), 0);
+        const baseTxt = almParsearComentarios(n.comentario).base.join(' · ');
         almVentana(`<div class="req-dlg alm-dlg-grande">
             <div class="alm-ver-top">
                 <div class="alm-ver-info"><div class="alm-ver-num">Nota de entrega N° ${esc(n.numero)} ${anulada ? '<span class="chip st-sobra">Anulada</span>' : ''}${n.modificaciones ? '<span class="chip st-info">Modificada</span>' : ''}</div>
                     <div class="alm-ver-cli">${esc(n.cliente)}</div>
                     <small>${tienda ? 'Despacho a tienda' : esc(n.condicion)}${n.vence ? ' · vence ' + fechaBonita(n.vence) : ''} · ${fechaBonita(n.fecha)} ${esc(n.hora)} · ${esc(n.usuario)}${n.cedula ? ' · RIF ' + esc(n.cedula) : ''}</small>
-                    ${n.comentario ? `<div class="alm-ver-com"><b>Comentario:</b> ${esc(n.comentario)}</div>` : ''}</div>
+                    ${baseTxt ? `<div class="alm-ver-com"><b>Comentario:</b> ${esc(baseTxt)}</div>` : ''}</div>
                 <div class="alm-total"><small>${anulada ? 'Total (anulada)' : 'Total'}</small><b>$ ${fmt(n.total)}</b><small>${n.totalBs ? 'Bs ' + fmt(n.totalBs) + (n.tasa ? ' · tasa ' + fmt(n.tasa) : '') : ''}${n.descuento ? ' · desc. $ ' + fmt(n.descuento) : ''}</small></div>
             </div>
             <div class="tabla-wrap alm-carrito alm-ver-tabla"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Código</th><th class="izq">Descripción</th><th>Cantidad</th><th>Precio $</th><th>Subtotal $</th></tr></thead><tbody>
@@ -20156,12 +20220,14 @@
             <div class="alm-pie"><span>${n.detalle.length} renglón(es) · ${und} und · ${almCant(kg, 'Pesado')} kg</span>
                 ${n.modificaciones ? `<span class="alm-ver-mod" title="${esc(n.modificaciones)}">Modificaciones: ${esc(n.modificaciones.split(' | ').pop())}</span>` : ''}</div>
             ${anulada ? `<div class="banner error" style="display:block;margin-top:.6rem">${esc(n.anulacion)}</div>` : !permisos.includes('movalmacen') ? '' : `<div class="alm-marcas-fila" id="almMarcasNota" data-num="${esc(n.numero)}">${almMarcasHTML(n)}</div>`}
+            <div class="alm-ver-coms" id="almNotaComs" data-num="${esc(n.numero)}">${almNotaComsHTML(n)}</div>
             <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0;flex-wrap:wrap">
                 ${anulada ? '' : `<button type="button" class="btn-eliminar" onclick="almAnular('${esc(n.numero)}')">Anular</button><button type="button" class="btn-ghost" onclick="almModificarNota('${esc(n.numero)}')">Modificar (clave)</button>`}
                 ${!anulada && n.condicion === 'Contado' && !n.cxc ? `<button type="button" class="btn-ghost" onclick="almACredito('${esc(n.numero)}')" title="El cliente no la pagó: queda como deuda en Cuentas por cobrar">Pasar a Cuentas por cobrar</button>` : ''}
                 ${!anulada && tienda && !n.ingresada ? `<button type="button" class="btn-primary" onclick="bsrAbrir('${esc(n.numero)}')" title="La PC de la tienda la ingresa en su BigSoft; aquí puede arreglar los renglones">Ingresar en BigSoft</button>` : ''}
                 ${esPrincipal ? `<button type="button" class="btn-ghost" onclick="almEnviarTelegram(almNotaDe('${esc(n.numero)}'))" title="Las notas se envían solas al guardarlas">Reenviar a Telegram</button>` : ''}
-                <button type="button" class="btn-ghost" onclick="almImprimir('nota', almNotaDe('${esc(n.numero)}'))">Imprimir</button><button type="button" class="btn-primary" onclick="almCerrar()" autofocus>Cerrar</button></div></div>`);
+                <button type="button" class="btn-ghost" onclick="almImprimir('nota', almNotaDe('${esc(n.numero)}'))">Imprimir</button><button type="button" class="btn-primary" onclick="almCerrar()"${enfocarCom ? '' : ' autofocus'}>Cerrar</button></div></div>`);
+        if (enfocarCom) setTimeout(() => { const inp = document.getElementById('almNotaComIn'); if (inp) { inp.focus(); inp.scrollIntoView({ block: 'nearest' }); } }, 40);
     }
     function almReemplazarNota(n) {
         if (!almNotas) return; const i = almNotas.findIndex(x => x.numero === n.numero);
@@ -21339,7 +21405,7 @@ Reglas:
             <td class="izq"><div class="cmp-prod"><input type="text" class="cmp-cod" list="cmpProds" value="${esc(l.codigo)}" placeholder="Código" autocomplete="off" onchange="cmpCodigo(${i}, this.value)">
                 ${p && !p.libre ? `<b>${esc(p.descripcion)}</b>` : `<input type="text" class="cmp-desc" value="${esc(l.descripcion)}" placeholder="Descripción del producto" autocomplete="off" oninput="cmp.lineas[${i}].descripcion=this.value" onchange="cmpDescripcion(${i})">`}</div>
                 <small class="cmp-motivo" id="cmpMo${i}">${esc(motivo)}</small>${l.origenCodigo === 'parecido' && p ? `<button type="button" class="btn-ghost btn-mini" style="margin:.2rem 0" onclick="cmpConfirmar(${i})">✓ Sí, es este</button>` : ''}
-                ${p && p.libre ? `<small>Sin código: se reparte completo a las tiendas${queda > 0 ? ' · <a href="#" onclick="event.preventDefault(); almEditarProducto(\'\', \'\')">registrarlo para dejar en el almacén</a>' : ''}</small>` : ''}
+                ${p && p.libre ? `<small>Sin código: se reparte completo a las tiendas${queda > 0 ? ` · <a href="#" onclick="event.preventDefault(); cmpRegistrarProducto(${i})">registrarlo para dejar en el almacén</a>` : ''}</small>` : ''}
                 ${l.leido && l.leido.pe > 1 ? (l.empaque ? `<small>Empaque: ${esc(l.conversion)} · <a href="#" onclick="event.preventDefault(); cmpEmpaque(${i}, false)">la cantidad ya está en unidades</a></small>`
                     : `<small>Tal como la factura: ${fmt(l.leido.cantidad)} ${esc(String(l.leido.unidad || 'und').toLowerCase())} · <a href="#" onclick="event.preventDefault(); cmpEmpaque(${i}, true)">es por bulto de ${l.leido.pe}</a></small>`)
                   : l.leido ? `<small>Por unidad · <a href="#" onclick="event.preventDefault(); cmpEmpaquePedir(${i})">¿es por bulto?</a></small>`
@@ -21467,6 +21533,17 @@ Reglas:
         const tr = document.getElementById('cmpF' + i); if (tr) tr.outerHTML = cmpFilaHTML(l, i);
         cmpPieActualizar();
         const sig = document.querySelector(`#cmpF${i} input[data-c="cantidad"]`); if (sig && p) sig.focus();
+    }
+    function cmpRegistrarProducto(i) {
+        const l = cmp.lineas[i]; if (!l) return;
+        const prov = cmp.proveedorId ? almProveedor(cmp.proveedorId) : null;
+        almEditarProducto('', '', {
+            desdeCompra: i,
+            costo: l.costo > 0 ? cmpR3(l.costo) : '',
+            descripcion: l.descripcion || '',
+            proveedor: prov ? prov.nombre : ((cmp.proveedorLeido && cmp.proveedorLeido.nombre) || ''),
+            bulto: l.leido && l.leido.pe > 1 ? l.leido.pe : ''
+        });
     }
     // Un campo de la tabla: se guarda y se recalcula lo que depende de él (sin redibujar: el cursor no se mueve)
     function cmpEntrada(el) {
@@ -23131,8 +23208,23 @@ Reglas:
             <div class="nota">El código se guarda tal cual, como texto: 051 y 0051 son productos distintos y ningún código se puede repetir. La existencia cambia sola con cada nota de entrega u operación de inventario.</div>`;
     }
     // Formulario del producto: Enter pasa de un campo al siguiente; en el último guarda. Margen y precio se calculan entre sí.
-    function almEditarProducto(codigo, codigoNuevo) {
-        const p = codigo ? almProducto(codigo) : { codigo: codigoNuevo || '', tipo: 'Pesado', iva: 'Exento', activo: true };
+    let almEditarCompraIdx = -1;
+    function almEditarProducto(codigo, codigoNuevo, opts) {
+        almEditarCompraIdx = opts && opts.desdeCompra != null ? Number(opts.desdeCompra) : -1;
+        const deCompra = !codigo && almEditarCompraIdx >= 0;
+        const p = codigo ? almProducto(codigo) : {
+            codigo: codigoNuevo || '',
+            descripcion: (opts && opts.descripcion) || '',
+            categoria: '',
+            tipo: '',
+            iva: '',
+            costo: (opts && opts.costo) || '',
+            precio: '',
+            bulto: (opts && opts.bulto) || '',
+            minimo: '',
+            proveedor: (opts && opts.proveedor) || '',
+            activo: true
+        };
         const margen = p.costo > 0 && p.precio > 0 ? almR((p.precio / p.costo - 1) * 100) : '';
         almVentana(`<form class="req-dlg per-dlg" data-enter onsubmit="almGuardarProducto(event, '${esc(codigo).replace(/'/g, '&#39;')}')">
             <h3>${codigo ? 'Modificar producto' : 'Nuevo producto'}</h3><div class="req-sub">${codigo ? 'El código no se cambia (su historial queda con ese código).' : 'Enter pasa al siguiente campo; en el último, guarda.'}</div>
@@ -23140,14 +23232,14 @@ Reglas:
                 <div><label for="almFCod">Código ${codigo ? '' : almBotonTeclado('almFCod')}</label><input type="text" id="almFCod" autocomplete="off" maxlength="30" required value="${esc(p.codigo)}" ${codigo ? 'disabled' : 'autofocus'} spellcheck="false" inputmode="${almTeclado()}" data-enter-propio oninput="almRevisarCodigo()" onkeydown="almCampoEnter(event, almRevisarCodigo)"><div id="almFCodAviso" class="alm-aviso"></div></div>
                 <div><label for="almFCat">Categoría <small>(código o nombre)</small></label><input type="text" id="almFCat" autocomplete="off" list="almCatLista" maxlength="40" required value="${esc(almCatTexto(p.categoria))}" ${codigo ? 'autofocus' : ''} placeholder="01 a 04" data-enter-propio oninput="almRevisarCategoria(false)" onkeydown="almCampoEnter(event, () => almRevisarCategoria(true))" onblur="almRevisarCategoria(true)"><div id="almFCatAviso" class="alm-aviso"></div></div>
                 <div class="per-ancho"><label for="almFDes">Descripción</label><input type="text" id="almFDes" autocomplete="off" maxlength="80" required value="${esc(p.descripcion || '')}"></div>
-                <div><label for="almFTipo">Se vende</label><select id="almFTipo"><option value="Pesado"${p.tipo === 'Pesado' ? ' selected' : ''}>Pesado (pide el peso en kg)</option><option value="Unidad"${p.tipo === 'Unidad' ? ' selected' : ''}>Por unidad</option></select></div>
+                <div><label for="almFTipo">Se vende</label><select id="almFTipo" required><option value=""${!p.tipo ? ' selected' : ''}>Elegir...</option><option value="Pesado"${p.tipo === 'Pesado' ? ' selected' : ''}>Pesado (pide el peso en kg)</option><option value="Unidad"${p.tipo === 'Unidad' ? ' selected' : ''}>Por unidad</option></select></div>
                 <div><label for="almFBul">Cantidad por bulto</label><input type="number" id="almFBul" step="0.001" min="0" value="${p.bulto || ''}"></div>
                 <div><label for="almFCos">Costo $</label><input type="number" id="almFCos" step="0.0001" min="0" value="${p.costo || ''}" oninput="almCalcPrecio('costo')"></div>
                 <div><label for="almFMar">Margen %</label><input type="number" id="almFMar" step="0.01" value="${margen}" oninput="almCalcPrecio('margen')"></div>
-                <div><label for="almFPre">Precio de venta $</label><input type="number" id="almFPre" step="0.0001" min="0" required value="${p.precio || ''}" oninput="almCalcPrecio('precio')"></div>
+                <div><label for="almFPre">${deCompra ? 'Precio de venta $ <small>(opcional aquí)</small>' : 'Precio de venta $'}</label><input type="number" id="almFPre" step="0.0001" min="0" ${deCompra ? '' : 'required'} placeholder="${deCompra ? 'Opcional (se define en paso 2)' : ''}" value="${p.precio || ''}" oninput="almCalcPrecio('precio')"></div>
                 <div><label for="almFMin">Existencia mínima</label><input type="number" id="almFMin" step="0.001" min="0" value="${p.minimo || ''}"></div>
                 <div><label for="almFProv">Proveedor</label><input type="text" id="almFProv" autocomplete="off" list="almProvLista2" maxlength="80" value="${esc(p.proveedor || '')}"></div>
-                <div><label for="almFIva">IVA</label><select id="almFIva"><option${p.iva !== 'IVA 16%' ? ' selected' : ''}>Exento</option><option${p.iva === 'IVA 16%' ? ' selected' : ''}>IVA 16%</option></select></div>
+                <div><label for="almFIva">IVA</label><select id="almFIva" required><option value=""${!p.iva ? ' selected' : ''}>Elegir...</option><option value="Exento"${p.iva === 'Exento' ? ' selected' : ''}>Exento</option><option value="IVA 16%"${p.iva === 'IVA 16%' ? ' selected' : ''}>IVA 16%</option></select></div>
                 ${codigo ? `<div class="per-ancho"><label class="interruptor"><input type="checkbox" id="almFAct" ${p.activo ? 'checked' : ''}><span class="sw-pista"></span> Activo (se puede facturar e ingresar)</label></div>` : ''}
             </div>
             <datalist id="almCatLista">${almDatos.categorias.map(c => `<option value="${esc(c.codigo + ' ' + c.nombre)}">`).join('')}</datalist>
@@ -23215,22 +23307,55 @@ Reglas:
     async function almGuardarProducto(ev, original) {
         ev.preventDefault();
         const v = id => document.getElementById(id).value.trim(), btn = document.getElementById('almFBtn'), err = document.getElementById('almFError');
+        if (err) err.textContent = '';
+        const compraIdx = !original ? almEditarCompraIdx : -1;
         if (!original && !almRevisarCodigo()) { err.textContent = almProducto(v('almFCod')) ? 'El código ' + v('almFCod') + ' ya está en uso: ' + almProducto(v('almFCod')).descripcion : 'Revise el código'; document.getElementById('almFCod').focus(); return; }
         if (!almRevisarCategoria(true)) { err.textContent = 'Elija la categoría (01 a 04)'; document.getElementById('almFCat').focus(); return; }
-        const act = document.getElementById('almFAct');
         if (!v('almFDes')) { err.textContent = 'Escriba la descripción'; document.getElementById('almFDes').focus(); return; }
-        // Se ve al instante en la lista y Google lo guarda en segundo plano
+        if (!v('almFTipo')) { err.textContent = 'Elija cómo se vende (Pesado o Por unidad)'; document.getElementById('almFTipo').focus(); return; }
+        if (!v('almFIva')) { err.textContent = 'Elija el IVA (Exento o IVA 16%)'; document.getElementById('almFIva').focus(); return; }
+        const preTxt = v('almFPre'), preNum = preTxt ? almNum(preTxt) : 0;
+        if (compraIdx < 0 && preTxt === '') { err.textContent = 'Escriba el precio de venta $'; document.getElementById('almFPre').focus(); return; }
+        if (preTxt !== '' && !(preNum >= 0)) { err.textContent = 'Revise el precio de venta $'; document.getElementById('almFPre').focus(); return; }
+        const act = document.getElementById('almFAct');
+        const numTxt = id => { const raw = v(id); if (!raw) return ''; const n = almNum(raw); return isFinite(n) ? String(n) : raw; };
         const pedido = { action: 'alm_producto_guardar', original, modificadoAnt: original && almProducto(original) ? almProducto(original).modificado || '' : undefined, codigo: (original || v('almFCod')).toUpperCase(), descripcion: v('almFDes'), categoria: v('almFCat'), tipo: v('almFTipo'),
-                         costo: v('almFCos'), precio: v('almFPre'), bulto: v('almFBul'), minimo: v('almFMin'), proveedor: v('almFProv'), iva: v('almFIva'), activo: act ? act.checked : undefined };
+                         costo: numTxt('almFCos'), precio: numTxt('almFPre'), bulto: numTxt('almFBul'), minimo: numTxt('almFMin'), proveedor: v('almFProv'), iva: v('almFIva'), activo: act ? act.checked : undefined };
         const cat = almBuscarCategoria(pedido.categoria), previo = original ? almProducto(original) : null;
         const local = Object.assign({}, previo || { existencia: 0, activo: true }, { codigo: pedido.codigo, descripcion: pedido.descripcion.toUpperCase(), categoria: cat ? cat.nombre : '', tipo: pedido.tipo,
                          costo: almNum(pedido.costo) || 0, precio: almNum(pedido.precio) || 0, bulto: almNum(pedido.bulto) || 0, minimo: almNum(pedido.minimo) || 0, proveedor: pedido.proveedor, iva: pedido.iva }, act ? { activo: act.checked } : {});
-        if (previo) Object.assign(previo, local); else almDatos.productos.push(local);
-        almCerrar(); almPintar();
-        almEnSegundoPlano(async () => {
-            try { const r = await llamarApi(pedido); almUsar(r); mostrarBanner(`Producto ${original ? 'modificado' : 'registrado'}: ${r.producto}.`, 'ok'); }
-            catch (e) { mostrarBanner(`El producto ${pedido.codigo} NO se guardó: ${e.message}`, 'error'); await almCargar(); }
-        });
+        btnCargando(btn, 'Guardando...');
+        try {
+            const r = await llamarApi(pedido);
+            if (r && Array.isArray(r.productos)) almUsar(r);
+            const codFinal = (r && r.producto) || pedido.codigo;
+            const itemFinal = (r && r.item) ? r.item : Object.assign({}, local, { codigo: codFinal });
+            if (almDatos && Array.isArray(almDatos.productos)) {
+                const idx = almDatos.productos.findIndex(x => x.codigo.toUpperCase() === codFinal.toUpperCase());
+                if (idx >= 0) Object.assign(almDatos.productos[idx], itemFinal);
+                else almDatos.productos.push(itemFinal);
+            }
+            almCerrar();
+            if (compraIdx >= 0 && almTab === 'compra' && cmp.lineas[compraIdx]) {
+                const l = cmp.lineas[compraIdx];
+                l.codigo = codFinal;
+                l.origenCodigo = 'manual';
+                l.libre = false;
+                cmpAplicarSugerencia(l);
+                if (itemFinal.precio > 0 && !(l.detal > 0)) {
+                    l.detal = itemFinal.precio;
+                    l.margenDetal = l.costo > 0 && l.detal > 0 ? cmpR2((1 - l.costo * (1 + (l.merma || 0) / 100) / l.detal) * 100) : 0;
+                }
+                cmpPintarCompra(document.getElementById('almContenido'), true);
+                cmpAvanceProgramar();
+            } else {
+                almPintar();
+            }
+            mostrarBanner(`Producto ${original ? 'modificado' : 'registrado'}: ${codFinal}.`, 'ok');
+        } catch (e) {
+            if (err) err.textContent = e.message || String(e);
+            if (btn) { btn.disabled = false; btn.textContent = 'Guardar'; }
+        }
     }
     // Seguimiento de un producto: todo lo que le pasó, en orden (del más viejo al más nuevo o al revés): entradas, salidas (notas),
     // ajustes, descuentos, devoluciones, anulaciones y los cambios de precio en tiendas, con lo que quedó después de cada uno
@@ -23593,7 +23718,7 @@ Reglas:
             td.des{font-family:Arial,Helvetica,sans-serif;font-size:7.4pt;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
             td.cod{font-size:7pt;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
             col.c1{width:15%}col.c2{width:16%}col.c4{width:13%}col.c5{width:14%}col.t1{width:7%}col.t2{width:18%}col.t3{width:17%}
-            .coment{margin:1mm 0;padding:1mm 1.8mm;border-left:.7mm solid #44AC00;background:#f0f9e8;font-size:7.4pt;line-height:1.3;border-radius:1mm}
+            .coment{margin:1mm 0;padding:1mm 1.8mm;border-left:.7mm solid #44AC00;background:#f0f9e8;font-size:7.4pt;line-height:1.3;border-radius:1mm;white-space:pre-line}
             tbody tr:nth-child(even) td{background:#f8fafc}
             .c{white-space:nowrap}.n{text-align:right;white-space:nowrap}th.n{text-align:right}
             .tot{display:flex;justify-content:flex-end;align-items:baseline;flex-wrap:wrap;gap:1.5mm 4mm;margin-top:1.2mm;padding-top:1mm;border-top:.4mm solid #0f172a;font-size:7.4pt;font-family:'Courier New',monospace}
