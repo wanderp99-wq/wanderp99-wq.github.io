@@ -2970,6 +2970,7 @@
                     <span class="req-arch-t">2. Existencia del local</span>
                     <span class="req-arch-s" id="reqEstLocal">Reporte de existencias de Bigsoft del local elegido</span>
                     <input type="file" accept=".xls,.xlsx,.csv" onchange="reqSubirExistencia(this.files[0], 'local'); this.value=''">
+                    <button type="button" class="btn-ghost btn-mini req-alm-btn" id="reqBtnLocalBS" onclick="event.preventDefault(); event.stopPropagation(); reqTraerExistenciaLocal()">Traer de BigSoft</button>
                 </label>
                 <div class="req-arch req-arch-fija">
                     <span class="req-arch-t">3. Ventas a promediar</span>
@@ -3899,7 +3900,7 @@
         if (/^cmp_(orden_precio|orden_nueva|orden_avisar|avisar_lista|marcar|marcar_lote|desc_divisas)$/.test(payload.action)) { const r = await cfPreciosEscribir(payload); if (r) return r; }
         if (CF_ALMACEN_ACC.test(payload.action)) { const r = await cfAlmacenEscribir(payload); if (r) return r; }
         if (/^req_(productos_guardar|exhibicion_guardar|variedad_guardar|ventas_guardar|ventas_borrar|guardar|telegram)$/.test(payload.action)) { const r = await cfReqEscribir(payload); if (r) return r; }
-        if (/^(bsr_pedir|bsc_listar|bsc_cajero)$/.test(payload.action)) { const r = await cfBigSoftEscribir(payload); if (r) { if (payload.action === 'bsr_pedir') r.desdeCF = true; return r; } }
+        if (/^(bsr_pedir|bsc_listar|bsc_cajero|bsc_reenviar_tg)$/.test(payload.action)) { const r = await cfBigSoftEscribir(payload); if (r) { if (payload.action === 'bsr_pedir') r.desdeCF = true; return r; } }
         if (payload.action === 'vx_anular') { const r = await cfVxAnular(payload); if (r) return r; }
         if (/^(cuadre_tol|cuentas_listar|cuentas_guardar)$/.test(payload.action)) { const r = await cfCuadreExtra(payload); if (r) return r; }
         // (15/11) Historial de nóminas: del servidor nuevo (con la Nómina encendida allá)
@@ -6886,40 +6887,59 @@
     }
     // (15/11) Los 5 grupos de Telegram de los cuadres de caja: cuáles encontró el sistema
     // Ventana: cada grupo (encontrado o no, con el motivo), lo que dice Telegram y el ID puesto a mano para los que no aparecen
-    async function tgCuadreVer(btn, ids) {
-        const texto = btn ? btn.textContent : ''; if (btn) btnCargando(btn, ids ? 'Guardando...' : 'Buscando...');
-        let r = null, error = '';
-        try { r = await DATOS.aGoogle(() => llamarApi({ action: 'tg_grupos_cuadre', ids: ids || null })); } catch (x) { error = x.message; }
+    async function tgCuadreVer(btn, ids, probar) {
+        const texto = btn ? btn.textContent : ''; if (btn) btnCargando(btn, probar !== undefined && probar !== null ? 'Probando...' : ids ? 'Guardando...' : 'Buscando...');
+        let r = null, error = '', enCF = false;
+        try {
+            if (typeof CF_URL === 'string' && CF_URL) {
+                try {
+                    const rc = await cfPedir({ action: 'tg_grupos_cuadre', ids: ids || null, probar: probar !== undefined ? probar : null, token: await cfToken() });
+                    if (rc && Array.isArray(rc.grupos)) { r = rc; enCF = true; }
+                    else if (rc && rc.sesion === false) cfSes.token = '';
+                    else if (rc && !rc.ok && rc.error) error = rc.error;
+                } catch (e) { if (CF_SOLO) error = e.message; }
+            }
+            if (!r && !error && !CF_SOLO) {
+                r = await DATOS.aGoogle(() => llamarApi({ action: 'tg_grupos_cuadre', ids: ids || null }));
+            } else if (ids && !CF_SOLO && !error) {
+                DATOS.aGoogle(() => llamarApi({ action: 'tg_grupos_cuadre', ids })).catch(() => {});
+            }
+        } catch (x) { error = x.message; }
         if (btn) { btn.disabled = false; btn.textContent = texto; }
         let fondo = document.getElementById('fbhDlg');
         if (!fondo) { fondo = document.createElement('div'); fondo.id = 'fbhDlg'; fondo.className = 'req-dlg-fondo'; document.body.appendChild(fondo); }
         fondo.onclick = ev => { if (ev.target === fondo) fondo.classList.add('hidden'); };
-        if (r && !Array.isArray(r.grupos)) { error = 'Google respondió algo inesperado (' + esc(JSON.stringify(r).slice(0, 120)) + '). Recargue el panel (Ctrl + F5) y vuelva a intentar.'; r = null; }
+        if (r && !Array.isArray(r.grupos)) { error = 'El servidor respondió algo inesperado (' + esc(JSON.stringify(r).slice(0, 120)) + '). Recargue el panel (Ctrl + F5) y vuelva a intentar.'; r = null; }
         const d = (r && r.diag) || {}, faltan = r ? r.grupos.filter(g => !g.ok) : [];
-        // (16/11) Lo que recibió Google de los números escritos y qué pasó con cada uno
         const enviados = ids ? Object.keys(ids).length : 0, recib = (r && r.recibidos) || [];
+        const resPrueba = r && r.probado ? `<div class="banner ok" style="display:block">Mensaje de prueba enviado correctamente a <b>${esc(r.grupoProbado || 'Telegram')}</b>.</div>`
+            : r && r.probarError ? `<div class="banner error" style="display:block">${esc(r.probarError)}</div>` : '';
         const resumen = !ids || !r ? '' : !recib.length
-            ? `<div class="banner error" style="display:block">Se enviaron ${enviados} número(s) pero Google no recibió ninguno${r.conIds === undefined ? ' (Google tiene una versión anterior: publique otra vez Apps Script)' : ''}.</div>`
-            : `<div class="banner ${recib.every(x => (r.grupos.find(g => g.grupo === x.grupo) || {}).ok) ? 'ok' : 'warn'}" style="display:block">Google recibió: ${recib.map(x => {
+            ? `<div class="banner error" style="display:block">Se enviaron ${enviados} número(s) pero el servidor no recibió ninguno.</div>`
+            : `<div class="banner ${recib.every(x => (r.grupos.find(g => g.grupo === x.grupo) || {}).ok) ? 'ok' : 'warn'}" style="display:block">Guardado: ${recib.map(x => {
                 const g = r.grupos.find(y => y.grupo === x.grupo) || {};
                 return esc(x.grupo) + ' (' + esc(x.texto) + ') → ' + (g.ok ? 'Listo' + (g.titulo ? ' · en Telegram se llama "' + esc(g.titulo) + '"' : '') : esc(g.error || 'no se pudo'));
             }).join('<br>')}</div>`;
-        const html = `<div class="req-dlg" style="max-width:720px"><h3>Grupos de cuadre en Telegram</h3>
-            ${resumen}
+        const notaFaltanCF = faltan.length && !CF_SOLO && enCF
+            ? 'Los cierres automáticos salen desde Cloudflare: si ya los tenía en el servidor anterior, pegue aquí su ID o enlace (o pulse "Pasar claves" en Tiempos). '
+            : '';
+        const html = `<div class="req-dlg" style="max-width:740px"><h3>Grupos de cuadre en Telegram</h3>
+            ${resPrueba}${resumen}
             ${error ? `<div class="banner error" style="display:block">${esc(error)}</div>` : `
-            <div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Grupo</th><th class="izq">Estado</th><th class="izq">ID del grupo o enlace del tema</th></tr></thead><tbody>
+            <div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Grupo</th><th class="izq">Estado</th><th class="izq">ID del grupo o enlace del tema</th>${enCF ? '<th></th>' : ''}</tr></thead><tbody>
             ${r.grupos.map((g, i) => `<tr><td class="izq"><b>${esc(g.grupo)}</b>${g.titulo && g.titulo !== g.grupo ? `<small>En Telegram: ${esc(g.titulo)}</small>` : ''}</td>
-                <td class="izq">${g.ok ? `<span class="chip st-ok">Listo</span>${g.tema ? `<small>Va al tema N° ${esc(g.tema)}</small>` : '<small>Al chat general del grupo</small>'}` : `<span class="chip st-falta">Falta</span>${g.error ? `<small>${esc(g.error.slice(0, 220))}</small>` : ''}`}</td>
-                <td class="izq"><input id="tgId${i}" data-local="${esc(g.local)}" placeholder="${g.ok ? 'Enlace del tema (opcional)' : '-100... o la dirección del grupo'}" style="max-width:16rem"></td></tr>`).join('')}
+                <td class="izq">${g.ok ? `<span class="chip st-ok">Listo</span>${g.tema ? `<small>Va al tema N° ${esc(g.tema)}</small>` : '<small>Al chat general del grupo</small>'}${g.error ? `<small style="color:var(--bad)">${esc(g.error)}</small>` : ''}` : `<span class="chip st-falta">Falta</span>${g.error ? `<small>${esc(g.error.slice(0, 220))}</small>` : ''}`}</td>
+                <td class="izq"><input id="tgId${i}" data-local="${esc(g.local)}" placeholder="${g.ok ? 'Enlace del tema (opcional)' : '-100... o la dirección del grupo'}" style="max-width:16rem"></td>
+                ${enCF ? `<td>${g.ok ? `<button type="button" class="btn-ghost btn-mini" onclick="tgCuadreVer(this, null, '${esc(g.local)}')">Probar</button>` : ''}</td>` : ''}</tr>`).join('')}
             </tbody></table></div>
-            <div class="nota">${faltan.length ? 'Si un grupo no aparece solo, ponga su ID: en <b>web.telegram.org</b> abra el grupo y copie el número que sale al final de la dirección (empieza con -100), o en Telegram de PC active Ajustes › Avanzado › Funciones experimentales › "Mostrar ID" y cópielo de la información del grupo. El bot tiene que estar dentro del grupo. ' : ''}
+            <div class="nota">${notaFaltanCF}${faltan.length ? 'Si un grupo no aparece solo, ponga su ID: en <b>web.telegram.org</b> abra el grupo y copie el número que sale al final de la dirección (empieza con -100), o en Telegram de PC active Ajustes › Avanzado › Funciones experimentales › "Mostrar ID" y cópielo de la información del grupo. El bot tiene que estar dentro del grupo. ' : ''}
                 Para que los avisos lleguen directo a un <b>tema</b> del grupo: en <b>web.telegram.org</b> abra el tema y copie la dirección completa (termina en _ y un número, por ejemplo #-1001234567890_5), o en Telegram toque el tema › Copiar enlace (t.me/c/…/5). Para volver al chat general, pegue solo el ID del grupo.</div>
-            ${faltan.length ? '' : '<div class="banner ok" style="display:block">Listo: el sistema puede avisar en los 5 grupos.</div>'}
+            ${faltan.length ? '' : `<div class="banner ok" style="display:block">Listo: el servidor puede avisar en los ${r.grupos.length} grupos.</div>`}
             <div class="req-acciones" style="justify-content:flex-end"><button type="button" class="btn-primary btn-mini" onclick="tgCuadreGuardarIds(this)">Guardar</button></div>
             <div class="banner ${d.bot ? 'ok' : 'warn'}" style="display:block">El bot que usa el sistema es <b>${esc(d.bot || '¿?')}</b>: ese es el que tiene que ser miembro de cada grupo.</div>
             <div class="nota">Lo que dice Telegram: ${d.webhook === 'no' ? 'el sistema recibe los mensajes del bot' : 'los mensajes del bot los recibe otro programa (' + esc(d.webhook || '?') + '), por eso el sistema no ve los /start: ponga los ID a mano'}${d.pendientes != null ? ' · mensajes en espera: ' + esc(String(d.pendientes)) : ''}.
-                ${(d.vistos || []).length ? 'Grupos que el sistema ha visto: ' + esc(d.vistos.join(' · ')) : 'Todavía no ha visto ningún grupo.'}</div>`}
-            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-primary" onclick="document.getElementById('fbhDlg').classList.add('hidden')">Cerrar</button></div></div>`;
+                ${(d.vistos || []).length ? 'Grupos que el sistema ha visto: ' + esc(d.vistos.join(' · ')) : ''}</div>`}
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-primary" onclick="document.getElementById('fbhDlg').classList.add('hidden'); if (vistaActual === 'cierrecaja') cieCargar();">Cerrar</button></div></div>`;
         if (!fondo.classList.contains('hidden') && /Grupos de cuadre/.test((fondo.querySelector('h3') || {}).textContent || '')) pintarVentana(fondo, html); else fondo.innerHTML = html;
         fondo.classList.remove('hidden');
     }
@@ -12657,57 +12677,146 @@
     async function reqLeerExcel(file) {
         const X = await libXLSX();
         const wb = X.read(await file.arrayBuffer(), { type: 'array' });
-        return X.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: '' });
+        return wb.SheetNames.map(nombre => ({ nombre, filas: X.utils.sheet_to_json(wb.Sheets[nombre], { header: 1, raw: true, defval: '' }) }));
     }
     const REQ_COLS = {
         codigo: ['CODIGO', 'COD_PLU', 'COD', 'CODIGO PRODUCTO', 'REFERENCIA'],
         nombre: ['DESCRIPC1', 'DESCRIP_PL', 'DESCRIPCION', 'NOMBRE', 'PRODUCTO', 'ARTICULO'],
         existencia: ['EXISTENCIA', 'EXIST', 'STOCK', 'DISPONIBLE', 'CANTIDAD'],
         venta: ['CANT_PLU', 'CANTIDAD', 'CANT', 'KILOS', 'VENDIDO'],
-        presentac: ['PRESENTAC'], departa: ['DEPARTA']
+        presentac: ['PRESENTAC'], departa: ['DEPARTA', 'CATEGORIA', 'DEPARTAMENTO'],
+        tienda: ['TIENDA', 'LOCAL', 'SUCURSAL']
     };
-    function reqColumnas(filas, cantidad) {
+    const reqNormCab = c => String(c == null ? '' : c).trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    function reqBuscarColumnas(filas, cantidad) {
         for (let i = 0; i < Math.min(filas.length, 25); i++) {
-            const cab = filas[i].map(c => String(c).trim().toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, ''));
+            if (!Array.isArray(filas[i])) continue;
+            const cab = filas[i].map(reqNormCab);
             const busca = lista => { for (const n of lista) { const j = cab.indexOf(n); if (j !== -1) return j; } return -1; };
-            // Si no está el nombre exacto, sirve una columna que lo contenga (DESCRIPCION DEL PRODUCTO, EXISTENCIA ACTUAL...)
-            const contiene = palabras => cab.findIndex(c => c && palabras.some(w => c.includes(w)));
             const col = { codigo: busca(REQ_COLS.codigo), nombre: busca(REQ_COLS.nombre), cantidad: busca(REQ_COLS[cantidad]),
-                          presentac: busca(REQ_COLS.presentac), departa: busca(REQ_COLS.departa) };
-            if (col.nombre === -1) col.nombre = contiene(['DESCRIP', 'NOMBRE', 'PRODUCTO']);
-            if (col.cantidad === -1) col.cantidad = contiene(cantidad === 'venta' ? ['CANT', 'VENDID', 'KILOS'] : ['EXIST', 'STOCK', 'DISPONIB', 'CANT']);
-            if (col.nombre !== -1 && col.cantidad !== -1) return { fila: i, col };
+                          presentac: busca(REQ_COLS.presentac), departa: busca(REQ_COLS.departa), tienda: busca(REQ_COLS.tienda) };
+            const exactoNombre = col.nombre !== -1, exactoCant = col.cantidad !== -1;
+            // Si no está el nombre exacto, sirve una columna que lo contenga (nunca la misma para nombre y cantidad ni encabezados de resumen)
+            if (col.nombre === -1) col.nombre = cab.findIndex((c, j) => j !== col.cantidad && c && ['DESCRIP', 'NOMBRE', 'PRODUCTO', 'ARTICULO'].some(w => c.includes(w)) && !/CON EXIST|PRODUCTOS CON|TOTAL|CANTIDAD/.test(c));
+            if (col.cantidad === -1) col.cantidad = cab.findIndex((c, j) => j !== col.nombre && c && (cantidad === 'venta' ? ['CANT', 'VENDID', 'KILOS'] : ['EXIST', 'STOCK', 'DISPONIB', 'CANT']).some(w => c.includes(w)) && !/NEGATIV|PRODUCTOS CON|ANTES/.test(c));
+            if (col.nombre !== -1 && col.cantidad !== -1 && col.nombre !== col.cantidad) {
+                return { fila: i, col, puntaje: (exactoNombre ? 50 : 0) + (exactoCant ? 50 : 0) + (col.codigo !== -1 ? 20 : 0) };
+            }
         }
+        return null;
+    }
+    function reqColumnas(filas, cantidad) {
+        const m = reqBuscarColumnas(filas, cantidad);
+        if (m) return m;
         throw new Error(`No encontré las columnas del archivo (descripción y ${cantidad === 'venta' ? 'cantidad vendida' : 'existencia'}). ¿Es el reporte correcto?`);
     }
-    function reqFilasArchivo(filas, cantidad) {
-        const { fila, col } = reqColumnas(filas, cantidad);
+    function reqElegirHoja(origen, cantidad) {
+        const hojas = Array.isArray(origen) && origen.length && Array.isArray(origen[0]) ? [{ nombre: '', filas: origen }] : (origen || []);
+        let mejor = null;
+        hojas.forEach(h => {
+            const filas = h && Array.isArray(h.filas) ? h.filas : [];
+            const m = reqBuscarColumnas(filas, cantidad);
+            if (!m) return;
+            const nh = reqNorm(h.nombre);
+            let score = m.puntaje;
+            if (nh === 'RESUMEN') score -= 500;
+            if (cantidad === 'existencia' && (nh === 'EXISTENCIA' || nh === 'EXISTENCIAS' || nh === 'INVENTARIO')) score += 300;
+            if (cantidad === 'venta') {
+                if (nh === 'POR PRODUCTO' || nh === 'VENTAS POR PRODUCTO') score += 300;
+                if (nh === 'DEVOLUCIONES' || nh === 'DETALLE' || nh === 'POR CAJERO') score -= 300;
+            }
+            const datos = Math.max(0, filas.length - m.fila);
+            if (!mejor || score > mejor.score || (score === mejor.score && datos > mejor.datos)) {
+                mejor = { hojas, hoja: h, filas, fila: m.fila, col: m.col, score, datos };
+            }
+        });
+        if (mejor) return mejor;
+        throw new Error(`No encontré las columnas del archivo (descripción y ${cantidad === 'venta' ? 'cantidad vendida' : 'existencia'}). ¿Es el reporte correcto?`);
+    }
+    function reqTiendaResumen(hojas) {
+        if (!Array.isArray(hojas) || !hojas.length || Array.isArray(hojas[0])) return '';
+        const res = hojas.find(h => h && reqNorm(h.nombre) === 'RESUMEN' && Array.isArray(h.filas));
+        if (!res) return '';
+        for (let i = 0; i < Math.min(res.filas.length, 10); i++) {
+            const cab = (res.filas[i] || []).map(reqNormCab);
+            const j = cab.findIndex(c => REQ_COLS.tienda.includes(c));
+            if (j === -1) continue;
+            const vistas = new Map();
+            res.filas.slice(i + 1).forEach(r => {
+                const t = String((r || [])[j] == null ? '' : r[j]).trim();
+                if (!t || /^(TOTAL|TOTALES|SUBTOTAL)$/i.test(t)) return;
+                const nt = reqNorm(t);
+                if (nt && !vistas.has(nt)) vistas.set(nt, t);
+            });
+            return vistas.size === 1 ? [...vistas.values()][0] : '';
+        }
+        return '';
+    }
+    function reqFilasArchivo(origen, cantidad, opts = {}) {
+        const { hojas, hoja, filas, fila, col } = reqElegirHoja(origen, cantidad);
+        const tiendaRes = opts.local && col.tienda === -1 ? reqTiendaResumen(hojas) : '';
+        if (opts.local && col.tienda === -1 && tiendaRes && reqNorm(tiendaRes) !== reqNorm(opts.local)) {
+            throw new Error(`Este archivo es de ${tiendaRes}, pero tiene seleccionado ${opts.local}. Cambie de local o suba el archivo de ${opts.local}.`);
+        }
         const val = (r, j) => (j === -1 ? '' : String(r[j] == null ? '' : r[j]).trim());
-        const mapa = new Map();
+        const esTot = s => /^(TOTAL|TOTALES|SUBTOTAL)$/i.test(String(s || '').trim());
+        const localObj = opts.local ? reqNorm(opts.local) : '';
+        const mapa = new Map(), tiendasVistas = new Set();
         filas.slice(fila + 1).forEach(r => {
-            const nombre = val(r, col.nombre), codigo = val(r, col.codigo).replace(/^\+/, '');
-            if (!nombre && !codigo) return;
+            if (!Array.isArray(r)) return;
+            const nombre = val(r, col.nombre), codigo = val(r, col.codigo).replace(/^\+/, ''), tienda = val(r, col.tienda);
+            if (esTot(codigo) || esTot(nombre) || esTot(tienda) || (!nombre && !codigo)) return;
+            if (col.tienda !== -1 && localObj) {
+                if (tienda) tiendasVistas.add(tienda);
+                if (!tienda || reqNorm(tienda) !== localObj) return;
+            }
             const k = nombre ? 'N:' + reqNorm(nombre) : 'C:' + codigo;   // se agrupa por descripción, no por código
             const x = mapa.get(k) || { codigo, nombre, cantidad: 0, presentac: val(r, col.presentac), departa: val(r, col.departa) };
             x.cantidad += numVE(r[col.cantidad]);
             mapa.set(k, x);
         });
-        return { items: [...mapa.values()], filaCab: fila };
+        if (col.tienda !== -1 && opts.local && !mapa.size && tiendasVistas.size) {
+            throw new Error(`El archivo tiene datos de ${[...tiendasVistas].join(', ')}, pero no de ${opts.local}.`);
+        }
+        return { items: [...mapa.values()], filaCab: fila, filasHoja: filas, hoja: hoja.nombre || '', tiendaArchivo: col.tienda !== -1 ? (opts.local || '') : tiendaRes, multiTienda: col.tienda !== -1 };
     }
     function reqFechaCelda(v) {
-        if (typeof v === 'number' && v > 30000 && v < 80000) { const d = XLSX.SSF.parse_date_code(v); return isoFecha(d.y, d.m, d.d); }
+        if (typeof v === 'number' && v > 30000 && v < 80000) { const d = (window.XLSX || XLSX).SSF.parse_date_code(v); return isoFecha(d.y, d.m, d.d); }
         if (v instanceof Date) return aIso(v);
-        return fechaDesdeTexto(v, false);
+        const s = String(v == null ? '' : v).trim();
+        if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+        return fechaDesdeTexto(s, false);
     }
-    // Las ventas de Bigsoft traen arriba "DESDE <fecha> HASTA <fecha>"
-    function reqFechasVentas(filas, hastaFila) {
+    // Las ventas de Bigsoft traen arriba "DESDE <fecha> HASTA <fecha>"; las de Reportes de tiendas traen "Ventas por día" o fechas en el nombre
+    function reqFechasVentas(hojas, filasHoja, hastaFila, nombreArchivo) {
         let desde = '', hasta = '';
-        filas.slice(0, hastaFila).forEach(r => r.forEach((c, j) => {
+        (filasHoja || []).slice(0, hastaFila).forEach(r => (r || []).forEach((c, j) => {
             const t = String(c).trim().toUpperCase().replace(':', '');
             if (t !== 'DESDE' && t !== 'HASTA') return;
             let v = ''; for (let k = j + 1; k < r.length; k++) if (String(r[k]).trim() !== '') { v = r[k]; break; }
             if (t === 'DESDE') desde = reqFechaCelda(v); else hasta = reqFechaCelda(v);
         }));
+        if ((!desde || !hasta) && Array.isArray(hojas) && hojas.length && !Array.isArray(hojas[0])) {
+            const hd = hojas.find(h => h && reqNorm(h.nombre) === 'VENTAS POR DIA' && Array.isArray(h.filas));
+            if (hd) {
+                let colF = -1, ini = -1;
+                for (let i = 0; i < Math.min(hd.filas.length, 10); i++) {
+                    colF = (hd.filas[i] || []).findIndex(c => reqNormCab(c) === 'FECHA');
+                    if (colF !== -1) { ini = i + 1; break; }
+                }
+                if (colF !== -1) {
+                    const fs = hd.filas.slice(ini).map(r => reqFechaCelda((r || [])[colF])).filter(Boolean).sort();
+                    if (fs.length) { if (!desde) desde = fs[0]; if (!hasta) hasta = fs[fs.length - 1]; }
+                }
+            }
+        }
+        if ((!desde || !hasta) && nombreArchivo) {
+            const m = String(nombreArchivo).match(/del\s+(\d{2}[-/]\d{2}[-/]\d{4})\s+al\s+(\d{2}[-/]\d{2}[-/]\d{4})/i);
+            if (m) {
+                if (!desde) desde = fechaDesdeTexto(m[1], false);
+                if (!hasta) hasta = fechaDesdeTexto(m[2], false);
+            }
+        }
         return { desde, hasta };
     }
 
@@ -12813,20 +12922,36 @@
             const top = con.slice().sort((a, b) => b.cantidad - a.cantidad).slice(0, 3).map(x => `${x.nombre} (${reqN(x.cantidad)})`).join(', ');
             return `${con.length} con existencia${top ? ` · más: ${top}` : ''}`;
         };
+        let localCat = 0, localCatCon = 0;
+        if (reqLocalEx && reqIdx) {
+            const vistos = new Set();
+            reqLocalEx.items.forEach(x => {
+                const p = reqBuscarTienda(x.codigo, x.nombre);
+                if (!p) return;
+                if (!vistos.has(p.clave)) { vistos.add(p.clave); localCat++; }
+                if (x.cantidad > 0 && !vistos.has('C:' + p.clave)) { vistos.add('C:' + p.clave); localCatCon++; }
+            });
+        }
+        const btnBS = document.getElementById('reqBtnLocalBS');
+        if (btnBS) {
+            const puedeBS = !CF_SOLO && (esPrincipal || permisos.includes('rep_existencia') || (permisos.includes('reportes') && !permisos.some(p => /^rep_/.test(p))));
+            btnBS.classList.toggle('hidden', !puedeBS);
+        }
         pinta('reqEstCava', reqCava, reqCava && `${reqCava.archivo} · ${reqCava.items.length} productos · ${vc.porClave.size} relacionados por nombre con el catálogo · ${resumen(reqCava)}`,
               'Excel de Bigsoft (DESCRIPCIÓN · EXISTENCIA)');
-        pinta('reqEstLocal', reqLocalEx, reqLocalEx && `${reqLocalEx.archivo} · ${reqLocalEx.local} · ${reqLocalEx.items.length} productos · ${resumen(reqLocalEx)}`,
+        pinta('reqEstLocal', reqLocalEx, reqLocalEx && `${reqLocalEx.archivo} · ${reqLocalEx.local} · ${reqLocalEx.items.length} productos · ${localCat} del catálogo (${localCatCon} con existencia) · ${resumen(reqLocalEx)}${localCat === 0 ? ' · AVISO: ningún producto coincidió con el catálogo' : ''}`,
               `Reporte de existencias de Bigsoft de ${reqLocalSel()}`);
     }
     async function reqSubirExistencia(file, tipo) {
         if (!(await reqListo())) return;
         if (!file) return;
         const el = document.getElementById(tipo === 'cava' ? 'reqEstCava' : 'reqEstLocal');
+        const local = tipo === 'local' ? reqLocalSel() : '';
         el.innerHTML = `${iconoCargando()} Leyendo ${esc(file.name)}...`;
         try {
-            const { items } = reqFilasArchivo(await reqLeerExcel(file), 'existencia');
+            const { items } = reqFilasArchivo(await reqLeerExcel(file), 'existencia', { local });
             if (!items.length) throw new Error('El archivo no tiene productos');
-            const dato = { archivo: file.name, items, local: tipo === 'local' ? reqLocalSel() : '' };
+            const dato = { archivo: file.name, items, local };
             if (tipo === 'cava') reqCava = dato; else reqLocalEx = dato;
             reqRes = null; document.getElementById('reqResultado').innerHTML = '';
             reqPintarArchivos();
@@ -12853,6 +12978,61 @@
             reqPintarArchivos();
         } catch (e) { el.textContent = 'No se pudo leer el almacén: ' + e.message; el.parentElement.classList.remove('listo'); }
         finally { btn.disabled = false; btn.textContent = 'Usar existencia del almacén'; }
+    }
+
+    // Existencia del local traída directo del BigSoft de la tienda (sin bajar y volver a subir el Excel)
+    async function reqTraerExistenciaLocal() {
+        if (!(await reqListo())) return;
+        const local = reqLocalSel(), btn = document.getElementById('reqBtnLocalBS'), el = document.getElementById('reqEstLocal');
+        btnCargando(btn, 'Consultando BigSoft...');
+        el.innerHTML = `${iconoCargando()} Pidiendo existencia a la PC de ${esc(local)}...`;
+        try {
+            const t = await bsrTarea('reporte', { local, reporte: 'existencia', todos: false }, (estado, vivo, seg, l, avance) => {
+                if (reqLocalSel() !== local) return;
+                if (estado === 'curso' && avance) {
+                    el.innerHTML = `${iconoCargando()} ${esc(local)}: ${esc(avance.texto || 'leyendo BigSoft')} (${avance.p || 0}%)${seg ? ' · ' + seg + ' s' : ''}`;
+                } else {
+                    const v = vivo || {}, dormida = v.hace == null || v.hace > 60;
+                    el.innerHTML = `${iconoCargando()} ${seg && dormida ? `Esperando a ${esc(local)} (sin noticias hace ${v.hace == null ? 'rato' : Math.round(v.hace / 60) + ' min'})...` : `Esperando a la PC de ${esc(local)}...`}${seg ? ' · ' + seg + ' s' : ''}`;
+                }
+            }, 180);
+            const res = t.resultado || {}, hojas = res.hojas || [];
+            const hoja = hojas.find(h => reqNorm(h.nombre) === 'EXISTENCIA') || hojas[0];
+            if (!hoja || !Array.isArray(hoja.filas)) throw new Error('BigSoft no devolvió la hoja de existencias.');
+            const cols = (hoja.columnas || []).map(c => reqNorm(c.t));
+            const iCod = cols.findIndex(c => REQ_COLS.codigo.includes(c));
+            const iNom = cols.findIndex(c => REQ_COLS.nombre.includes(c));
+            const iEx = cols.findIndex(c => REQ_COLS.existencia.includes(c));
+            const iCat = cols.findIndex(c => REQ_COLS.departa.includes(c) || c.includes('CATEG'));
+            if (iNom === -1 || iEx === -1) throw new Error('Las columnas de BigSoft no tienen descripción y existencia.');
+            const mapa = new Map();
+            const esTot = s => /^(TOTAL|TOTALES|SUBTOTAL)$/i.test(String(s || '').trim());
+            hoja.filas.forEach(r => {
+                const nombre = String(r[iNom] == null ? '' : r[iNom]).trim();
+                const codigo = iCod === -1 ? '' : String(r[iCod] == null ? '' : r[iCod]).trim().replace(/^\+/, '');
+                if (esTot(codigo) || esTot(nombre) || (!nombre && !codigo)) return;
+                const k = nombre ? 'N:' + reqNorm(nombre) : 'C:' + codigo;
+                const x = mapa.get(k) || { codigo, nombre, cantidad: 0, presentac: '', departa: iCat === -1 ? '' : String(r[iCat] == null ? '' : r[iCat]).trim() };
+                x.cantidad += numVE(r[iEx]);
+                mapa.set(k, x);
+            });
+            const items = [...mapa.values()];
+            if (!items.length) throw new Error(`BigSoft de ${local} no devolvió productos con existencia.`);
+            if (reqLocalSel() !== local) return;
+            const gen = String(res.generado || '');
+            const labelHora = gen.length >= 16 ? fechaBonita(gen.slice(0, 10)) + ' ' + gen.slice(11, 16) : 'ahora';
+            reqLocalEx = { archivo: 'BigSoft · ' + labelHora, items, local };
+            reqRes = null; document.getElementById('reqResultado').innerHTML = '';
+            reqPintarArchivos();
+        } catch (e) {
+            if (reqLocalSel() !== local) return;
+            reqLocalEx = null;
+            reqRes = null; document.getElementById('reqResultado').innerHTML = '';
+            el.textContent = `BigSoft ${local}: ${e.message}`;
+            el.parentElement.classList.remove('listo');
+        } finally {
+            btn.disabled = false; btn.textContent = 'Traer de BigSoft';
+        }
     }
 
     // ---------- Cálculo ----------
@@ -13422,14 +13602,15 @@
         const out = document.getElementById('reqVPrevia');
         out.innerHTML = cargandoHTML('Leyendo ' + file.name + '...');
         try {
-            const filas = await reqLeerExcel(file);
-            const { items, filaCab } = reqFilasArchivo(filas, 'venta');
-            const f = reqFechasVentas(filas, filaCab);
+            const hojas = await reqLeerExcel(file);
+            const localSel = document.getElementById('reqVLocal').value;
+            const { items, filaCab, filasHoja, multiTienda } = reqFilasArchivo(hojas, 'venta', { local: localSel });
+            const f = reqFechasVentas(hojas, filasHoja, filaCab, file.name);
             if (f.desde) document.getElementById('reqVDesde').value = f.desde;
             if (f.hasta) document.getElementById('reqVHasta').value = f.hasta;
             // Solo se guardan las ventas del catálogo y las que parecen de charcutería o lácteos
             const guardar = items.filter(x => x.cantidad > 0 && (reqBuscarTienda(x.codigo, x.nombre) || REQ_PALABRAS.test(reqNorm(x.nombre))));
-            reqVPend = { archivo: file.name, items: guardar };
+            reqVPend = { archivo: file.name, items: guardar, localArchivo: multiTienda ? localSel : '' };
             const top = guardar.slice().sort((a, b) => b.cantidad - a.cantidad).slice(0, 8).map(x => `${esc(x.nombre)} (${reqN(x.cantidad)})`).join(' · ');
             out.innerHTML = `<div class="banner">${esc(file.name)}: ${items.length} productos en el archivo, <b>${guardar.length}</b> de charcutería y lácteos se guardarán.
                 ${f.desde ? `Período del archivo: <b>${fechaBonita(f.desde)} al ${fechaBonita(f.hasta)}</b>.` : 'No traía fechas: escríbalas arriba.'}
@@ -13444,6 +13625,10 @@
         const btn = document.getElementById('reqVBtn'), out = document.getElementById('reqVPrevia');
         const local = document.getElementById('reqVLocal').value, desde = document.getElementById('reqVDesde').value, hasta = document.getElementById('reqVHasta').value;
         if (!reqVPend) return;
+        if (reqVPend.localArchivo && reqVPend.localArchivo !== local) {
+            alert(`Este archivo tiene varias tiendas y se leyó filtrado para ${reqVPend.localArchivo}. Vuelva a elegir el archivo para cargar las ventas de ${local}.`);
+            return;
+        }
         if (!desde || !hasta || hasta < desde) { alert('Revise las fechas desde y hasta de las ventas.'); return; }
         btnCargando(btn, 'Guardando...');
         try {
@@ -13512,7 +13697,7 @@
         try {
             const { items } = reqFilasArchivo(await reqLeerExcel(file), 'existencia');
             const ya = new Set(reqCat.map(p => reqNorm(p.nombre)));   // ya está en el catálogo si tiene el mismo nombre
-            reqCandidatos = items.filter(x => x.nombre && !ya.has(reqNorm(x.nombre)) && (x.departa === '01' || REQ_PALABRAS.test(reqNorm(x.nombre))))
+            reqCandidatos = items.filter(x => x.nombre && !ya.has(reqNorm(x.nombre)) && (x.departa === '01' || /CHARCUT|LACTEO/.test(reqNorm(x.departa)) || REQ_PALABRAS.test(reqNorm(x.nombre))))
                 .map(x => ({ ...x, marcado: REQ_PALABRAS.test(reqNorm(x.nombre)), sug: reqSugerir(x.nombre, x.presentac) }))
                 .sort((a, b) => (a.sug.categoria || 'ZZZ').localeCompare(b.sug.categoria || 'ZZZ') || a.nombre.localeCompare(b.nombre));
             if (!reqCandidatos.length) { out.innerHTML = '<div class="banner">No hay productos nuevos de charcutería o lácteos en ese archivo.</div>'; return; }
@@ -22583,10 +22768,10 @@ Reglas:
     // cierre de BigSoft). Google la registra, avisa por Telegram y llena los montos "sistema" de la ficha de ese cajero.
     // ==========================================
     const cieNorm = v => String(v || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
-    let cie = { local: '', cajas: null, buscando: false, espera: '', error: '', cierres: [], trabajadores: [], asignados: [], cerrando: '', aviso: null, cargado: false };
+    let cie = { local: '', cajas: null, buscando: false, espera: '', error: '', cierres: [], trabajadores: [], asignados: [], cerrando: '', aviso: null, tgCuadreOk: null, cargado: false };
     function cieIniciar() { if (!cie.local) cie.local = TIENDAS_ORDEN[0].nombre; ciePintar(); if (!cie.cargado) cieCargar(); }
     async function cieCargar() {
-        try { const r = await llamarApi({ action: 'bsc_listar', dias: 14 }); Object.assign(cie, { cierres: r.cierres || [], trabajadores: r.trabajadores || [], asignados: r.asignados || [], cargado: true }); }
+        try { const r = await llamarApi({ action: 'bsc_listar', dias: 14 }); Object.assign(cie, { cierres: r.cierres || [], trabajadores: r.trabajadores || [], asignados: r.asignados || [], tgCuadreOk: r.tgCuadreOk === undefined ? null : !!r.tgCuadreOk, cargado: true }); }
         catch (e) { cie.error = e.message; }
         ciePintar();
     }
@@ -22610,8 +22795,21 @@ Reglas:
         cie.cerrando = ''; ciePintar();
     }
     async function cieCajero(login, trabajador) {
-        try { const r = await llamarApi({ action: 'bsc_cajero', local: cie.local, login, trabajador, idem: nuevoIdem() }); Object.assign(cie, { cierres: r.cierres || [], asignados: r.asignados || [] }); mostrarBanner('Listo: ' + login + (trabajador ? ' es ' + trabajador : ' quedó sin trabajador') + '.', 'ok'); }
+        try { const r = await llamarApi({ action: 'bsc_cajero', local: cie.local, login, trabajador, idem: nuevoIdem() }); Object.assign(cie, { cierres: r.cierres || [], asignados: r.asignados || [], tgCuadreOk: r.tgCuadreOk === undefined ? cie.tgCuadreOk : !!r.tgCuadreOk }); mostrarBanner('Listo: ' + login + (trabajador ? ' es ' + trabajador : ' quedó sin trabajador') + '.', 'ok'); }
         catch (e) { mostrarBanner('No se pudo: ' + e.message, 'error'); }
+        ciePintar();
+    }
+    async function cieReenviarTg(id, btn) {
+        if (btn) btnCargando(btn, 'Enviando...');
+        try {
+            const r = await llamarApi({ action: 'bsc_reenviar_tg', id, idem: nuevoIdem() });
+            Object.assign(cie, { cierres: r.cierres || cie.cierres, asignados: r.asignados || cie.asignados, tgCuadreOk: r.tgCuadreOk === undefined ? cie.tgCuadreOk : !!r.tgCuadreOk });
+            mostrarBanner('Aviso de cierre enviado al grupo de Telegram.', 'ok');
+        } catch (e) {
+            mostrarBanner(e.message, 'error');
+            await cieCargar();
+            return;
+        }
         ciePintar();
     }
     // El trabajador de un usuario de BigSoft: el elegido aquí o el que reconoció Google en su último cierre
@@ -22644,13 +22842,24 @@ Reglas:
                 ${cie.cajas.some(c => c.conectado) ? `<div class="nota">La caja está en uso: el cajero tiene abierto el programa de caja o vendió hace menos de 30 minutos. Para cerrarla debe salir primero de la caja${CF_SOLO ? '' : ' en BigSoft (BigSoft tampoco la cierra así)'}.</div>` : ''}`;
         const res = a ? `<div class="banner ok" style="display:block">Caja de <b>${esc(a.nombre || a.login)}</b> cerrada${CF_SOLO ? '' : ' en BigSoft'} (cierre N° ${esc(String(a.nroCierre || ''))}, ${fmtNum(a.facturas || 0)} facturas). Total ${fmt(a.total || 0)} Bs ·
                 efectivo ${fmt(a.efectivo || 0)} · punto ${fmt(a.tarjeta || 0)} · pago móvil ${fmt(a.pagoMovil || 0)} · biopago ${fmt(a.biopago || 0)} · divisas ${fmt(a.divisas || 0)} $.
-                ${a.registro && a.registro.error ? `<br><b>No se pudo registrar:</b> ${esc(a.registro.error)}` : a.registro && a.registro.ficha && a.registro.ficha.ficha ? `<br>Ficha ${esc(String(a.registro.ficha.ficha))}: ${esc(a.registro.ficha.estado || '')}${a.registro.ficha.diferencias ? ' (' + esc(a.registro.ficha.diferencias) + ')' : ''}.` : '<br>Su ficha todavía no ha llegado: los montos se pasan solos cuando llegue.'}</div>` : '';
-        const lista = cie.cierres.length ? `<div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">Fecha</th><th class="izq">Tienda</th><th class="izq">Cajero</th><th>N°</th><th>Total Bs</th><th class="izq">Ficha</th><th class="izq">Estado</th></tr></thead><tbody>
+                ${a.registro && a.registro.error ? `<br><b>No se pudo registrar:</b> ${esc(a.registro.error)}` : a.registro && a.registro.ficha && a.registro.ficha.ficha ? `<br>Ficha ${esc(String(a.registro.ficha.ficha))}: ${esc(a.registro.ficha.estado || '')}${a.registro.ficha.diferencias ? ' (' + esc(a.registro.ficha.diferencias) + ')' : ''}.` : '<br>Su ficha todavía no ha llegado: los montos se pasan solos cuando llegue.'}
+                ${a.registro && a.registro.tg && !a.registro.tg.ok ? `<br><b style="color:var(--bad)">Telegram:</b> ${esc(a.registro.tg.error || 'No se pudo enviar')}` : ''}</div>` : '';
+        const sinGrupo = cie.cargado && cie.tgCuadreOk === false
+            ? `<div class="banner warn" style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap"><span><b>Falta configurar el grupo de Telegram de cuadres en el servidor nuevo:</b> los cierres de caja no se enviarán en automático hasta guardarlo.</span>${esPrincipal ? '<button type="button" class="btn-primary btn-mini" onclick="tgCuadreVer(this)">Configurar grupos de Telegram</button>' : ''}</div>` : '';
+        const tgCelda = x => {
+            const st = x.tgEstado === 'enviado' ? '<span class="chip st-ok">Enviado</span>'
+                : x.tgEstado === 'sin_grupo' ? '<span class="chip st-amar">Sin grupo</span>'
+                : x.tgEstado === 'error' ? `<span class="chip st-falta">Error</span><small>${esc(x.tgError || 'Falló')}</small>`
+                : '<span class="nota">—</span>';
+            return `<td class="izq">${st} ${x.tgConcError ? `<small style="color:var(--bad)">Conc.: ${esc(x.tgConcError)}</small>` : ''} <button type="button" class="btn-ghost btn-mini" onclick="cieReenviarTg('${esc(x.id)}', this)">Reenviar</button></td>`;
+        };
+        const lista = cie.cierres.length ? `<div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">Fecha</th><th class="izq">Tienda</th><th class="izq">Cajero</th><th>N°</th><th>Total Bs</th><th class="izq">Ficha</th><th class="izq">Estado</th><th class="izq">Telegram</th></tr></thead><tbody>
                 ${cie.cierres.map(x => `<tr><td class="izq">${esc(fecha(x.fecha))}<small>${esc(String(x.hora || '').slice(0, 5))}</small></td><td class="izq">${esc(x.local)}</td>
                     <td class="izq">${esc(x.trabajador || x.nombreBs || x.login)}<small>${esc(x.login)}</small></td><td>${esc(x.nro)}</td><td>${fmt(x.total)}</td><td class="izq">${esc(x.ficha) || '—'}</td>
-                    <td class="izq"><span class="chip ${CIE_ESTADO[x.estado] || 'st-info'}">${esc(x.estado)}</span>${x.diferencias ? `<small>${esc(x.diferencias)}</small>` : ''}</td></tr>`).join('')}</tbody></table></div>`
+                    <td class="izq"><span class="chip ${CIE_ESTADO[x.estado] || 'st-info'}">${esc(x.estado)}</span>${x.diferencias ? `<small>${esc(x.diferencias)}</small>` : ''}</td>${tgCelda(x)}</tr>`).join('')}</tbody></table></div>`
             : cie.cargado ? '<div class="empty">No hay cierres en los últimos 14 días.</div>' : cargandoHTML('Cargando cierres...');
         return `<div class="filters"><div><label for="cieTienda">Tienda</label><select id="cieTienda" onchange="cie.local = this.value; cie.cajas = null; cie.aviso = null; ciePintar()">${TIENDAS_ORDEN.map(t => `<option${t.nombre === cie.local ? ' selected' : ''}>${esc(t.nombre)}</option>`).join('')}</select></div></div>
+            ${sinGrupo}
             <div class="req-acciones"><button type="button" class="btn-primary" ${cie.buscando || cie.cerrando ? 'disabled' : ''} onclick="cieVerCajas()">Ver cajas abiertas</button></div>
             ${cie.error ? `<div class="banner error" style="display:block">${esc(cie.error)}</div>` : ''}${res}
             ${cie.cerrando ? bsrEsperaHTML('Cerrando la caja de ' + cie.cerrando + ' en ' + cie.local + '...') : cajas}
