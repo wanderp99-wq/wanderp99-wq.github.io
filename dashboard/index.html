@@ -3923,7 +3923,10 @@
                 const t0c = performance.now(), r = await cfPedir(Object.assign({}, payload, { token: await cfToken(), vista: typeof vistaActual === 'string' ? vistaActual : '', disp: DISPOSITIVO }));
                 if (r && r.ok) {
                     anotarTiempo(payload.action + ' (Cloudflare)', Math.round(performance.now() - t0c), 0, true);
-                    if (payload.action === 'paq_subir' && !CF_SOLO) llamarApiReal(payload, performance.now()).catch(() => {});
+                    if (payload.action === 'paq_subir' && !CF_SOLO) {
+                        try { await llamarApiReal(payload, performance.now()); }
+                        catch (eg) { r.googleError = (eg && eg.message) || 'sin respuesta'; }
+                    }
                     return r;
                 }
                 if (r && r.sesion === false) cfSes.token = '';
@@ -7300,7 +7303,8 @@
             const zip = await new Promise((ok, mal) => { const l = new FileReader(); l.onload = () => ok(String(l.result).split(',')[1]); l.onerror = () => mal(new Error('No se pudo leer el archivo')); l.readAsDataURL(archivo); });
             const r = await DATOS.aGoogle(() => llamarApi({ action: 'paq_subir', zip, idem: nuevoIdem() }));
             paqDatos = r;
-            paqMsg = `<div class="banner ok" style="display:block">Listo: versión ${esc(r.paquete.version)} publicada. Las tiendas con el avisador encendido se actualizan solas en uno o dos minutos.</div>`;
+            const avisoG = r.googleError ? ` (respaldo en Google falló: ${esc(r.googleError)})` : '';
+            paqMsg = `<div class="banner ok" style="display:block">Listo: versión ${esc(r.paquete.version)} publicada. Las tiendas con el avisador encendido se actualizan solas en uno o dos minutos.${avisoG}</div>`;
         } catch (e) { paqMsg = `<div class="banner error" style="display:block">${esc(e.message)}</div>`; }
         paqPintar();
     }
