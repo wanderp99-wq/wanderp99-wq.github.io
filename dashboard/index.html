@@ -3738,7 +3738,7 @@
         if (TIEMPOS.length > 60) TIEMPOS.pop();
     }
     // Solo lectura: si la respuesta de Google no llega, se reintenta una vez sola (no cambia nada en la hoja)
-    const SOLO_LECTURA = /^(nom_semana|fb_hoja_leer|login|fb_token|fb_prueba|list|cuadre_detalle|cuadre_detalle_lote|mov_listar|cuentas_listar|conc_listar|efe_listar|cc_listar|req_datos|req_ventas|req_historial|asis_hoy|asis_listar|asisg_listar|per_listar|cxc_deudas|nom_historial|nom_autorizar|nom_ajustes|hor_datos|alm_datos|alm_notas|alm_ingresos|alm_kardex|alm_seguimiento|alm_tiendas|alm_existencias|alm_espera_listar|cmp_compras|cmp_ordenes|cmp_enlazar|cmp_borradores|cmp_borrador|pnom_listar|ping|cambios|pendientes|enlinea|marca_estado|tg_grupos_cuadre|pm_cuentas_estado|pm_tg_chats)$/;
+    const SOLO_LECTURA = /^(nom_semana|fb_hoja_leer|login|fb_token|fb_prueba|list|cuadre_detalle|cuadre_detalle_lote|mov_listar|cuentas_listar|conc_listar|efe_listar|cc_listar|req_datos|req_ventas|req_historial|asis_hoy|asis_listar|asisg_listar|per_listar|cxc_deudas|nom_historial|nom_autorizar|nom_ajustes|hor_datos|alm_datos|alm_notas|alm_ingresos|alm_kardex|alm_seguimiento|alm_tiendas|alm_existencias|alm_espera_listar|cmp_compras|cmp_ordenes|cmp_enlazar|cmp_borradores|cmp_borrador|pnom_listar|ping|cambios|pendientes|enlinea|marca_estado|tg_grupos_cuadre|pm_cuentas_estado|pm_tg_chats|fl_leer)$/;
     // Guardados sin repetir: cada cambio lleva un "idem". Si no llegó la respuesta y se vuelve a pulsar el MISMO cambio,
     // se manda el mismo idem y Google responde "ya estaba registrado" en vez de guardarlo otra vez.
     const idemPendientes = new Map();   // contenido del cambio -> idem del intento sin respuesta
@@ -3779,7 +3779,7 @@
     // ==========================================
     const DATOS = (() => {
         // Lecturas que no se copian: entrar, avisos, lo que cambia a cada momento o es de una sola vez
-        const NO_COPIAR = /^(login|fb_token|fb_prueba|fb_hoja_leer|ping|cambios|pendientes|enlinea|marca_estado|cmp_enlazar|cmp_borrador|nom_autorizar|alm_kardex|alm_seguimiento|pm_cuentas_estado|pm_tg_chats)$/;
+        const NO_COPIAR = /^(login|fb_token|fb_prueba|fb_hoja_leer|ping|cambios|pendientes|enlinea|marca_estado|cmp_enlazar|cmp_borrador|nom_autorizar|alm_kardex|alm_seguimiento|pm_cuentas_estado|pm_tg_chats|fl_leer)$/;
         const VIGENCIA = 3 * 24 * 3600 * 1000;   // lo guardado hace más de 3 días no se muestra
         const RECIENTE = 20000;                   // leído de Google hace menos de 20 s: no se vuelve a preguntar
         const memoria = new Map();                // llave -> { s (texto), t (cuándo), ver (versiones de sus áreas) }
@@ -3916,8 +3916,8 @@
         if (/^(cuadre_tol|cuentas_listar|cuentas_guardar)$/.test(payload.action)) { const r = await cfCuadreExtra(payload); if (r) return r; }
         // (15/11) Historial de nóminas: del servidor nuevo (con la Nómina encendida allá)
         if (payload.action === 'nom_historial') { const r = await cfNomHistorial(payload); if (r) return r; }
-        // (22/11 · 24/11) Campana, usuarios en línea, paquete de utilidades, avisos de tienda y cuentas de pago móvil directo al servidor nuevo
-        if (/^(pendientes|enlinea|paq_estado|paq_zip|paq_subir|aviso_tienda|pm_cuentas_estado|pm_cuenta_guardar|pm_cuenta_quitar|pm_cuenta_probar_tg|pm_tg_chats)$/.test(payload.action) && typeof CF_URL === 'string' && CF_URL) {
+        // (22/11 · 24/11) Campana, usuarios en línea, paquete de utilidades, avisos de tienda, listas de la ficha y cuentas de pago móvil directo al servidor nuevo
+        if (/^(pendientes|enlinea|paq_estado|paq_zip|paq_subir|aviso_tienda|pm_cuentas_estado|pm_cuenta_guardar|pm_cuenta_quitar|pm_cuenta_probar_tg|pm_tg_chats|fl_leer|fl_guardar)$/.test(payload.action) && typeof CF_URL === 'string' && CF_URL) {
             let cfErr = '';
             try {
                 const t0c = performance.now(), r = await cfPedir(Object.assign({}, payload, { token: await cfToken(), vista: typeof vistaActual === 'string' ? vistaActual : '', disp: DISPOSITIVO }));
@@ -3930,8 +3930,8 @@
                     return r;
                 }
                 if (r && r.sesion === false) cfSes.token = '';
-                else if ((payload.action === 'aviso_tienda' || /^pm_(cuenta|tg_)/.test(payload.action)) && r && !r.noAqui && r.error) cfErr = r.error;
-            } catch (e) { if (/Cuenta suspendida/i.test(e && e.message)) cerrarSesion(e.message); if (/^pm_(cuenta|tg_)/.test(payload.action)) throw e; }
+                else if ((payload.action === 'aviso_tienda' || /^pm_(cuenta|tg_)|^fl_(leer|guardar)$/.test(payload.action)) && r && !r.noAqui && r.error) cfErr = r.error;
+            } catch (e) { if (/Cuenta suspendida/i.test(e && e.message)) cerrarSesion(e.message); if (/^pm_(cuenta|tg_)|^fl_(leer|guardar)$/.test(payload.action)) throw e; }
             if (cfErr) throw new Error(cfErr);
         }
         // (12/11) Lecturas del almacén con "Usar Firebase en el Almacén" encendido: se responden aquí con lo de Firebase (sin Google)
@@ -6897,6 +6897,11 @@
             };
             const r = await DATOS.aGoogle(() => llamarApi(payload));
             if (pmModal.estado) pmModal.estado.cuentas = r.cuentas || [];
+            if (Array.isArray(r.titularesFicha)) {
+                if (pmModal.estado) pmModal.estado.titularesFicha = r.titularesFicha;
+                if (typeof CUA_LISTAS === 'object' && CUA_LISTAS.pm) CUA_LISTAS.pm.titular = r.titularesFicha;
+                flDatos = null; flBorrador = null;
+            }
             if (r.llaveNueva && r.cuenta) pmModal.llaves[r.cuenta.id] = r.llaveNueva;
             pmModal.formAbierto = false;
             pmModal.scriptId = r.cuenta ? r.cuenta.id : '';
@@ -11889,8 +11894,8 @@ function revisarPagos(forzar) {
         return flPidiendo;
     }
     // El Cuadre de caja las pide una vez al abrir "Agregar" o "Modificar" (y redibuja la caja cuando llegan)
-    function flAsegurar() { if (!flDatos && !flPidiendo && WEB_APP_URL) flCargar().then(() => { if (seleccion !== null && flDatos) renderDetalle(); }); }
-    function flIniciar() { flPintar(); if (!flDatos) flCargar(); }
+    function flAsegurar() { if (!flDatos && !flPidiendo) flCargar().then(() => { if (seleccion !== null && flDatos) renderDetalle(); }); }
+    function flIniciar() { flPintar(); flCargar(); }
     const flCambio = () => !!flDatos && FL_LISTAS.some(([k]) => JSON.stringify(flBorrador[k]) !== JSON.stringify(flDatos[k]));
     function flPintar() { const el = document.getElementById('flContenido'); if (el) pintarConservando(el, flVista()); }
     function flVista() {
@@ -11913,12 +11918,12 @@ function revisarPagos(forzar) {
             </div>`;
         };
         const hist = (flDatos.cambios || []).slice(0, 10);
-        return `<div class="nota" style="margin-top:0">Lo que se elige en la ficha de las tiendas. Se guarda en <b>Firebase</b>: la ficha toma los cambios la próxima vez que se abra con internet, y el Cuadre de caja los usa al agregar o modificar pagos. El orden de aquí es el orden en la ficha.
+        return `<div class="nota" style="margin-top:0">Lo que se elige en la ficha de las tiendas. Se guarda en <b>el servidor</b>: la ficha toma los cambios la próxima vez que se abra con internet, y el Cuadre de caja los usa al agregar o modificar pagos. El orden de aquí es el orden en la ficha.
             ${flDatos.actualizado ? `Último cambio: ${esc(flDatos.actualizado)} por ${esc(flDatos.por)}.` : 'Todavía son las de siempre (nadie las ha cambiado).'}</div>
             <div class="fl-grid">${FL_LISTAS.map(tarjeta).join('')}</div>
             <div class="req-acciones" style="justify-content:flex-end">
                 <button type="button" class="btn-ghost" onclick="flUsar(flDatos); flPintar()" ${cambio ? '' : 'disabled'}>Descartar cambios</button>
-                <button type="button" class="btn-primary" id="flBtnGuardar" onclick="flGuardar()" ${cambio ? '' : 'disabled'}>Guardar en Firebase</button></div>
+                <button type="button" class="btn-primary" id="flBtnGuardar" onclick="flGuardar()" ${cambio ? '' : 'disabled'}>Guardar cambios</button></div>
             ${hist.length ? `<div class="grafico-card"><div class="grafico-head"><h3>Últimos cambios</h3></div>
                 <div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Cuándo</th><th class="izq">Quién</th><th class="izq">Qué cambió</th></tr></thead><tbody>
                 ${hist.map(h => `<tr><td class="izq">${esc(h.cuando)}</td><td class="izq">${esc(h.quien)}</td><td class="izq">${esc(h.texto)}</td></tr>`).join('')}</tbody></table></div></div>` : ''}`;
@@ -11939,7 +11944,7 @@ function revisarPagos(forzar) {
         try {
             const r = await llamarApi({ action: 'fl_guardar', listas: flBorrador });
             flUsar(r.listas);
-            mostrarBanner('Listas guardadas en Firebase. ' + r.cambio, 'ok');
+            mostrarBanner('Listas guardadas. ' + (r.cambio || ''), 'ok');
         } catch (e) { mostrarBanner('No se pudo guardar: ' + e.message, 'error'); }
         flPintar();
     }
