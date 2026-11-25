@@ -3452,7 +3452,31 @@
     // ==========================================
     // URL /exec de la aplicación web de CuadreSistema.gs. Vacía = modo demostración.
     const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwB4qpxVZG3kQYpC1OJFfgrovqvt2x5G7O6qwZVDLcf1VKZ78jLtmP1iPPbL0bR3Qc/exec";
-    const TOLERANCIA_USD = 0.50;    // Diferencia (en $) que todavía se considera "cuadra"
+    // Tolerancias del cierre (mismas de Tiempos › Tolerancias del cierre: efectivo sobrante/faltante, métodos, divisas)
+    const TOL_CIERRE_DEF = { sobranteEfectivo: 1.5, faltante: 0.4, metodos: 0.1, divisas: 0 };
+    let cuaTol = Object.assign({}, TOL_CIERRE_DEF);
+    let cfCuadreTol = null;   // cuando llega de Cloudflare, tiene prioridad mientras esta sesión siga allí
+    const cuaNormTol = t => {
+        const src = t && typeof t === 'object' && !Array.isArray(t) ? t : {};
+        const out = {};
+        Object.keys(TOL_CIERRE_DEF).forEach(k => {
+            const v = Number(String(src[k]).replace(',', '.'));
+            out[k] = isFinite(v) && v >= 0 && src[k] !== '' && src[k] != null ? Math.round(v * 100) / 100 : TOL_CIERRE_DEF[k];
+        });
+        return out;
+    };
+    function cuaAplicarTol(t, desdeCF) {
+        if (!t || typeof t !== 'object') return;
+        const n = cuaNormTol(t);
+        if (desdeCF) cfCuadreTol = n;
+        else if (cfCuadreTol) return;
+        const cambio = Object.keys(TOL_CIERRE_DEF).some(k => cuaTol[k] !== n[k]);
+        cuaTol = n;
+        if (cambio && typeof filas !== 'undefined' && filas.length) {
+            if (vistaActual === 'cuadre' && typeof render === 'function') render();
+            else if (vistaActual === 'menu' && typeof tableroPintar === 'function') tableroPintar();
+        }
+    }
 
     const METODOS = [
         { key: 'bs',      nombre: 'Efectivo Bs',  moneda: 'Bs' },
@@ -3691,22 +3715,44 @@
         return f[key].sistema;
     }
 
+    function estadoMetodoDe(key, moneda, dif, tasa, pendiente, tol = cuaTol) {
+        if (pendiente) return { estado: 'st-pend', vueltos: false };
+        const d = Math.round((Number(dif) || 0) * 100) / 100;
+        const du = moneda === '$' ? d : (tasa ? d / tasa : 0);
+        if (!d) return { estado: 'st-ok', vueltos: false };
+        let malo = false, vueltos = false;
+        if (key === 'bs') {
+            if (!tasa) malo = Math.abs(d) >= 1;
+            else if (d > 0) { malo = du > tol.sobranteEfectivo; vueltos = !malo; }
+            else malo = -du > tol.faltante;
+        } else if (moneda === '$') {
+            malo = Math.abs(d) > tol.divisas + 0.004;
+        } else {
+            malo = tasa ? Math.abs(du) > tol.metodos : Math.abs(d) >= 1;
+        }
+        if (!malo) return { estado: 'st-ok', vueltos };
+        return { estado: d > 0 ? 'st-sobra' : 'st-falta', vueltos: false };
+    }
+
     function calcular(f) {
         const tasa = f.tasa || 0;
         const n = v => v || 0;
+        const tol = cuaTol;
         const r = {};
         let sinSistema = true;
 
         METODOS.forEach(m => {
             const sis = valorSistema(f, m.key);
-            if (sis !== null && sis !== undefined) sinSistema = false;
+            const pend = sis === null || sis === undefined;
+            if (!pend) sinSistema = false;
             let fisico;
             if (m.key === 'bs')           fisico = n(f.bs.fisico) + n(f.bs.dejo) + n(f.bs.gasto) - n(f.bs.recibido);              // P = O+N+M-L
             else if (m.key === 'divisas') fisico = n(f.divisas.dejo) + n(f.divisas.gasto) + n(f.divisas.fisico) - n(f.divisas.recibido); // AI = AF+AG+AH-AE
             else                          fisico = n(f[m.key].fisico);
-            const dif = fisico - n(sis);
+            const dif = Math.round((fisico - n(sis)) * 100) / 100;
             const difUsd = m.moneda === '$' ? dif : (tasa ? dif / tasa : 0);
-            r[m.key] = { fisico, sistema: sis, dif, difUsd, estado: estadoDe(difUsd, sis === null || sis === undefined) };
+            const est = estadoMetodoDe(m.key, m.moneda, dif, tasa, pend, tol);
+            r[m.key] = { fisico, sistema: sis, dif, difUsd, estado: est.estado, vueltos: est.vueltos };
         });
 
         // E "Re" = (Q+U+Y+AC+AN)/G + AJ   (Biopago incluido, igual que en la hoja)
@@ -3716,13 +3762,23 @@
                                 + n(valorSistema(f, 'biopago'))) / tasa : 0)
                        + n(valorSistema(f, 'divisas'));
         r.sinSistema = sinSistema;
-        r.estado = sinSistema ? 'st-pend' : estadoDe(r.difTotal, false);
+        const difEfeUsd = r.bs.difUsd;
+        const maxSobrante = (difEfeUsd > 0 ? Math.min(difEfeUsd, tol.sobranteEfectivo) : 0) + tol.metodos;
+        const faltaTotal = tasa > 0 && -r.difTotal > tol.faltante;
+        const netoCuadra = tasa > 0 && r.difTotal >= -tol.faltante - 0.004 && r.difTotal <= maxSobrante + 0.004;
+        const malos = METODOS.filter(m => r[m.key].estado === 'st-sobra' || r[m.key].estado === 'st-falta');
+        const compensado = malos.length > 0 && netoCuadra;
+        const cuadra = (!malos.length && !faltaTotal) || compensado;
+        const signoDif = Math.abs(r.difTotal) >= 0.005 ? r.difTotal : malos.reduce((s, m) => s + r[m.key].dif, 0);
+        r.vueltos = !!r.bs.vueltos && r.bs.estado === 'st-ok';
+        r.compensado = compensado;
+        r.estado = sinSistema ? 'st-pend' : cuadra ? 'st-ok' : (signoDif >= 0 ? 'st-sobra' : 'st-falta');
         return r;
     }
 
     function estadoDe(difUsd, pendiente) {
         if (pendiente) return 'st-pend';
-        if (Math.abs(difUsd) <= TOLERANCIA_USD) return 'st-ok';
+        if (difUsd >= 0 ? difUsd <= cuaTol.metodos : -difUsd <= cuaTol.faltante) return 'st-ok';
         return difUsd > 0 ? 'st-sobra' : 'st-falta';
     }
     const TEXTO_ESTADO = { 'st-pend': 'Sin sistema', 'st-ok': 'Cuadra', 'st-sobra': 'Sobrante', 'st-falta': 'Faltante' };
@@ -4022,6 +4078,7 @@
             if (!data.ok) throw new Error(data.error || 'Error desconocido');
             if (payload.action === 'login' && data.usuario) {
                 Object.assign(cfSes, { token: data.token || '', vence: data.vence || (Date.now() + 3600000), clave, modulos: (data.empresa || {}).modulos || {}, modHora: Date.now(), mala: '' });
+                if (data.empresa && data.empresa.cuadre_tol) cuaAplicarTol(data.empresa.cuadre_tol, true);
                 const u = data.usuario, todos = MODULOS.map(m => m.id).concat(['verexistencia', 'rep_existencia', 'rep_ajustes', 'rep_ventas']);
                 if (data.empresa && typeof aplicarEmpresaCF === 'function') aplicarEmpresaCF(data.empresa);
                 return Object.assign({}, data, {
@@ -4053,6 +4110,7 @@
                 }
                 if (dc && dc.ok && dc.usuario) {
                     Object.assign(cfSes, { token: dc.token || '', vence: dc.vence || (Date.now() + 3600000), clave, modulos: (dc.empresa || {}).modulos || {}, modHora: Date.now(), mala: '' });
+                    if (dc.empresa && dc.empresa.cuadre_tol) cuaAplicarTol(dc.empresa.cuadre_tol, true);
                     const u = dc.usuario;
                     anotarTiempo('login (Cloudflare)', performance.now() - t0, typeof dc.ms === 'number' ? dc.ms : null, true);
                     // Mismo resultado que el login de Google (CuadreSistema.gs:358): principal = clave principal O rol de administrador
@@ -5875,6 +5933,7 @@
         }
         cfSes.mala = '';
         Object.assign(cfSes, { token: r.token, vence: r.vence, clave, modulos: (r.empresa || {}).modulos || {}, modHora: Date.now() });
+        if (r.empresa && r.empresa.cuadre_tol) cuaAplicarTol(r.empresa.cuadre_tol, true);
         return r.token;
     }
     // Interruptores del servidor nuevo (cada 5 minutos, sin demorar la lectura: la primera vez se consulta aparte)
@@ -5883,7 +5942,10 @@
         cfSes.pidiendo = (async () => {
             try {
                 const t = await cfToken(), r = await cfPedir({ action: 'cfg_leer', token: t });
-                if (r.ok) { cfSes.modulos = (r.empresa || {}).modulos || {}; cfSes.modHora = Date.now(); }
+                if (r.ok) {
+                    cfSes.modulos = (r.empresa || {}).modulos || {}; cfSes.modHora = Date.now();
+                    if (r.empresa && r.empresa.cuadre_tol) cuaAplicarTol(r.empresa.cuadre_tol, true);
+                }
                 else if (r.sesion === false) cfSes.token = '';
             } catch (e) { cfSes.modulos = cfSes.modulos || {}; cfSes.modHora = Date.now(); }
             finally { cfSes.pidiendo = null; }
@@ -6155,7 +6217,8 @@
         try { e = await DATOS.aGoogle(() => llamarApi({ action: 'cf_efectivo', estado: true })); } catch (x) { error = x.message; }
         finally { btn.disabled = false; btn.textContent = texto; }
         let fondo = document.getElementById('fbhDlg');
-        if (!fondo) { fondo = document.createElement('div'); fondo.id = 'fbhDlg'; fondo.className = 'req-dlg-fondo'; document.body.appendChild(fondo); }
+        if (!fondo) { fondo = document.createElement('div'); fondo.id = 'fbhDlg'; fondo.className = 'req-dlg-fondo'; }
+        if (fondo.classList.contains('hidden') || !fondo.parentElement) document.body.appendChild(fondo);
         fondo.onclick = ev => { if (ev.target === fondo) fondo.classList.add('hidden'); };
         const on = !!(e && e.oficial);
         fondo.innerHTML = `<div class="req-dlg" style="max-width:640px"><h3>Efectivo y caja chica en el servidor nuevo</h3>
@@ -6183,7 +6246,8 @@
         try { e = await DATOS.aGoogle(() => llamarApi({ action: 'cf_hojas', que: 'estado' })); } catch (x) { error = x.message; }
         finally { if (btn) { btn.disabled = false; btn.textContent = texto; } }
         let fondo = document.getElementById('fbhDlg');
-        if (!fondo) { fondo = document.createElement('div'); fondo.id = 'fbhDlg'; fondo.className = 'req-dlg-fondo'; document.body.appendChild(fondo); }
+        if (!fondo) { fondo = document.createElement('div'); fondo.id = 'fbhDlg'; fondo.className = 'req-dlg-fondo'; }
+        if (fondo.classList.contains('hidden') || !fondo.parentElement) document.body.appendChild(fondo);
         fondo.onclick = ev => { if (ev.target === fondo) fondo.classList.add('hidden'); };
         const donde = g => g.cf ? '<span class="chip st-ok">Servidor nuevo</span>' : g.fs ? '<span class="chip st-info">Firebase</span>' : '<span class="chip st-pend">Hoja de Google</span>';
         fondo.innerHTML = `<div class="req-dlg" style="max-width:760px"><h3>Hojas en el servidor nuevo</h3>
@@ -6236,7 +6300,8 @@
         try { e = await DATOS.aGoogle(() => llamarApi({ action: 'cf_cxp', estado: true })); } catch (x) { error = x.message; }
         finally { if (btn) { btn.disabled = false; btn.textContent = texto; } }
         let fondo = document.getElementById('fbhDlg');
-        if (!fondo) { fondo = document.createElement('div'); fondo.id = 'fbhDlg'; fondo.className = 'req-dlg-fondo'; document.body.appendChild(fondo); }
+        if (!fondo) { fondo = document.createElement('div'); fondo.id = 'fbhDlg'; fondo.className = 'req-dlg-fondo'; }
+        if (fondo.classList.contains('hidden') || !fondo.parentElement) document.body.appendChild(fondo);
         fondo.onclick = ev => { if (ev.target === fondo) fondo.classList.add('hidden'); };
         const on = !!(e && e.oficial);
         fondo.innerHTML = `<div class="req-dlg" style="max-width:640px"><h3>Cuentas por pagar en el servidor nuevo</h3>
@@ -6264,7 +6329,8 @@
         try { e = await DATOS.aGoogle(() => llamarApi({ action: 'cf_vx', estado: true })); } catch (x) { error = x.message; }
         finally { if (btn) { btn.disabled = false; btn.textContent = texto; } }
         let fondo = document.getElementById('fbhDlg');
-        if (!fondo) { fondo = document.createElement('div'); fondo.id = 'fbhDlg'; fondo.className = 'req-dlg-fondo'; document.body.appendChild(fondo); }
+        if (!fondo) { fondo = document.createElement('div'); fondo.id = 'fbhDlg'; fondo.className = 'req-dlg-fondo'; }
+        if (fondo.classList.contains('hidden') || !fondo.parentElement) document.body.appendChild(fondo);
         fondo.onclick = ev => { if (ev.target === fondo) fondo.classList.add('hidden'); };
         const on = !!(e && e.oficial);
         fondo.innerHTML = `<div class="req-dlg" style="max-width:640px"><h3>Venta express en el servidor nuevo</h3>
@@ -7179,7 +7245,8 @@ function revisarPagos(forzar) {
     }
     function pmModalPintar(error) {
         let fondo = document.getElementById('fbhDlg');
-        if (!fondo) { fondo = document.createElement('div'); fondo.id = 'fbhDlg'; fondo.className = 'req-dlg-fondo'; document.body.appendChild(fondo); }
+        if (!fondo) { fondo = document.createElement('div'); fondo.id = 'fbhDlg'; fondo.className = 'req-dlg-fondo'; }
+        if (fondo.classList.contains('hidden') || !fondo.parentElement) document.body.appendChild(fondo);
         fondo.onclick = ev => { if (ev.target === fondo) fondo.classList.add('hidden'); };
         const est = pmModal.estado || {}, ctas = est.cuentas || [], bcr = pmModal.bcr;
         const titsSug = [...new Set(['Wander Daniel Paredes', 'Raimary Quintero', 'Junior Lanz', 'Lisbeth Perez', 'Plaza Valencia'].concat(est.titularesFicha || []))];
@@ -7311,9 +7378,16 @@ function revisarPagos(forzar) {
         const pedido = { action: 'cuadre_tol' };
         if (guardar) { pedido.tol = {}; ['sobranteEfectivo', 'faltante', 'metodos', 'divisas'].forEach(k => { pedido.tol[k] = (document.getElementById('tolc_' + k) || {}).value; }); }
         try { r = await DATOS.aGoogle(() => llamarApi(pedido)); } catch (x) { error = x.message; }
+        if (r && r.tol) {
+            cuaAplicarTol(r.tol, cfModuloEncendido('cuadre') || cfModuloEncendido('bsg'));
+            if (guardar && !CF_SOLO && WEB_APP_URL && (cfModuloEncendido('cuadre') || cfModuloEncendido('bsg'))) {
+                try { await fetch(WEB_APP_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(Object.assign({}, pedido, { clave, eq: EQUIPO_ID, disp: DISPOSITIVO })) }); } catch (e) {}
+            }
+        }
         if (btn) { btn.disabled = false; btn.textContent = texto; }
         let fondo = document.getElementById('fbhDlg');
-        if (!fondo) { fondo = document.createElement('div'); fondo.id = 'fbhDlg'; fondo.className = 'req-dlg-fondo'; document.body.appendChild(fondo); }
+        if (!fondo) { fondo = document.createElement('div'); fondo.id = 'fbhDlg'; fondo.className = 'req-dlg-fondo'; }
+        if (fondo.classList.contains('hidden') || !fondo.parentElement) document.body.appendChild(fondo);
         fondo.onclick = ev => { if (ev.target === fondo) fondo.classList.add('hidden'); };
         const t = (r && r.tol) || {}, def = (r && r.def) || {};
         const campo = (k, titulo, ayuda) => `<div><label for="tolc_${k}">${titulo}</label><input id="tolc_${k}" type="number" step="0.01" min="0" value="${t[k] != null ? t[k] : ''}"><small>${ayuda} (de fábrica: $${fmt(def[k] || 0)})</small></div>`;
@@ -7354,7 +7428,8 @@ function revisarPagos(forzar) {
         } catch (x) { error = x.message; }
         if (btn) { btn.disabled = false; btn.textContent = texto; }
         let fondo = document.getElementById('fbhDlg');
-        if (!fondo) { fondo = document.createElement('div'); fondo.id = 'fbhDlg'; fondo.className = 'req-dlg-fondo'; document.body.appendChild(fondo); }
+        if (!fondo) { fondo = document.createElement('div'); fondo.id = 'fbhDlg'; fondo.className = 'req-dlg-fondo'; }
+        if (fondo.classList.contains('hidden') || !fondo.parentElement) document.body.appendChild(fondo);
         fondo.onclick = ev => { if (ev.target === fondo) fondo.classList.add('hidden'); };
         if (r && !Array.isArray(r.grupos)) { error = 'El servidor respondió algo inesperado (' + esc(JSON.stringify(r).slice(0, 120)) + '). Recargue el panel (Ctrl + F5) y vuelva a intentar.'; r = null; }
         const d = (r && r.diag) || {}, faltan = r ? r.grupos.filter(g => !g.ok) : [];
@@ -7520,8 +7595,21 @@ function revisarPagos(forzar) {
         return r;
     }
     async function cfCuadreExtra(p) {
-        if (!cfModuloEncendido('cuadre')) return null;
-        const t0 = performance.now(), r = await cfEscribir(Object.assign({}, p, { modulo: 'cuadre', repetible: p.action === 'cuentas_listar' }));
+        if (typeof CF_URL === 'string' && CF_URL && clave && (!cfSes.modulos || Date.now() - cfSes.modHora > 300000)) {
+            await cfModulos().catch(() => null);
+        }
+        const porBsg = p.action === 'cuadre_tol' && cfModuloEncendido('bsg');
+        if (!cfModuloEncendido('cuadre') && !porBsg) return null;
+        const t0 = performance.now();
+        let r = null;
+        if (porBsg && !cfModuloEncendido('cuadre')) {
+            try {
+                const t = await cfToken(), res = await cfPedir(Object.assign({}, p, { token: t }));
+                if (res && res.ok) r = res;
+            } catch (e) {}
+        } else {
+            r = await cfEscribir(Object.assign({}, p, { modulo: 'cuadre', repetible: p.action === 'cuentas_listar' || (p.action === 'cuadre_tol' && !p.tol) }));
+        }
         if (r) anotarTiempo(p.action + ' (Cloudflare)', Math.round(performance.now() - t0), 0, true);
         return r;
     }
@@ -8070,6 +8158,8 @@ function revisarPagos(forzar) {
             const r = await llamarApi({ action: 'login' });
             permisos = normalizarPermisos(r.permisos); nombreUsuario = r.nombre || nombreUsuario; esPrincipal = !!r.principal;
             scriptViejo = !('nombre' in r); servidorVersion = r.version || null;
+            if (r.cuadreTol) cuaAplicarTol(r.cuadreTol, false);
+            if (!cfCuadreTol && typeof CF_URL === 'string' && CF_URL && !cfSes.pidiendo) cfModulos();
             guardarSesion(); mostrarBienvenida();
             if (vistaActual === 'menu') renderMenu();
             avisarScriptViejo();
@@ -8109,6 +8199,8 @@ function revisarPagos(forzar) {
                 esPrincipal = !!r.principal;
                 scriptViejo = !('nombre' in r);   // el script nuevo siempre devuelve el nombre
                 servidorVersion = r.version || null;
+                if (r.cuadreTol) cuaAplicarTol(r.cuadreTol, false);
+                if (!cfCuadreTol && typeof CF_URL === 'string' && CF_URL && !cfSes.pidiendo) cfModulos();
                 avisosSeguridad = r;
             }
             input.value = '';
@@ -8319,6 +8411,7 @@ function revisarPagos(forzar) {
         permisos = [];
         nombreUsuario = ''; esPrincipal = false; olvidarClavesAdmin(); DATOS.salir(); vivoFbDetener(); pendFbDetener(); cxpDetener(); cxp.docs = []; cxp.cargado = false; cxp.pagos = null; NOMVIVO.reiniciar(); nomVivoDirecta = null; nomVivoAvisado = false; nomVivoRotoHora = 0; ALMVIVO.reiniciar(); almVivoDirecta = null; almVivoAvisado = false; almVivoRotoHora = 0; CAJAVIVO.reiniciar(); cajaVivoCfg = null; cajaVivoAvisado = false; cajaVivoRotoHora = 0; PERVIVO.reiniciar(); perVivoCfg = null; perVivoAvisado = false; perVivoRotoHora = 0; reqDirecto.reiniciar(); factDirecto.reiniciar(); FB.salir(); efeFbOff = null; efeFbActivo = false; efeFbRoto = ''; efeFbLlego = false;
         filas = []; borradores = {}; seleccion = null; cargadoDesde = null; cuadreIniciado = false;
+        cfCuadreTol = null; cuaTol = Object.assign({}, TOL_CIERRE_DEF);
         // Al salir se borra todo lo guardado en memoria (otra persona puede entrar con menos permisos)
         efeDatos = { filas: [], cajaChica: [] }; efeCargado = null; efeCargadoEn = 0; precargadoDesde = null; Object.keys(pagMemoria).forEach(k => delete pagMemoria[k]);
         precargaSesion++; Object.keys(precargaEstado).forEach(k => delete precargaEstado[k]);   // cancela la precarga en curso
@@ -8440,6 +8533,7 @@ function revisarPagos(forzar) {
         if (vista === 'efectivo' || vista === 'cajachica') efeIniciar(vista === 'cajachica');
         // Cuadre y Visor de ventas comparten los mismos datos (filas de la hoja de cuadres)
         if (vista === 'cuadre' || vista === 'ventas') {
+            if (typeof CF_URL === 'string' && CF_URL && !cfCuadreTol && !cfSes.pidiendo) cfModulos();
             if (vista === 'cuadre' && !cuadreModoInicial) { cuadreModoInicial = true; cambiarModo('graficos'); }   // Cuadre de caja abre en Gráficos
             // Sin datos todavía (o la precarga falló): se cargan ahora
             if (!cuadreIniciado || (!cargadoDesde && !cargandoCajas)) {
@@ -9416,6 +9510,7 @@ function revisarPagos(forzar) {
         aviso(soloLoQueFalta ? `Cargando cajas del ${fechaBonita(desde)} al ${fechaBonita(hasta)}...` : `Cargando cajas desde el ${fechaBonita(desde)}...`, 'cargando');
         try {
             const data = await llamarApi({ action: 'list', desde, hasta });
+            if (data && data.tol) cuaAplicarTol(data.tol, false);
             if (soloLoQueFalta) {
                 const ya = new Set(filas.map(f => f.fila));
                 filas = (data.filas || []).filter(f => !ya.has(f.fila)).concat(filas);
@@ -10033,7 +10128,8 @@ function revisarPagos(forzar) {
         const conSis = lista.filter(x => !x.c.sinSistema);
         const sumVenta = conSis.reduce((a, x) => a + x.c.ventaTotal, 0);
         const sumDif = conSis.reduce((a, x) => a + x.c.difTotal, 0);
-        const estTotal = conSis.length ? estadoDe(sumDif, false) : 'st-pend';
+        const maxSobSem = conSis.reduce((a, x) => a + (x.c.bs.difUsd > 0 ? Math.min(x.c.bs.difUsd, cuaTol.sobranteEfectivo) : 0), 0) + cuaTol.metodos;
+        const estTotal = conSis.length ? (sumDif >= 0 ? (sumDif <= maxSobSem + 0.004 ? 'st-ok' : 'st-sobra') : (-sumDif <= cuaTol.faltante + 0.004 ? 'st-ok' : 'st-falta')) : 'st-pend';
         const sinSis = lista.length - conSis.length;
         html += `</tbody><tfoot><tr class="total-row">
             <td class="izq" colspan="4">Total · ${conSis.length} caja${conSis.length === 1 ? '' : 's'} con sistema` +
@@ -10897,7 +10993,7 @@ function revisarPagos(forzar) {
                 <button type="button" class="btn-borrar" id="cuaFaltBtn" onclick="cuaFaltanteANomina()" ${hayCambios ? 'disabled title="Guarde primero los cambios del sistema"' : ''}>Cargar faltante a la nómina de ${esc(f.cajero)}</button>
                 <div class="nota" style="margin:0">Se agrega como crédito a su nombre en BD NOMINA (con el N° de ficha) y la caja queda cuadrada en 0. Pide la clave de administrador. Aparece en Cuentas por Cobrar como deuda del trabajador.</div>
             </div>` : ''}
-            <div class="nota">Tolerancia: ±$${fmt(TOLERANCIA_USD)}. La diferencia total sigue la columna "Re" de la hoja.</div>
+            <div class="nota">Tolerancias del cierre: efectivo Bs +$${fmt(cuaTol.sobranteEfectivo)} / -$${fmt(cuaTol.faltante)} · métodos ±$${fmt(cuaTol.metodos)} · divisas ±$${fmt(cuaTol.divisas)} · total -$${fmt(cuaTol.faltante)} (se compensan entre métodos). La diferencia total sigue la columna "Re" de la hoja.${esPrincipal ? ` <button type="button" class="btn-ghost btn-mini" onclick="tolCierreVer(this)">Cambiar</button>` : ''}</div>
             ${cuaComentariosHTML(f)}
         `;
         actualizarCifras(f);
@@ -12588,14 +12684,17 @@ function revisarPagos(forzar) {
             document.getElementById('difusd-' + m.key).textContent = pend ? '—' : conSigno(r.difUsd, '$');
             const chip = document.getElementById('chip-' + m.key);
             chip.className = 'chip ' + r.estado;
-            chip.textContent = TEXTO_ESTADO[r.estado];
+            chip.textContent = r.vueltos ? 'Cuadra · vueltos' : TEXTO_ESTADO[r.estado];
+            chip.title = r.vueltos ? `Sobrante en efectivo aceptado por vueltos (hasta $${fmt(cuaTol.sobranteEfectivo)})` : '';
         });
         document.getElementById('ventaTotal').textContent = fmtMoneda(c.ventaTotal, '$');
 
+        const notaEst = c.compensado ? 'Compensado entre métodos' : c.vueltos ? 'Vueltos en efectivo' : '';
+        const subTxt = c.sinSistema ? '' : [f.tasa ? '≈ ' + conSigno(c.difTotal * f.tasa, 'Bs') : '', notaEst].filter(Boolean).join(' · ');
         document.getElementById('resultado').className = 'resultado ' + c.estado;
         document.getElementById('rLabel').textContent = c.sinSistema ? 'Falta cargar sistema' : TEXTO_ESTADO[c.estado];
         document.getElementById('rValue').textContent = c.sinSistema ? '—' : conSigno(c.difTotal, '$');
-        document.getElementById('rSub').textContent = c.sinSistema ? '' : (f.tasa ? '≈ ' + conSigno(c.difTotal * f.tasa, 'Bs') : '');
+        document.getElementById('rSub').textContent = subTxt;
     }
 
     function editarSistema(input) {
