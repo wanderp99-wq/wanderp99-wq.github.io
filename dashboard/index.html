@@ -1620,6 +1620,11 @@
         .alm-filtros { grid-template-columns: repeat(3, minmax(0, 1fr)); }
         .alm-acc { white-space: nowrap; } .alm-acc .btn-mini + .btn-mini { margin-left: .3rem; }
         tr.alm-anulada td { opacity: .55; text-decoration: line-through; } tr.alm-anulada td:last-child, tr.alm-anulada td:nth-last-child(2) { text-decoration: none; }
+        /* Al pasar el cursor por una fila de Productos/Almacén se ilumina en blanco (o tono elevado en modo oscuro) para seguir código, descripción y existencia sin perderse */
+        #vistaAlm .req-tabla:not(.alm-notas-tabla) tbody td { transition: background-color .08s ease; }
+        #vistaAlm .req-tabla:not(.alm-notas-tabla) tbody tr:not(.alm-fila-total):hover td { background: var(--card-bg); }
+        #vistaAlm .req-tabla:not(.alm-notas-tabla) tbody tr:not(.alm-fila-total):hover td:first-child { box-shadow: inset 3px 0 0 var(--primary); }
+        :root:not([data-theme="light"]) #vistaAlm .req-tabla:not(.alm-notas-tabla) tbody tr:not(.alm-fila-total):hover td { background: var(--input-bg); }
         .alm-aviso { color: var(--bad); font-size: .78rem; margin-top: .25rem; line-height: 1.35; } .alm-aviso .btn-mini { margin-left: .3rem; } .alm-ok { color: var(--ok); font-weight: 600; }
         .alm-teclado { float: right; font: 700 .68rem ui-monospace, Consolas, monospace; background: var(--list-bg); border: 1px solid var(--border); border-radius: 6px; padding: .05rem .4rem; color: var(--text-muted); cursor: pointer; }
         @media (hover: hover) and (pointer: fine) { .alm-teclado { display: none; } }   /* solo en teléfonos y tabletas */ input.alm-mal { border-color: var(--bad) !important; }
