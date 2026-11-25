@@ -623,6 +623,7 @@
         .hab-ofe-grp { display: inline-flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
         .hab-ofe-chip { font-size: .74rem; font-weight: 800; padding: .18rem .45rem; border-radius: 6px; background: #FF4000; color: #ffffff; white-space: nowrap; }
         .hab-ofe-chip.mal { background: var(--warn-bg); color: var(--warn); }
+        .hab-sel-chk { width: 16px !important; height: 16px; min-width: 0 !important; margin: 0; padding: 0 !important; cursor: pointer; vertical-align: middle; }
         tr.bsr-activa td { background: color-mix(in srgb, var(--primary) 9%, transparent); }
         /* Entrar con huella */
         .huella-entrar { display: flex; flex-direction: column; align-items: stretch; gap: .45rem; margin: .25rem 0 .5rem; }
@@ -7309,7 +7310,8 @@ function activar() {
   });
   ScriptApp.newTrigger('revisarPagos').timeBased().everyMinutes(1).create();
   const props = PropertiesService.getScriptProperties();
-  if (!props.getProperty('PM_DESDE')) props.setProperty('PM_DESDE', String(Date.now() - 2 * 864e5));
+  props.setProperty('PM_DESDE', String(Date.now() - 2 * 864e5));
+  props.deleteProperty('PM_VISTOS');
   const r = revisarPagos(true);
   console.log('Listo (' + pmCorreoPropio() + '): ' + JSON.stringify(r));
 }
@@ -7353,7 +7355,8 @@ function pmHtmlATexto(html) {
 function pmExtraer(texto) {
   const limpio = String(texto || '').replace(/[\\u00a0\\u200b\\ufeff]/g, ' ').replace(/\\*/g, '').replace(/\\s+/g, ' ');
   const dos = n => String(n).padStart(2, '0');
-  // 1) R4 Conecta: "R4 informa: Pago movil recibido del 584124384807 el 24/11/2026 16:38:53 por Bs.10.00, Referencia 976744609 CI 26879740."
+  // 1) R4 Conecta:
+  //    a) "R4 informa: Pago movil recibido del 584124384807 el 24/11/2026 16:38:53 por Bs.10.00, Referencia 976744609 CI 26879740."
   if (/r4\\s+informa\\s*:\\s*pago\\s+m[oó]vil\\s+recibido/i.test(limpio)) {
     const tel = /\\bdel\\s+(\\d{7,15})/i.exec(limpio);
     const f = /\\bel\\s+(\\d{2})\\/(\\d{2})\\/(\\d{4})\\s+(\\d{1,2}):(\\d{2}):(\\d{2})(?:\\s*([AP])\\.?\\s*M)?/i.exec(limpio);
@@ -7366,6 +7369,35 @@ function pmExtraer(texto) {
     if (f[7]) { h = h % 12; if (/p/i.test(f[7])) h += 12; }
     return { ref: ref[1], monto: val, tel: tel ? tel[1] : '', ci: ci ? ci[1] : '',
              fecha: f[3] + '-' + f[2] + '-' + f[1] + ' ' + dos(h) + ':' + f[5] + ':' + f[6], banco: 'R4' };
+  }
+  //    b) "TRANSFERENCIA RECIBIDA MONTO:6428.73Bs. BANCO ORIGEN:... REMITENTE:... REFERENCIA:00626503 ... Fecha de la Transacción :Nov 25 2026 6:12PM"
+  if (/transferencia\\s+recibida/i.test(limpio) && !/transferencia\\s+enviada|\\bbeneficiario\\s*:/i.test(limpio) && !/bancrecer/i.test(limpio)
+      && /(?:\\br4\\b|r4conecta|r4\\s+banco|concepto\\s*:)/i.test(limpio)) {
+    const monto = /\\bMONTO\\s*:\\s*(?:Bs\\.?\\s*)?([\\d.,]+)\\s*(?:Bs\\.?)?/i.exec(limpio);
+    const ref = /\\bREFERENCIA\\s*:?\\s*(\\d{6,20})/i.exec(limpio);
+    const rem = /\\bREMITENTE\\s*:\\s*(.+?)(?=\\s+(?:REFERENCIA|CONCEPTO|FECHA|BANCO|CUENTA|RECIBA)\\b|$)/i.exec(limpio);
+    const val = monto ? pmParseMonto(monto[1]) : 0;
+    if (!ref || !(val > 0)) return null;
+    const MES = { JAN: '01', ENE: '01', FEB: '02', MAR: '03', APR: '04', ABR: '04', MAY: '05', JUN: '06',
+                  JUL: '07', AUG: '08', AGO: '08', SEP: '09', SET: '09', OCT: '10', NOV: '11', DEC: '12', DIC: '12' };
+    const normMes = m => MES[String(m || '').normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').slice(0, 3).toUpperCase()] || '';
+    const mNamed = /Fecha(?:\\s+de\\s+la\\s+(?:Transacci[oó]n|Operaci[oó]n))?\\s*:\\s*([A-Za-zÁÉÍÓÚáéíóú]{3,12})\\s+(\\d{1,2}),?\\s+(\\d{4})\\s+(\\d{1,2}):(\\d{2})(?::(\\d{2}))?(?:\\s*([AP])\\.?\\s*M\\.?)?/i.exec(limpio);
+    const mDMN = !mNamed && /Fecha(?:\\s+de\\s+la\\s+(?:Transacci[oó]n|Operaci[oó]n))?\\s*:\\s*(\\d{1,2})[\\s\\/-]+([A-Za-zÁÉÍÓÚáéíóú]{3,12})[\\s\\/-]+(\\d{4})\\s+(\\d{1,2}):(\\d{2})(?::(\\d{2}))?(?:\\s*([AP])\\.?\\s*M\\.?)?/i.exec(limpio);
+    const mNum = !mNamed && !mDMN && /Fecha(?:\\s+de\\s+la\\s+(?:Transacci[oó]n|Operaci[oó]n))?\\s*:\\s*(\\d{2})[\\/-](\\d{2})[\\/-](\\d{4})\\s+(\\d{1,2}):(\\d{2})(?::(\\d{2}))?(?:\\s*([AP])\\.?\\s*M\\.?)?/i.exec(limpio);
+    let fecha = '';
+    if (mNamed) {
+      const mm = normMes(mNamed[1]); if (!mm) return null;
+      let h = Number(mNamed[4]); if (mNamed[7]) { h = h % 12; if (/p/i.test(mNamed[7])) h += 12; }
+      fecha = mNamed[3] + '-' + mm + '-' + dos(mNamed[2]) + ' ' + dos(h) + ':' + mNamed[5] + ':' + (mNamed[6] || '00');
+    } else if (mDMN) {
+      const mm = normMes(mDMN[2]); if (!mm) return null;
+      let h = Number(mDMN[4]); if (mDMN[7]) { h = h % 12; if (/p/i.test(mDMN[7])) h += 12; }
+      fecha = mDMN[3] + '-' + mm + '-' + dos(mDMN[1]) + ' ' + dos(h) + ':' + mDMN[5] + ':' + (mDMN[6] || '00');
+    } else if (mNum) {
+      let h = Number(mNum[4]); if (mNum[7]) { h = h % 12; if (/p/i.test(mNum[7])) h += 12; }
+      fecha = mNum[3] + '-' + mNum[2] + '-' + mNum[1] + ' ' + dos(h) + ':' + mNum[5] + ':' + (mNum[6] || '00');
+    } else return null;
+    return { ref: ref[1], monto: val, tel: rem ? rem[1].trim().slice(0, 20) : '', ci: '', fecha: fecha, banco: 'R4' };
   }
   // 2) Bancrecer Pago Móvil Pag@Ya (bdigital@bancrecer.com.ve)
   if (/bancrecer/i.test(limpio)) {
@@ -7420,7 +7452,7 @@ function revisarPagos(forzar) {
   try { JSON.parse(props.getProperty('PM_VISTOS') || '[]').forEach(id => { vistos[id] = true; }); } catch (e) {}
 
   const buscas = [];
-  if (PM_CFG.bancos.includes('R4')) buscas.push('"R4 informa: Pago movil recibido" OR "R4 informa: Pago móvil recibido"');
+  if (PM_CFG.bancos.includes('R4')) buscas.push('(from:r4conecta.io OR from:r4banco.com.ve OR "R4 informa: Pago movil recibido" OR "R4 informa: Pago móvil recibido" OR subject:"TRANSFERENCIA RECIBIDA" OR "R4 Banco Microfinanciero")');
   if (PM_CFG.bancos.includes('Bancrecer')) buscas.push('(from:bancrecer.com.ve OR subject:"Pago Móvil recibido" OR "Monto de la transacción" OR "Crédito Inmediato")');
   if (!buscas.length) return { ok: false, error: 'Sin bancos configurados' };
 
@@ -7438,7 +7470,7 @@ function revisarPagos(forzar) {
       revisados++;
       const de = String(m.getFrom() || '').toLowerCase();
       const correo = (/<([^>]+)>/.exec(de) || [, de])[1].trim();
-      const okR4 = /@r4(?:conecta|banco)?\\.(?:io|com\\.ve)$/.test(correo);
+      const okR4 = /(?:@|\\.)r4(?:conecta|banco)?\\.(?:io|com\\.ve)$/.test(correo);
       const okBcr = /(?:@|\\.)bancrecer\\.com\\.ve$/.test(correo);
       const okExtra = (miCorreo && correo === miCorreo) || (PM_CFG.remitentesExtra || []).some(x => String(x || '').toLowerCase() === correo);
       if (!okR4 && !okBcr && !okExtra) { idsNuevos.push(mid); return; }
@@ -7552,7 +7584,7 @@ function revisarPagos(forzar) {
         }
 
         const pagos = (est.pagos || []).filter(p => !pmModal.filtro || [p.banco, p.titular, p.ref, p.tel].some(v => String(v || '').toLowerCase().includes(pmModal.filtro.toLowerCase())));
-        const html = `<div class="req-dlg" style="max-width:820px"><h3>Cuentas de Pago Móvil por correo (sin IFTTT)</h3>
+        const html = `<div class="req-dlg" style="width:min(1120px, 96vw);max-width:none"><h3>Cuentas de Pago Móvil por correo (sin IFTTT)</h3>
             ${error ? `<div class="banner error" style="display:block">${esc(error)}</div>` : `
             ${pmModal.msg || ''}
             <div class="req-sub">Cada persona conecta su propio Gmail con Google Apps Script (sin reenviar correos ni pagar IFTTT). Todos los pagos llegan a Plaza Software para validar al instante en la ficha y el panel.</div>
@@ -7603,7 +7635,7 @@ function revisarPagos(forzar) {
                 <b>Últimos pagos recibidos (${pagos.length})</b>
                 <input type="text" placeholder="Filtrar banco, titular o ref..." value="${esc(pmModal.filtro)}" oninput="pmModal.filtro=this.value;pmModalPintar()" style="max-width:220px">
             </div>
-            <div class="tabla-wrap" style="max-height:17rem;overflow:auto"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Fecha</th><th class="izq">Banco · Titular</th><th class="izq">Referencia</th><th>Monto Bs</th><th class="izq">Teléfono</th><th class="izq">Usado en</th></tr></thead><tbody>
+            <div class="tabla-wrap" style="max-height:clamp(17rem, 38vh, 28rem);overflow:auto"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Fecha</th><th class="izq">Banco · Titular</th><th class="izq">Referencia</th><th>Monto Bs</th><th class="izq">Teléfono</th><th class="izq">Usado en</th></tr></thead><tbody>
                 ${pagos.map(p => `<tr><td class="izq">${esc(pmFmtFecha(p.fecha))}</td><td class="izq"><b>${esc(p.banco || 'Bancrecer')}</b>${p.titular ? ' · ' + esc(p.titular) : ''}</td><td class="izq">${esc(p.ref)}</td><td>${fmt(p.monto)}</td><td class="izq">${esc(p.tel || '')}</td>
                     <td class="izq">${p.usado ? esc(p.usado.tienda + ' · ' + p.usado.fecha + (p.usado.nroFicha ? ' · ficha ' + p.usado.nroFicha : '')) : p.precargado ? `<span class="chip st-amar">Precargado${p.precargado.tienda ? ': ' + esc(p.precargado.tienda) : ''}</span>` : '<span class="chip st-pend">Sin usar</span>'}</td></tr>`).join('') || '<tr><td colspan="6" class="izq">Todavía no hay pagos leídos.</td></tr>'}
             </tbody></table></div>`}
@@ -21519,13 +21551,13 @@ Reglas:
 - Una línea por producto, con los campos separados por " | ".
 - Números con punto decimal y sin separador de miles (ejemplo: 1234.50).
 - Si la factura tiene precios en USD y en Bs, usa los de USD y pon MONEDA: USD y TOTAL en USD.
-- COSTO_UNITARIO = precio unitario SIN IVA tal como aparece en el renglón. Si el renglón ya incluye IVA y la factura NO desglosa IVA aparte al pie, pon IVA = 0.
+- COSTO_UNITARIO = precio unitario tal como está impreso en el renglón (no le dividas ni le sumes IVA por tu cuenta cuando el pie desglosa SUBTOTAL/BASE e IVA_TOTAL). Si el renglón ya incluye IVA y la factura NO desglosa IVA aparte al pie, pon IVA = 0.
 - IVA = 16 si el producto es gravado ((G), G16%, T16%) O si la factura cobra IVA al pie (IVA_TOTAL > 0) y EXENTO = 0 (todo gravado). Pon 0 si es exento ((E)) o si la factura no cobra IVA (IVA_TOTAL = 0).
-- En facturas mixtas (algunos (E) y otros (G)), respeta la marca de cada renglón: (E) = 0, (G) o T16% = 16.
+- En facturas mixtas (algunos (E) y otros (G) o T16%), respeta la marca de cada renglón: (E) = 0, (G) o T16% = 16.
 - UNIDAD: UND, KG, CAJA, BULTO, PAQUETE o FARDO, como diga la factura. Si la descripción dice cuántas unidades trae, es BULTO.
 - UNIDADES_POR_EMPAQUE: cuántas unidades trae cada bulto, caja o paquete, según la factura o la descripción. Ejemplos: "SARDINA 170GR X 24" = 24, "DETERGENTE 1KG X 12" = 12, "AZUCAR 30X1K" = 30, "JUGO 12X1.5L" = 12, "GALLETA 6X28G" = 6, "CHUPETA 48 X1" = 48. Si no lo dice, 0.
-- Si el renglón solo muestra el total (sin precio unitario), COSTO_UNITARIO = total ÷ cantidad. La cantidad a veces va en la línea de arriba ("2x Bs 8.057,35" o "[ 2 ] x 10.862,07") o al final de la descripción ("... 30X1K 1 (E)" = cantidad 1).
-- CODIGO: el código del producto del proveedor. BARRAS: el código de barras si aparece; si no, déjalo vacío.
+- Si el renglón solo muestra el total (sin precio unitario), COSTO_UNITARIO = total ÷ cantidad. La cantidad a veces va en la línea de arriba ("2x Bs 8.057,35" o "[ 2 ] x 10.862,07") o al final de la descripción antes de la marca fiscal: en tickets "... <CANTIDAD> (E)" o "... <CANTIDAD> T16,00%" la CANTIDAD es SIEMPRE el último número pegado antes de (E)/(G)/T16% (si la descripción termina en un número como "... LECHE COMPLETA 2 1 (E)", el "2" es parte de la descripción y la cantidad es 1).
+- CODIGO: el código real del producto del proveedor. Si antes del código aparece un número correlativo de línea (001, 002, 003...), ignora ese correlativo y pon en CODIGO el código de producto que le sigue (ej. "001 000102 CAFE..." → CODIGO = 000102); si solo hay número de línea correlativo sin código real, déjalo vacío. BARRAS: el código de barras si aparece; si no, déjalo vacío.
 - No inventes datos: si algo no se ve, déjalo vacío.`;
     // Lee el texto que devolvió la IA: el formato de arriba, una tabla con | o el JSON de Gemini
     function cmpLeerTexto(txt) {
@@ -22182,10 +22214,10 @@ Reglas:
             lineas.forEach(l => { cmpIvaPoner(l, 16); cmpAplicarSugerencia(l); });
             return `La factura trae IVA pero los renglones venían sin él: se sumó el 16 % al costo de todos los productos. Revíselo (en cada renglón: "quitar").`;
         }
-        // 3) Doble IVA o IVA de más: si al quitar el IVA a todos cuadra exactamente con el total
+        // 3) Doble IVA o IVA de más: solo se quita el IVA si cuadra mejor con el total (con el mismo margen acotado por IVA_TOTAL para no dañar facturas grandes con poco IVA)
         if (lineas.some(l => l.iva > 0)) {
             const sinNada = lineas.reduce((s, l) => s + l.leido.cantidad * l.leido.costo / (1 + (Number(l.iva) || 0) / 100), 0);
-            if (cerca(sinNada, tot, Math.max(0.05, tot * 0.01))) {
+            if (cerca(sinNada, tot) && Math.abs(sinNada - tot) < Math.abs(actual - tot)) {
                 lineas.forEach(l => { if (l.iva) { cmpIvaPoner(l, 0); cmpAplicarSugerencia(l); } });
                 return `Los costos de la factura ya incluían el IVA (o era exenta): se quitó el 16 % extra para cuadrar con el total. Revíselo.`;
             }
@@ -23725,7 +23757,8 @@ Reglas:
         peq:    { nom: 'Pequeño · 6,5 × 2,8 cm (27/hoja · riel)',           porHoja: 27, cls: 'grid-3col' },
         est:    { nom: 'Estándar · 6,5 × 4,5 cm (15/hoja)',                 porHoja: 15, cls: 'grid-3col' },
         gra4:   { nom: 'Grande Compacto · 9,3 × 12,2 cm (4/hoja)',          porHoja: 4,  cls: 'grid-2col-gra' },
-        gra_mc: { nom: 'Grande Media Carta · 19 × 12,2 cm (2/hoja)',        porHoja: 2,  cls: 'grid-gra-mc' }
+        gra_mc: { nom: 'Grande Media Carta · 19 × 12,2 cm (2/hoja)',        porHoja: 2,  cls: 'grid-gra-mc' },
+        carta:  { nom: 'Carta Completa · 19 × 25,4 cm (1/hoja · marca agua)', porHoja: 1, cls: 'grid-carta' }
     };
     function habUnidadCorta(u) {
         const s = String(u || '').trim().toUpperCase();
@@ -23868,15 +23901,25 @@ Reglas:
         }
         return list;
     }
-    function habAgregarVisibles() {
+    function habAgregarVisibles() { habSeleccionarTodos(false); }
+    function habSeleccionarTodos(quitar) {
         const st = hab.cache[hab.tienda]; if (!st) return;
-        const vis = habFiltrados(st).slice(0, 100);
-        const enCola = new Set(hab.cola.map(x => x.cod));
-        let agregados = 0;
-        vis.forEach(it => {
-            if (!enCola.has(it.cod)) { hab.cola.push({ cod: it.cod, desc: it.desc, precio: it.precio, unit: it.unit || 'c/u', copias: 1, ofe: false, antes: 0 }); agregados++; }
-        });
-        if (agregados) habRepintar();
+        const list = habFiltrados(st); if (!list.length) return;
+        if (quitar) {
+            const quitarSet = new Set(list.map(x => x.cod));
+            hab.cola = hab.cola.filter(x => !quitarSet.has(x.cod));
+        } else {
+            const enCola = new Set(hab.cola.map(x => x.cod));
+            list.forEach(it => {
+                if (!enCola.has(it.cod)) hab.cola.push({ cod: it.cod, desc: it.desc, precio: it.precio, unit: it.unit || 'c/u', copias: 1, ofe: false, antes: 0 });
+            });
+        }
+        habRepintar();
+    }
+    function habAlternarSel(cod, marcar) {
+        const idx = hab.cola.findIndex(x => x.cod === cod);
+        if (marcar && idx < 0) habAgregar(cod, false);
+        else if (!marcar && idx >= 0) { hab.cola.splice(idx, 1); habRepintar(); }
     }
     const habAhorroPct = (precio, antes) => (antes > precio && antes > 0) ? Math.max(0, Math.round((1 - precio / antes) * 100)) : 0;
     function habFormatearPrecio(val) {
@@ -23891,6 +23934,15 @@ Reglas:
         const conCod = o.conCodigo !== false;
         const symEl = document.getElementById('habBcvSvg');
         const bcvDefs = symEl ? symEl.innerHTML : '';
+        const plazaLogoSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="400 380 1130 1175"><path fill="#FF4000" d="M423 398 H950 C1230 398 1400 560 1450 788 L1115 952 C1110 790 1075 655 870 655 H773 V1193 L423 1365 Z"/><path fill="#44AC00" d="M423 1365 L1508 834 V865 L658 1533 H423 Z"/><path fill="#F7931E" d="M820 1533 L1465 1026 C1460 1140 1448 1225 1420 1295 C1360 1440 1250 1490 1160 1505 C1090 1522 1020 1533 950 1533 Z"/></svg>';
+        const iconEl = typeof document !== 'undefined' && document.querySelector ? document.querySelector('link[rel="icon"]') : null;
+        const logoUrl = (iconEl && iconEl.href) || ('data:image/svg+xml;charset=utf-8,' + encodeURIComponent(plazaLogoSvg));
+        // Marca de agua (estilo carnet: varios logos en gris con relieve, rotación, tamaño y transparencia asimétricos)
+        const HAB_MARCA_CARTA = [[-12, 34, 68, -16, 0.08], [120, 38, 60, 12, 0.095], [50, 102, 88, -6, 0.07], [-8, 166, 62, 16, 0.085], [122, 174, 72, -11, 0.08]];
+        const marcaCartaHtml = tam === 'carta'
+            ? '<div class="hab-marca-agua">' + HAB_MARCA_CARTA.map(([x, y, tm, giro, op]) =>
+                `<img src="${logoUrl}" alt="" style="width:${tm}mm;height:${tm}mm;left:${x}mm;top:${y}mm;transform:rotate(${giro}deg);opacity:${op}">`).join('') + '</div>'
+            : '';
         const expandidos = [];
         (items || []).forEach(it => {
             const n = Math.min(99, Math.max(1, parseInt(it.copias, 10) || 1));
@@ -23907,6 +23959,7 @@ Reglas:
         const tachadoHtml = txt => `<span class="tachado">${esc(txt)}<svg viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true"><path d="M 1,22 C 30,15 68,12 99,5"/></svg></span>`;
         const footHtml = `<div class="tag-foot"><span>Precio Ref.</span><span class="bcv-wrap">${bcvDefs ? '<svg class="bcv-logo" aria-hidden="true"><use href="#ico-bcv"></use></svg>' : ''}<span>Tasa BCV</span></span></div>`;
         const tagHtml = it => {
+            const tagCls = 'tag-' + tam.replace(/_/g, '-');
             const { ent, dec } = habFormatearPrecio(it.precio);
             const rawLen = ent.replace(/\./g, '').length;
             const clsD = rawLen >= 3 ? 'd3' : (rawLen === 2 ? 'd2' : '');
@@ -23935,10 +23988,11 @@ Reglas:
                         </div>
                     </div>${footHtml}</div>`;
             }
-            if ((tam === 'est' || tam === 'gra4') && ofeValida) {
-                const kicker = tam === 'est' ? 'OFERTA' : 'PRECIO ESPECIAL';
-                return `<div class="tag tag-${tam} ${clsTinta} ${clsOfe} ${clsD}">
+            if ((tam === 'est' || tam === 'gra4' || tam === 'carta') && ofeValida) {
+                const kicker = tam === 'est' ? 'OFERTA' : tam === 'carta' ? '¡OFERTA IMPERDIBLE!' : 'PRECIO ESPECIAL';
+                return `<div class="tag ${tagCls} ${clsTinta} ${clsOfe} ${clsD}">
                     <div class="tag-top"><div class="tag-top-left">${logoSvg(true)}<span class="tag-kicker">${kicker}</span></div>${badge}</div>
+                    ${marcaCartaHtml}
                     <div class="tag-prod">${prod}</div>
                     <div class="tag-mid">
                         <div class="est-ofe-top">${antesTxt ? `<span class="antes">Antes ${tachadoHtml(antesTxt)}</span>` : ''}<span class="save">${ahorraTxt}</span></div>
@@ -23946,7 +24000,7 @@ Reglas:
                     </div>${footHtml}</div>`;
             }
             if (tam === 'gra_mc' && ofeValida) {
-                return `<div class="tag tag-gra-mc ${clsTinta} ofe ${clsD}">
+                return `<div class="tag ${tagCls} ${clsTinta} ofe ${clsD}">
                     <div class="tag-top"><div class="tag-top-left">${logoSvg(true)}<span class="tag-kicker">¡OFERTA IMPERDIBLE!</span></div>${badge}</div>
                     <div class="tag-prod">${prod}</div>
                     <div class="tag-mid oferta">
@@ -23955,8 +24009,9 @@ Reglas:
                     </div>${footHtml}</div>`;
             }
             const kicker = tam === 'gra_mc' ? 'PLAZA VALENCIA · GRAN FORMATO' : 'PLAZA VALENCIA';
-            return `<div class="tag tag-${tam} ${clsTinta} normal ${clsD}">
+            return `<div class="tag ${tagCls} ${clsTinta} normal ${clsD}">
                 <div class="tag-top"><div class="tag-top-left">${logoSvg(false)}<span class="tag-kicker">${kicker}</span></div>${badge}</div>
+                ${marcaCartaHtml}
                 <div class="tag-prod">${prod}</div>
                 <div class="tag-mid"><div class="p-wrap"><span class="p-sym">$</span><span class="p-int">${ent}</span><div class="p-right"><span class="p-dec">${dec}</span><span class="p-unit">${unit}</span></div></div></div>
                 ${footHtml}</div>`;
@@ -23984,6 +24039,9 @@ Reglas:
             .grid-3col { display: grid; grid-template-columns: repeat(3, 65mm); gap: 2mm; justify-content: center; }
             .grid-2col-gra { display: grid; grid-template-columns: repeat(2, 93mm); gap: 4mm; justify-content: center; }
             .grid-gra-mc { display: grid; grid-template-columns: 190mm; gap: 6mm; justify-content: center; }
+            .grid-carta { display: grid; grid-template-columns: 190mm; justify-content: center; }
+            .hab-marca-agua { position: absolute; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+            .hab-marca-agua img { position: absolute; filter: grayscale(1) contrast(1.1) drop-shadow(-.65mm -.65mm 0 rgba(255,255,255,1)) drop-shadow(.7mm .7mm .25mm rgba(15,23,42,.55)); }
             .tag { background: #ffffff; color: #000000; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; position: relative; font-variant-numeric: tabular-nums; outline: 0.25mm dashed #94a3b8; outline-offset: 0.45mm; }
             .tag-top { display: flex; align-items: center; justify-content: space-between; color: #ffffff; font-weight: 800; text-transform: uppercase; flex-shrink: 0; }
             .tag-top-left { display: flex; align-items: center; gap: 1.2mm; min-width: 0; }
@@ -24030,8 +24088,9 @@ Reglas:
             .tag-peq .peq-body { display: grid; grid-template-columns: 67% 33%; align-items: center; padding: 0.6mm 1.6mm; flex: 1 1 auto; min-height: 0; }
             .tag-peq .peq-left { min-width: 0; padding: 0 2mm 0 1mm; display: flex; flex-direction: column; justify-content: center; gap: 0.45mm; }
             .tag-peq .tag-prod { text-align: left; font-size: 6.7pt; padding: 0; line-height: 1.14; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-            .tag-peq .peq-ofe-row { display: flex; align-items: center; gap: 1.2mm; margin-top: 0.25mm; }
-            .tag-peq .antes { font-size: 6.7pt; } .tag-peq .tachado svg path { stroke-width: 1px; } .tag-peq .save { font-size: 6.3pt; padding: 0.3mm 1.1mm; border-radius: 0.6mm; }
+            .tag-peq.ofe .tag-prod { font-size: 6.4pt; line-height: 1.1; -webkit-line-clamp: 2; }
+            .tag-peq .peq-ofe-row { display: flex; flex-direction: column; align-items: flex-start; gap: 0.75mm; margin-top: 0.35mm; }
+            .tag-peq .antes { font-size: 9.4pt; line-height: 1.05; } .tag-peq .tachado svg path { stroke-width: 1.3px; } .tag-peq .save { font-size: 9pt; line-height: 1.05; padding: 0.55mm 2.2mm; border-radius: 0.85mm; }
             .tag-peq .peq-right { display: flex; align-items: flex-start; justify-content: center; border-left: 0.25mm solid #e2e8f0; padding-left: 0.8mm; }
             .tag-peq .p-sym { font-size: 7pt; margin-top: 1mm; margin-right: 0.3mm; } .tag-peq .p-int { font-size: 23pt; } .tag-peq .p-dec { font-size: 9.8pt; margin-top: 0.3mm; } .tag-peq .p-unit { font-size: 5.3pt; margin-top: 0.3mm; }
             .tag-peq.d2 .p-int { font-size: 18pt; } .tag-peq.d2 .p-dec { font-size: 8.5pt; }
@@ -24055,6 +24114,19 @@ Reglas:
             .tag-gra4.ofe .p-int { font-size: 68pt; } .tag-gra4.ofe.d2 .p-int { font-size: 58pt; } .tag-gra4.ofe.d3 .p-int { font-size: 44pt; }
             .tag-gra4 .antes { font-size: 18pt; } .tag-gra4 .tachado svg path { stroke-width: 1.8px; } .tag-gra4 .save { font-size: 17pt; padding: 2mm 4.5mm; border-radius: 1.6mm; }
             .tag-gra4 .tag-foot { height: 10mm; padding: 0 4mm; font-size: 9.5pt; } .tag-gra4 .bcv-wrap { gap: 1.8mm; } .tag-gra4 .bcv-logo { width: 6.5mm; height: 6.5mm; }
+            .tag-carta { width: 190mm; height: 254mm; border-width: 1.3mm !important; outline: none; }
+            .tag-carta > *:not(.hab-marca-agua) { position: relative; z-index: 1; }
+            .tag-carta .tag-top { height: 18mm; padding: 0 9mm; font-size: 19pt; } .tag-carta .tag-badge { padding: 1.4mm 4.5mm; font-size: 15pt; border-radius: 1.4mm; } .tag-carta .logo { width: 10.5mm; height: 10.5mm; }
+            .tag-carta .tag-prod { font-size: 34pt; padding: 8mm 10mm 0; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; text-shadow: 0 0 1.2mm #ffffff, 0 0 2.4mm #ffffff; }
+            .tag-carta .tag-mid { padding: 0 10mm; }
+            .tag-carta .p-wrap, .tag-carta .antes { text-shadow: 0 0 1.2mm #ffffff, 0 0 2.4mm #ffffff; }
+            .tag-carta .p-sym { font-size: 46pt; margin-top: 7mm; margin-right: 3mm; } .tag-carta .p-int { font-size: 205pt; } .tag-carta.d2 .p-int { font-size: 168pt; } .tag-carta.d3 .p-int { font-size: 124pt; }
+            .tag-carta .p-dec { font-size: 72pt; margin-top: 4mm; } .tag-carta .p-unit { font-size: 28pt; margin-top: 4.5mm; }
+            .tag-carta.ofe .tag-mid { flex-direction: column; align-items: center; justify-content: center; gap: 11mm; }
+            .tag-carta.ofe .est-ofe-top { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5.5mm; }
+            .tag-carta.ofe .p-sym { font-size: 40pt; margin-top: 5mm; } .tag-carta.ofe .p-int { font-size: 170pt; } .tag-carta.ofe.d2 .p-int { font-size: 142pt; } .tag-carta.ofe.d3 .p-int { font-size: 108pt; } .tag-carta.ofe .p-dec { font-size: 62pt; } .tag-carta.ofe .p-unit { font-size: 24pt; }
+            .tag-carta .antes { font-size: 34pt; } .tag-carta .tachado svg path { stroke-width: 2.8px; } .tag-carta .save { font-size: 33pt; padding: 3.5mm 9mm; border-radius: 3mm; text-shadow: none; }
+            .tag-carta .tag-foot { height: 15mm; padding: 0 9mm; font-size: 15.5pt; background: rgba(248, 250, 252, 0.94); } .tag-carta.t-bn .tag-foot { background: rgba(255, 255, 255, 0.95); } .tag-carta .bcv-wrap { gap: 3mm; } .tag-carta .bcv-logo { width: 11mm; height: 11mm; }
         </style></head><body>
             <svg xmlns="http://www.w3.org/2000/svg" style="display:none">${bcvDefs}</svg>
             <div class="toolbar no-print"><div><b>Habladores · ${expandidos.length} etiqueta(s) · ${hojas.length} hoja(s) Carta</b> <span style="opacity:.8;font-size:12px;margin-left:8px;">Imprimir en Carta · Escala 100 %</span></div>
@@ -24143,26 +24215,29 @@ Reglas:
             <div class="rpt-estados" id="habEstadoBox">${habEstadoHTML(hab.tienda, st)}</div>
             ${habColaHTML()}`;
         if (!st || st.paso !== 'listo') {
-            return h + (st ? '' : `<div class="nota">Consulta en vivo el BigSoft de la tienda elegida (solo lectura). Lista los productos que tienen existencia disponible para que agregues los que quieras con un clic e imprimas sus habladores en Tamaño Pequeño (6,5 × 2,8 cm · 27/hoja), Estándar (6,5 × 4,5 cm · 15/hoja), Grande Compacto (4/hoja) o Grande Media Carta (2/hoja).</div>`);
+            return h + (st ? '' : `<div class="nota">Consulta en vivo el BigSoft de la tienda elegida (solo lectura). Lista los productos que tienen existencia disponible para que agregues los que quieras con un clic e imprimas sus habladores en Tamaño Pequeño (6,5 × 2,8 cm · 27/hoja), Estándar (6,5 × 4,5 cm · 15/hoja), Grande Compacto (4/hoja), Media Carta (2/hoja) o Carta Completa (1/hoja con marca de agua).</div>`);
         }
         const cats = [...new Set(st.items.map(x => x.cat).filter(Boolean))].sort((a, b) => ALM_ORDEN.compare(a, b));
         const filtrados = habFiltrados(st), MAX = 120, ver = filtrados.slice(0, MAX), mapaCola = new Map(hab.cola.map(x => [x.cod, x]));
+        const todosSel = filtrados.length > 0 && filtrados.every(x => mapaCola.has(x.cod));
+        const algunosSel = !todosSel && filtrados.some(x => mapaCola.has(x.cod));
         h += `<div class="rpt-vista">
                 <div><label for="habCat">Categoría</label><select id="habCat" onchange="hab.cat=this.value;habRepintar()"><option value="">Todas (${st.items.length})</option>${cats.map(c => `<option${c === hab.cat ? ' selected' : ''}>${esc(c)}</option>`).join('')}</select></div>
                 <div class="rpt-buscar"><label for="habBus">Buscar</label><input type="search" id="habBus" autocomplete="off" placeholder="Código o descripción..." value="${esc(hab.bus || '')}" oninput="habBuscarInput(this.value)"></div>
-                ${filtrados.length ? `<button type="button" class="btn-ghost" onclick="habAgregarVisibles()">+ Agregar visibles (${Math.min(filtrados.length, 100)})</button>` : ''}
+                ${filtrados.length ? `<button type="button" class="${todosSel ? 'btn-primary' : 'btn-ghost'}" onclick="habSeleccionarTodos(${todosSel})">${todosSel ? `✓ Todos seleccionados (${filtrados.length}) · Quitar` : `☑ Seleccionar todos (${filtrados.length})`}</button>` : ''}
             </div>`;
         if (!ver.length) return h + `<div class="empty">${st.items.length ? 'Ningún producto con estos filtros.' : 'No hay productos con existencia positiva en esta tienda.'}</div>`;
-        h += `<div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Código</th><th class="izq">Descripción</th><th class="izq">Categoría</th><th>Existencia</th><th>Detal Ref. $</th><th class="izq">Imprimir</th></tr></thead><tbody>
+        if (algunosSel) setTimeout(() => { const el = document.getElementById('habSelTodos'); if (el) el.indeterminate = true; }, 0);
+        h += `<div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th style="width:2.2rem"><input type="checkbox" id="habSelTodos" class="hab-sel-chk" ${todosSel ? 'checked' : ''} onchange="habSeleccionarTodos(${todosSel})" title="${todosSel ? 'Quitar todos' : 'Seleccionar todos'} (${filtrados.length})" aria-label="Seleccionar todos"></th><th class="izq">Código</th><th class="izq">Descripción</th><th class="izq">Categoría</th><th>Existencia</th><th>Detal Ref. $</th><th class="izq">Imprimir</th></tr></thead><tbody>
             ${ver.map(it => {
                 const c = mapaCola.get(it.cod), cq = esc(it.cod).replace(/'/g, '&#39;');
                 const btns = c
                     ? `<button type="button" class="btn-primary btn-mini" onclick="habSumar('${cq}',1)">En cola ×${c.copias} (+)</button><button type="button" class="btn-ghost btn-mini" onclick="habSumar('${cq}',-1)">−1</button><button type="button" class="btn-ghost btn-mini" onclick="habImprimirUno('${cq}')">Imprimir</button>`
                     : `<button type="button" class="btn-ghost btn-mini" onclick="habAgregar('${cq}',false)">+ Normal</button><button type="button" class="btn-ghost btn-mini" onclick="habAgregar('${cq}',true)">+ Oferta</button><button type="button" class="btn-primary btn-mini" onclick="habImprimirUno('${cq}')">Imprimir</button>`;
-                return `<tr><td class="izq"><b>${esc(it.cod)}</b></td><td class="izq">${esc(it.desc)}<small>${esc(it.unit)}</small></td><td class="izq">${esc(it.cat) || '—'}</td>
+                return `<tr><td><input type="checkbox" class="hab-sel-chk" ${c ? 'checked' : ''} onchange="habAlternarSel('${cq}',this.checked)" aria-label="Seleccionar ${esc(it.desc)}"></td><td class="izq"><b>${esc(it.cod)}</b></td><td class="izq">${esc(it.desc)}<small>${esc(it.unit)}</small></td><td class="izq">${esc(it.cat) || '—'}</td>
                     <td>${nfVE(0, 3).format(it.exist)}</td><td><b>${fmt(it.precio)}</b></td><td class="alm-acc">${btns}</td></tr>`;
             }).join('')}
-        </tbody></table></div>${filtrados.length > MAX ? `<div class="nota">Mostrando ${MAX} de ${filtrados.length} productos con existencia. Escribe en Buscar o filtra por categoría para encontrar cualquier producto.</div>` : ''}`;
+        </tbody></table></div>${filtrados.length > MAX ? `<div class="nota">Mostrando ${MAX} de ${filtrados.length} productos con existencia. "Seleccionar todos" agrega los ${filtrados.length} completos, o usa Buscar/Categoría para filtrar.</div>` : ''}`;
         return h;
     }
 
