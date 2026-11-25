@@ -7714,7 +7714,8 @@ function revisarPagos(forzar) {
                 : !t.version ? '<span class="chip st-falta">Anterior: copiar a mano una vez</span>'
                 : p && t.version === p.version ? '<span class="chip st-ok">Al día</span>'
                 : '<span class="chip st-amar">Actualizando</span>';
-            return `<tr><td class="izq">${esc(t.local)}</td><td class="izq">${t.version ? esc(t.version) : '—'}<small>${esc(paqHace(t.hace))}</small></td><td>${chip}</td></tr>`;
+            const errTxt = t.paqError && (!p || t.version !== p.version) ? `<small style="color:var(--bad)">Error: ${esc(t.paqError)}</small>` : '';
+            return `<tr><td class="izq">${esc(t.local)}</td><td class="izq">${t.version ? esc(t.version) : '—'}<small>${esc(paqHace(t.hace))}</small>${errTxt}</td><td>${chip}</td></tr>`;
         };
         pintarConservando(el, `<div class="fb-cab"><h4>Utilidades de las tiendas</h4><span class="fb-res">${p ? `Publicada <b>${esc(p.version)}</b> · ${al} de ${tiendas.length} tiendas al día` : 'Todavía no se ha subido ningún paquete'}</span></div>
             ${p ? `<div class="req-sub" style="margin-bottom:.5rem">Subida el ${esc(p.subido || '')} por ${esc(p.por || '')} · ${fmtNum(p.archivos || 0)} archivos · ${fmtNum(Math.round((p.tam || 0) / 1024))} KB</div>` : ''}
@@ -23466,7 +23467,7 @@ Reglas:
                         <td class="izq">${no ? `<span class="chip ${c.conectado || c.enEspera ? 'st-sobra' : 'st-pend'}">${esc(no)}</span>` : '<span class="chip st-ok">Se puede cerrar</span>'}</td>
                         <td>${no ? '' : `<button type="button" class="btn-primary btn-mini" data-login="${esc(c.login)}" ${cie.cerrando ? 'disabled' : ''} onclick="cieCerrar(this.dataset.login)">${cie.cerrando === c.login ? 'Cerrando...' : 'Cerrar caja'}</button>`}</td></tr>`;
                 }).join('')}</tbody></table></div>
-                ${cie.cajas.some(c => c.conectado) ? `<div class="nota">La caja está en uso: el cajero tiene abierto el programa de caja o vendió hace menos de 30 minutos. Para cerrarla debe salir primero de la caja${CF_SOLO ? '' : ' en BigSoft (BigSoft tampoco la cierra así)'}.</div>` : ''}`;
+                ${cie.cajas.some(c => c.conectado) ? `<div class="nota">La caja está en uso: el cajero tiene abierto el programa de caja. Para cerrarla debe salir primero de la caja${CF_SOLO ? '' : ' en BigSoft (BigSoft tampoco la cierra así)'}.</div>` : ''}`;
         const res = a ? `<div class="banner ok" style="display:block">Caja de <b>${esc(a.nombre || a.login)}</b> cerrada${CF_SOLO ? '' : ' en BigSoft'} (cierre N° ${esc(String(a.nroCierre || ''))}, ${fmtNum(a.facturas || 0)} facturas). Total ${fmt(a.total || 0)} Bs ·
                 efectivo ${fmt(a.efectivo || 0)} · punto ${fmt(a.tarjeta || 0)} · pago móvil ${fmt(a.pagoMovil || 0)} · biopago ${fmt(a.biopago || 0)} · divisas ${fmt(a.divisas || 0)} $.
                 ${a.registro && a.registro.error ? `<br><b>No se pudo registrar:</b> ${esc(a.registro.error)}` : a.registro && a.registro.ficha && a.registro.ficha.ficha ? `<br>Ficha ${esc(String(a.registro.ficha.ficha))}: ${esc(a.registro.ficha.estado || '')}${a.registro.ficha.diferencias ? ' (' + esc(a.registro.ficha.diferencias) + ')' : ''}.` : '<br>Su ficha todavía no ha llegado: los montos se pasan solos cuando llegue.'}
