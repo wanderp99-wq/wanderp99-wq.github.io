@@ -1254,7 +1254,8 @@
     let listaBancosPM = [...listaBancos, "Provincial"]; // Bancos para Pago Móvil (incluye Provincial)
     let listaTiposGasto = ["Compra material", "Pago proveedor", "Credito", "Otro"];
     let listaTitulares = ["Plaza Valencia", "Junior Lanz", "Raimary Quintero"];
-    let listaTitularesPM = [...listaTitulares, "Lisbeth Perez"];
+    let listaTitularesPM = [...listaTitulares, "Lisbeth Perez", "Wander Daniel Paredes"];
+    let pmActivos = [];
     function usarListasFicha(l) {
         const ok = a => Array.isArray(a) && a.length && a.every(x => typeof x === 'string');
         if (ok(l.bancosTDD)) listaBancos = l.bancosTDD;
@@ -1304,6 +1305,10 @@
                 usarListasFicha(l);
                 try { localStorage.setItem('ficha_listas', JSON.stringify(l)); } catch (e) {}
                 if (JSON.stringify([listaBancos, listaBancosPM, listaTitulares, listaTitularesPM, listaTiposGasto]) !== antes) refrescarListasFicha();
+            }
+            if (cf && Array.isArray(cf.pm_activos)) {
+                pmActivos = cf.pm_activos;
+                pmRevisar(false);
             }
         } catch (e) {}
     }
@@ -1505,7 +1510,7 @@
         fijarValor(div.querySelector('.pm-banco'), banco);
         fijarValor(div.querySelector('.pm-titular'), titular);
         div.querySelectorAll('input, select').forEach(el => el.addEventListener('input', guardarBorrador));
-        div.querySelectorAll('.pm-ref, .pm-banco, .pm-monto').forEach(el => { el.addEventListener('input', pmRevisarPronto); el.addEventListener('change', pmRevisarPronto); });
+        div.querySelectorAll('.pm-ref, .pm-banco, .pm-titular, .pm-monto').forEach(el => { el.addEventListener('input', pmRevisarPronto); el.addEventListener('change', pmRevisarPronto); });
         document.getElementById('pagoMovilContainer').appendChild(div);
     }
 
@@ -1569,23 +1574,36 @@
         document.getElementById('totalVentasDiv').textContent = formatearMoneda(total);
     }
 
-    // ---------- (15/11) Pago móvil de Bancrecer: ¿está en la cuenta? ----------
-    // Bancrecer manda un correo por cada pago móvil recibido; el sistema lo lee y lo deja en el servidor nuevo. Aquí, al escribir los
-    // 4 dígitos y el monto de un pago de Bancrecer, se pregunta al momento: en la cuenta, ya reportado en otra ficha o tienda, el monto
-    // no coincide, o todavía no aparece (en ese caso se le pide al sistema leer el correo ya mismo). Solo dice el estado.
+    // ---------- (15/11 · 24/11) Pago móvil (Bancrecer y R4): ¿está en la cuenta? ----------
+    // El sistema lee los correos de cada cuenta configurada y los deja en Cloudflare. Al escribir los 4 dígitos y el monto
+    // se consulta al momento si está en la cuenta, si ya lo reportó otra ficha o tienda, o si el monto no coincide.
     let pmT = 0, pmPidiendo = 0;
-    const pmRenglones = () => Array.from(document.querySelectorAll('#pagoMovilContainer .dynamic-row')).map(row => ({ row,
-        ref4: String(row.querySelector('.pm-ref').value || '').trim(), banco: row.querySelector('.pm-banco').value, monto: parseFloat(row.querySelector('.pm-monto').value) || 0 }))
-        .filter(x => /bancrecer/i.test(x.banco));
+    const pmBancoMonitoreado = b => {
+        const s = String(b || '').trim().toLowerCase();
+        if (!s) return false;
+        if (s === 'bancrecer' || s === 'r4') return true;
+        return pmActivos.some(a => String(a.banco || '').trim().toLowerCase() === s);
+    };
+    const pmRenglones = () => Array.from(document.querySelectorAll('#pagoMovilContainer .dynamic-row')).map(row => ({
+        row,
+        ref4: String(row.querySelector('.pm-ref').value || '').trim(),
+        banco: row.querySelector('.pm-banco').value,
+        titular: (row.querySelector('.pm-titular') || {}).value || '',
+        monto: parseFloat(row.querySelector('.pm-monto').value) || 0
+    })).filter(x => pmBancoMonitoreado(x.banco));
     function pmRevisarPronto() { clearTimeout(pmT); pmT = setTimeout(() => pmRevisar(false), 700); }
     function pmPintar(x, r) {
         const el = x.row.querySelector('.pm-estado'); if (!el) return;
         const fmt = n => Number(n).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        const t = !r ? ['', ''] : r.estado === 'ok' ? ['ok', '✓ Está en la cuenta de Bancrecer' + (r.hora ? ' (recibido ' + (r.fecha && r.fecha !== document.getElementById('fecha').value ? r.fecha.split('-').reverse().join('/') + ' ' : '') + r.hora + ')' : '')]
+        const bNom = (r && r.banco) || x.banco || 'la cuenta';
+        const tit = r && r.titular ? ' · ' + r.titular : '';
+        const ojoTit = r && r.mismoTitular === false && x.titular && r.titular ? ' (ojo: llegó al correo de ' + r.titular + ')' : '';
+        const t = !r || r.estado === 'sin_cuenta' ? ['', '']
+            : r.estado === 'ok' ? ['ok', '✓ Está en ' + bNom + tit + (r.hora ? ' (recibido ' + (r.fecha && r.fecha !== document.getElementById('fecha').value ? r.fecha.split('-').reverse().join('/') + ' ' : '') + r.hora + ')' : '') + ojoTit]
             : r.estado === 'usado' ? ['mal', '✕ Este pago ya se reportó en ' + (r.tienda || 'otra ficha') + (r.fechaFicha ? ' (' + r.fechaFicha.split('-').reverse().join('/') + (r.turno ? ', ' + r.turno : '') + ')' : '') + (r.nroFicha ? ' · ficha ' + r.nroFicha : '')]
             : r.estado === 'repetido' ? ['mal', '✕ Está repetido en esta ficha']
-            : r.estado === 'monto' ? ['duda', 'En el banco esa referencia es por Bs ' + fmt(r.montoBanco) + ': revise el monto']
-            : r.estado === 'no' ? ['duda', r.leido ? 'Todavía no aparece en la cuenta de Bancrecer (revise la referencia y el monto, o espere unos minutos)' : 'Buscando en la cuenta de Bancrecer...']
+            : r.estado === 'monto' ? ['duda', 'En ' + bNom + ' esa referencia es por Bs ' + fmt(r.montoBanco) + ': revise el monto']
+            : r.estado === 'no' ? ['duda', r.leido ? 'Todavía no aparece en ' + bNom + tit + ' (revise la referencia y el monto, o espere 1 min)' : 'Buscando en ' + bNom + '...']
             : r.estado === 'sinred' ? ['', 'No se pudo revisar ahora (sin internet)'] : ['', ''];
         el.className = 'pm-estado ' + t[0]; el.textContent = t[1];
     }
@@ -1596,14 +1614,14 @@
         const listos = l.filter(x => /^\d{4}$/.test(x.ref4) && x.monto > 0);
         l.filter(x => !listos.includes(x)).forEach(x => pmPintar(x, null));
         if (!listos.length) return [];
-        const yo = ++pmPidiendo, pagos = listos.map(x => ({ ref4: x.ref4, monto: x.monto, fecha }));
+        const yo = ++pmPidiendo, pagos = listos.map(x => ({ ref4: x.ref4, monto: x.monto, banco: x.banco, titular: x.titular, fecha }));
         let idem = ''; try { idem = localStorage.getItem('caja_idem') || ''; } catch (e) {}
         let r = await cfPublico('pub_pm_ver', { pagos, idem }, 6000);
         if (yo !== pmPidiendo) return [];
         if (!r) { listos.forEach(x => pmPintar(x, { estado: 'sinred' })); return []; }
         r.resultados.forEach((v, i) => pmPintar(listos[i], v));
-        // Los que no aparecen: el sistema lee el correo ahora mismo y se vuelve a preguntar
-        if (r.resultados.some(v => v.estado === 'no')) {
+        // Bancrecer del correo central: si no aparece aún, se le pide a Google leer el correo ahora mismo
+        if (r.resultados.some((v, i) => v.estado === 'no' && /bancrecer/i.test(listos[i].banco))) {
             try {
                 const resp = await fetch(URL_HOJA, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                     body: JSON.stringify({ consultaFicha: 'pago_movil', equipo: fichaEquipo(), pagos, idem }) });
@@ -1613,7 +1631,7 @@
             if (yo !== pmPidiendo) return [];
             r.resultados.forEach((v, i) => pmPintar(listos[i], Object.assign({ leido: true }, v)));
         }
-        return final ? r.resultados.map((v, i) => Object.assign({ ref4: listos[i].ref4, monto: listos[i].monto }, v)).filter(v => v.estado !== 'ok') : [];
+        return final ? r.resultados.map((v, i) => Object.assign({}, v, { ref4: listos[i].ref4, monto: listos[i].monto, banco: v.banco || listos[i].banco })).filter(v => v.estado !== 'ok' && v.estado !== 'sin_cuenta' && v.estado !== 'sinred') : [];
     }
     setTimeout(() => pmRevisar(false), 1500);   // lo que quedó del borrador
 
@@ -2668,9 +2686,9 @@
             const malos = await Promise.race([pmRevisar(true), new Promise(ok => setTimeout(() => ok([]), 12000))]);
             if (malos.length) {
                 const fmt = n => Number(n).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                const txt = malos.map(v => '• Ref. ' + v.ref4 + ' · Bs ' + fmt(v.monto) + ': ' + (v.estado === 'usado' ? 'ya se reportó en ' + (v.tienda || 'otra ficha') : v.estado === 'repetido' ? 'repetido en esta ficha'
+                const txt = malos.map(v => '• ' + (v.banco ? v.banco + ' · ' : '') + 'Ref. ' + v.ref4 + ' · Bs ' + fmt(v.monto) + ': ' + (v.estado === 'usado' ? 'ya se reportó en ' + (v.tienda || 'otra ficha') : v.estado === 'repetido' ? 'repetido en esta ficha'
                     : v.estado === 'monto' ? 'en el banco es por Bs ' + fmt(v.montoBanco) : v.estado === 'sinred' ? 'no se pudo revisar' : 'no aparece en la cuenta')).join('\n');
-                if (!confirm('Pagos móviles de Bancrecer que no cuadran:\n\n' + txt + '\n\nRevíselos. ¿Enviar la ficha de todas formas? (Administración recibirá el aviso)')) return;
+                if (!confirm('Pagos móviles que no cuadran:\n\n' + txt + '\n\nRevíselos. ¿Enviar la ficha de todas formas? (Administración recibirá el aviso)')) return;
             }
         } catch (e) {}
 

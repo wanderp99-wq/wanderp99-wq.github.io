@@ -2638,7 +2638,7 @@
         <!-- ===== CARGAR ===== -->
         <div id="pagCargar" class="hidden">
             <div class="grafico-card">
-                <div class="grafico-head"><h3>Cargar estado de cuenta</h3></div>
+                <div class="grafico-head" style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap"><h3>Cargar estado de cuenta</h3><button type="button" id="pagBtnPmCorreo" class="btn-ghost btn-mini hidden" onclick="pmAbrir(this)">Cuentas por correo (R4 / Bancrecer)</button></div>
                 <div class="grafico-sub">
                     <b>BNC:</b> PDF "movimientos entre fechas" o Excel de BNCNET ·
                     <b>Bancrecer:</b> Excel de movimientos ·
@@ -3738,7 +3738,7 @@
         if (TIEMPOS.length > 60) TIEMPOS.pop();
     }
     // Solo lectura: si la respuesta de Google no llega, se reintenta una vez sola (no cambia nada en la hoja)
-    const SOLO_LECTURA = /^(nom_semana|fb_hoja_leer|login|fb_token|fb_prueba|list|cuadre_detalle|cuadre_detalle_lote|mov_listar|cuentas_listar|conc_listar|efe_listar|cc_listar|req_datos|req_ventas|req_historial|asis_hoy|asis_listar|asisg_listar|per_listar|cxc_deudas|nom_historial|nom_autorizar|nom_ajustes|hor_datos|alm_datos|alm_notas|alm_ingresos|alm_kardex|alm_seguimiento|alm_tiendas|alm_existencias|alm_espera_listar|cmp_compras|cmp_ordenes|cmp_enlazar|cmp_borradores|cmp_borrador|pnom_listar|ping|cambios|pendientes|enlinea|marca_estado|tg_grupos_cuadre)$/;
+    const SOLO_LECTURA = /^(nom_semana|fb_hoja_leer|login|fb_token|fb_prueba|list|cuadre_detalle|cuadre_detalle_lote|mov_listar|cuentas_listar|conc_listar|efe_listar|cc_listar|req_datos|req_ventas|req_historial|asis_hoy|asis_listar|asisg_listar|per_listar|cxc_deudas|nom_historial|nom_autorizar|nom_ajustes|hor_datos|alm_datos|alm_notas|alm_ingresos|alm_kardex|alm_seguimiento|alm_tiendas|alm_existencias|alm_espera_listar|cmp_compras|cmp_ordenes|cmp_enlazar|cmp_borradores|cmp_borrador|pnom_listar|ping|cambios|pendientes|enlinea|marca_estado|tg_grupos_cuadre|pm_cuentas_estado|pm_tg_chats)$/;
     // Guardados sin repetir: cada cambio lleva un "idem". Si no llegó la respuesta y se vuelve a pulsar el MISMO cambio,
     // se manda el mismo idem y Google responde "ya estaba registrado" en vez de guardarlo otra vez.
     const idemPendientes = new Map();   // contenido del cambio -> idem del intento sin respuesta
@@ -3779,7 +3779,7 @@
     // ==========================================
     const DATOS = (() => {
         // Lecturas que no se copian: entrar, avisos, lo que cambia a cada momento o es de una sola vez
-        const NO_COPIAR = /^(login|fb_token|fb_prueba|fb_hoja_leer|ping|cambios|pendientes|enlinea|marca_estado|cmp_enlazar|cmp_borrador|nom_autorizar|alm_kardex|alm_seguimiento)$/;
+        const NO_COPIAR = /^(login|fb_token|fb_prueba|fb_hoja_leer|ping|cambios|pendientes|enlinea|marca_estado|cmp_enlazar|cmp_borrador|nom_autorizar|alm_kardex|alm_seguimiento|pm_cuentas_estado|pm_tg_chats)$/;
         const VIGENCIA = 3 * 24 * 3600 * 1000;   // lo guardado hace más de 3 días no se muestra
         const RECIENTE = 20000;                   // leído de Google hace menos de 20 s: no se vuelve a preguntar
         const memoria = new Map();                // llave -> { s (texto), t (cuándo), ver (versiones de sus áreas) }
@@ -3916,8 +3916,8 @@
         if (/^(cuadre_tol|cuentas_listar|cuentas_guardar)$/.test(payload.action)) { const r = await cfCuadreExtra(payload); if (r) return r; }
         // (15/11) Historial de nóminas: del servidor nuevo (con la Nómina encendida allá)
         if (payload.action === 'nom_historial') { const r = await cfNomHistorial(payload); if (r) return r; }
-        // (22/11) Campana (pendientes), usuarios en línea, paquete de utilidades y avisos de tienda directo al servidor nuevo
-        if (/^(pendientes|enlinea|paq_estado|paq_subir|aviso_tienda)$/.test(payload.action) && typeof CF_URL === 'string' && CF_URL) {
+        // (22/11 · 24/11) Campana, usuarios en línea, paquete de utilidades, avisos de tienda y cuentas de pago móvil directo al servidor nuevo
+        if (/^(pendientes|enlinea|paq_estado|paq_zip|paq_subir|aviso_tienda|pm_cuentas_estado|pm_cuenta_guardar|pm_cuenta_quitar|pm_cuenta_probar_tg|pm_tg_chats)$/.test(payload.action) && typeof CF_URL === 'string' && CF_URL) {
             let cfErr = '';
             try {
                 const t0c = performance.now(), r = await cfPedir(Object.assign({}, payload, { token: await cfToken(), vista: typeof vistaActual === 'string' ? vistaActual : '', disp: DISPOSITIVO }));
@@ -3930,8 +3930,8 @@
                     return r;
                 }
                 if (r && r.sesion === false) cfSes.token = '';
-                else if (payload.action === 'aviso_tienda' && r && !r.noAqui && r.error) cfErr = r.error;
-            } catch (e) { if (/Cuenta suspendida/i.test(e && e.message)) cerrarSesion(e.message); }
+                else if ((payload.action === 'aviso_tienda' || /^pm_(cuenta|tg_)/.test(payload.action)) && r && !r.noAqui && r.error) cfErr = r.error;
+            } catch (e) { if (/Cuenta suspendida/i.test(e && e.message)) cerrarSesion(e.message); if (/^pm_(cuenta|tg_)/.test(payload.action)) throw e; }
             if (cfErr) throw new Error(cfErr);
         }
         // (12/11) Lecturas del almacén con "Usar Firebase en el Almacén" encendido: se responden aquí con lo de Firebase (sin Google)
@@ -6839,39 +6839,443 @@
                     : `<div class="fb-ind"><span>Revisión automática (cada 5 min)</span><b>${rev ? (revHace != null ? `Activa · corrió hace ${revHace} min` : 'Activa · todavía no corre') : 'No activa'}</b><button type="button" class="btn-ghost btn-mini" onclick="fbRevision(this, false)">Pasar a manual</button></div>`}
             </div>
             <div class="tabla-wrap"><table class="req-tabla fb-tabla" data-sin-paginar><thead><tr><th class="izq">Módulo</th><th class="izq">Dónde se guarda</th><th></th></tr></thead><tbody>${filas.map(f => f.html).join('')}</tbody></table></div>
-            <div class="req-acciones" style="justify-content:flex-end;margin:.5rem 0 0"><button type="button" class="btn-ghost btn-mini" onclick="fbHojas(this, 'copiar', 'pagos')">Copiar todo a la hoja ahora</button><button type="button" class="btn-ghost btn-mini" onclick="fbProbar(this)">Probar Firebase</button><button type="button" class="btn-ghost btn-mini" onclick="fbhComparar(this)">Comparar Nómina (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="almfbComparar(this)">Comparar Almacén y compras (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="cajafbComparar(this)">Comparar Cuadre y Validar pagos (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="perfbComparar(this)">Comparar Cuentas por cobrar, asistencia y horarios (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="reqfactComparar(this)">Comparar Requerimientos y Facturar (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="cfAbrir()">Servidor nuevo (Cloudflare)</button><button type="button" class="btn-ghost btn-mini" onclick="tgCuadreVer(this)">Grupos de cuadre en Telegram</button><button type="button" class="btn-ghost btn-mini" onclick="tolCierreVer(this)">Tolerancias del cierre</button><button type="button" class="btn-ghost btn-mini" onclick="bcrAbrir(this)">Pago móvil Bancrecer</button><button type="button" class="btn-primary btn-mini" onclick="fbRevisarAhora(this)">Actualizar</button></div>
+            <div class="req-acciones" style="justify-content:flex-end;margin:.5rem 0 0"><button type="button" class="btn-ghost btn-mini" onclick="fbHojas(this, 'copiar', 'pagos')">Copiar todo a la hoja ahora</button><button type="button" class="btn-ghost btn-mini" onclick="fbProbar(this)">Probar Firebase</button><button type="button" class="btn-ghost btn-mini" onclick="fbhComparar(this)">Comparar Nómina (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="almfbComparar(this)">Comparar Almacén y compras (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="cajafbComparar(this)">Comparar Cuadre y Validar pagos (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="perfbComparar(this)">Comparar Cuentas por cobrar, asistencia y horarios (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="reqfactComparar(this)">Comparar Requerimientos y Facturar (Firebase directo)</button><button type="button" class="btn-ghost btn-mini" onclick="cfAbrir()">Servidor nuevo (Cloudflare)</button><button type="button" class="btn-ghost btn-mini" onclick="tgCuadreVer(this)">Grupos de cuadre en Telegram</button><button type="button" class="btn-ghost btn-mini" onclick="tolCierreVer(this)">Tolerancias del cierre</button><button type="button" class="btn-ghost btn-mini" onclick="pmAbrir(this)">Pagos móviles (correo)</button><button type="button" class="btn-primary btn-mini" onclick="fbRevisarAhora(this)">Actualizar</button></div>
             <div class="nota">"En el servidor nuevo": lo de ese módulo se guarda en Cloudflare y la hoja de Google recibe una copia una vez al día (lo que se cambie a mano en la hoja ya no cuenta). "Pasar al servidor nuevo" copia todo, lo compara y solo si queda igual se cambia; cada uno se puede devolver desde su "Detalle".</div>`;
     }
-    // (15/11) Pago móvil de Bancrecer leído del correo: correos autorizados para reenviar los avisos, leer ahora y los últimos leídos
-    async function bcrAbrir(btn, extra) {
+    // (15/11 · 24/11) Pagos móviles leídos del correo (R4 Conecta y Bancrecer): múltiples cuentas independientes sin IFTTT + respaldo central
+    const pmModal = { estado: null, bcr: null, edit: null, formAbierto: false, llaves: {}, scriptId: '', tgChats: null, msg: '', filtro: '' };
+    const bcrAbrir = pmAbrir;
+    async function pmAbrir(btn, bcrExtra) {
         const texto = btn ? btn.textContent : ''; if (btn) btnCargando(btn, 'Consultando...');
-        let e = null, error = '';
-        try { e = await DATOS.aGoogle(() => llamarApi(Object.assign({ action: 'bcr_estado' }, extra || {}))); } catch (x) { error = x.message; }
+        let error = '';
+        try {
+            const pBcr = (!CF_SOLO && WEB_APP_URL)
+                ? DATOS.aGoogle(() => llamarApi(Object.assign({ action: 'bcr_estado' }, bcrExtra || {}))).catch(x => ({ error: x.message }))
+                : Promise.resolve(null);
+            const [est, bcr] = await Promise.all([DATOS.aGoogle(() => llamarApi({ action: 'pm_cuentas_estado' })), pBcr]);
+            pmModal.estado = est;
+            pmModal.bcr = bcr;
+            pmModal.msg = '';
+        } catch (x) { error = x.message; }
         finally { if (btn) { btn.disabled = false; btn.textContent = texto; } }
+        pmModalPintar(error);
+    }
+    function pmFmtFecha(f) { return String(f || '').slice(8, 10) + '/' + String(f || '').slice(5, 7) + ' ' + String(f || '').slice(11, 16); }
+    function pmEditar(id) {
+        const est = pmModal.estado || {}, ctas = est.cuentas || [];
+        const c = id ? ctas.find(x => x.id === id) : null;
+        pmModal.edit = c ? {
+            id: c.id, nombre: c.nombre || '', banco: c.banco || 'R4', titular: c.titular || '', correo: c.correo || '',
+            remitentes: (c.remitentes || []).join(', '), tgModo: c.tgModo || 'ninguno', tgChat: c.tgChat || '',
+            regenerarLlave: false, agregarListaFicha: false
+        } : {
+            id: '', nombre: '', banco: 'R4', titular: '', correo: '', remitentes: '', tgModo: 'ninguno', tgChat: '',
+            regenerarLlave: true, agregarListaFicha: true
+        };
+        pmModal.formAbierto = true;
+        pmModal.scriptId = '';
+        pmModal.msg = '';
+        pmModalPintar();
+    }
+    async function pmGuardarCuenta(ev, btn) {
+        if (ev) ev.preventDefault();
+        const texto = btn ? btn.textContent : ''; if (btn) btnCargando(btn, 'Guardando...');
+        try {
+            const g = id => (document.getElementById(id) || {}).value || '';
+            const payload = {
+                action: 'pm_cuenta_guardar',
+                id: pmModal.edit && pmModal.edit.id || '',
+                nombre: g('pmFNueNombre'),
+                banco: g('pmFBanco'),
+                titular: g('pmFTitular'),
+                correo: g('pmFCorreo'),
+                remitentes: g('pmFRem'),
+                tgModo: g('pmFTgModo'),
+                tgChat: g('pmFTgChat'),
+                regenerarLlave: !!((document.getElementById('pmFRegen') || {}).checked) || !(pmModal.edit && pmModal.edit.id),
+                agregarListaFicha: !!((document.getElementById('pmFAgrLista') || {}).checked)
+            };
+            const r = await DATOS.aGoogle(() => llamarApi(payload));
+            if (pmModal.estado) pmModal.estado.cuentas = r.cuentas || [];
+            if (r.llaveNueva && r.cuenta) pmModal.llaves[r.cuenta.id] = r.llaveNueva;
+            pmModal.formAbierto = false;
+            pmModal.scriptId = r.cuenta ? r.cuenta.id : '';
+            pmModal.msg = `<div class="banner ok" style="display:block">Cuenta guardada (${esc((r.cuenta && r.cuenta.nombre) || '')}). ${r.llaveNueva ? 'Copia el código de abajo e instálalo una vez en la cuenta de Google de esa persona.' : ''}</div>`;
+        } catch (x) {
+            pmModal.msg = `<div class="banner error" style="display:block">${esc(x.message)}</div>`;
+        } finally { if (btn) { btn.disabled = false; btn.textContent = texto; } }
+        pmModalPintar();
+    }
+    async function pmQuitarCuenta(id, btn) {
+        const c = ((pmModal.estado && pmModal.estado.cuentas) || []).find(x => x.id === id);
+        if (!confirm(`¿Quitar la cuenta "${(c && c.nombre) || id}"?\n\nSus pagos ya guardados no se borran, pero su script de Google dejará de aceptarse.`)) return;
+        const texto = btn ? btn.textContent : ''; if (btn) btnCargando(btn, 'Quitando...');
+        try {
+            const r = await DATOS.aGoogle(() => llamarApi({ action: 'pm_cuenta_quitar', id }));
+            if (pmModal.estado) pmModal.estado.cuentas = r.cuentas || [];
+            if (pmModal.scriptId === id) pmModal.scriptId = '';
+            pmModal.msg = `<div class="banner ok" style="display:block">Cuenta quitada.</div>`;
+        } catch (x) {
+            pmModal.msg = `<div class="banner error" style="display:block">${esc(x.message)}</div>`;
+        } finally { if (btn) { btn.disabled = false; btn.textContent = texto; } }
+        pmModalPintar();
+    }
+    async function pmVerScript(id, regen, btn) {
+        pmModal.scriptId = id;
+        pmModal.formAbierto = false;
+        pmModal.msg = '';
+        if (regen) {
+            const c = ((pmModal.estado && pmModal.estado.cuentas) || []).find(x => x.id === id);
+            if (c) {
+                const texto = btn ? btn.textContent : ''; if (btn) btnCargando(btn, 'Generando...');
+                try {
+                    const r = await DATOS.aGoogle(() => llamarApi({
+                        action: 'pm_cuenta_guardar', id: c.id, nombre: c.nombre, banco: c.banco, titular: c.titular,
+                        correo: c.correo, remitentes: (c.remitentes || []).join(','), tgModo: c.tgModo || 'ninguno',
+                        tgChat: c.tgChat || '', regenerarLlave: true
+                    }));
+                    if (pmModal.estado) pmModal.estado.cuentas = r.cuentas || [];
+                    if (r.llaveNueva) pmModal.llaves[id] = r.llaveNueva;
+                } catch (x) {
+                    pmModal.msg = `<div class="banner error" style="display:block">${esc(x.message)}</div>`;
+                } finally { if (btn) { btn.disabled = false; btn.textContent = texto; } }
+            }
+        }
+        pmModalPintar();
+    }
+    async function pmBuscarChats(btn) {
+        const texto = btn ? btn.textContent : ''; if (btn) btnCargando(btn, 'Buscando...');
+        try {
+            const r = await DATOS.aGoogle(() => llamarApi({ action: 'pm_tg_chats' }));
+            pmModal.tgChats = r;
+        } catch (x) {
+            pmModal.msg = `<div class="banner error" style="display:block">${esc(x.message)}</div>`;
+        } finally { if (btn) { btn.disabled = false; btn.textContent = texto; } }
+        pmModalPintar();
+    }
+    async function pmProbarChat(id, btn) {
+        const texto = btn ? btn.textContent : ''; if (btn) btnCargando(btn, 'Enviando...');
+        try {
+            const payload = id ? { action: 'pm_cuenta_probar_tg', id } : { action: 'pm_cuenta_probar_tg', tgChat: (document.getElementById('pmFTgChat') || {}).value || '' };
+            await DATOS.aGoogle(() => llamarApi(payload));
+            pmModal.msg = '<div class="banner ok" style="display:block">Mensaje de prueba enviado correctamente por Telegram.</div>';
+        } catch (x) {
+            pmModal.msg = `<div class="banner error" style="display:block">${esc(x.message)}</div>`;
+        } finally { if (btn) { btn.disabled = false; btn.textContent = texto; } }
+        pmModalPintar();
+    }
+    function pmCopiarScript(btn) {
+        const ta = document.getElementById('pmScriptArea');
+        if (!ta) return;
+        ta.select();
+        const done = () => { if (btn) { const t = btn.textContent; btn.textContent = '¡Copiado!'; setTimeout(() => { btn.textContent = t; }, 2000); } };
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(ta.value).then(done).catch(() => { try { document.execCommand('copy'); done(); } catch (e) {} });
+        else { try { document.execCommand('copy'); done(); } catch (e) {} }
+    }
+    function pmGenerarScript(c, llave) {
+        const srv = (typeof CF_URL === 'string' && CF_URL ? CF_URL : 'https://plaza-software.jdsistemas.workers.dev') + '/api';
+        const emp = (typeof CF_EMPRESA === 'string' && CF_EMPRESA) || 'plaza-valencia';
+        const bancos = c.banco === 'Todos' ? ['R4', 'Bancrecer'] : [c.banco || 'R4'];
+        const extras = Array.isArray(c.remitentes) ? c.remitentes : [];
+        return `// ============================================================
+// PLAZA SOFTWARE · Lector automático de Pago Móvil (SIN IFTTT)
+// Cuenta: ${c.nombre || ''} (${bancos.join(' / ')} · Titular: ${c.titular || ''})
+// Instalar en https://script.google.com desde la cuenta de Google de ${c.titular || c.nombre || 'esta persona'}:
+//   1. Nuevo proyecto  2. Pegar este código y Guardar  3. Elegir "activar" arriba y pulsar Ejecutar
+// ============================================================
+const PM_CFG = {
+  servidor: ${JSON.stringify(srv)},
+  empresa: ${JSON.stringify(emp)},
+  cuentaId: ${JSON.stringify(c.id || '')},
+  llave: ${JSON.stringify(llave || '')},
+  bancos: ${JSON.stringify(bancos)},
+  remitentesExtra: ${JSON.stringify(extras)}
+};
+
+function activar() {
+  ScriptApp.getProjectTriggers().forEach(t => {
+    if (t.getHandlerFunction() === 'revisarPagos') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('revisarPagos').timeBased().everyMinutes(1).create();
+  const props = PropertiesService.getScriptProperties();
+  if (!props.getProperty('PM_DESDE')) props.setProperty('PM_DESDE', String(Date.now() - 2 * 864e5));
+  const r = revisarPagos(true);
+  console.log('Listo (' + pmCorreoPropio() + '): ' + JSON.stringify(r));
+}
+
+function probarAhora() {
+  const r = revisarPagos(true);
+  console.log(JSON.stringify(r));
+  return r;
+}
+
+function pmCorreoPropio() {
+  try { return String(Session.getActiveUser().getEmail() || Session.getEffectiveUser().getEmail() || '').toLowerCase(); }
+  catch (e) { return ''; }
+}
+
+function pmParseMonto(raw) {
+  let s = String(raw || '').trim();
+  if (!s) return 0;
+  if (/,\\d{1,2}$/.test(s)) s = s.replace(/\\./g, '').replace(',', '.');
+  else if (/\\.\\d{1,2}$/.test(s)) s = s.replace(/,/g, '');
+  else if (/\\.\\d{3}$/.test(s) && !/,/.test(s)) s = s.replace(/\\./g, '');
+  else s = s.replace(/[^\\d.]/g, '');
+  const n = Number(s);
+  return isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : 0;
+}
+
+function pmHtmlATexto(html) {
+  return String(html || '')
+    .replace(/<br\\s*\\/?>/gi, '\\n')
+    .replace(/<\\/(p|div|tr|td|li)>/gi, '\\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&aacute;/gi, 'á').replace(/&eacute;/gi, 'é').replace(/&iacute;/gi, 'í').replace(/&oacute;/gi, 'ó').replace(/&uacute;/gi, 'ú')
+    .replace(/[\\u00a0\\u200b\\ufeff]/g, ' ');
+}
+
+function pmExtraer(texto) {
+  const limpio = String(texto || '').replace(/[\\u00a0\\u200b\\ufeff]/g, ' ').replace(/\\*/g, '').replace(/\\s+/g, ' ');
+  // 1) R4 Conecta: "R4 informa: Pago movil recibido del 584124384807 el 24/11/2026 16:38:53 por Bs.10.00, Referencia 976744609 CI 26879740."
+  if (/r4\\s+informa\\s*:\\s*pago\\s+m[oó]vil\\s+recibido/i.test(limpio)) {
+    const tel = /\\bdel\\s+(\\d{7,15})/i.exec(limpio);
+    const f = /\\bel\\s+(\\d{2})\\/(\\d{2})\\/(\\d{4})\\s+(\\d{1,2}):(\\d{2}):(\\d{2})(?:\\s*([AP])\\.?\\s*M)?/i.exec(limpio);
+    const monto = /\\bpor\\s+Bs\\.?\\s*([\\d.,]+)/i.exec(limpio);
+    const ref = /\\bReferencia\\s+(\\d{6,20})/i.exec(limpio);
+    const ci = /\\bCI\\s+([VEJGP]?-?\\d{5,15})/i.exec(limpio);
+    const val = monto ? pmParseMonto(monto[1]) : 0;
+    if (!val || !ref || !f) return null;
+    let h = Number(f[4]);
+    if (f[7]) { h = h % 12; if (/p/i.test(f[7])) h += 12; }
+    const dos = n => String(n).padStart(2, '0');
+    return { ref: ref[1], monto: val, tel: tel ? tel[1] : '', ci: ci ? ci[1] : '',
+             fecha: f[3] + '-' + f[2] + '-' + f[1] + ' ' + dos(h) + ':' + f[5] + ':' + f[6], banco: 'R4' };
+  }
+  // 2) Bancrecer: "Transacción Pago Móvil recibido"
+  if (/bancrecer/i.test(limpio)) {
+    const monto = /Monto de la transacci[oó]n:\\s*Bs\\.?\\s*([\\d.]+,\\d{2})/i.exec(limpio);
+    const ref = /Referencia:\\s*(\\d{6,20})/i.exec(limpio);
+    const tel = /Tel[eé]fono emisor:\\s*(\\d{7,15})/i.exec(limpio);
+    const f = /Fecha de la operaci[oó]n:\\s*(\\d{2})\\/(\\d{2})\\/(\\d{4})\\s+(\\d{1,2}):(\\d{2}):(\\d{2})\\s*([AP])\\.?\\s*M/i.exec(limpio);
+    const res = /Resultado de la transacci[oó]n:\\s*([A-Za-zÁÉÍÓÚáéíóú]+)/i.exec(limpio);
+    if (!monto || !ref || !f) return null;
+    if (res && !/^aprobad/i.test(res[1])) return null;
+    const val = pmParseMonto(monto[1]);
+    if (!val) return null;
+    let h = Number(f[4]) % 12; if (/p/i.test(f[7])) h += 12;
+    const dos = n => String(n).padStart(2, '0');
+    return { ref: ref[1], monto: val, tel: tel ? tel[1] : '',
+             fecha: f[3] + '-' + f[2] + '-' + f[1] + ' ' + dos(h) + ':' + f[5] + ':' + f[6], banco: 'Bancrecer' };
+  }
+  return null;
+}
+
+function pmGuardarVistos(props, vistos, ids) {
+  ids.forEach(id => { vistos[id] = true; });
+  const lista = Object.keys(vistos).slice(-250);
+  props.setProperty('PM_VISTOS', JSON.stringify(lista));
+}
+
+function revisarPagos(forzar) {
+  const props = PropertiesService.getScriptProperties();
+  const c = CacheService.getScriptCache();
+  const esInicial = !props.getProperty('PM_INICIAL_OK');
+  const desde = Number(props.getProperty('PM_DESDE')) || (Date.now() - 2 * 864e5);
+  const epoch = Math.floor((desde - 7200e3) / 1000);
+  const miCorreo = pmCorreoPropio();
+  let vistos = {};
+  try { JSON.parse(props.getProperty('PM_VISTOS') || '[]').forEach(id => { vistos[id] = true; }); } catch (e) {}
+
+  const buscas = [];
+  if (PM_CFG.bancos.includes('R4')) buscas.push('"R4 informa: Pago movil recibido" OR "R4 informa: Pago móvil recibido"');
+  if (PM_CFG.bancos.includes('Bancrecer')) buscas.push('subject:"Pago Móvil recibido"');
+  if (!buscas.length) return { ok: false, error: 'Sin bancos configurados' };
+
+  const q = 'in:anywhere -in:trash (' + buscas.join(' OR ') + ') after:' + epoch;
+  const hilos = GmailApp.search(q, 0, 50);
+  const pagos = [], idsNuevos = [];
+  let hasta = desde, revisados = 0;
+
+  hilos.forEach(h => {
+    h.getMessages().forEach(m => {
+      const mid = m.getId();
+      if (vistos[mid]) return;
+      const t = m.getDate().getTime();
+      if (t < desde - 7200e3) return;
+      revisados++;
+      const de = String(m.getFrom() || '').toLowerCase();
+      const correo = (/<([^>]+)>/.exec(de) || [, de])[1].trim();
+      const okR4 = /@r4(?:conecta|banco)?\\.(?:io|com\\.ve)$/.test(correo);
+      const okBcr = /@bancrecer\\.com\\.ve$/.test(correo);
+      const okExtra = (miCorreo && correo === miCorreo) || (PM_CFG.remitentesExtra || []).some(x => String(x || '').toLowerCase() === correo);
+      if (!okR4 && !okBcr && !okExtra) { idsNuevos.push(mid); return; }
+
+      let p = pmExtraer(m.getPlainBody());
+      if (!p) p = pmExtraer(pmHtmlATexto(m.getBody()));
+      if (p && (PM_CFG.bancos.includes(p.banco) || !PM_CFG.bancos.length)) {
+        pagos.push(p);
+      }
+      idsNuevos.push(mid);
+      if (t > hasta) hasta = t;
+    });
+  });
+
+  const pingHace = Date.now() - Number(c.get('pm_ping') || 0);
+  if (!pagos.length && !forzar && pingHace < 15 * 60000 && !esInicial) {
+    if (idsNuevos.length) pmGuardarVistos(props, vistos, idsNuevos);
+    return { ok: true, sinCambios: true };
+  }
+
+  const resp = UrlFetchApp.fetch(PM_CFG.servidor, {
+    method: 'post',
+    contentType: 'text/plain;charset=utf-8',
+    muteHttpExceptions: true,
+    payload: JSON.stringify({
+      empresa: PM_CFG.empresa,
+      action: 'pub_pm_correo',
+      cuentaId: PM_CFG.cuentaId,
+      llave: PM_CFG.llave,
+      email: miCorreo,
+      pagos: pagos,
+      revisados: revisados,
+      inicial: esInicial
+    })
+  });
+  const j = JSON.parse(resp.getContentText() || '{}');
+  if (!j.ok) throw new Error(j.error || ('HTTP ' + resp.getResponseCode()));
+  c.put('pm_ping', String(Date.now()), 1800);
+  if (esInicial) props.setProperty('PM_INICIAL_OK', '1');
+  if (hasta > desde) props.setProperty('PM_DESDE', String(hasta));
+  if (idsNuevos.length) pmGuardarVistos(props, vistos, idsNuevos);
+  return j;
+}`;
+    }
+    function pmModalPintar(error) {
         let fondo = document.getElementById('fbhDlg');
         if (!fondo) { fondo = document.createElement('div'); fondo.id = 'fbhDlg'; fondo.className = 'req-dlg-fondo'; document.body.appendChild(fondo); }
         fondo.onclick = ev => { if (ev.target === fondo) fondo.classList.add('hidden'); };
-        const fecha = f => String(f || '').slice(8, 10) + '/' + String(f || '').slice(5, 7) + ' ' + String(f || '').slice(11, 16);
-        const html = `<div class="req-dlg" style="max-width:720px"><h3>Pago móvil de Bancrecer</h3>
+        const est = pmModal.estado || {}, ctas = est.cuentas || [], bcr = pmModal.bcr;
+        const titsSug = [...new Set(['Wander Daniel Paredes', 'Raimary Quintero', 'Junior Lanz', 'Lisbeth Perez', 'Plaza Valencia'].concat(est.titularesFicha || []))];
+        const tgBot = est.telegram && est.telegram.bot ? est.telegram.bot : '';
+        const txtModo = { ninguno: 'Sin avisos (solo ficha/panel)', alertas: 'Solo alertas', todo: 'Cada pago + alertas' };
+
+        let formHtml = '';
+        if (pmModal.formAbierto && pmModal.edit) {
+            const ed = pmModal.edit;
+            const yaEnLista = ed.titular && (est.titularesFicha || []).some(t => t.toLowerCase() === ed.titular.trim().toLowerCase());
+            const chats = (pmModal.tgChats && pmModal.tgChats.chats) || [];
+            formHtml = `<form class="card" style="margin:.6rem 0" onsubmit="pmGuardarCuenta(event, document.getElementById('pmBtnGuardarCta'))">
+                <h4 style="margin:0 0 .4rem">${ed.id ? 'Editar cuenta' : 'Nueva cuenta independiente (sin IFTTT)'}</h4>
+                <div class="filters">
+                    <div><label for="pmFNueNombre">Nombre de cuenta</label><input id="pmFNueNombre" value="${esc(ed.nombre)}" placeholder="Ej. R4 Wander Paredes" required></div>
+                    <div><label for="pmFBanco">Banco que llega al correo</label><select id="pmFBanco">
+                        <option value="R4"${ed.banco === 'R4' ? ' selected' : ''}>R4 (R4 Conecta)</option>
+                        <option value="Bancrecer"${ed.banco === 'Bancrecer' ? ' selected' : ''}>Bancrecer</option>
+                        <option value="Todos"${ed.banco === 'Todos' ? ' selected' : ''}>Ambos (R4 y Bancrecer)</option>
+                    </select></div>
+                    <div><label for="pmFTitular">Titular en la ficha</label><input id="pmFTitular" list="pmTitSug" value="${esc(ed.titular)}" placeholder="Ej. Wander Daniel Paredes" required>
+                        <datalist id="pmTitSug">${titsSug.map(t => `<option value="${esc(t)}">`).join('')}</datalist></div>
+                    <div><label for="pmFCorreo">Correo Gmail de esta cuenta</label><input id="pmFCorreo" type="email" value="${esc(ed.correo)}" placeholder="wander.p.99@gmail.com"></div>
+                    <div style="grid-column:1/-1"><label for="pmFRem">Correos extra autorizados para reenvíos (opcional)</label><input id="pmFRem" value="${esc(ed.remitentes)}" placeholder="Ej. correo@outlook.com"></div>
+                    <div><label for="pmFTgModo">Telegram para esta cuenta</label><select id="pmFTgModo">
+                        <option value="ninguno"${ed.tgModo === 'ninguno' ? ' selected' : ''}>Sin avisos (solo guardar y validar)</option>
+                        <option value="alertas"${ed.tgModo === 'alertas' ? ' selected' : ''}>Solo alertas cuando una ficha no cuadre</option>
+                        <option value="todo"${ed.tgModo === 'todo' ? ' selected' : ''}>Cada pago recibido + alertas</option>
+                    </select></div>
+                    <div><label for="pmFTgChat">Chat o grupo de Telegram (opcional)</label>
+                        <div style="display:flex;gap:.35rem"><input id="pmFTgChat" value="${esc(ed.tgChat)}" placeholder="ID o #-100...">
+                            <button type="button" class="btn-ghost btn-mini" onclick="pmBuscarChats(this)">Detectar</button>
+                            <button type="button" class="btn-ghost btn-mini" onclick="pmProbarChat('', this)">Probar</button></div>
+                    </div>
+                </div>
+                ${pmModal.tgChats ? `<div class="nota" style="margin-top:.35rem">${pmModal.tgChats.webhook ? 'El bot tiene un webhook activo; copie el ID del chat manualmente.' : chats.length ? 'Toque un chat o grupo reciente (' + esc(pmModal.tgChats.bot || tgBot) + '): ' + chats.map(c => `<button type="button" class="btn-ghost btn-mini" style="margin:.15rem .2rem" onclick="document.getElementById('pmFTgChat').value='${esc(c.id)}'">${esc(c.titulo)} (${esc(c.tipo === 'private' ? 'privado' : 'grupo')})</button>`).join('') : 'No hay chats recientes. Escríbale <b>/start</b> a ' + esc(pmModal.tgChats.bot || tgBot || 'tu bot') + ' (o agrégalo al grupo) y vuelve a pulsar Detectar.'}</div>` : ''}
+                ${!yaEnLista ? `<label class="interruptor" style="margin:.45rem 0"><input type="checkbox" id="pmFAgrLista"${ed.agregarListaFicha ? ' checked' : ''}><span class="sw-pista"></span> Agregar también este titular a "Listas de la ficha"</label>` : ''}
+                ${ed.id ? `<label class="interruptor" style="margin:.35rem 0"><input type="checkbox" id="pmFRegen"${ed.regenerarLlave ? ' checked' : ''}><span class="sw-pista"></span> Generar llave nueva (invalida el script anterior)</label>` : ''}
+                <div class="req-acciones" style="justify-content:flex-end;margin:.5rem 0 0">
+                    <button type="button" class="btn-ghost btn-mini" onclick="pmModal.formAbierto=false;pmModalPintar()">Cancelar</button>
+                    <button type="submit" class="btn-primary btn-mini" id="pmBtnGuardarCta">Guardar cuenta y ver código</button>
+                </div>
+            </form>`;
+        }
+
+        let scriptHtml = '';
+        if (pmModal.scriptId) {
+            const c = ctas.find(x => x.id === pmModal.scriptId);
+            if (c) {
+                const ll = pmModal.llaves[c.id];
+                scriptHtml = `<div class="card" style="margin:.6rem 0">
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap">
+                        <h4 style="margin:0">Script para ${esc(c.nombre)} (${esc(c.banco)} · ${esc(c.titular)})</h4>
+                        <button type="button" class="btn-ghost btn-mini" onclick="pmModal.scriptId='';pmModalPintar()">Cerrar código</button>
+                    </div>
+                    ${ll ? `<div class="nota" style="margin:.4rem 0"><b>Sin IFTTT · correo propio:</b> entra con la cuenta <b>${esc(c.correo || c.titular)}</b> a <a href="https://script.google.com" target="_blank" rel="noopener">script.google.com</a> → <b>Nuevo proyecto</b> → borra todo y pega este código → <b>Guardar</b> → elige <b>activar</b> arriba y pulsa <b>Ejecutar</b> (acepta el permiso de Gmail una sola vez). Listo: revisa cada 1 minuto.</div>
+                        <textarea id="pmScriptArea" readonly rows="8" style="width:100%;font-family:monospace;font-size:.78rem">${esc(pmGenerarScript(c, ll))}</textarea>
+                        <div class="req-acciones" style="justify-content:flex-end;margin:.4rem 0 0"><button type="button" class="btn-primary btn-mini" onclick="pmCopiarScript(this)">Copiar código</button></div>`
+                    : `<div class="nota" style="margin:.4rem 0">Por seguridad, la llave de esta cuenta no se muestra de nuevo una vez cerrada la ventana. Si su script ya está corriendo en Google déjelo así; si vas a instalarlo otra vez, genera un código nuevo (reemplaza la llave anterior).</div>
+                        <div class="req-acciones" style="justify-content:flex-end;margin:.3rem 0 0"><button type="button" class="btn-primary btn-mini" onclick="pmVerScript('${esc(c.id)}', true, this)">Generar código nuevo</button></div>`}
+                </div>`;
+            }
+        }
+
+        const pagos = (est.pagos || []).filter(p => !pmModal.filtro || [p.banco, p.titular, p.ref, p.tel].some(v => String(v || '').toLowerCase().includes(pmModal.filtro.toLowerCase())));
+        const html = `<div class="req-dlg" style="max-width:820px"><h3>Cuentas de Pago Móvil por correo (sin IFTTT)</h3>
             ${error ? `<div class="banner error" style="display:block">${esc(error)}</div>` : `
-            <div class="req-sub">El sistema lee los avisos de Bancrecer en el correo <b>${esc(e.cuenta || '')}</b> cada 5 minutos (y al momento cuando una ficha pregunta por uno que no aparece).
-                ${e.ultimo ? 'Última lectura: ' + esc(e.ultimo.cuando) + '.' : 'Todavía no se ha leído.'}</div>
-            ${e.lectura ? `<div class="banner ${e.lectura.revisados ? 'ok' : 'warn'}" style="display:block">Leído ahora: ${fmtNum(e.lectura.revisados || 0)} correo(s) con el asunto "Pago Móvil recibido", ${fmtNum(e.lectura.nuevos || 0)} pago(s) nuevo(s).${e.lectura.revisados ? '' : ' No llegó ningún aviso de los últimos días a este correo.'}</div>
-                ${(e.lectura.detalle || []).length ? `<div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Llegó</th><th class="izq">De</th><th class="izq">Qué pasó</th></tr></thead><tbody>
-                ${e.lectura.detalle.map(x => `<tr><td class="izq">${esc(x.fecha)}</td><td class="izq">${esc(x.de)}</td><td class="izq">${/^leído/.test(x.estado) ? `<span class="chip st-ok">${esc(x.estado)}</span>`
-                    : /no autorizado/.test(x.estado) ? `<span class="chip st-falta">Remitente no autorizado</span> <button type="button" class="btn-ghost btn-mini" data-c="${esc(x.de)}" onclick="bcrAbrir(this, { remitentes: [...(document.getElementById('bcrRem').value || '').split(','), this.dataset.c].join(','), leer: true })">Autorizar y leer</button>`
-                    : `<span class="chip st-falta">${esc(x.estado)}</span>`}</td></tr>`).join('')}</tbody></table></div>` : ''}` : ''}
-            <div class="filters"><div style="grid-column:1/-1"><label for="bcrRem">Correos autorizados para reenviar los avisos (además de Bancrecer)</label>
-                <input id="bcrRem" value="${esc((e.remitentes || []).join(', '))}" placeholder="Por ejemplo: cuenta@outlook.com"></div></div>
-            <div class="nota">Si los avisos llegan a otro correo (por ejemplo Outlook), cree allí una regla que los reenvíe a ${esc(e.cuenta || 'la cuenta del sistema')} y escriba aquí ese correo. Los avisos de cualquier otro remitente no cuentan.</div>
-            <div class="req-acciones" style="justify-content:flex-end"><button type="button" class="btn-ghost btn-mini" onclick="bcrAbrir(this, { remitentes: document.getElementById('bcrRem').value })">Guardar correos</button>
-                <button type="button" class="btn-primary btn-mini" onclick="bcrAbrir(this, { leer: true })">Leer el correo ahora</button></div>
-            <div class="tabla-wrap" style="max-height:20rem;overflow:auto"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Fecha</th><th class="izq">Referencia</th><th>Monto Bs</th><th class="izq">Teléfono</th><th class="izq">Usado en</th></tr></thead><tbody>
-                ${(e.pagos || []).map(p => `<tr><td class="izq">${esc(fecha(p.fecha))}</td><td class="izq">${esc(p.ref)}</td><td>${fmt(p.monto)}</td><td class="izq">${esc(p.tel || '')}</td>
-                    <td class="izq">${p.usado ? esc(p.usado.tienda + ' · ' + p.usado.fecha + (p.usado.nroFicha ? ' · ficha ' + p.usado.nroFicha : '')) : '<span class="chip st-pend">Sin usar</span>'}</td></tr>`).join('') || '<tr><td colspan="5" class="izq">Todavía no hay pagos leídos.</td></tr>'}
+            ${pmModal.msg || ''}
+            <div class="req-sub">Cada persona conecta su propio Gmail con Google Apps Script (sin reenviar correos ni pagar IFTTT). Todos los pagos llegan a Plaza Software para validar al instante en la ficha y el panel.</div>
+            <div class="req-acciones" style="justify-content:space-between;align-items:center;margin:.45rem 0">
+                <b>Cuentas independientes (${ctas.length})</b>
+                <div style="display:flex;gap:.35rem">
+                    <button type="button" class="btn-ghost btn-mini" onclick="pmAbrir(this)">Actualizar</button>
+                    <button type="button" class="btn-primary btn-mini" onclick="pmEditar('')">+ Agregar cuenta</button>
+                </div>
+            </div>
+            <div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Cuenta</th><th class="izq">Banco · Titular</th><th class="izq">Correo y estado</th><th class="izq">Telegram</th><th></th></tr></thead><tbody>
+                ${ctas.map(c => {
+                    const u = c.ultimo;
+                    const estCta = !u ? '<span class="chip st-pend">Pendiente de instalar script</span>'
+                        : u.error ? `<span class="chip st-falta">${esc(u.error)}</span>`
+                        : `<span class="chip st-ok">Activo · ${esc(pmFmtFecha(u.cuando))}</span><small> ${fmtNum(u.leidos || 0)} leídos</small>`;
+                    const tgTxt = c.tgModo === 'ninguno' || !c.tgChat ? '<small>Sin avisos</small>'
+                        : `<span class="chip st-info">${esc(txtModo[c.tgModo] || c.tgModo)}</span><small> ${esc(c.tgTitulo || c.tgChat)}</small>`;
+                    return `<tr>
+                        <td class="izq"><b>${esc(c.nombre)}</b></td>
+                        <td class="izq">${esc(c.banco)} · ${esc(c.titular)}</td>
+                        <td class="izq">${esc((u && u.email) || c.correo || '—')}<br>${estCta}</td>
+                        <td class="izq">${tgTxt}</td>
+                        <td style="white-space:nowrap">
+                            <button type="button" class="btn-ghost btn-mini" onclick="pmVerScript('${esc(c.id)}', false, this)">Script</button>
+                            <button type="button" class="btn-ghost btn-mini" onclick="pmEditar('${esc(c.id)}')">Editar</button>
+                            ${c.tgChat ? `<button type="button" class="btn-ghost btn-mini" onclick="pmProbarChat('${esc(c.id)}', this)">Probar TG</button>` : ''}
+                            <button type="button" class="btn-ghost btn-mini" onclick="pmQuitarCuenta('${esc(c.id)}', this)" title="Quitar">✕</button>
+                        </td></tr>`;
+                }).join('') || '<tr><td colspan="5" class="izq">Todavía no hay cuentas independientes configuradas (pulsa "+ Agregar cuenta" para R4 Wander, Raimary, Junior, Lisbeth...).</td></tr>'}
+            </tbody></table></div>
+            ${formHtml}${scriptHtml}
+            ${bcr ? `<details style="margin:.6rem 0"${bcr.lectura || bcr.error ? ' open' : ''}><summary style="cursor:pointer;font-weight:600">Cuenta central de Google Apps Script (${esc(bcr.cuenta || 'Bancrecer / R4')} · respaldo cada 5 min)</summary>
+                <div style="margin-top:.45rem">
+                ${bcr.error ? `<div class="banner error" style="display:block">${esc(bcr.error)}</div>` : `
+                <div class="req-sub">${bcr.ultimo ? 'Última lectura: ' + esc(bcr.ultimo.cuando) + '.' : 'Todavía no se ha leído.'}</div>
+                ${bcr.lectura ? `<div class="banner ${bcr.lectura.revisados ? 'ok' : 'warn'}" style="display:block">Leído ahora: ${fmtNum(bcr.lectura.revisados || 0)} correo(s), ${fmtNum(bcr.lectura.nuevos || 0)} pago(s) nuevo(s).</div>
+                    ${(bcr.lectura.detalle || []).length ? `<div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Llegó</th><th class="izq">De</th><th class="izq">Qué pasó</th></tr></thead><tbody>
+                    ${bcr.lectura.detalle.map(x => `<tr><td class="izq">${esc(x.fecha)}</td><td class="izq">${esc(x.de)}</td><td class="izq">${/^leído/.test(x.estado) ? `<span class="chip st-ok">${esc(x.estado)}</span>`
+                        : /no autorizado/.test(x.estado) ? `<span class="chip st-falta">Remitente no autorizado</span> <button type="button" class="btn-ghost btn-mini" data-c="${esc(x.de)}" onclick="pmAbrir(this, { remitentes: [...(document.getElementById('bcrRem').value || '').split(','), this.dataset.c].join(','), leer: true })">Autorizar y leer</button>`
+                        : `<span class="chip st-falta">${esc(x.estado)}</span>`}</td></tr>`).join('')}</tbody></table></div>` : ''}` : ''}
+                <div class="filters"><div style="grid-column:1/-1"><label for="bcrRem">Correos autorizados para reenviar avisos a la cuenta central</label>
+                    <input id="bcrRem" value="${esc((bcr.remitentes || []).join(', '))}" placeholder="Por ejemplo: cuenta@outlook.com"></div></div>
+                <div class="req-acciones" style="justify-content:flex-end"><button type="button" class="btn-ghost btn-mini" onclick="pmAbrir(this, { remitentes: document.getElementById('bcrRem').value })">Guardar correos</button>
+                    <button type="button" class="btn-primary btn-mini" onclick="pmAbrir(this, { leer: true })">Leer central ahora</button></div>`}
+                </div></details>` : ''}
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;margin:.6rem 0 .3rem;flex-wrap:wrap">
+                <b>Últimos pagos recibidos (${pagos.length})</b>
+                <input type="text" placeholder="Filtrar banco, titular o ref..." value="${esc(pmModal.filtro)}" oninput="pmModal.filtro=this.value;pmModalPintar()" style="max-width:220px">
+            </div>
+            <div class="tabla-wrap" style="max-height:17rem;overflow:auto"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Fecha</th><th class="izq">Banco · Titular</th><th class="izq">Referencia</th><th>Monto Bs</th><th class="izq">Teléfono</th><th class="izq">Usado en</th></tr></thead><tbody>
+                ${pagos.map(p => `<tr><td class="izq">${esc(pmFmtFecha(p.fecha))}</td><td class="izq"><b>${esc(p.banco || 'Bancrecer')}</b>${p.titular ? ' · ' + esc(p.titular) : ''}</td><td class="izq">${esc(p.ref)}</td><td>${fmt(p.monto)}</td><td class="izq">${esc(p.tel || '')}</td>
+                    <td class="izq">${p.usado ? esc(p.usado.tienda + ' · ' + p.usado.fecha + (p.usado.nroFicha ? ' · ficha ' + p.usado.nroFicha : '')) : '<span class="chip st-pend">Sin usar</span>'}</td></tr>`).join('') || '<tr><td colspan="6" class="izq">Todavía no hay pagos leídos.</td></tr>'}
             </tbody></table></div>`}
             <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-primary" onclick="document.getElementById('fbhDlg').classList.add('hidden')">Cerrar</button></div></div>`;
-        if (!fondo.classList.contains('hidden') && fondo.querySelector('h3') && /Bancrecer/.test(fondo.querySelector('h3').textContent)) pintarVentana(fondo, html); else fondo.innerHTML = html;
+        if (!fondo.classList.contains('hidden') && fondo.querySelector('h3') && /Pago Móvil|Bancrecer/.test(fondo.querySelector('h3').textContent)) pintarVentana(fondo, html); else fondo.innerHTML = html;
         fondo.classList.remove('hidden');
     }
     // (17/11) Tolerancias del aviso de diferencias del cierre de caja (BigSoft contra la ficha), en $
@@ -7258,11 +7662,12 @@
     }
     // ---------- (13/11) Utilidades de las tiendas: se actualizan solas (BigSoft.gs › paq_estado / paq_subir) ----------
     // Se sube el .zip que arma "Armar paquete para tiendas.ps1"; el Avisador de cada tienda lo baja en el próximo minuto y se reinicia.
-    let paqDatos = null, paqMsg = '';
+    let paqDatos = null, paqMsg = '', paqGoogle = null;
     async function paqCargar() {
         const el = document.getElementById('paqEstado'); if (!el) return;
         if (!paqDatos) el.innerHTML = cargandoHTML('Cargando Utilidades de las tiendas');
-        try { paqDatos = await DATOS.aGoogle(() => llamarApi({ action: 'paq_estado' })); }
+        const gProm = !CF_SOLO && WEB_APP_URL ? llamarApiReal({ action: 'paq_estado' }, performance.now()).then(g => ({ version: (g.paquete && g.paquete.version) || '' })).catch(e => ({ error: (e && e.message) || 'sin respuesta' })) : Promise.resolve(null);
+        try { const [r, g] = await Promise.all([DATOS.aGoogle(() => llamarApi({ action: 'paq_estado' })), gProm]); paqDatos = r; paqGoogle = g; }
         catch (e) { el.innerHTML = `<div class="fb-cab"><h4>Utilidades de las tiendas</h4></div><div class="banner error" style="display:block">${esc(e.message)}</div>`; return; }
         paqPintar();
     }
@@ -7274,6 +7679,10 @@
         const el = document.getElementById('paqEstado'); if (!el || !paqDatos) return;
         const p = paqDatos.paquete, tiendas = paqDatos.tiendas || [];
         const al = tiendas.filter(t => p && t.version === p.version).length;
+        const faltaGoogle = !CF_SOLO && p && paqGoogle && (paqGoogle.error || paqGoogle.version !== p.version);
+        const avisoGoogle = !CF_SOLO && p && paqGoogle ? (faltaGoogle
+            ? `<div class="banner warn" style="display:flex;justify-content:space-between;align-items:center;gap:.6rem;flex-wrap:wrap;margin:.45rem 0"><span><b>Respaldo en Google desactualizado</b> (${paqGoogle.error ? esc(paqGoogle.error) : paqGoogle.version ? 'tiene ' + esc(paqGoogle.version) : 'sin paquete'}): las tiendas en versión anterior bajan el paquete desde Google.</span><button type="button" class="btn-primary btn-mini" onclick="paqCopiarAGoogle(this)">Copiar a Google ahora</button></div>`
+            : `<div class="req-sub" style="margin:.35rem 0">Respaldo en Google al día (${esc(paqGoogle.version || p.version)}).</div>`) : '';
         const fila = t => {
             const chip = t.hace == null ? '<span class="chip st-pend">Apagada o sin avisador</span>'
                 : !t.version ? '<span class="chip st-falta">Anterior: copiar a mano una vez</span>'
@@ -7284,13 +7693,28 @@
         pintarConservando(el, `<div class="fb-cab"><h4>Utilidades de las tiendas</h4><span class="fb-res">${p ? `Publicada <b>${esc(p.version)}</b> · ${al} de ${tiendas.length} tiendas al día` : 'Todavía no se ha subido ningún paquete'}</span></div>
             ${p ? `<div class="req-sub" style="margin-bottom:.5rem">Subida el ${esc(p.subido || '')} por ${esc(p.por || '')} · ${fmtNum(p.archivos || 0)} archivos · ${fmtNum(Math.round((p.tam || 0) / 1024))} KB</div>` : ''}
             <div class="tabla-wrap"><table class="req-tabla fb-tabla" data-sin-paginar><thead><tr><th class="izq">Tienda</th><th class="izq">Versión de Utilidades</th><th></th></tr></thead><tbody>${tiendas.map(fila).join('')}</tbody></table></div>
-            ${paqMsg}
+            ${avisoGoogle}${paqMsg}
             <div class="req-acciones" style="justify-content:flex-end;margin:.5rem 0 0">
                 <input type="file" id="paqArchivo" accept=".zip,application/zip" class="hidden" onchange="paqSubir(this)">
-                <button type="button" class="btn-ghost btn-mini" onclick="paqDatos=null;paqMsg='';paqCargar()">Actualizar</button>
+                <button type="button" class="btn-ghost btn-mini" onclick="paqDatos=null;paqMsg='';paqGoogle=null;paqCargar()">Actualizar</button>
                 <button type="button" class="btn-primary btn-mini" id="paqBtn" onclick="document.getElementById('paqArchivo').click()">${ico('subir')} Subir paquete nuevo (.zip)</button>
             </div>
             <div class="nota">Arme el paquete con "Armar paquete para tiendas.ps1" y suba "UTILIDADES para tiendas.zip". Cada tienda con el avisador encendido lo baja sola en uno o dos minutos y se reinicia; no toca su configuración. Las tiendas marcadas "Anterior" necesitan que se copie el paquete a mano una última vez.</div>`);
+    }
+    async function paqCopiarAGoogle(btn) {
+        if (btn) { btn.disabled = true; btnCargando(btn, 'Copiando a Google...'); }
+        try {
+            const z = await DATOS.aGoogle(() => llamarApi({ action: 'paq_zip' }));
+            if (!z || !z.zip) throw new Error('No hay paquete en Cloudflare');
+            const g = await llamarApiReal({ action: 'paq_subir', zip: z.zip, idem: nuevoIdem() }, performance.now());
+            const v = (g && g.paquete && g.paquete.version) || z.version || '';
+            paqGoogle = { version: v };
+            paqMsg = `<div class="banner ok" style="display:block">Listo: paquete ${esc(v)} copiado a Google. Si alguna tienda falló antes, reintenta en menos de 1 hora (o al reiniciar su Avisador).</div>`;
+        } catch (e) {
+            paqGoogle = { error: e.message };
+            paqMsg = `<div class="banner error" style="display:block">No se pudo copiar a Google: ${esc(e.message)}</div>`;
+        }
+        paqPintar();
     }
     async function paqSubir(input) {
         const archivo = input.files && input.files[0]; input.value = '';
@@ -7303,6 +7727,7 @@
             const zip = await new Promise((ok, mal) => { const l = new FileReader(); l.onload = () => ok(String(l.result).split(',')[1]); l.onerror = () => mal(new Error('No se pudo leer el archivo')); l.readAsDataURL(archivo); });
             const r = await DATOS.aGoogle(() => llamarApi({ action: 'paq_subir', zip, idem: nuevoIdem() }));
             paqDatos = r;
+            paqGoogle = !CF_SOLO ? (r.googleError ? { error: r.googleError } : { version: r.paquete.version }) : null;
             const avisoG = r.googleError ? ` (respaldo en Google falló: ${esc(r.googleError)})` : '';
             paqMsg = `<div class="banner ok" style="display:block">Listo: versión ${esc(r.paquete.version)} publicada. Las tiendas con el avisador encendido se actualizan solas en uno o dos minutos.${avisoG}</div>`;
         } catch (e) { paqMsg = `<div class="banner error" style="display:block">${esc(e.message)}</div>`; }
@@ -10555,7 +10980,7 @@
     // mientras llegan, las de siempre.
     let CUA_LISTAS = {
         tdd: { banco: ['R4', 'BNC', 'Bancrecer', 'BDV'], titular: ['Plaza Valencia', 'Junior Lanz', 'Raimary Quintero'] },
-        pm:  { banco: ['R4', 'BNC', 'Bancrecer', 'BDV', 'Provincial'], titular: ['Plaza Valencia', 'Junior Lanz', 'Raimary Quintero', 'Lisbeth Perez'] }
+        pm:  { banco: ['R4', 'BNC', 'Bancrecer', 'BDV', 'Provincial'], titular: ['Plaza Valencia', 'Junior Lanz', 'Raimary Quintero', 'Lisbeth Perez', 'Wander Daniel Paredes'] }
     };
 
     // ==========================================
@@ -24295,6 +24720,7 @@ Reglas:
 
     // ---------- Pantalla ----------
     async function pagIniciar() {
+        const bPm = document.getElementById('pagBtnPmCorreo'); if (bPm) bPm.classList.toggle('hidden', !esPrincipal);
         if (!pagIniciado) {
             pagIniciado = true;
             if (!pagCuentasListas) document.getElementById('pagDKpis').innerHTML = cargandoHTML('Cargando cuentas...');
