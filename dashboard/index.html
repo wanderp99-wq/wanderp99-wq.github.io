@@ -7032,16 +7032,21 @@ function pmParseMonto(raw) {
 
 function pmHtmlATexto(html) {
   return String(html || '')
+    .replace(/<style[\\s\\S]*?<\\/style>/gi, ' ')
     .replace(/<br\\s*\\/?>/gi, '\\n')
-    .replace(/<\\/(p|div|tr|td|li)>/gi, '\\n')
+    .replace(/<\\/(p|div|tr|td|li|h\\d)>/gi, '\\n')
     .replace(/<[^>]+>/g, ' ')
+    .replace(/&#(\\d+);/g, (_, n) => String.fromCharCode(Number(n)))
     .replace(/&nbsp;/gi, ' ')
     .replace(/&aacute;/gi, 'á').replace(/&eacute;/gi, 'é').replace(/&iacute;/gi, 'í').replace(/&oacute;/gi, 'ó').replace(/&uacute;/gi, 'ú')
+    .replace(/&Aacute;/gi, 'Á').replace(/&Eacute;/gi, 'É').replace(/&Iacute;/gi, 'Í').replace(/&Oacute;/gi, 'Ó').replace(/&Uacute;/gi, 'Ú')
+    .replace(/&ntilde;/gi, 'ñ').replace(/&Ntilde;/gi, 'Ñ')
     .replace(/[\\u00a0\\u200b\\ufeff]/g, ' ');
 }
 
 function pmExtraer(texto) {
   const limpio = String(texto || '').replace(/[\\u00a0\\u200b\\ufeff]/g, ' ').replace(/\\*/g, '').replace(/\\s+/g, ' ');
+  const dos = n => String(n).padStart(2, '0');
   // 1) R4 Conecta: "R4 informa: Pago movil recibido del 584124384807 el 24/11/2026 16:38:53 por Bs.10.00, Referencia 976744609 CI 26879740."
   if (/r4\\s+informa\\s*:\\s*pago\\s+m[oó]vil\\s+recibido/i.test(limpio)) {
     const tel = /\\bdel\\s+(\\d{7,15})/i.exec(limpio);
@@ -7053,25 +7058,41 @@ function pmExtraer(texto) {
     if (!val || !ref || !f) return null;
     let h = Number(f[4]);
     if (f[7]) { h = h % 12; if (/p/i.test(f[7])) h += 12; }
-    const dos = n => String(n).padStart(2, '0');
     return { ref: ref[1], monto: val, tel: tel ? tel[1] : '', ci: ci ? ci[1] : '',
              fecha: f[3] + '-' + f[2] + '-' + f[1] + ' ' + dos(h) + ':' + f[5] + ':' + f[6], banco: 'R4' };
   }
-  // 2) Bancrecer: "Transacción Pago Móvil recibido"
+  // 2) Bancrecer Pago Móvil Pag@Ya (bdigital@bancrecer.com.ve)
   if (/bancrecer/i.test(limpio)) {
-    const monto = /Monto de la transacci[oó]n:\\s*Bs\\.?\\s*([\\d.]+,\\d{2})/i.exec(limpio);
-    const ref = /Referencia:\\s*(\\d{6,20})/i.exec(limpio);
-    const tel = /Tel[eé]fono emisor:\\s*(\\d{7,15})/i.exec(limpio);
-    const f = /Fecha de la operaci[oó]n:\\s*(\\d{2})\\/(\\d{2})\\/(\\d{4})\\s+(\\d{1,2}):(\\d{2}):(\\d{2})\\s*([AP])\\.?\\s*M/i.exec(limpio);
-    const res = /Resultado de la transacci[oó]n:\\s*([A-Za-zÁÉÍÓÚáéíóú]+)/i.exec(limpio);
-    if (!monto || !ref || !f) return null;
-    if (res && !/^aprobad/i.test(res[1])) return null;
-    const val = pmParseMonto(monto[1]);
-    if (!val) return null;
-    let h = Number(f[4]) % 12; if (/p/i.test(f[7])) h += 12;
-    const dos = n => String(n).padStart(2, '0');
-    return { ref: ref[1], monto: val, tel: tel ? tel[1] : '',
-             fecha: f[3] + '-' + f[2] + '-' + f[1] + ' ' + dos(h) + ':' + f[5] + ':' + f[6], banco: 'Bancrecer' };
+    const monto = /Monto\\s+de\\s+la\\s+transacci[oó]n:\\s*Bs\\.?\\s*([\\d.,]+)/i.exec(limpio);
+    const f = /Fecha\\s+de\\s+la\\s+operaci[oó]n:\\s*(\\d{2})\\/(\\d{2})\\/(\\d{4})\\s+(\\d{1,2}):(\\d{2}):(\\d{2})(?:\\s*([AP])\\.?\\s*M)?/i.exec(limpio);
+    if (monto && f) {
+      if (/Tel[eé]fono\\s+(?:destino|receptor|beneficiario)|Banco\\s+destino|Beneficiario:/i.test(limpio)) return null;
+      const ref = /Referencia:\\s*(\\d{6,20})/i.exec(limpio);
+      const tel = /Tel[eé]fono\\s+emisor:\\s*(\\d{7,15})/i.exec(limpio);
+      const res = /Resultado\\s+de\\s+la\\s+transacci[oó]n:\\s*([A-Za-zÁÉÍÓÚáéíóú]+)/i.exec(limpio);
+      const val = pmParseMonto(monto[1]);
+      if (!ref || !(val > 0)) return null;
+      if (res && !/^(?:aprobad|pagad|exitos)/i.test(res[1])) return null;
+      let h = Number(f[4]);
+      if (f[7]) { h = h % 12; if (/p/i.test(f[7])) h += 12; }
+      return { ref: ref[1], monto: val, tel: tel ? tel[1] : '',
+               fecha: f[3] + '-' + f[2] + '-' + f[1] + ' ' + dos(h) + ':' + f[5] + ':' + f[6], banco: 'Bancrecer' };
+    }
+    // 3) Bancrecer Crédito Inmediato recibido (bservicios@bancrecer.com.ve)
+    if (/cr[eé]dito\\s+inmediato/i.test(limpio) && /\\bOrdenante:/i.test(limpio) && !/\\bBeneficiario:/i.test(limpio)) {
+      const m2 = /Monto\\s+Transferido:\\s*Bs\\.?\\s*([\\d.,]+)/i.exec(limpio);
+      const r2 = /Referencia(?:\\s+No\\.?)?:\\s*(\\d{6,20})/i.exec(limpio);
+      const f2 = /Fecha:\\s*(\\d{2})\\/(\\d{2})\\/(\\d{4})\\s+(\\d{1,2}):(\\d{2}):(\\d{2})(?:\\s*([AP])\\.?\\s*M)?/i.exec(limpio);
+      const res2 = /Resultado:\\s*([A-Za-zÁÉÍÓÚáéíóú]+)/i.exec(limpio);
+      const ord = /Ordenante:\\s*([^•]+?)(?=\\s+(?:Banco\\s+Origen|Cuenta\\s+Destino|Monto\\s+Transferido)\\b|$)/i.exec(limpio);
+      const val2 = m2 ? pmParseMonto(m2[1]) : 0;
+      if (!r2 || !f2 || !(val2 > 0)) return null;
+      if (res2 && !/^(?:aprobad|pagad|exitos)/i.test(res2[1])) return null;
+      let h = Number(f2[4]);
+      if (f2[7]) { h = h % 12; if (/p/i.test(f2[7])) h += 12; }
+      return { ref: r2[1], monto: val2, tel: ord ? ord[1].trim().slice(0, 20) : '',
+               fecha: f2[3] + '-' + f2[2] + '-' + f2[1] + ' ' + dos(h) + ':' + f2[5] + ':' + f2[6], banco: 'Bancrecer' };
+    }
   }
   return null;
 }
@@ -7094,7 +7115,7 @@ function revisarPagos(forzar) {
 
   const buscas = [];
   if (PM_CFG.bancos.includes('R4')) buscas.push('"R4 informa: Pago movil recibido" OR "R4 informa: Pago móvil recibido"');
-  if (PM_CFG.bancos.includes('Bancrecer')) buscas.push('subject:"Pago Móvil recibido"');
+  if (PM_CFG.bancos.includes('Bancrecer')) buscas.push('(from:bancrecer.com.ve OR subject:"Pago Móvil recibido" OR "Monto de la transacción" OR "Crédito Inmediato")');
   if (!buscas.length) return { ok: false, error: 'Sin bancos configurados' };
 
   const q = 'in:anywhere -in:trash (' + buscas.join(' OR ') + ') after:' + epoch;
@@ -7112,7 +7133,7 @@ function revisarPagos(forzar) {
       const de = String(m.getFrom() || '').toLowerCase();
       const correo = (/<([^>]+)>/.exec(de) || [, de])[1].trim();
       const okR4 = /@r4(?:conecta|banco)?\\.(?:io|com\\.ve)$/.test(correo);
-      const okBcr = /@bancrecer\\.com\\.ve$/.test(correo);
+      const okBcr = /(?:@|\\.)bancrecer\\.com\\.ve$/.test(correo);
       const okExtra = (miCorreo && correo === miCorreo) || (PM_CFG.remitentesExtra || []).some(x => String(x || '').toLowerCase() === correo);
       if (!okR4 && !okBcr && !okExtra) { idsNuevos.push(mid); return; }
 
