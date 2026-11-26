@@ -7391,7 +7391,10 @@
         const texto = btn ? btn.textContent : ''; if (btn) btnCargando(btn, 'Cambiando...');
         try {
             const r = await DATOS.aGoogle(() => llamarApi({ action: 'pm_webhook_regenerar' }));
-            if (pmModal.estado && r.webhookLlave) pmModal.estado.webhookLlave = r.webhookLlave;
+            if (pmModal.estado && r.webhookLlave) {
+                pmModal.estado.webhookLlave = r.webhookLlave;
+                pmModal.estado.webhookUltimo = null;
+            }
             pmModal.msg = '<div class="banner ok" style="display:block">Nuevo enlace secreto generado. Pégale el enlace nuevo en CloudMailin.</div>';
         } catch (x) {
             pmModal.msg = `<div class="banner error" style="display:block">${esc(x.message)}</div>`;
@@ -7780,9 +7783,17 @@ function revisarPagos(forzar) {
             }
         }
 
-        const pagos = (est.pagos || []).filter(p => !pmModal.filtro || [p.banco, p.titular, p.ref, p.tel].some(v => String(v || '').toLowerCase().includes(pmModal.filtro.toLowerCase())));
+        const pagos = (est.pagos || []).filter(p => !pmModal.filtro || [p.banco, p.titular, p.ref, p.tel, p.via].some(v => String(v || '').toLowerCase().includes(pmModal.filtro.toLowerCase())));
         const domVal = est.dominio || '';
         const whAviso = est.webhookAviso || null;
+        const whUlt = est.webhookUltimo || null;
+        const pmViaChip = v => v === 'correo_cm' ? '<span class="chip st-ok">⚡ CloudMailin</span>'
+            : v === 'correo_cf' ? '<span class="chip st-ok">⚡ Dominio</span>'
+            : v === 'apps_script' ? '<span class="chip st-info">⏱ Script</span>'
+            : v === 'central' ? '<span class="chip st-pend">⏱ Central</span>'
+            : '<span class="nota">—</span>';
+        const whSt = whUlt ? (whUlt.estado === 'ok' || whUlt.estado === 'actualizado' || whUlt.estado === 'confirmacion' ? 'st-ok'
+            : (whUlt.estado === 'sin_cuenta' || whUlt.estado === 'duplicado' || whUlt.estado === 'ignorado') ? 'st-amar' : 'st-falta') : '';
         const html = `<div class="req-dlg" style="width:min(1120px, 96vw);max-width:none"><h3>Cuentas de Pago Móvil por correo</h3>
             ${error ? `<div class="banner error" style="display:block">${esc(error)}</div>` : `
             ${pmModal.msg || ''}
@@ -7817,6 +7828,8 @@ function revisarPagos(forzar) {
                         </div>
                         <button type="button" class="btn-primary btn-mini" onclick="pmGuardarCloudMailin(this)">Guardar correo</button>
                     </div>
+                    ${whUlt ? `<div class="nota" style="margin:.1rem 0 0">Último webhook recibido: <span class="chip ${whSt}">${esc(pmFmtFecha(whUlt.cuando))} · ${esc(whUlt.estado)}</span>${whUlt.detalle ? ' · ' + esc(whUlt.detalle) : ''}${whUlt.correo ? ' (' + esc(whUlt.correo) + ')' : ''}</div>`
+                        : (whUrl ? `<div class="nota" style="margin:.1rem 0 0">Todavía no ha llegado ningún webhook de CloudMailin a este enlace.</div>` : '')}
                 </div>
                 <details style="margin-top:.5rem"${!cmCorreo && !domVal ? ' open' : ''}><summary style="cursor:pointer;font-weight:600;font-size:.84rem">Paso a paso para crear tu dirección gratis en CloudMailin (2 min)</summary>
                     <ol class="nota" style="margin:.35rem 0 0;padding-left:1.25rem;line-height:1.45">
@@ -7895,9 +7908,9 @@ function revisarPagos(forzar) {
                 <b>Últimos pagos recibidos (${pagos.length})</b>
                 <input type="text" placeholder="Filtrar banco, titular o ref..." value="${esc(pmModal.filtro)}" oninput="pmModal.filtro=this.value;pmModalPintar()" style="max-width:220px">
             </div>
-            <div class="tabla-wrap" style="max-height:clamp(17rem, 38vh, 28rem);overflow:auto"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Fecha</th><th class="izq">Banco · Titular</th><th class="izq">Referencia</th><th>Monto Bs</th><th class="izq">Teléfono</th><th class="izq">Usado en</th></tr></thead><tbody>
-                ${pagos.map(p => `<tr><td class="izq">${esc(pmFmtFecha(p.fecha))}</td><td class="izq"><b>${esc(p.banco || 'Bancrecer')}</b>${p.titular ? ' · ' + esc(p.titular) : ''}</td><td class="izq">${esc(p.ref)}</td><td>${fmt(p.monto)}</td><td class="izq">${esc(p.tel || '')}</td>
-                    <td class="izq">${p.usado ? esc(p.usado.tienda + ' · ' + p.usado.fecha + (p.usado.nroFicha ? ' · ficha ' + p.usado.nroFicha : '')) : p.precargado ? `<span class="chip st-amar">Precargado${p.precargado.tienda ? ': ' + esc(p.precargado.tienda) : ''}</span>` : '<span class="chip st-pend">Sin usar</span>'}</td></tr>`).join('') || '<tr><td colspan="6" class="izq">Todavía no hay pagos leídos.</td></tr>'}
+            <div class="tabla-wrap" style="max-height:clamp(17rem, 38vh, 28rem);overflow:auto"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Fecha</th><th class="izq">Banco · Titular</th><th class="izq">Referencia</th><th>Monto Bs</th><th class="izq">Teléfono</th><th class="izq">Vía</th><th class="izq">Usado en</th></tr></thead><tbody>
+                ${pagos.map(p => `<tr><td class="izq">${esc(pmFmtFecha(p.fecha))}</td><td class="izq"><b>${esc(p.banco || 'Bancrecer')}</b>${p.titular ? ' · ' + esc(p.titular) : ''}</td><td class="izq">${esc(p.ref)}</td><td>${fmt(p.monto)}</td><td class="izq">${esc(p.tel || '')}</td><td class="izq">${pmViaChip(p.via)}</td>
+                    <td class="izq">${p.usado ? esc(p.usado.tienda + ' · ' + p.usado.fecha + (p.usado.nroFicha ? ' · ficha ' + p.usado.nroFicha : '')) : p.precargado ? `<span class="chip st-amar">Precargado${p.precargado.tienda ? ': ' + esc(p.precargado.tienda) : ''}</span>` : '<span class="chip st-pend">Sin usar</span>'}</td></tr>`).join('') || '<tr><td colspan="7" class="izq">Todavía no hay pagos leídos.</td></tr>'}
             </tbody></table></div>`}
             <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="button" class="btn-primary" onclick="document.getElementById('fbhDlg').classList.add('hidden')">Cerrar</button></div></div>`;
         if (!fondo.classList.contains('hidden') && fondo.querySelector('h3') && /Pago Móvil|Bancrecer/.test(fondo.querySelector('h3').textContent)) pintarVentana(fondo, html); else fondo.innerHTML = html;
@@ -8149,12 +8162,12 @@ function revisarPagos(forzar) {
         'Requerimientos de charcutería guardará directo en el servidor nuevo: catálogo, exhibición mínima, variedad mínima, períodos de ventas, generar requerimientos y envío al grupo "Actividades y transporte" por Telegram. Si el servidor nuevo no responde, se guarda en Google como antes.'); }
     async function cfBigSoftEscribir(p) {
         if (!cfModuloEncendido('bsg')) return null;
-        const t0 = performance.now(), r = await cfEscribir(Object.assign({}, p, { modulo: 'bsg', repetible: p.action === 'bsc_listar' || (p.action === 'bsr_pedir' && !/^(ingresar|precios_cargar|cierre)$/.test(p.tipo || '')) }));
+        const t0 = performance.now(), r = await cfEscribir(Object.assign({}, p, { modulo: 'bsg', repetible: p.action === 'bsc_listar' || (p.action === 'bsr_pedir' && !/^(ingresar|precios_cargar|cierre|tasa_actualizar)$/.test(p.tipo || '')) }));
         if (r) anotarTiempo(p.action + ' (Cloudflare)', Math.round(performance.now() - t0), 0, true);
         return r;
     }
     function cfBsgAbrir(btn) { return cfModuloSwitch(btn, 'bsg', 'cf_bsg', 'BigSoft y pedidos a las tiendas',
-        'Los pedidos a distancia a las PC de las tiendas (reportes, revisar/ingresar notas, revisar/cargar precios, cajas abiertas y cierres) irán directo por el servidor nuevo sin pasar por Google. Si el servidor nuevo no responde, pasan por Google como antes.'); }
+        'Los pedidos a distancia a las PC de las tiendas (reportes, revisar/ingresar notas, revisar/cargar precios, actualizar tasas, cajas abiertas y cierres) irán directo por el servidor nuevo sin pasar por Google. Si el servidor nuevo no responde, pasan por Google como antes.'); }
     function cfTareasAbrir(btn) { return cfModuloSwitch(btn, 'tareasg', 'cf_tareas', 'las tareas automáticas',
         'El servidor nuevo enviará solo, cada 5 minutos: a los 5 minutos de la entrada, al grupo de cada tienda quién no ha llegado; a los 15, al grupo "Equipo de información" (o que la tienda no ha abierto), y el personal con su propio horario; y cada mañana desde las 7 (y los lunes, la semana) los pagos de Cuentas por pagar al grupo de Administración. Google deja de enviarlos para que no lleguen dos veces. Las demás tareas (correo de Bancrecer, copia diaria, BigSoft) siguen en Google.'); }
     function cfPreciosgAbrir(btn) { return cfModuloSwitch(btn, 'preciosg', 'cf_preciosg', 'Precios en tiendas',
@@ -8590,6 +8603,7 @@ function revisarPagos(forzar) {
         multideposito: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 5l9 5.5"/><path d="M5 10v9h14v-9"/><path d="M9 14.5h6m0 0-2-2m2 2-2 2"/></svg>',
         cierrecaja: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="10" width="18" height="10" rx="1.5"/><path d="M7 10V7a5 5 0 0 1 10 0v3"/><path d="M12 14v2"/></svg>',
         reportes: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5"/><path d="M9 17v-3M12 17v-5M15 17v-2"/></svg>',
+        tasasbs: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15.5-6.3L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.3L3 16"/><path d="M3 21v-5h5"/><path d="M12 7v10M14.5 9.5a2 2 0 0 0-2-1.5h-1a2 2 0 0 0 0 4h1a2 2 0 0 1 0 4h-1a2 2 0 0 1-2-1.5"/></svg>',
         habladores: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z"/><circle cx="7.5" cy="7.5" r="1.4"/><path d="M12 11v6M9.5 14h5"/></svg>',
         facturar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>',
         talento: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="8" r="3.5"/><path d="M3.5 20c0-3.6 2.9-6.5 6.5-6.5 1.3 0 2.5.4 3.5 1"/><path d="m17.5 13 1.2 2.4 2.6.4-1.9 1.8.5 2.6-2.4-1.3-2.4 1.3.5-2.6-1.9-1.8 2.6-.4z"/></svg>',
@@ -8601,7 +8615,7 @@ function revisarPagos(forzar) {
         { id: 'rrhh',    titulo: 'Recursos humanos', desc: 'Personal, asistencia y nómina.' },
         { id: 'almacen', titulo: 'Almacén',        desc: 'Inventario y movimientos de mercancía.' },
         // (16/11) Lo que se hace en el BigSoft de cada tienda desde aquí
-        { id: 'bigsoft', titulo: 'BigSoft',        desc: 'El sistema de cada tienda: cierres de caja, precios, reportes, notas por ingresar y listas de la ficha.' }
+        { id: 'bigsoft', titulo: 'BigSoft',        desc: 'El sistema de cada tienda: cierres de caja, precios, tasas, reportes, notas por ingresar y listas de la ficha.' }
     ];
     // Para agregar un módulo: una línea aquí + su id en los permisos de la clave (CuadreSistema.gs)
     const MODULOS = [
@@ -8629,6 +8643,7 @@ function revisarPagos(forzar) {
         { id: 'multideposito', area: 'almacen', titulo: 'Depósitos y traspasos', desc: 'Stock independiente por sucursal y traspasos en tránsito entre sedes.', listo: true, acceso: ['movalmacen', 'inventario', 'facturar'] },
         { id: 'precios',    area: 'bigsoft', titulo: 'Precios en tiendas',    desc: 'Lo que entró al almacén: costo y precios nuevos, qué falta en cada tienda y cargarlos en su BigSoft.', listo: true },
         { id: 'reportes',   area: 'bigsoft', titulo: 'Reportes de tiendas',   desc: 'Existencia, ajustes de inventario y ventas del BigSoft de cada tienda, en Excel.', listo: true },
+        { id: 'tasasbs',    area: 'bigsoft', titulo: 'Tasas en tiendas',      desc: 'Ver y actualizar a distancia la tasa BCV y los precios en el BigSoft de cada tienda.', listo: true, acceso: ['precios', 'cierrecaja', 'movalmacen'] },
         { id: 'habladores', area: 'bigsoft', titulo: 'Habladores de precios', desc: 'Consulta los productos con existencia en la tienda e imprime habladores en Pequeño, Estándar o Grande.', listo: true, acceso: ['habladores'] },
         // Atajo (no es un permiso aparte): las notas emitidas "Por ingresar en tienda", para quien tiene Entradas y salidas o Facturar
         { id: 'notasbs',    area: 'bigsoft', titulo: 'Notas por ingresar',    desc: 'Notas de despacho a las tiendas que faltan por ingresar en su BigSoft. Se ingresan a distancia desde aquí.', listo: true,
@@ -8644,7 +8659,7 @@ function revisarPagos(forzar) {
         almacen: ['movalmacen', 'inventario', 'facturar'],
         pedidos: ['reqcharcu'],
         rrhh: ['talento', 'horarios', 'asistencia', 'asisgestion', 'nomina', 'pagonomina'],
-        pos: ['cierrecaja', 'precios', 'notasbs', 'reportes', 'habladores'],
+        pos: ['cierrecaja', 'precios', 'notasbs', 'reportes', 'tasasbs', 'habladores'],
         ventaexpress: ['ventaexpress'],
         multideposito: ['multideposito']
     };
@@ -9022,7 +9037,7 @@ function revisarPagos(forzar) {
         claveAdminAuto(document.body);
         // login, menu, cuadre, ventas y admin tienen su propia sección; el resto usa la genérica "en construcción"
         // Caja chica usa la misma sección de Control de efectivo, mostrando solo la caja chica
-        const seccion = vista === 'multideposito' ? 'md' : vista === 'cierrecaja' ? 'cie' : vista === 'cajachica' ? 'efectivo' : vista === 'reqcharcu' ? 'req' : vista === 'asistencia' ? 'asis' : vista === 'asisgestion' ? 'asisg' : (vista === 'nomina' || vista === 'talento' || vista === 'cxc' || vista === 'horarios') ? 'per' : (vista === 'inventario' || vista === 'movalmacen' || vista === 'precios' || vista === 'facturar' || vista === 'reportes' || vista === 'habladores') ? 'alm' : vista === 'pagonomina' ? 'pnom' : vista === 'listasficha' ? 'fl' : vista === 'ventaexpress' ? 'vx' : vista === 'marcaje' ? 'marca' : vista === 'cxp' ? 'cxp' : ['login', 'menu', 'cuadre', 'ventas', 'admin', 'pagos', 'efectivo'].includes(vista) ? vista : 'modulo';
+        const seccion = vista === 'multideposito' ? 'md' : vista === 'cierrecaja' ? 'cie' : vista === 'cajachica' ? 'efectivo' : vista === 'reqcharcu' ? 'req' : vista === 'asistencia' ? 'asis' : vista === 'asisgestion' ? 'asisg' : (vista === 'nomina' || vista === 'talento' || vista === 'cxc' || vista === 'horarios') ? 'per' : (vista === 'inventario' || vista === 'movalmacen' || vista === 'precios' || vista === 'facturar' || vista === 'reportes' || vista === 'habladores' || vista === 'tasasbs') ? 'alm' : vista === 'pagonomina' ? 'pnom' : vista === 'listasficha' ? 'fl' : vista === 'ventaexpress' ? 'vx' : vista === 'marcaje' ? 'marca' : vista === 'cxp' ? 'cxp' : ['login', 'menu', 'cuadre', 'ventas', 'admin', 'pagos', 'efectivo'].includes(vista) ? vista : 'modulo';
         ['login', 'menu', 'cuadre', 'ventas', 'admin', 'pagos', 'efectivo', 'req', 'asis', 'asisg', 'per', 'alm', 'pnom', 'fl', 'vx', 'marca', 'cxp', 'cie', 'md', 'modulo'].forEach(v => {
             const el = document.getElementById('vista' + v[0].toUpperCase() + v.slice(1));
             el.dataset.pantalla = '';   // al aparecer entra deslizándose (ANIM)
@@ -9057,7 +9072,7 @@ function revisarPagos(forzar) {
         if (vista === 'asisgestion') asisgIniciar();
         if (vista === 'nomina' || vista === 'talento' || vista === 'cxc' || vista === 'horarios') perIniciar(vista);
         if (vista === 'marcaje') marcaIniciar();
-        if (vista === 'inventario' || vista === 'movalmacen' || vista === 'precios' || vista === 'facturar' || vista === 'reportes' || vista === 'habladores') almIniciar(vista, vistaAntes !== vista);
+        if (vista === 'inventario' || vista === 'movalmacen' || vista === 'precios' || vista === 'facturar' || vista === 'reportes' || vista === 'habladores' || vista === 'tasasbs') almIniciar(vista, vistaAntes !== vista);
         if (vista === 'pagonomina') pnomIniciar();
         if (vista === 'listasficha') flIniciar();
         if (vista === 'ventaexpress') vxIniciar();
@@ -9094,6 +9109,7 @@ function revisarPagos(forzar) {
         nomina: () => perCargar(), talento: () => perCargar(), cxc: () => perCargar(), horarios: () => perCargar(),
         inventario: () => almCargar(), facturar: () => almCargar(), movalmacen: () => { cmpCompras = null; return almCargar(); }, precios: () => { cmpOrd = null; return almCargar(); }, pagonomina: () => pnomCargar(),
         reportes: () => almPintar(),   // los reportes se piden con su botón (cada uno lo saca la PC de la tienda)
+        tasasbs: async () => { tasasPromesa = null; await cargarTasasBCV(); almPintar(); },
         habladores: () => almPintar(),
         listasficha: () => flCargar(),
         ventaexpress: () => vxPintar(),   // Firebase lo trae en vivo
@@ -9262,7 +9278,7 @@ function revisarPagos(forzar) {
     const NAV_GRUPOS = {
         admin: [['Cajas y ventas', ['cuadre', 'pagos', 'ventas']], ['Dinero', ['efectivo', 'cajachica', 'gastos']], ['Cuentas', ['cxc', 'cxp']], ['Tiendas', ['ventaexpress']]],
         almacen: [['Mercancía', ['movalmacen', 'inventario', 'facturar', 'multideposito']], ['Pedidos de las tiendas', ['reqcharcu']]],
-        bigsoft: [['Cajas', ['cierrecaja', 'listasficha']], ['Tiendas', ['precios', 'notasbs', 'reportes', 'habladores']]],
+        bigsoft: [['Cajas', ['cierrecaja', 'listasficha']], ['Tiendas', ['precios', 'notasbs', 'tasasbs', 'reportes', 'habladores']]],
         rrhh: [['Personal', ['talento', 'horarios']], ['Asistencia', ['asistencia', 'asisgestion']], ['Pagos', ['nomina', 'pagonomina']]]
     };
     const LOGO_JD_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#0f172a"/><rect x="3" y="3" width="58" height="58" rx="11" fill="none" stroke="#38bdf8" stroke-width="2.5"/><text x="32" y="42" text-anchor="middle" font-family="system-ui,-apple-system,Segoe UI,sans-serif" font-weight="800" font-size="28" letter-spacing="-1" fill="#f8fafc">JD</text></svg>';
@@ -19398,12 +19414,77 @@ function revisarPagos(forzar) {
             </tbody></table></div>`;
         }).join('') || '<div class="empty">Nada coincide con la búsqueda.</div>';
     }
+    function cxpResumenDeDetalle(detalle) {
+        const items = [];
+        let kg = 0, und = 0;
+        (Array.isArray(detalle) ? detalle : []).forEach(x => {
+            const c = Math.round((Number(x && (x.cantidad != null ? x.cantidad : x.c)) || 0) * 1000) / 1000;
+            if (!(c > 0)) return;
+            const u = /^pesad|^kg$/i.test(String((x && (x.tipo || x.u)) || '')) ? 'kg' : 'und';
+            const d = String(x && (x.descripcion || x.d) || '').trim().slice(0, 70);
+            const p = Math.round((Number(x && (x.costo != null ? x.costo : x.p)) || 0) * 100) / 100;
+            if (u === 'kg') kg += c; else und += c;
+            items.push({ d, c, u, p });
+        });
+        if (!items.length) return null;
+        const r3 = n => Math.round(n * 1000) / 1000;
+        return { kg: r3(kg), und: r3(und), n: items.length, items: items.slice(0, 80) };
+    }
+    function cxpResumenCorto(res) {
+        if (!res || !(res.kg > 0 || res.und > 0 || (res.items || []).length)) return '';
+        const partes = [];
+        if (res.kg > 0) partes.push(nfVE(0, 3).format(res.kg) + ' kg');
+        if (res.und > 0) partes.push(nfVE(0, 3).format(res.und) + ' und');
+        if (res.n > 0) partes.push(res.n + ' prod.');
+        return partes.join(' · ');
+    }
+    function cxpResumenBloqueHTML(res) {
+        if (!res) return '';
+        const head = cxpResumenCorto(res), items = Array.isArray(res.items) ? res.items : [];
+        if (!head && !items.length) return '';
+        const fmtIt = x => `<span>${nfVE(0, 3).format(Number(x.c) || 0)} ${esc(x.u || 'kg')} · ${esc(x.d || '')}${x.p > 0 ? ' ($ ' + fmt(x.p) + '/' + esc(x.u || 'kg') + ')' : ''}</span>`;
+        const vis = items.slice(0, 5), extra = items.slice(5);
+        return `<div>Resumen de ingreso${head ? ': ' + esc(head) : ''}</div>`
+            + (vis.length ? `<div style="margin-top:.18rem;display:grid;gap:.1rem;font-size:.76rem">${vis.map(fmtIt).join('')}</div>` : '')
+            + (extra.length ? `<details style="margin-top:.15rem;font-size:.76rem"><summary style="cursor:pointer">+ ${extra.length} producto(s) más</summary><div style="margin-top:.1rem;display:grid;gap:.1rem">${extra.map(fmtIt).join('')}</div></details>` : '');
+    }
+    const cxpResCache = {};
+    async function cxpCargarResumenLegacy(d, alTener) {
+        if (!d || d.resumen || !d.ref || !(esPrincipal || permisos.includes('movalmacen') || permisos.includes('inventario'))) return;
+        if (d.origen !== 'ingreso' && d.origen !== 'compra') return;
+        const num = String(d.ref).replace(/\D/g, '').padStart(6, '0'), k = d.origen + '|' + num;
+        if (cxpResCache[k]) { d.resumen = cxpResCache[k]; if (alTener) alTener(); return; }
+        try {
+            let det = null;
+            if (d.origen === 'ingreso') {
+                let op = (almIngresos || []).find(x => x.numero === num);
+                if (!op) {
+                    const base = d.fechaFactura || d.fechaRecibida || cxpHoy();
+                    const r = await llamarApi({ action: 'alm_ingresos', desde: sumarDias(base, -3), hasta: sumarDias(base, 3) });
+                    op = (r.ingresos || []).find(x => x.numero === num);
+                }
+                if (op && op.detalle) det = op.detalle;
+            } else if (d.origen === 'compra') {
+                let c = (typeof cmpCompras !== 'undefined' && cmpCompras || []).find(x => x.numero === num);
+                if (!c) {
+                    const r = await llamarApi({ action: 'cmp_compras' });
+                    c = (r.compras || []).find(x => x.numero === num);
+                }
+                if (c && c.detalle) {
+                    const pm = {}; ((almDatos && almDatos.productos) || []).forEach(p => { pm[p.codigo] = p; });
+                    det = c.detalle.map(x => ({ descripcion: x.descripcion, tipo: (pm[x.codigo] || {}).tipo || 'Unidad', cantidad: x.cantidad, costo: x.costo }));
+                }
+            }
+            const res = cxpResumenDeDetalle(det);
+            if (res) { cxpResCache[k] = res; d.resumen = res; if (alTener) alTener(); }
+        } catch (e) {}
+    }
     function cxpVistaRevisar(rev) {
         if (!rev.length) return '<div class="empty">No hay facturas por revisar. Cuando el almacén registre una (o entre una compra), aparece aquí para completar lo fiscal y las condiciones de pago.</div>';
         return `<div class="nota">Complete la parte fiscal (base, IVA y retención), los días de crédito y los descuentos por pronto pago, y apruebe: pasa a la Agenda de pagos.</div>
         <div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Recibida</th><th class="izq">Proveedor</th><th class="izq">Documento</th><th>Monto bruto</th><th class="izq">Origen</th><th class="izq">Foto</th><th></th></tr></thead><tbody>${rev.sort((a, b) => String(a.fechaRecibida).localeCompare(String(b.fechaRecibida))).map(d => `
             <tr><td class="izq">${cxpF(d.fechaRecibida || d.fechaFactura)}<br><small>${esc(d.creadoPor || '')}</small></td><td class="izq"><b>${esc(d.proveedor)}</b></td><td class="izq">${esc(d.documento)}${d.fiscal ? ' <span class="chip st-info">Fiscal</span>' : ''}</td>
-            <td>${d.moneda === 'Bs' ? fmtBs(d.montoBruto) : cxpUsd(d.montoBruto)}</td><td class="izq"><small>${esc(d.origen === 'compra' ? 'Compra con foto' : d.origen === 'ingreso' ? 'Operación de inventario' : d.origen === 'almacen' ? 'Registrada por el almacén' : 'Administración')}${d.ref ? ' · ' + esc(d.ref) : ''}</small></td>
+            <td>${d.moneda === 'Bs' ? fmtBs(d.montoBruto) : cxpUsd(d.montoBruto)}</td><td class="izq"><small>${esc(d.origen === 'compra' ? 'Compra con foto' : d.origen === 'ingreso' ? 'Operación de inventario' : d.origen === 'almacen' ? 'Registrada por el almacén' : 'Administración')}${d.ref ? ' · ' + esc(d.ref) : ''}</small>${d.resumen ? `<small style="display:block;color:var(--text-muted)">${esc(cxpResumenCorto(d.resumen))}</small>` : ''}</td>
             <td class="izq">${(d.fotos || []).map((u, i) => `<a href="${esc(u)}" target="_blank" rel="noopener">${ico('imagen')}${(d.fotos || []).length > 1 ? i + 1 : 'Ver'}</a>`).join(' ') || '<span class="nota">Sin foto</span>'}</td>
             <td><div class="req-acciones" style="margin:0;flex-wrap:nowrap"><button type="button" class="btn-primary btn-mini" onclick="cxpRevisar('${d.id}')">Revisar</button><button type="button" class="btn-ghost btn-mini" title="Fue una compra al contado: sale de Cuentas por pagar" onclick="cxpSacarContado('${d.id}')">Fue de contado</button></div></td></tr>`).join('')}</tbody></table></div>`;
     }
@@ -19523,7 +19604,9 @@ function revisarPagos(forzar) {
                 ${fila('Proveedor', esc(d.proveedor) + (d.rif ? ' · ' + esc(d.rif) : ''))}${fila('Documento', esc(d.documento || '') + (d.control ? ' · control ' + esc(d.control) : ''))}
                 ${fila('Fecha de la factura', fechaBonita(d.fechaFactura))}${d.tipo !== 'prestamo' ? fila('Monto de la factura', mon(d.montoBruto || 0) + (d.moneda === 'Bs' && d.tasaFactura ? ' · tasa ' + fmt(d.tasaFactura) : '')) : fila('Capital', cxpUsd(d.capital) + ' · ' + fmt(d.tasaAnual) + ' % anual · ' + esc(d.sistema || ''))}
                 ${fiscal}${fila('Pagado', d.pagado ? cxpUsd(d.pagado) + (d.descontado ? ' (incluye ' + cxpUsd(d.descontado) + ' de descuento)' : '') : '')}
-                ${fila('Pronto pago', desc)}${fila('Nota', esc(d.nota || ''))}${fila('Foto', (d.fotos || []).map((u, i) => `<a href="${esc(u)}" target="_blank" rel="noopener">${ico('imagen')}Foto ${i + 1}</a>`).join(' '))}
+                ${fila('Pronto pago', desc)}${fila('Nota', esc(d.nota || ''))}
+                ${d.resumen || (d.origen === 'ingreso' || d.origen === 'compra') ? `<tr id="cxpVerResumenFila" style="${d.resumen ? '' : 'display:none'}"><td class="izq" style="color:var(--text-muted)">Ingreso almacén</td><td class="izq"><div id="cxpVerResumen" style="color:var(--text-muted);font-weight:400;font-size:.82rem;line-height:1.45">${d.resumen ? cxpResumenBloqueHTML(d.resumen) : ''}</div></td></tr>` : ''}
+                ${fila('Foto', (d.fotos || []).map((u, i) => `<a href="${esc(u)}" target="_blank" rel="noopener">${ico('imagen')}Foto ${i + 1}</a>`).join(' '))}
                 ${d.anulada ? fila('Anulada', esc(d.anulada.quien + ' · ' + d.anulada.cuando + ' · ' + d.anulada.motivo)) : ''}${d.contado ? fila('Al contado', esc(d.contado.quien + ' · ' + d.contado.cuando + (d.contado.motivo ? ' · ' + d.contado.motivo : ''))) : ''}
             </tbody></table></div>${cuotas}${pagos}</div>
             <div class="cxp-ver-lado" id="cxpComCaja">${cxpComentariosHTML(d)}</div></div>
@@ -19535,6 +19618,11 @@ function revisarPagos(forzar) {
                 ${admin && d.tipo !== 'prestamo' && d.estado !== 'anulada' && d.estado !== 'pagada' ? `<button type="button" class="btn-ghost" onclick="almCerrar();cxpRevisar('${d.id}')">${d.estado === 'por_revisar' ? 'Revisar' : 'Cambiar condiciones'}</button>` : ''}
                 ${d.estado === 'aprobada' && saldo > 0 && d.tipo !== 'prestamo' ? `<button type="button" class="btn-primary" onclick="almCerrar();cxpPagar('${d.id}', 0)">Pagar</button>` : ''}
                 <button type="button" class="btn-ghost" onclick="almCerrar()">Cerrar</button></div></div>`);
+        if (!d.resumen) cxpCargarResumenLegacy(d, () => {
+            if (!cxp._ver || cxp._ver.id !== d.id) return;
+            const box = document.getElementById('cxpVerResumen'), tr = document.getElementById('cxpVerResumenFila');
+            if (box && tr && d.resumen) { box.innerHTML = cxpResumenBloqueHTML(d.resumen); tr.style.display = ''; }
+        });
     }
 
     // ---------- Revisar / registrar a mano (Administración) ----------
@@ -19552,6 +19640,9 @@ function revisarPagos(forzar) {
         if (r.credito == null) r.credito = 0;
         r.descuentos = r.descuentos || [];
         cxpRevPintar(true);
+        if (r.id && !r.resumen) cxpCargarResumenLegacy(r, () => {
+            if (cxpRev && cxpRev.id === r.id && almDlgAbierta()) cxpRevPintar();
+        });
     }
     // Lo que se debe: total de la factura menos la retención de IVA; en $ (si la factura es en Bs, a la tasa BCV de su fecha)
     function cxpRevCalcular(r) {
@@ -19598,6 +19689,7 @@ function revisarPagos(forzar) {
                 <div><button type="button" class="btn-ghost btn-mini" onclick="cxpRevDesc(${i}, null)">Quitar</button></div></div>`).join('')}
             ${r.descuentos.length < 4 ? `<button type="button" class="btn-ghost btn-mini" onclick="cxpRevDesc(-1)">＋ Descuento por pronto pago</button>` : ''}
             <div class="filters" style="margin-top:.6rem"><div style="grid-column:1/-1"><label for="crNota">Nota</label><input id="crNota" value="${esc(r.nota || '')}" oninput="cxpRevCampo('nota', this.value)" maxlength="200"></div></div>
+            ${r.resumen ? `<div id="crResumen" class="nota" style="margin:.2rem 0 .45rem;color:var(--text-muted);font-size:.8rem;line-height:1.45">${cxpResumenBloqueHTML(r.resumen)}</div>` : ''}
             <div style="margin:.6rem 0;padding:.65rem;border:1px solid var(--border);border-radius:10px;background:var(--bg)">
                 <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
                     <label class="btn-ghost btn-mini" style="cursor:pointer;margin:0">${ico('camara')}${r._fotoNueva ? 'Cambiar foto nueva' : ((r.fotos || []).length ? 'Agregar otra foto' : 'Subir foto de la factura')}<input type="file" accept="image/*" capture="environment" style="display:none" onchange="cxpRevFoto(this.files[0])"></label>
@@ -19666,6 +19758,7 @@ function revisarPagos(forzar) {
                 fiscal: !!r.fiscal, base: r.fiscal ? cxpR(r.base) : 0, exento: r.fiscal ? cxpR(r.exento) : 0, iva: r.iva, retPct: r.fiscal ? Number(r.retPct) : 0, retIva: r.retIva,
                 totalUsd: r.totalUsd, credito: Number(r.credito) || 0, vence: r.vence, descuentos: r.descuentos.map(x => ({ dias: Number(x.dias), pct: Number(x.pct) || 0, monto: Number(x.monto) || 0 })),
                 fotos: fotosAct, nota: String(r.nota || '').slice(0, 200), revisadoPor: quien, revisado: ahora };
+            if (r.resumen) datos.resumen = r.resumen;
             if (aprobar) Object.assign(datos, { estado: 'aprobada', abierta: true });
             const ref = fs.doc(db, 'cxp_docs', id), ya = r.id ? cxp.docs.find(x => x.id === id) : null;
             const listo = () => { almCerrar(); mostrarBanner(aprobar ? `Factura ${datos.documento} de ${datos.proveedor} aprobada: pasa a la Agenda de pagos (vence el ${fechaBonita(datos.vence)}).` : 'Guardada (todavía por revisar).', 'ok'); };
@@ -20160,7 +20253,7 @@ function revisarPagos(forzar) {
     let almDatos = null, almVista = '', almTab = '', almNotas = null, almIngresos = null;
     let almVenta = { items: [], sel: -1, descuento: 0, claveDesc: '', claveStock: '', ultimo: '' };
     let almIng = { operacion: '', proveedorId: '', documento: '', clienteId: '', nota: '', pago: '', items: [], sel: -1, listo: false, ultimo: '' };
-    const ALM_TABS = { precios: [['ordenes', 'Por actualizar'], ['completas', 'Historial'], ['remoto', 'Cargar en tiendas']], inventario: [['productos', 'Productos'], ['seguimiento', 'Seguimiento de producto']], facturar: [['facturar', 'Despacho'], ['notas', 'Notas emitidas']], movalmacen: [['compra', 'Compra con foto'], ['ingresar', 'Operaciones de inventario'], ['cxpfactura', 'Registrar factura recibida'], ['notas', 'Notas emitidas'], ['ingresos', 'Historial de operaciones'], ['tiendas', 'Inversión por tienda']], reportes: [['reportes', 'Reportes de tiendas']], habladores: [['habladores', 'Habladores de precios']] };
+    const ALM_TABS = { precios: [['ordenes', 'Por actualizar'], ['completas', 'Historial'], ['remoto', 'Cargar en tiendas']], inventario: [['productos', 'Productos'], ['seguimiento', 'Seguimiento de producto']], facturar: [['facturar', 'Despacho'], ['notas', 'Notas emitidas']], movalmacen: [['compra', 'Compra con foto'], ['ingresar', 'Operaciones de inventario'], ['cxpfactura', 'Registrar factura recibida'], ['notas', 'Notas emitidas'], ['ingresos', 'Historial de operaciones'], ['tiendas', 'Inversión por tienda']], reportes: [['reportes', 'Reportes de tiendas']], tasasbs: [['tasasbs', 'Tasas en tiendas']], habladores: [['habladores', 'Habladores de precios']] };
     // Entradas y salidas: al entrar se elige la operación en cuadros (como los módulos); dentro, "‹ Entradas y salidas" vuelve a los cuadros
     const ALM_OPERACIONES = {
         compra: ['Foto de la factura del proveedor: se lee sola, se calcula el precio y se reparte a las tiendas.', '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>'],
@@ -20206,8 +20299,11 @@ function revisarPagos(forzar) {
         if (vista === 'movalmacen') { if (otra || !ALM_TABS.movalmacen.some(([t]) => t === almTab)) almTab = ''; }   // al entrar: los cuadros
         else if (!ALM_TABS[vista].some(([t]) => t === almTab)) almTab = ALM_TABS[vista][0][0];
         almTabsPintar();
-        // Reportes de tiendas y Habladores: no necesitan los productos del almacén (los saca el BigSoft de cada tienda)
-        if (vista === 'reportes' || vista === 'habladores') { almPintar(); return; }
+        // Reportes de tiendas, Tasas en tiendas y Habladores: no necesitan los productos del almacén (los saca el BigSoft de cada tienda)
+        if (vista === 'reportes' || vista === 'habladores' || vista === 'tasasbs') {
+            if (vista === 'tasasbs') cargarTasasBCV().then(() => { if (vistaActual === 'tasasbs') almPintar(); });
+            almPintar(); return;
+        }
         cargarTasasBCV().then(() => { if (vistaActual === almVista) almPintar(); });
         if (almDatos) almPintar(); else document.getElementById('almContenido').innerHTML = cargandoHTML('Cargando productos...');
         if (!almDatos || Date.now() - almDatosEn > 120000) await almCargar(!almDatos);
@@ -20232,7 +20328,7 @@ function revisarPagos(forzar) {
         almDatosEn = Date.now();
         almDatos = { productos: r.productos || [], clientes: r.clientes || [], categorias: r.categorias || [], proveedores: r.proveedores || [],
                      proximaNota: r.proximaNota || '', proximoIngreso: r.proximoIngreso || '', telegram: !!r.telegram, pendientes: r.pendientes || null, precios: r.precios || {} };
-        if (vistaActual !== 'reportes' && vistaActual !== 'habladores') almPintar();   // Reportes/Habladores no usan almDatos: la precarga no debe repintarlos
+        if (vistaActual !== 'reportes' && vistaActual !== 'habladores' && vistaActual !== 'tasasbs') almPintar();   // Reportes/Habladores/Tasas no usan almDatos: la precarga no debe repintarlos
     }
     function almModo(t) {
         const cambio = almTab !== t;
@@ -20250,6 +20346,7 @@ function revisarPagos(forzar) {
             return;
         }
         if (vistaActual === 'reportes') { if (almVista === 'reportes') pintarConservando(out, rptVista(), almPintar); return; }
+        if (vistaActual === 'tasasbs') { if (almVista === 'tasasbs') pintarConservando(out, bsTasaVista(), almPintar); return; }
         if (vistaActual === 'habladores') { if (almVista === 'habladores') pintarConservando(out, habVista(), almPintar); return; }
         if (!almDatos || (vistaActual !== 'inventario' && vistaActual !== 'movalmacen' && vistaActual !== 'precios' && vistaActual !== 'facturar')) return;
         if (almVista === 'movalmacen' && !almTab) { pintarConservando(out, almPendientesHTML() + almOperacionesHTML(), almPintar); return; }
@@ -23731,6 +23828,29 @@ Reglas:
         bspPintar();
     }
     // Detener: deja de esperar a la PC de la tienda (sin internet o apagada) y libera la pantalla
+    async function bspActualizarTasa() {
+        const s = bsp;
+        if (!s.tienda) { mostrarBanner('Elija la tienda.', 'warn'); return; }
+        const id = Date.now();
+        Object.assign(s, { id, paso: 'cargando', errorSuave: false, seg: 0, estadoTarea: 'pendiente' });
+        bspPintar();
+        try {
+            const t = await bsrTarea('tasa_actualizar', { local: s.tienda }, bspAlEsperar(s, id), 180, s.senal = { detenido: false });
+            if (s.id !== id) return;
+            const r = t.resultado || {};
+            if (r.nueva) {
+                mostrarBanner(`Tasa actualizada en ${s.tienda}: BCV ${bspF(r.nueva.bcv)} · precios ${bspF(r.nueva.precios)} (${fmtNum(r.productos || 0)} productos recalculados).`, 'ok');
+            }
+            await bspRevisar();
+        } catch (e) {
+            if (s.id !== id) return;
+            s.paso = 'error';
+            s.error = /Pedido desconocido/i.test(e.message)
+                ? `La PC de ${s.tienda} tiene las Utilidades anteriores, que no actualizan tasas a distancia. Suba el paquete nuevo de UTILIDADES en Tiempos (o cópielo en esa PC) y reinicie el avisador.`
+                : e.message;
+            bspPintar();
+        }
+    }
     function bspDetener() {
         [bsp.senal, bsp.senalBus].forEach(s => { if (s) { s.detenido = true; if (s.despertar) s.despertar(); } });
         if (bsp.busqueda && bsp.busqueda.cargando) bsp.busqueda = { texto: bsp.busqueda.texto, error: 'Se dejó de esperar la búsqueda.', productos: [] };
@@ -23812,7 +23932,7 @@ Reglas:
                     : `<span class="bsr-botones" style="display:inline-flex;gap:.3rem;flex-wrap:nowrap"><button type="button" class="btn-ghost btn-mini" onclick="bspElegir('${esc(x.clave)}')">Elegir producto</button><button type="button" class="btn-ghost btn-mini" onclick="bspRegistrar('${esc(x.clave)}')">Registrar nuevo</button></span>`) : ''}</td></tr>`;
         }).join('');
         const el = l.find(x => x.clave === bsp.eligiendo), rg = l.find(x => x.clave === bsp.registrando);
-        return cab + `<div class="nota" ${tasa.hoy ? '' : 'style="color:var(--warn)"'}>Tasa de precios del BigSoft de ${esc(bsp.tienda)}: <b>${bspF(tasa.precios)}</b> · descuento por pago en divisas ${bspF(tasa.descuento)} %${tasa.hoy ? '' : ` · <b>OJO: no es la de hoy${tasa.fecha ? ' (es del ' + fechaBonita(tasa.fecha) + ')' : ''}: actualice la tasa en la tienda antes de cargar</b>`}</div>
+        return cab + `<div class="nota" style="display:flex;align-items:center;justify-content:space-between;gap:.6rem;flex-wrap:wrap;${tasa.hoy ? '' : 'color:var(--warn)'}"><span>Tasa de precios del BigSoft de ${esc(bsp.tienda)}: <b>${bspF(tasa.precios)}</b> · descuento por pago en divisas ${bspF(tasa.descuento)} %${tasa.hoy ? '' : ` · <b>OJO: no es la de hoy${tasa.fecha ? ' (es del ' + fechaBonita(tasa.fecha) + ')' : ''}: actualice la tasa en la tienda antes de cargar</b>`}</span><button type="button" class="btn-${tasa.hoy ? 'ghost' : 'primary'} btn-mini" onclick="bspActualizarTasa()">Actualizar tasa en BigSoft</button></div>
             <div class="req-acciones alm-lista-acc">${cargables.length ? `<button type="button" class="btn-ghost btn-mini" onclick="bspTodas()">${marcadas.length === cargables.length ? 'Quitar todos' : `Marcar todos (${cargables.length})`}</button>` : ''}</div>
             <div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th></th><th class="izq">Código</th><th class="izq">Producto</th><th>Detal $ BCV</th><th>Mayor $ BCV</th><th>Costo $ BCV</th><th>Detal hoy (div.)</th><th>Detal nuevo Bs</th><th class="izq">En BigSoft</th><th></th></tr></thead><tbody>${filas}</tbody></table></div>
             ${el ? bspElegirHTML(el) : rg ? bspFichaHTML(rg) : ''}
@@ -24095,6 +24215,140 @@ Reglas:
         const url = URL.createObjectURL(new Blob([datos], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
         const a = document.createElement('a'); a.href = url; a.download = nombre; document.body.appendChild(a); a.click(); a.remove();
         setTimeout(() => URL.revokeObjectURL(url), 60000);
+    }
+
+    // ---------- Tasas de BigSoft en tiendas (remoto.js / BigSoft.gs › bsr_pedir "tasa_ver" | "tasa_actualizar", Utilidades › Remoto.ps1 + Tasa.ps1) ----------
+    const bst = { est: {} };
+    const bstOcupado = t => { const e = bst.est[t]; return !!(e && (e.paso === 'pendiente' || e.paso === 'curso')); };
+    const bstHayCurso = () => CMP_TIENDAS.some(bstOcupado);
+    const bstPintar = () => { if (vistaActual === 'tasasbs' && almVista === 'tasasbs') almPintar(); };
+    function bstEstadoLineaHTML(t) {
+        const e = bst.est[t] || { paso: 'libre' }, v = e.vivo || {}, dormida = v.hace == null || v.hace > 60;
+        const accionTxt = e.tipo === 'tasa_actualizar' ? 'actualizando tasa' : 'consultando tasa';
+        if (e.paso === 'pendiente' || e.paso === 'curso') {
+            return `<span class="rpt-esp">${iconoCargando()}<small>${e.paso === 'curso' ? `${esc(t)}: ${accionTxt} en BigSoft...`
+                : e.seg && dormida ? `<b style="color:var(--warn)">La PC de ${esc(t)} no ha respondido ${v.hace == null ? 'hoy' : 'en ' + Math.round(v.hace / 60) + ' min'}.</b> Debe estar encendida, con internet y con el avisador abierto.`
+                : `Esperando a la PC de ${esc(t)}...`}${e.seg ? ' · ' + e.seg + ' s' : ''}</small></span>`;
+        }
+        if (e.paso === 'error') {
+            return e.detenido ? `<span class="chip st-pend">Detenido</span><small>${esc(e.err)}</small>`
+                : `<span class="chip st-falta">No se pudo</span><small class="rpt-mal">${esc(e.err)}</small>`;
+        }
+        const a = e.act;
+        if (!a) return '<span class="chip st-pend">Sin consultar</span>';
+        if (a.modo === 'actualizar') {
+            return `<span class="chip st-ok">${a.yaEstaba ? 'Recalculada (ya estaba al día)' : 'Tasa actualizada'}</span><small>${fmtNum(a.productos || 0)} productos recalculados · las cajas toman la tasa nueva al abrir</small>`;
+        }
+        return `<span class="chip ${a.alDia ? 'st-ok' : 'st-amar'}">${a.alDia ? 'Al día' : 'Desactualizada'}</span><small>${fmtNum(a.productos || 0)} productos con referencia</small>`;
+    }
+    function bstTasaCeldaHTML(t) {
+        const e = bst.est[t], a = e && e.act;
+        if (!a) return '<span class="nota">—</span>';
+        const fBs = v => v > 0 ? 'Bs ' + fmt(v) : '—';
+        if (a.modo === 'actualizar') {
+            const cambio = a.anterior && a.anterior.bcv > 0 && Math.abs((a.nueva.bcv || 0) - a.anterior.bcv) >= 0.005;
+            return `<b>BCV ${fBs(a.nueva.bcv)}</b> · Precios ${fBs(a.nueva.precios)}<small>${cambio ? `antes BCV ${fBs(a.anterior.bcv)} · precios ${fBs(a.anterior.precios)} · ` : ''}${a.nueva.fecha ? fechaBonita(a.nueva.fecha) : ''}</small>`;
+        }
+        return `<b>BCV ${fBs(a.actual.bcv)}</b> · Precios ${fBs(a.actual.precios)}<small>${a.actual.fecha ? 'Fecha en BigSoft: ' + fechaBonita(a.actual.fecha) : 'Sin fecha'}${!a.alDia && a.objetivo ? ' · BCV hoy: ' + fBs(a.objetivo.bcv) : ''}</small>`;
+    }
+    function bstRefrescarTabla() {
+        if (vistaActual !== 'tasasbs' || almVista !== 'tasasbs') return;
+        const tbody = document.getElementById('bstTbody');
+        if (tbody) {
+            CMP_TIENDAS.forEach(t => {
+                const st = document.getElementById('bstSt_' + CMP_SIGLA[t]);
+                if (st) st.innerHTML = bstEstadoLineaHTML(t);
+            });
+        } else bstPintar();
+    }
+    async function bsTasaCorrer(tiendasLista, tipo) {
+        const lista = (tiendasLista || []).filter(t => CMP_TIENDAS.includes(t) && !bstOcupado(t));
+        if (!lista.length) return;
+        lista.forEach(t => {
+            const prev = bst.est[t] || {};
+            bst.est[t] = { paso: 'pendiente', tipo, seg: 0, vivo: null, detenido: false, err: '', act: prev.act || null, senal: { detenido: false }, vuelta: (prev.vuelta || 0) + 1 };
+        });
+        bstPintar();
+        await Promise.all(lista.map(async local => {
+            const e = bst.est[local], vuelta = e.vuelta;
+            try {
+                const resT = await bsrTarea(tipo, { local }, (estado, vivo, seg) => {
+                    if (e.vuelta !== vuelta || e.detenido) return;
+                    Object.assign(e, { paso: estado, vivo, seg });
+                    bstRefrescarTabla();
+                }, 180, e.senal);
+                if (e.vuelta !== vuelta || e.detenido) return;
+                const r = resT.resultado || {};
+                e.paso = 'listo';
+                e.act = tipo === 'tasa_actualizar'
+                    ? { modo: 'actualizar', anterior: r.anterior || {}, nueva: r.nueva || {}, productos: r.productos || 0, yaEstaba: !!r.yaEstaba }
+                    : { modo: 'ver', actual: r.actual || {}, objetivo: r.objetivo || {}, productos: r.productos || 0, alDia: !!r.alDia };
+                bstPintar();
+            } catch (err) {
+                if (e.vuelta !== vuelta || e.detenido) return;
+                e.paso = 'error';
+                e.err = /Pedido desconocido/i.test(err.message)
+                    ? `La PC de ${local} tiene las Utilidades anteriores, que no actualizan tasas a distancia. Suba el paquete nuevo de UTILIDADES en Tiempos > Utilidades de las tiendas (o cópielo en esa PC) y reinicie el avisador.`
+                    : err.message;
+                bstPintar();
+            }
+        }));
+    }
+    function bsTasaTodas(tipo) { bsTasaCorrer(CMP_TIENDAS.slice(), tipo); }
+    function bsTasaUna(tienda, tipo) { bsTasaCorrer([tienda], tipo); }
+    function bsTasaReintentar() { bsTasaCorrer(CMP_TIENDAS.filter(t => bst.est[t] && bst.est[t].paso === 'error' && !bstOcupado(t)), 'tasa_actualizar'); }
+    function bsTasaDetener(tienda) {
+        const lista = tienda ? [tienda] : CMP_TIENDAS.slice();
+        lista.forEach(t => {
+            const e = bst.est[t]; if (!e || (e.paso !== 'pendiente' && e.paso !== 'curso')) return;
+            e.detenido = true; e.paso = 'error'; e.err = `Detenido: se dejó de esperar a la PC de ${t}.`;
+            e.vuelta = (e.vuelta || 0) + 1;
+            if (e.senal) { e.senal.detenido = true; if (e.senal.despertar) e.senal.despertar(); }
+        });
+        bstPintar();
+    }
+    async function bsTasaRefrescarBcv(btn) {
+        const t0 = btn ? btn.textContent : ''; if (btn) btnCargando(btn, 'Leyendo BCV...');
+        try { tasasPromesa = null; await cargarTasasBCV(); } finally { if (btn) { btn.disabled = false; btn.textContent = t0; } }
+        bstPintar();
+    }
+    function bsTasaVista() {
+        const tBcv = tasaBCVdel(fechaLocalHoy());
+        const bcv = tBcv ? Number(tBcv[1]) : 0;
+        const bcv2 = bcv > 0 ? Math.round(bcv * 100) / 100 : 0;
+        const sup = bcv2 > 0 ? Math.round((bcv2 / 0.92) * 100) / 100 : 0;
+        const curso = bstHayCurso();
+        const fallas = CMP_TIENDAS.filter(t => bst.est[t] && bst.est[t].paso === 'error' && !bstOcupado(t));
+        const filas = CMP_TIENDAS.map(t => {
+            const oc = bstOcupado(t), sig = CMP_SIGLA[t] || t.replace(/\W+/g, '_');
+            return `<tr>
+                <td class="izq"><b>${esc(t)}</b></td>
+                <td class="izq">${bstTasaCeldaHTML(t)}</td>
+                <td class="izq" id="bstSt_${esc(sig)}">${bstEstadoLineaHTML(t)}</td>
+                <td style="white-space:nowrap">
+                    ${oc ? `<button type="button" class="btn-ghost btn-mini" onclick="bsTasaDetener('${esc(t)}')">Detener</button>`
+                    : `<button type="button" class="btn-ghost btn-mini" onclick="bsTasaUna('${esc(t)}', 'tasa_ver')">Consultar</button>
+                       <button type="button" class="btn-primary btn-mini" onclick="bsTasaUna('${esc(t)}', 'tasa_actualizar')">Actualizar tasa</button>`}
+                </td></tr>`;
+        }).join('');
+        return `<div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:.75rem;flex-wrap:wrap;margin-bottom:.75rem">
+                <div>
+                    <div style="font-weight:700;font-size:.95rem">${bcv2 > 0 ? `Tasa BCV vigente: Bs ${fmt(bcv)}` : 'Consultando tasa BCV vigente...'}</div>
+                    <small style="color:var(--text-muted)">${tBcv ? `Fecha valor ${fechaBonita(tBcv[0])} · En BigSoft: Venta Bs ${fmt(bcv2)} · Precios (8 % desc.) Bs ${fmt(sup)}` : 'Se toma automáticamente del BCV al enviar a las tiendas.'}</small>
+                </div>
+                <button type="button" class="btn-ghost btn-mini" onclick="bsTasaRefrescarBcv(this)">Refrescar BCV</button>
+            </div>
+            <div class="req-acciones" style="flex-wrap:wrap">
+                <button type="button" class="btn-primary" onclick="bsTasaTodas('tasa_actualizar')" ${CMP_TIENDAS.every(bstOcupado) ? 'disabled' : ''}>Actualizar tasas en todas las tiendas</button>
+                <button type="button" class="btn-ghost" onclick="bsTasaTodas('tasa_ver')" ${CMP_TIENDAS.every(bstOcupado) ? 'disabled' : ''}>Consultar tasas actuales</button>
+                ${curso ? `<button type="button" class="btn-ghost" onclick="bsTasaDetener()">${ico('detener')}Detener espera</button>` : ''}
+                ${fallas.length && !curso ? `<button type="button" class="btn-ghost" onclick="bsTasaReintentar()">Reintentar en las que fallaron (${fallas.length})</button>` : ''}
+            </div>
+            <div class="tabla-wrap"><table class="req-tabla" data-sin-paginar>
+                <thead><tr><th class="izq">Tienda</th><th class="izq">Tasa en BigSoft</th><th class="izq">Estado</th><th>Acciones</th></tr></thead>
+                <tbody id="bstTbody">${filas}</tbody>
+            </table></div>
+            <div class="nota">Actualiza la referencia del día y recalcula todos los precios en bolívares directo en la base de datos de BigSoft (MySQL o FoxPro) de cada tienda encendida con el avisador abierto. Si hay una caja abierta, toma la tasa nueva al abrir de nuevo.</div>`;
     }
 
     // ---------- Habladores de precios desde existencia en tienda (BigSoft.gs › bsr_pedir "existencia", Utilidades › Reportes.ps1) ----------
