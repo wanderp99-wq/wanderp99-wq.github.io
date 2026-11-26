@@ -23758,7 +23758,7 @@ Reglas:
         est:    { nom: 'Estándar · 6,5 × 4,5 cm (15/hoja)',                 porHoja: 15, cls: 'grid-3col' },
         gra4:   { nom: 'Grande Compacto · 9,3 × 12,2 cm (4/hoja)',          porHoja: 4,  cls: 'grid-2col-gra' },
         gra_mc: { nom: 'Grande Media Carta · 19 × 12,2 cm (2/hoja)',        porHoja: 2,  cls: 'grid-gra-mc' },
-        carta:  { nom: 'Carta Completa · 19 × 25,4 cm (1/hoja · marca agua)', porHoja: 1, cls: 'grid-carta' }
+        carta:  { nom: 'Carta Completa Horizontal · 25,4 × 19 cm (1/hoja · marca agua)', porHoja: 1, cls: 'grid-carta', landscape: true }
     };
     function habUnidadCorta(u) {
         const s = String(u || '').trim().toUpperCase();
@@ -23937,8 +23937,8 @@ Reglas:
         const plazaLogoSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="400 380 1130 1175"><path fill="#FF4000" d="M423 398 H950 C1230 398 1400 560 1450 788 L1115 952 C1110 790 1075 655 870 655 H773 V1193 L423 1365 Z"/><path fill="#44AC00" d="M423 1365 L1508 834 V865 L658 1533 H423 Z"/><path fill="#F7931E" d="M820 1533 L1465 1026 C1460 1140 1448 1225 1420 1295 C1360 1440 1250 1490 1160 1505 C1090 1522 1020 1533 950 1533 Z"/></svg>';
         const iconEl = typeof document !== 'undefined' && document.querySelector ? document.querySelector('link[rel="icon"]') : null;
         const logoUrl = (iconEl && iconEl.href) || ('data:image/svg+xml;charset=utf-8,' + encodeURIComponent(plazaLogoSvg));
-        // Marca de agua (estilo carnet: varios logos en gris con relieve, rotación, tamaño y transparencia asimétricos)
-        const HAB_MARCA_CARTA = [[-12, 34, 68, -16, 0.08], [120, 38, 60, 12, 0.095], [50, 102, 88, -6, 0.07], [-8, 166, 62, 16, 0.085], [122, 174, 72, -11, 0.08]];
+        // Marca de agua (estilo carnet: varios logos en gris con relieve, rotación, tamaño y transparencia asimétricos en las 4 zonas exteriores)
+        const HAB_MARCA_CARTA = [[8, 25, 42, -16, 0.085], [202, 28, 38, 14, 0.095], [16, 126, 40, 13, 0.085], [198, 120, 46, -11, 0.08]];
         const marcaCartaHtml = tam === 'carta'
             ? '<div class="hab-marca-agua">' + HAB_MARCA_CARTA.map(([x, y, tm, giro, op]) =>
                 `<img src="${logoUrl}" alt="" style="width:${tm}mm;height:${tm}mm;left:${x}mm;top:${y}mm;transform:rotate(${giro}deg);opacity:${op}">`).join('') + '</div>'
@@ -23988,27 +23988,27 @@ Reglas:
                         </div>
                     </div>${footHtml}</div>`;
             }
-            if ((tam === 'est' || tam === 'gra4' || tam === 'carta') && ofeValida) {
-                const kicker = tam === 'est' ? 'OFERTA' : tam === 'carta' ? '¡OFERTA IMPERDIBLE!' : 'PRECIO ESPECIAL';
+            if ((tam === 'est' || tam === 'gra4') && ofeValida) {
+                const kicker = tam === 'est' ? 'OFERTA' : 'PRECIO ESPECIAL';
                 return `<div class="tag ${tagCls} ${clsTinta} ${clsOfe} ${clsD}">
                     <div class="tag-top"><div class="tag-top-left">${logoSvg(true)}<span class="tag-kicker">${kicker}</span></div>${badge}</div>
-                    ${marcaCartaHtml}
                     <div class="tag-prod">${prod}</div>
                     <div class="tag-mid">
                         <div class="est-ofe-top">${antesTxt ? `<span class="antes">Antes ${tachadoHtml(antesTxt)}</span>` : ''}<span class="save">${ahorraTxt}</span></div>
                         <div class="p-wrap"><span class="p-sym">$</span><span class="p-int">${ent}</span><div class="p-right"><span class="p-dec">${dec}</span><span class="p-unit">${unit}</span></div></div>
                     </div>${footHtml}</div>`;
             }
-            if (tam === 'gra_mc' && ofeValida) {
+            if ((tam === 'gra_mc' || tam === 'carta') && ofeValida) {
                 return `<div class="tag ${tagCls} ${clsTinta} ofe ${clsD}">
                     <div class="tag-top"><div class="tag-top-left">${logoSvg(true)}<span class="tag-kicker">¡OFERTA IMPERDIBLE!</span></div>${badge}</div>
+                    ${marcaCartaHtml}
                     <div class="tag-prod">${prod}</div>
                     <div class="tag-mid oferta">
                         <div class="p-wrap"><span class="p-sym">$</span><span class="p-int">${ent}</span><div class="p-right"><span class="p-dec">${dec}</span><span class="p-unit">${unit}</span></div></div>
                         <div class="anchor">${antesTxt ? `<div class="antes">Antes ${tachadoHtml(antesTxt)}</div>` : ''}<div class="save">${ahorraTxt}</div></div>
                     </div>${footHtml}</div>`;
             }
-            const kicker = tam === 'gra_mc' ? 'PLAZA VALENCIA · GRAN FORMATO' : 'PLAZA VALENCIA';
+            const kicker = (tam === 'gra_mc' || tam === 'carta') ? 'PLAZA VALENCIA · GRAN FORMATO' : 'PLAZA VALENCIA';
             return `<div class="tag ${tagCls} ${clsTinta} normal ${clsD}">
                 <div class="tag-top"><div class="tag-top-left">${logoSvg(false)}<span class="tag-kicker">${kicker}</span></div>${badge}</div>
                 ${marcaCartaHtml}
@@ -24023,13 +24023,13 @@ Reglas:
             hojas.push(`<section class="sheet"><div class="${cfg.cls}">${expandidos.slice(i, i + cfg.porHoja).map(tagHtml).join('')}</div></section>`);
         }
         return `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Habladores de precios</title><style>
-            @page { size: letter portrait; margin: 8mm; }
+            @page { size: letter ${cfg.landscape ? 'landscape' : 'portrait'}; margin: 8mm; }
             * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
             body { margin: 0; padding: 0; font-family: "Segoe UI", Arial, Helvetica, sans-serif; background: #e2e8f0; color: #0f172a; }
             .toolbar { position: sticky; top: 0; z-index: 20; background: #0f172a; color: #f8fafc; padding: 10px 18px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
             .btn-p { border: 0; background: #FF4000; color: #ffffff; padding: 8px 14px; border-radius: 6px; font-size: 13px; font-weight: 700; cursor: pointer; }
             .pages { padding: 14px 0 28px; display: flex; flex-direction: column; align-items: center; gap: 16px; }
-            .sheet { width: 215.9mm; min-height: 279.4mm; padding: 8mm; background: #ffffff; box-shadow: 0 6px 24px rgba(15,23,42,0.16); }
+            .sheet { width: ${cfg.landscape ? '279.4mm' : '215.9mm'}; min-height: ${cfg.landscape ? '215.9mm' : '279.4mm'}; padding: 8mm; background: #ffffff; box-shadow: 0 6px 24px rgba(15,23,42,0.16); }
             @media print {
                 body { background: #ffffff; } .no-print { display: none !important; }
                 .pages { padding: 0; display: block; }
@@ -24039,9 +24039,9 @@ Reglas:
             .grid-3col { display: grid; grid-template-columns: repeat(3, 65mm); gap: 2mm; justify-content: center; }
             .grid-2col-gra { display: grid; grid-template-columns: repeat(2, 93mm); gap: 4mm; justify-content: center; }
             .grid-gra-mc { display: grid; grid-template-columns: 190mm; gap: 6mm; justify-content: center; }
-            .grid-carta { display: grid; grid-template-columns: 190mm; justify-content: center; }
+            .grid-carta { display: grid; grid-template-columns: 254mm; justify-content: center; align-content: center; }
             .hab-marca-agua { position: absolute; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
-            .hab-marca-agua img { position: absolute; filter: grayscale(1) contrast(1.1) drop-shadow(-.65mm -.65mm 0 rgba(255,255,255,1)) drop-shadow(.7mm .7mm .25mm rgba(15,23,42,.55)); }
+            .hab-marca-agua img { position: absolute; filter: grayscale(1) contrast(1.15) drop-shadow(-.45mm -.45mm 0 rgba(255,255,255,1)) drop-shadow(.55mm .55mm .2mm rgba(15,23,42,.6)); }
             .tag { background: #ffffff; color: #000000; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; position: relative; font-variant-numeric: tabular-nums; outline: 0.25mm dashed #94a3b8; outline-offset: 0.45mm; }
             .tag-top { display: flex; align-items: center; justify-content: space-between; color: #ffffff; font-weight: 800; text-transform: uppercase; flex-shrink: 0; }
             .tag-top-left { display: flex; align-items: center; gap: 1.2mm; min-width: 0; }
@@ -24099,10 +24099,13 @@ Reglas:
             .tag-gra-mc { width: 190mm; height: 122mm; border-width: 1mm !important; }
             .tag-gra-mc .tag-top { height: 13mm; padding: 0 7mm; font-size: 14pt; } .tag-gra-mc .tag-badge { padding: 1mm 3.5mm; font-size: 12.5pt; } .tag-gra-mc .logo { width: 7.5mm; height: 7.5mm; }
             .tag-gra-mc .tag-prod { font-size: 21pt; padding: 3.5mm 7mm 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-            .tag-gra-mc .tag-mid { padding: 0 9mm; } .tag-gra-mc .p-sym { font-size: 26pt; margin-top: 3mm; margin-right: 1.5mm; } .tag-gra-mc .p-int { font-size: 108pt; } .tag-gra-mc .p-dec { font-size: 40pt; margin-top: 1.5mm; } .tag-gra-mc .p-unit { font-size: 17pt; margin-top: 2.2mm; }
-            .tag-gra-mc.d2 .p-int { font-size: 92pt; } .tag-gra-mc.d3 .p-int { font-size: 72pt; }
-            .tag-gra-mc.ofe .p-int { font-size: 84pt; } .tag-gra-mc.ofe .p-dec { font-size: 32pt; } .tag-gra-mc.ofe.d3 .p-int { font-size: 64pt; }
-            .tag-gra-mc .anchor { padding-left: 10mm; gap: 4mm; } .tag-gra-mc .antes { font-size: 28pt; } .tag-gra-mc .tachado svg path { stroke-width: 2.3px; } .tag-gra-mc .save { font-size: 27pt; padding: 3mm 6.5mm; border-radius: 2mm; }
+            .tag-gra-mc .tag-mid { padding: 0 7mm; } .tag-gra-mc .p-sym { font-size: 36pt; margin-top: 5mm; margin-right: 1.5mm; } .tag-gra-mc .p-int { font-size: 165pt; } .tag-gra-mc .p-dec { font-size: 60pt; margin-top: 2.5mm; } .tag-gra-mc .p-unit { font-size: 22pt; margin-top: 3mm; }
+            .tag-gra-mc.d2 .p-int { font-size: 142pt; } .tag-gra-mc.d2 .p-dec { font-size: 54pt; } .tag-gra-mc.d3 .p-int { font-size: 112pt; } .tag-gra-mc.d3 .p-dec { font-size: 44pt; } .tag-gra-mc.d3 .p-sym { font-size: 28pt; }
+            .tag-gra-mc.ofe .tag-mid.oferta { justify-content: center; gap: 8mm; }
+            .tag-gra-mc.ofe .p-sym { font-size: 32pt; margin-top: 4mm; } .tag-gra-mc.ofe .p-int { font-size: 132pt; } .tag-gra-mc.ofe .p-dec { font-size: 48pt; margin-top: 2mm; } .tag-gra-mc.ofe .p-unit { font-size: 20pt; margin-top: 2.5mm; }
+            .tag-gra-mc.ofe.d2 .p-int { font-size: 108pt; } .tag-gra-mc.ofe.d2 .p-dec { font-size: 40pt; } .tag-gra-mc.ofe.d2 .p-sym { font-size: 27pt; }
+            .tag-gra-mc.ofe.d3 .p-int { font-size: 82pt; } .tag-gra-mc.ofe.d3 .p-dec { font-size: 32pt; } .tag-gra-mc.ofe.d3 .p-sym { font-size: 23pt; } .tag-gra-mc.ofe.d3 .p-unit { font-size: 17pt; }
+            .tag-gra-mc .anchor { padding-left: 8mm; gap: 4mm; } .tag-gra-mc .antes { font-size: 27pt; } .tag-gra-mc .tachado svg path { stroke-width: 2.4px; } .tag-gra-mc .save { font-size: 26pt; padding: 3mm 6mm; border-radius: 2mm; }
             .tag-gra-mc .tag-foot { height: 12mm; padding: 0 7mm; font-size: 12.5pt; } .tag-gra-mc .bcv-wrap { gap: 2.5mm; } .tag-gra-mc .bcv-logo { width: 8.8mm; height: 8.8mm; }
             .tag-gra4 { width: 93mm; height: 122mm; border-width: 0.9mm !important; }
             .tag-gra4 .tag-top { height: 11mm; padding: 0 4mm; font-size: 10.5pt; } .tag-gra4 .tag-badge { padding: 0.7mm 2.2mm; font-size: 9.5pt; } .tag-gra4 .logo { width: 5.5mm; height: 5.5mm; }
@@ -24114,22 +24117,22 @@ Reglas:
             .tag-gra4.ofe .p-int { font-size: 68pt; } .tag-gra4.ofe.d2 .p-int { font-size: 58pt; } .tag-gra4.ofe.d3 .p-int { font-size: 44pt; }
             .tag-gra4 .antes { font-size: 18pt; } .tag-gra4 .tachado svg path { stroke-width: 1.8px; } .tag-gra4 .save { font-size: 17pt; padding: 2mm 4.5mm; border-radius: 1.6mm; }
             .tag-gra4 .tag-foot { height: 10mm; padding: 0 4mm; font-size: 9.5pt; } .tag-gra4 .bcv-wrap { gap: 1.8mm; } .tag-gra4 .bcv-logo { width: 6.5mm; height: 6.5mm; }
-            .tag-carta { width: 190mm; height: 254mm; border-width: 1.3mm !important; outline: none; }
+            .tag-carta { width: 254mm; height: 190mm; margin: 4.5mm auto 0; border-width: 1.35mm !important; outline: none; background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); }
             .tag-carta > *:not(.hab-marca-agua) { position: relative; z-index: 1; }
-            .tag-carta .tag-top { height: 18mm; padding: 0 9mm; font-size: 19pt; } .tag-carta .tag-badge { padding: 1.4mm 4.5mm; font-size: 15pt; border-radius: 1.4mm; } .tag-carta .logo { width: 10.5mm; height: 10.5mm; }
-            .tag-carta .tag-prod { font-size: 34pt; padding: 8mm 10mm 0; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; text-shadow: 0 0 1.2mm #ffffff, 0 0 2.4mm #ffffff; }
+            .tag-carta .tag-top { height: 18mm; padding: 0 9mm; font-size: 19pt; } .tag-carta .tag-badge { padding: 1.3mm 4.5mm; font-size: 15.5pt; border-radius: 1.4mm; } .tag-carta .logo { width: 10mm; height: 10mm; }
+            .tag-carta .tag-prod { font-size: 31pt; padding: 5.5mm 12mm 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.12; text-shadow: 0 0 1mm #ffffff; }
             .tag-carta .tag-mid { padding: 0 10mm; }
-            .tag-carta .p-wrap, .tag-carta .antes { text-shadow: 0 0 1.2mm #ffffff, 0 0 2.4mm #ffffff; }
-            .tag-carta .p-sym { font-size: 46pt; margin-top: 7mm; margin-right: 3mm; } .tag-carta .p-int { font-size: 205pt; } .tag-carta.d2 .p-int { font-size: 168pt; } .tag-carta.d3 .p-int { font-size: 124pt; }
-            .tag-carta .p-dec { font-size: 72pt; margin-top: 4mm; } .tag-carta .p-unit { font-size: 28pt; margin-top: 4.5mm; }
-            .tag-carta.ofe .tag-mid { flex-direction: column; align-items: center; justify-content: center; gap: 11mm; }
-            .tag-carta.ofe .est-ofe-top { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5.5mm; }
-            .tag-carta.ofe .p-sym { font-size: 40pt; margin-top: 5mm; } .tag-carta.ofe .p-int { font-size: 170pt; } .tag-carta.ofe.d2 .p-int { font-size: 142pt; } .tag-carta.ofe.d3 .p-int { font-size: 108pt; } .tag-carta.ofe .p-dec { font-size: 62pt; } .tag-carta.ofe .p-unit { font-size: 24pt; }
-            .tag-carta .antes { font-size: 34pt; } .tag-carta .tachado svg path { stroke-width: 2.8px; } .tag-carta .save { font-size: 33pt; padding: 3.5mm 9mm; border-radius: 3mm; text-shadow: none; }
-            .tag-carta .tag-foot { height: 15mm; padding: 0 9mm; font-size: 15.5pt; background: rgba(248, 250, 252, 0.94); } .tag-carta.t-bn .tag-foot { background: rgba(255, 255, 255, 0.95); } .tag-carta .bcv-wrap { gap: 3mm; } .tag-carta .bcv-logo { width: 11mm; height: 11mm; }
+            .tag-carta .p-wrap, .tag-carta .antes { text-shadow: 0 0 1mm #ffffff; }
+            .tag-carta .p-sym { font-size: 62pt; margin-top: 9mm; margin-right: 3mm; } .tag-carta .p-int { font-size: 276pt; } .tag-carta.d2 .p-int { font-size: 232pt; } .tag-carta.d2 .p-sym { font-size: 54pt; } .tag-carta.d3 .p-int { font-size: 176pt; } .tag-carta.d3 .p-sym { font-size: 44pt; }
+            .tag-carta .p-dec { font-size: 96pt; margin-top: 4.5mm; } .tag-carta .p-unit { font-size: 36pt; margin-top: 5.5mm; } .tag-carta.d2 .p-dec { font-size: 84pt; } .tag-carta.d2 .p-unit { font-size: 32pt; } .tag-carta.d3 .p-dec { font-size: 68pt; } .tag-carta.d3 .p-unit { font-size: 27pt; }
+            .tag-carta.ofe .tag-mid.oferta { justify-content: center; gap: 11mm; }
+            .tag-carta.ofe .p-sym { font-size: 48pt; margin-top: 7mm; margin-right: 2mm; } .tag-carta.ofe .p-int { font-size: 212pt; } .tag-carta.ofe.d2 .p-int { font-size: 166pt; } .tag-carta.ofe.d2 .p-sym { font-size: 40pt; } .tag-carta.ofe.d3 .p-int { font-size: 124pt; } .tag-carta.ofe.d3 .p-sym { font-size: 32pt; }
+            .tag-carta.ofe .p-dec { font-size: 76pt; margin-top: 3.5mm; } .tag-carta.ofe.d2 .p-dec { font-size: 62pt; } .tag-carta.ofe.d3 .p-dec { font-size: 48pt; } .tag-carta.ofe .p-unit { font-size: 30pt; margin-top: 4mm; } .tag-carta.ofe.d2 .p-unit { font-size: 26pt; } .tag-carta.ofe.d3 .p-unit { font-size: 22pt; }
+            .tag-carta .anchor { padding-left: 11mm; border-left-width: 1mm; gap: 6mm; } .tag-carta .antes { font-size: 40pt; } .tag-carta .tachado svg path { stroke-width: 3.2px; } .tag-carta .save { font-size: 38pt; padding: 4.5mm 8.5mm; border-radius: 2.8mm; text-shadow: none; }
+            .tag-carta .tag-foot { height: 15mm; padding: 0 9mm; font-size: 15.5pt; background: rgba(248, 250, 252, 0.96); } .tag-carta.t-bn .tag-foot { background: rgba(255, 255, 255, 0.97); } .tag-carta .bcv-wrap { gap: 3mm; } .tag-carta .bcv-logo { width: 11mm; height: 11mm; }
         </style></head><body>
             <svg xmlns="http://www.w3.org/2000/svg" style="display:none">${bcvDefs}</svg>
-            <div class="toolbar no-print"><div><b>Habladores · ${expandidos.length} etiqueta(s) · ${hojas.length} hoja(s) Carta</b> <span style="opacity:.8;font-size:12px;margin-left:8px;">Imprimir en Carta · Escala 100 %</span></div>
+            <div class="toolbar no-print"><div><b>Habladores · ${expandidos.length} etiqueta(s) · ${hojas.length} hoja(s) Carta</b> <span style="opacity:.8;font-size:12px;margin-left:8px;">Imprimir en Carta ${cfg.landscape ? 'horizontal' : 'vertical'} · Escala 100 %</span></div>
             <button type="button" class="btn-p" onclick="window.print()">Imprimir ahora</button></div>
             <div class="pages">${hojas.join('')}</div></body></html>`;
     }
