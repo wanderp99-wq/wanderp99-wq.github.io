@@ -4214,7 +4214,7 @@
         // (15/11) Historial de nóminas: del servidor nuevo (con la Nómina encendida allá)
         if (payload.action === 'nom_historial') { const r = await cfNomHistorial(payload); if (r) return r; }
         // (22/11 · 24/11) Campana, usuarios en línea, paquete de utilidades, avisos de tienda, listas de la ficha y cuentas de pago móvil directo al servidor nuevo
-        if (/^(pendientes|enlinea|paq_estado|paq_zip|paq_subir|aviso_tienda|pm_cuentas_estado|pm_cuenta_guardar|pm_cuenta_quitar|pm_dominio_guardar|pm_confirmacion_limpiar|pm_cuenta_probar_tg|pm_tg_chats|fl_leer|fl_guardar)$/.test(payload.action) && typeof CF_URL === 'string' && CF_URL) {
+        if (/^(pendientes|enlinea|paq_estado|paq_zip|paq_subir|aviso_tienda|pm_cuentas_estado|pm_cuenta_guardar|pm_cuenta_quitar|pm_dominio_guardar|pm_confirmacion_limpiar|pm_webhook_guardar|pm_webhook_regenerar|pm_cuenta_probar_tg|pm_tg_chats|fl_leer|fl_guardar)$/.test(payload.action) && typeof CF_URL === 'string' && CF_URL) {
             let cfErr = '';
             try {
                 const t0c = performance.now(), r = await cfPedir(Object.assign({}, payload, { token: await cfToken(), vista: typeof vistaActual === 'string' ? vistaActual : '', disp: DISPOSITIVO }));
@@ -4227,8 +4227,8 @@
                     return r;
                 }
                 if (r && r.sesion === false) cfSes.token = '';
-                else if ((payload.action === 'aviso_tienda' || /^pm_(cuenta|tg_|dominio|confirmacion)|^fl_(leer|guardar)$/.test(payload.action)) && r && !r.noAqui && r.error) cfErr = r.error;
-            } catch (e) { if (/Cuenta suspendida/i.test(e && e.message)) cerrarSesion(e.message); if (/^pm_(cuenta|tg_|dominio|confirmacion)|^fl_(leer|guardar)$/.test(payload.action)) throw e; }
+                else if ((payload.action === 'aviso_tienda' || /^pm_(cuenta|tg_|dominio|confirmacion|webhook)|^fl_(leer|guardar)$/.test(payload.action)) && r && !r.noAqui && r.error) cfErr = r.error;
+            } catch (e) { if (/Cuenta suspendida/i.test(e && e.message)) cerrarSesion(e.message); if (/^pm_(cuenta|tg_|dominio|confirmacion|webhook)|^fl_(leer|guardar)$/.test(payload.action)) throw e; }
             if (cfErr) throw new Error(cfErr);
         }
         // (12/11) Lecturas del almacén con "Usar Firebase en el Almacén" encendido: se responden aquí con lo de Firebase (sin Google)
@@ -7305,6 +7305,42 @@
             } catch (e) {}
         }, 200);
     }
+    function pmWebhookUrl(llave) {
+        const base = (typeof CF_URL === 'string' && CF_URL ? CF_URL : 'https://plaza-software.jdsistemas.workers.dev').replace(/\/+$/, '');
+        const emp = encodeURIComponent((typeof CF_EMPRESA === 'string' && CF_EMPRESA) || 'plaza-valencia');
+        return llave ? `${base}/pm-webhook/${emp}/${encodeURIComponent(llave)}` : '';
+    }
+    async function pmGuardarCloudMailin(btn) {
+        const inp = document.getElementById('pmCmInput');
+        const correo = inp ? inp.value.trim() : '';
+        const texto = btn ? btn.textContent : ''; if (btn) btnCargando(btn, 'Guardando...');
+        try {
+            const r = await DATOS.aGoogle(() => llamarApi({ action: 'pm_webhook_guardar', correoCloudMailin: correo }));
+            if (pmModal.estado) {
+                pmModal.estado.correoCloudMailin = r.correoCloudMailin || '';
+                pmModal.estado.webhookLlave = r.webhookLlave || pmModal.estado.webhookLlave;
+                pmModal.estado.webhookAviso = null;
+            }
+            pmModal.msg = r.correoCloudMailin
+                ? `<div class="banner ok" style="display:block">Correo de CloudMailin guardado: <b>${esc(r.correoCloudMailin)}</b>. Ahora pulsa <b>Conectar</b> en cada cuenta para reenviarle los correos del banco.</div>`
+                : '<div class="banner ok" style="display:block">Correo de CloudMailin quitado.</div>';
+        } catch (x) {
+            pmModal.msg = `<div class="banner error" style="display:block">${esc(x.message)}</div>`;
+        } finally { if (btn) { btn.disabled = false; btn.textContent = texto; } }
+        pmModalPintar();
+    }
+    async function pmRegenerarWebhook(btn) {
+        if (!confirm('¿Cambiar el enlace secreto de CloudMailin?\n\nTendrás que pegar el enlace nuevo en CloudMailin (Target URL) para que sigan entrando los correos.')) return;
+        const texto = btn ? btn.textContent : ''; if (btn) btnCargando(btn, 'Cambiando...');
+        try {
+            const r = await DATOS.aGoogle(() => llamarApi({ action: 'pm_webhook_regenerar' }));
+            if (pmModal.estado && r.webhookLlave) pmModal.estado.webhookLlave = r.webhookLlave;
+            pmModal.msg = '<div class="banner ok" style="display:block">Nuevo enlace secreto generado. Pégale el enlace nuevo en CloudMailin.</div>';
+        } catch (x) {
+            pmModal.msg = `<div class="banner error" style="display:block">${esc(x.message)}</div>`;
+        } finally { if (btn) { btn.disabled = false; btn.textContent = texto; } }
+        pmModalPintar();
+    }
     async function pmGuardarDominio(btn) {
         const inp = document.getElementById('pmDomInput');
         const dom = inp ? inp.value.trim() : '';
@@ -7320,11 +7356,14 @@
         } finally { if (btn) { btn.disabled = false; btn.textContent = texto; } }
         pmModalPintar();
     }
-    async function pmLimpiarConf(id, btn) {
+    async function pmLimpiarConf(id, btn, esGlobal) {
         if (btn) btn.disabled = true;
         try {
-            const r = await DATOS.aGoogle(() => llamarApi({ action: 'pm_confirmacion_limpiar', id }));
-            if (pmModal.estado && r.cuentas) pmModal.estado.cuentas = r.cuentas;
+            const r = await DATOS.aGoogle(() => llamarApi({ action: 'pm_confirmacion_limpiar', id: id || '', global: !!esGlobal }));
+            if (pmModal.estado) {
+                if (r.cuentas) pmModal.estado.cuentas = r.cuentas;
+                if (esGlobal || !id) { pmModal.estado.confirmacionGlobal = null; pmModal.estado.webhookAviso = null; }
+            }
         } catch (x) { pmModal.msg = `<div class="banner error" style="display:block">${esc(x.message)}</div>`; }
         pmModalPintar();
     }
@@ -7388,7 +7427,7 @@ function pmCorreoPropio() {
 }
 
 function pmParseMonto(raw) {
-  let s = String(raw || '').trim();
+  let s = String(raw || '').trim().replace(/[.,;:\\s]+$/, '');
   if (!s) return 0;
   if (/,\\d{1,2}$/.test(s)) s = s.replace(/\\./g, '').replace(',', '.');
   else if (/\\.\\d{1,2}$/.test(s)) s = s.replace(/,/g, '');
@@ -7625,13 +7664,17 @@ function revisarPagos(forzar) {
         }
 
         let scriptHtml = '';
+        const cmCorreo = est.correoCloudMailin || '';
+        const whUrl = pmWebhookUrl(est.webhookLlave || '');
+        const confGlobal = est.confirmacionGlobal || null;
         if (pmModal.scriptId) {
             const c = ctas.find(x => x.id === pmModal.scriptId);
             if (c) {
                 const ll = pmModal.llaves[c.id];
-                const dir = c.correoReceptor || '';
-                const domActual = est.dominio || '';
-                const conf = c.confirmacionGoogle;
+                const usaDominio = !!c.correoReceptor;
+                const dir = c.correoReceptor || cmCorreo || '';
+                const confPropia = !!c.confirmacionGoogle;
+                const conf = c.confirmacionGoogle || (confGlobal && (!confGlobal.origen || !c.correo || confGlobal.origen.toLowerCase() === c.correo.toLowerCase()) ? confGlobal : null);
                 const filtroDe = c.banco === 'R4' ? 'from:(r4conecta.io OR r4banco.com.ve)'
                     : c.banco === 'Bancrecer' ? 'from:bancrecer.com.ve'
                     : 'from:(r4conecta.io OR r4banco.com.ve OR bancrecer.com.ve)';
@@ -7643,23 +7686,24 @@ function revisarPagos(forzar) {
                     <div class="card" style="margin:.55rem 0;border-color:var(--primary)">
                         <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.35rem">
                             <b>⚡ Reenvío directo en tiempo real (2–5 segundos)</b>
-                            ${dir ? `<button type="button" class="btn-ghost btn-mini" onclick="pmRegenerarCorreo('${esc(c.id)}', this)">Nueva dirección</button>` : ''}
+                            ${usaDominio ? `<button type="button" class="btn-ghost btn-mini" onclick="pmRegenerarCorreo('${esc(c.id)}', this)">Nueva dirección</button>` : ''}
                         </div>
                         ${dir ? `<div style="display:flex;gap:.45rem;align-items:center;flex-wrap:wrap;margin:.35rem 0">
                                 <code style="padding:.35rem .55rem;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;font-size:.86rem">${esc(dir)}</code>
                                 <button type="button" class="btn-primary btn-mini" onclick="pmCopiarTexto('${esc(dir)}', this)">Copiar correo</button>
                             </div>
+                            ${!usaDominio && !c.correo ? `<div class="banner warn" style="display:block;margin:.4rem 0">Pulsa <b>Editar</b> y escribe el <b>Correo Gmail</b> de esta persona para que cada pago vaya a su cuenta correcta.</div>` : ''}
                             ${conf ? `<div class="banner ok" style="display:block;margin:.45rem 0">
                                 <b>Confirmación de Gmail recibida:</b>${conf.codigo ? ` Código <code>${esc(conf.codigo)}</code>` : ''}
                                 ${conf.enlace ? ` · <a href="${esc(conf.enlace)}" target="_blank" rel="noopener">Abrir enlace para confirmar</a>` : ''}
-                                <button type="button" class="btn-ghost btn-mini" style="margin-left:.5rem" onclick="pmLimpiarConf('${esc(c.id)}', this)">Ya confirmé</button>
+                                <button type="button" class="btn-ghost btn-mini" style="margin-left:.5rem" onclick="pmLimpiarConf('${esc(confPropia ? c.id : '')}', this, ${confPropia ? 'false' : 'true'})">Ya confirmé</button>
                             </div>` : ''}
                             <ol class="nota" style="margin:.35rem 0 .1rem;padding-left:1.25rem;line-height:1.45">
-                                <li>En el Gmail de <b>${esc(c.correo || c.titular)}</b> entra a <b>Configuración › Ver todos los ajustes › Reenvío y correo POP/IMAP › Añadir una dirección de reenvío</b> y pega <code>${esc(dir)}</code>.</li>
-                                <li>En 2 segundos te aparecerá aquí arriba (y en tu Telegram) el código/enlace de confirmación de Gmail para aprobarlo.</li>
-                                <li>Luego entra a <b>Filtros y direcciones bloqueadas › Crear un filtro</b>: en <b>De</b> pon <code>${esc(filtroDe)}</code> <button type="button" class="btn-ghost btn-mini" onclick="pmCopiarTexto('${esc(filtroDe)}', this)">Copiar</button> y elige <b>Reenviarlo a</b> <code>${esc(dir)}</code> (puedes dejar "Solo reenviar estos" sin mover correos).</li>
+                                <li>En el Gmail de <b>${esc(c.correo || c.titular)}</b> ve a <b>Configuración (tuerca) › Ver todos los ajustes › Reenvío y correo POP/IMAP › Añadir una dirección de reenvío</b> y pega <code>${esc(dir)}</code>.</li>
+                                <li>En 2–5 segundos te aparecerá aquí arriba (y en Telegram) el código o enlace de confirmación de Gmail para aprobarlo. Luego deja marcada arriba la opción <b>Inhabilitar el reenvío</b> general (para no reenviar correos personales) y guarda cambios.</li>
+                                <li>Ve a <b>Filtros y direcciones bloqueadas › Crear un filtro</b>: en <b>De</b> pon <code>${esc(filtroDe)}</code> <button type="button" class="btn-ghost btn-mini" onclick="pmCopiarTexto('${esc(filtroDe)}', this)">Copiar</button> › <b>Crear filtro</b> › marca <b>Reenviarlo a</b> <code>${esc(dir)}</code> › <b>Crear filtro</b>.</li>
                             </ol>`
-                        : `<div class="nota" style="margin:0">Primero guarda arriba tu <b>Dominio en Cloudflare</b>${domActual ? '' : ' (por ejemplo <code>pagos.tudominio.com</code>)'} para generar la dirección única de esta cuenta.</div>`}
+                        : `<div class="nota" style="margin:0">Primero guarda arriba tu <b>correo de CloudMailin</b> (gratis sin dominio) o tu dominio en Cloudflare para mostrar aquí la dirección de reenvío.</div>`}
                     </div>
                     <details style="margin:.4rem 0 0"><summary style="cursor:pointer;font-weight:600;font-size:.88rem">Respaldo opcional: Script en Google Apps Script (cada 1 minuto)</summary>
                     ${ll ? `<div class="nota" style="margin:.4rem 0"><b>Respaldo cada 1 min:</b> entra con <b>${esc(c.correo || c.titular)}</b> a <a href="https://script.google.com" target="_blank" rel="noopener">script.google.com</a> → <b>Nuevo proyecto</b> → pega este código → <b>Guardar</b> → elige <b>activar</b> y pulsa <b>Ejecutar</b>.</div>
@@ -7674,22 +7718,65 @@ function revisarPagos(forzar) {
 
         const pagos = (est.pagos || []).filter(p => !pmModal.filtro || [p.banco, p.titular, p.ref, p.tel].some(v => String(v || '').toLowerCase().includes(pmModal.filtro.toLowerCase())));
         const domVal = est.dominio || '';
+        const whAviso = est.webhookAviso || null;
         const html = `<div class="req-dlg" style="width:min(1120px, 96vw);max-width:none"><h3>Cuentas de Pago Móvil por correo</h3>
             ${error ? `<div class="banner error" style="display:block">${esc(error)}</div>` : `
             ${pmModal.msg || ''}
-            <div class="req-sub">Con <b>Reenvío directo en Cloudflare</b> cada pago móvil llega en <b>2–5 segundos</b> y se valida en vivo en la ficha sin tocar el teclado. (Google Apps Script queda como respaldo opcional).</div>
-            <div class="card" style="margin:.55rem 0;padding:.65rem .8rem">
-                <div style="display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;justify-content:space-between">
-                    <div style="flex:1 1 260px">
-                        <div style="font-weight:700;font-size:.9rem">⚡ Dominio receptor en Cloudflare (tiempo real) ${domVal ? `<span class="chip st-ok" style="margin-left:.3rem">${esc(domVal)}</span>` : '<span class="chip st-pend" style="margin-left:.3rem">Sin configurar</span>'}</div>
-                        <small style="color:var(--text-muted)">En tu panel de Cloudflare: <b>Email › Email Routing › Catch-all</b> (o regla) → <b>Send to a Worker</b>: <code>plaza-software</code>.</small>
+            <div class="req-sub">Con <b>Reenvío en tiempo real</b> (gratis con CloudMailin sin dominio propio, o con tu dominio en Cloudflare) cada pago llega en <b>2–5 segundos</b> y se valida solo en la ficha.</div>
+            ${confGlobal ? `<div class="banner ok" style="display:block;margin:.45rem 0">
+                <b>📩 Confirmación de Gmail recibida${confGlobal.origen ? ' (' + esc(confGlobal.origen) + ')' : ''}:</b>${confGlobal.codigo ? ` Código <code>${esc(confGlobal.codigo)}</code>` : ''}
+                ${confGlobal.enlace ? ` · <a href="${esc(confGlobal.enlace)}" target="_blank" rel="noopener">Abrir enlace para confirmar</a>` : ''}
+                <button type="button" class="btn-ghost btn-mini" style="margin-left:.5rem" onclick="pmLimpiarConf('', this, true)">Ya confirmé</button>
+            </div>` : ''}
+            ${whAviso ? `<div class="banner warn" style="display:block;margin:.45rem 0">
+                <b>⚠️ Correo sin cuenta asignada:</b> ${esc(whAviso.mensaje || '')}
+                <button type="button" class="btn-ghost btn-mini" style="margin-left:.5rem" onclick="pmLimpiarConf('', this, true)">Entendido</button>
+            </div>` : ''}
+            <div class="card" style="margin:.55rem 0;padding:.75rem .9rem;border-color:var(--primary)">
+                <div style="display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;justify-content:space-between;margin-bottom:.45rem">
+                    <div style="font-weight:700;font-size:.92rem">⚡ Tiempo real SIN dominio propio (CloudMailin gratis · hasta 10.000/mes)
+                        ${cmCorreo ? `<span class="chip st-ok" style="margin-left:.35rem">${esc(cmCorreo)}</span>` : '<span class="chip st-pend" style="margin-left:.35rem">Falta pegar correo</span>'}</div>
+                    ${whUrl ? `<button type="button" class="btn-ghost btn-mini" onclick="pmRegenerarWebhook(this)">Cambiar enlace</button>` : ''}
+                </div>
+                <div style="display:grid;gap:.45rem">
+                    <div>
+                        <small style="color:var(--text-muted);display:block;margin-bottom:.2rem"><b>1. Enlace para pegar en CloudMailin (Target URL):</b></small>
+                        <div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap">
+                            <code style="padding:.32rem .5rem;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;font-size:.8rem;word-break:break-all;flex:1 1 280px">${esc(whUrl || 'Guardando enlace...')}</code>
+                            ${whUrl ? `<button type="button" class="btn-primary btn-mini" onclick="pmCopiarTexto('${esc(whUrl)}', this)">Copiar enlace</button>` : ''}
+                        </div>
                     </div>
-                    <div style="display:flex;gap:.35rem;align-items:center;flex:0 1 auto">
-                        <input id="pmDomInput" value="${esc(domVal)}" placeholder="ej. pagos.tuempresa.com" style="min-width:210px">
-                        <button type="button" class="btn-primary btn-mini" onclick="pmGuardarDominio(this)">Guardar dominio</button>
+                    <div style="display:flex;flex-wrap:wrap;gap:.4rem;align-items:flex-end">
+                        <div style="flex:1 1 260px">
+                            <label for="pmCmInput" style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.2rem">2. Correo receptor que te dio CloudMailin (<code>@cloudmta.net</code>):</label>
+                            <input id="pmCmInput" type="email" value="${esc(cmCorreo)}" placeholder="ej. a1b2c3d4@cloudmta.net" style="width:100%">
+                        </div>
+                        <button type="button" class="btn-primary btn-mini" onclick="pmGuardarCloudMailin(this)">Guardar correo</button>
                     </div>
                 </div>
+                <details style="margin-top:.5rem"${!cmCorreo && !domVal ? ' open' : ''}><summary style="cursor:pointer;font-weight:600;font-size:.84rem">Paso a paso para crear tu dirección gratis en CloudMailin (2 min)</summary>
+                    <ol class="nota" style="margin:.35rem 0 0;padding-left:1.25rem;line-height:1.45">
+                        <li>Entra a <a href="https://www.cloudmailin.com/users/sign_up" target="_blank" rel="noopener"><b>cloudmailin.com</b></a> y crea tu cuenta gratis (Free Plan, 10.000 correos/mes, sin tarjeta).</li>
+                        <li>Toca <b>Create Address</b> y elige formato <b>JSON (Normalized)</b> (el que viene por defecto).</li>
+                        <li>En <b>Target URL</b> pega el enlace del punto 1 de arriba (botón <b>Copiar enlace</b>) y guarda.</li>
+                        <li>Copia la dirección <code>@cloudmta.net</code> que te da CloudMailin, pégala en el punto 2 de arriba y pulsa <b>Guardar correo</b>. <i>(Un solo correo de CloudMailin sirve para todas tus cuentas de Gmail).</i></li>
+                    </ol>
+                </details>
             </div>
+            <details style="margin:.45rem 0"${domVal ? ' open' : ''}><summary style="cursor:pointer;font-weight:600;font-size:.86rem">¿Tienes dominio propio en Cloudflare? ${domVal ? esc(domVal) : '(opcional)'}</summary>
+                <div class="card" style="margin:.4rem 0;padding:.65rem .8rem">
+                    <div style="display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;justify-content:space-between">
+                        <div style="flex:1 1 260px">
+                            <div style="font-weight:700;font-size:.88rem">Dominio receptor en Cloudflare ${domVal ? `<span class="chip st-ok" style="margin-left:.3rem">${esc(domVal)}</span>` : '<span class="chip st-pend" style="margin-left:.3rem">Opcional</span>'}</div>
+                            <small style="color:var(--text-muted)">En Cloudflare: <b>Email › Email Routing › Catch-all</b> → <b>Send to a Worker</b>: <code>plaza-software</code>.</small>
+                        </div>
+                        <div style="display:flex;gap:.35rem;align-items:center;flex:0 1 auto">
+                            <input id="pmDomInput" value="${esc(domVal)}" placeholder="ej. pagos.tuempresa.com" style="min-width:210px">
+                            <button type="button" class="btn-primary btn-mini" onclick="pmGuardarDominio(this)">Guardar dominio</button>
+                        </div>
+                    </div>
+                </div>
+            </details>
             <div class="req-acciones" style="justify-content:space-between;align-items:center;margin:.45rem 0">
                 <b>Cuentas (${ctas.length})</b>
                 <div style="display:flex;gap:.35rem">
@@ -7700,8 +7787,9 @@ function revisarPagos(forzar) {
             <div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Cuenta</th><th class="izq">Banco · Titular</th><th class="izq">Correo y estado</th><th class="izq">Telegram</th><th></th></tr></thead><tbody>
                 ${ctas.map(c => {
                     const u = c.ultimo;
-                    const esDirecto = u && u.via === 'correo_cf';
-                    const estCta = !u ? `<span class="chip st-pend">${c.correoReceptor ? 'Listo · esperando primer correo' : 'Pendiente de configurar'}</span>`
+                    const esDirecto = u && (u.via === 'correo_cf' || u.via === 'correo_cm');
+                    const destino = c.correoReceptor || cmCorreo;
+                    const estCta = !u ? `<span class="chip st-pend">${destino ? 'Listo · esperando primer correo' : 'Pendiente de configurar'}</span>`
                         : u.error ? `<span class="chip st-falta">${esc(u.error)}</span>`
                         : `<span class="chip st-ok">${esDirecto ? '⚡ Tiempo real' : '⏱ Script'} · ${esc(pmFmtFecha(u.cuando))}</span><small> ${fmtNum(u.leidos || 0)} leídos</small>`;
                     const tgTxt = c.tgModo === 'ninguno' || !c.tgChat ? '<small>Sin avisos</small>'
@@ -7711,7 +7799,7 @@ function revisarPagos(forzar) {
                         <td class="izq"><b>${esc(c.nombre)}</b></td>
                         <td class="izq">${esc(c.banco)} · ${esc(c.titular)}</td>
                         <td class="izq">${esc((u && u.email) || c.correo || '—')}
-                            ${c.correoReceptor ? `<br><small>Reenvío: <code>${esc(c.correoReceptor)}</code> <button type="button" class="btn-ghost btn-mini" onclick="pmCopiarTexto('${esc(c.correoReceptor)}', this)">Copiar</button></small>` : ''}
+                            ${destino ? `<br><small>Reenvío: <code>${esc(destino)}</code> <button type="button" class="btn-ghost btn-mini" onclick="pmCopiarTexto('${esc(destino)}', this)">Copiar</button></small>` : ''}
                             ${conf ? `<br><small style="color:var(--ok);font-weight:700">🔑 Código Gmail: <code>${esc(conf.codigo || 'ver enlace')}</code>${conf.enlace ? ` · <a href="${esc(conf.enlace)}" target="_blank" rel="noopener">Confirmar</a>` : ''}</small>` : ''}
                             <br>${estCta}</td>
                         <td class="izq">${tgTxt}</td>
