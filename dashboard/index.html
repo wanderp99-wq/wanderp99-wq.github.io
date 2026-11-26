@@ -610,17 +610,20 @@
         .hab-cola-bts { display: flex; flex-wrap: wrap; gap: .45rem; }
         .hab-cola-lista { display: grid; gap: .45rem; max-height: 290px; overflow-y: auto; padding-right: 2px; }
         .hab-item { display: flex; flex-wrap: wrap; align-items: center; gap: .45rem .6rem; padding: .5rem .65rem; border: 1px solid var(--border); border-radius: 10px; background: var(--list-bg); }
-        .hab-item-cod { font-weight: 700; font-size: .82rem; color: var(--text-muted); min-width: 4.5rem; }
+        .hab-item-cod { width: 5.2rem; }
+        .hab-item-cod input { padding: .32rem .4rem; font-size: .82rem; font-weight: 700; text-align: center; }
         .hab-item-des { flex: 1 1 13rem; min-width: 0; }
         .hab-item-des input { padding: .32rem .45rem; font-size: .85rem; }
         .hab-item-num { width: 5.5rem; }
         .hab-item-num input { padding: .32rem .4rem; font-size: .85rem; text-align: right; }
-        .hab-item-und { width: 4.6rem; }
+        .hab-item-und { width: 4.8rem; }
         .hab-item-und input { padding: .32rem .4rem; font-size: .85rem; text-align: center; }
+        .hab-item-may { width: 7rem; }
+        .hab-item-may input { padding: .32rem .4rem; font-size: .83rem; }
         .hab-item-cop { display: inline-flex; align-items: center; gap: .25rem; font-size: .84rem; font-weight: 700; }
         .hab-item-cop input { width: 3.3rem; padding: .3rem .25rem; text-align: center; font-size: .85rem; }
         .hab-item-lbl { font-size: .7rem; color: var(--text-muted); display: block; margin-bottom: .15rem; }
-        .hab-ofe-grp { display: inline-flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
+        .hab-ofe-grp, .hab-may-grp { display: inline-flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
         .hab-ofe-chip { font-size: .74rem; font-weight: 800; padding: .18rem .45rem; border-radius: 6px; background: #FF4000; color: #ffffff; white-space: nowrap; }
         .hab-ofe-chip.mal { background: var(--warn-bg); color: var(--warn); }
         .hab-sel-chk { width: 16px !important; height: 16px; min-width: 0 !important; margin: 0; padding: 0 !important; cursor: pointer; vertical-align: middle; }
@@ -1410,7 +1413,7 @@
         .cmp-pago-btn b { font-size: 1.6rem; color: var(--title); }
         .cmp-pago-btn span { font-size: .92rem; color: var(--text-muted); }
         .cmp-pago-btn:hover, .cmp-pago-btn:focus-visible { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 8%, var(--list-bg)); outline: none; }
-        .cmp-pago-btn.elegido { border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 25%, transparent); }
+        .cmp-pago-btn.elegido { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 10%, var(--list-bg)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 25%, transparent); }
         @media (max-width: 420px) { .cmp-pago-op { grid-template-columns: 1fr; } .cmp-pago-btn { min-height: 110px; } }
         .cmp-resumen { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .5rem; }
         .cmp-resumen > div { padding: .55rem .7rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--list-bg); min-width: 0; }
@@ -1454,6 +1457,10 @@
         .cmp-tabla th.cmp-t, .cmp-tabla td.cmp-t { background: var(--list-bg); }
         .cmp-pie { display: flex; flex-wrap: wrap; gap: .4rem 1.4rem; align-items: baseline; margin: .7rem 0; font-size: .92rem; }
         .cmp-pie b { font-size: 1.05rem; }
+        .cmp-almacen-aviso { width: 100%; display: flex; align-items: flex-start; gap: .55rem; padding: .65rem .85rem; border-radius: var(--radius); border: 1.5px solid var(--warn, #d97706); background: var(--warn-bg, rgba(217, 119, 6, .12)); color: var(--text-main); font-size: .88rem; margin-top: .25rem; }
+        .cmp-almacen-aviso b { font-size: .92rem; color: var(--title); }
+        .cmp-almacen-lista { max-height: 200px; overflow: auto; margin: .55rem 0; padding: .5rem .75rem .5rem 1.45rem; border: 1px solid var(--border); border-radius: 10px; background: var(--list-bg); font-size: .86rem; line-height: 1.45; }
+        .cmp-almacen-lista li + li { margin-top: .2rem; }
         .cmp-orden { border: 1px solid var(--border); border-radius: var(--radius); padding: .8rem .9rem; margin-bottom: .7rem; }
         .cmp-ord-cab { display: flex; flex-wrap: wrap; gap: .4rem .7rem; align-items: baseline; }
         .cmp-ord-cab b { font-size: 1rem; }
@@ -8224,7 +8231,8 @@ function revisarPagos(forzar) {
             let aplicadas = 0;
             if (items.length) { const r = await cfEscribir(Object.assign(base, { action: 'pagos_validar', auto: true, items })); if (!r) return null; aplicadas = r.aplicadas || 0; }
             const despues = await cfCajaResponder({ action: 'conc_listar', desde: p.desde, hasta: p.hasta });
-            return despues ? Object.assign({}, despues, { aplicadas, porAplicar: 0 }) : { ok: true, aplicadas, filas: antes.filas };
+            if (despues) { await pagEnriquecerCorreo(despues.filas); return Object.assign({}, despues, { aplicadas, porAplicar: 0 }); }
+            return { ok: true, aplicadas, filas: antes.filas };
         }
         return null;
     }
@@ -20151,7 +20159,7 @@ function revisarPagos(forzar) {
     let almCodTexto = '';   // lo escrito en el código (se conserva si la pantalla se vuelve a dibujar)
     let almDatos = null, almVista = '', almTab = '', almNotas = null, almIngresos = null;
     let almVenta = { items: [], sel: -1, descuento: 0, claveDesc: '', claveStock: '', ultimo: '' };
-    let almIng = { operacion: '', proveedorId: '', documento: '', clienteId: '', nota: '', items: [], sel: -1, listo: false, ultimo: '' };
+    let almIng = { operacion: '', proveedorId: '', documento: '', clienteId: '', nota: '', pago: '', items: [], sel: -1, listo: false, ultimo: '' };
     const ALM_TABS = { precios: [['ordenes', 'Por actualizar'], ['completas', 'Historial'], ['remoto', 'Cargar en tiendas']], inventario: [['productos', 'Productos'], ['seguimiento', 'Seguimiento de producto']], facturar: [['facturar', 'Despacho'], ['notas', 'Notas emitidas']], movalmacen: [['compra', 'Compra con foto'], ['ingresar', 'Operaciones de inventario'], ['cxpfactura', 'Registrar factura recibida'], ['notas', 'Notas emitidas'], ['ingresos', 'Historial de operaciones'], ['tiendas', 'Inversión por tienda']], reportes: [['reportes', 'Reportes de tiendas']], habladores: [['habladores', 'Habladores de precios']] };
     // Entradas y salidas: al entrar se elige la operación en cuadros (como los módulos); dentro, "‹ Entradas y salidas" vuelve a los cuadros
     const ALM_OPERACIONES = {
@@ -20913,7 +20921,7 @@ function revisarPagos(forzar) {
         if (almIng.listo) {
             const op = ALM_OPS.find(o => o[0] === almIng.operacion)[1];
             const quien = almIng.operacion === 'DEVOLUCION' ? (almDatos.clientes.find(c => c.id === almIng.clienteId) || {}).nombre : (almProveedor(almIng.proveedorId) || {}).nombre;
-            return `<div class="alm-ing-cab"><span class="chip st-info">${esc(op)}</span>${quien ? `<b>${esc(quien)}</b>` : ''}${almIng.documento ? `<small>Doc. ${esc(almIng.documento)}</small>` : ''}
+            return `<div class="alm-ing-cab"><span class="chip st-info">${esc(op)}</span>${almIng.operacion === 'COMPRA' && almIng.pago ? `<span class="chip ${almIng.pago === 'credito' ? 'st-amar' : 'st-ok'}">${almIng.pago === 'credito' ? 'Crédito' : 'Contado'}</span>` : ''}${quien ? `<b>${esc(quien)}</b>` : ''}${almIng.documento ? `<small>Doc. ${esc(almIng.documento)}</small>` : ''}
                 <span class="alm-ing-num">Operación N° ${esc(almDatos.proximoIngreso)}</span><button type="button" class="btn-ghost btn-mini" onclick="almCambiarOperacion()">Cambiar operación</button></div>` + almPosVista(almIng, true);
         }
         const op = almIng.operacion;
@@ -20937,14 +20945,21 @@ function revisarPagos(forzar) {
                             : `<input type="search" id="almIngProv" autocomplete="off" data-primero data-enter-propio value="${esc(almProvTexto)}" placeholder="Nombre o RIF del proveedor" oninput="almProvTexto=this.value;almProvIdx=0;almProvPintar()" onkeydown="almProvTecla(event)">
                                <button type="button" class="btn-ghost" onclick="almNuevoProveedor()">+ Nuevo</button>`}</div>
                         ${almIng.proveedorId ? '' : `<div class="alm-lista corta" id="almProvLista">${almProvListaHTML()}</div>`}</div>
-                    <div><label for="almIngDoc">${op === 'COMPRA' ? 'N° de factura o nota' : 'Referencia (opcional)'}</label><input type="text" id="almIngDoc" autocomplete="off" maxlength="40" ${op === 'COMPRA' ? 'required' : ''} value="${esc(almIng.documento)}" oninput="almIng.documento=this.value"></div>
-                    ${op === 'COMPRA' ? `<div><label for="almIngPago">¿Cómo se paga?</label><select id="almIngPago" onchange="almIng.pago=this.value"><option value="" ${!almIng.pago ? 'selected' : ''}>Elija...</option><option value="credito" ${almIng.pago === 'credito' ? 'selected' : ''}>A crédito (va a Cuentas por pagar)</option><option value="contado" ${almIng.pago === 'contado' ? 'selected' : ''}>Al contado (ya está pagada)</option></select></div>` : ''}
+                    <div><label for="almIngDoc">${op === 'COMPRA' ? 'N° de factura o nota' : 'Referencia (opcional)'}</label><input type="text" id="almIngDoc" data-falta="N° de factura o nota" autocomplete="off" maxlength="40" ${op === 'COMPRA' ? 'required' : ''} value="${esc(almIng.documento)}" oninput="almIng.documento=this.value; almActualizarPagoIng()"></div>
                     ${op === 'COMPRA' || op === 'SIN_FACTURA' ? `<div style="align-self:end"><label class="interruptor"><input type="checkbox" id="almIngFiscal" ${almIng.fiscal ? 'checked' : ''} onchange="almIng.fiscal=this.checked"><span class="sw-pista"></span> Factura fiscal</label></div>` : ''}
+                    ${op === 'COMPRA' ? `<div class="per-ancho${almIng.proveedorId && String(almIng.documento || '').trim() ? '' : ' hidden'}" id="almIngPagoBloque">
+                        <label>¿Cómo se paga esta factura?</label>
+                        <div class="cmp-pago-op" style="margin-top:.35rem">
+                            <button type="button" id="almBtnCredito" class="cmp-pago-btn${almIng.pago === 'credito' ? ' elegido' : ''}" onclick="almElegirPagoIng('credito')"><b>Crédito</b><span>Se paga después: va a Cuentas por pagar</span></button>
+                            <button type="button" id="almBtnContado" class="cmp-pago-btn${almIng.pago === 'contado' ? ' elegido' : ''}" onclick="almElegirPagoIng('contado')"><b>Contado</b><span>Ya está pagada</span></button>
+                        </div>
+                    </div>` : ''}
                     ${op === 'DEV_PROVEEDOR' ? '<div class="per-ancho nota" style="margin-top:0">La mercancía sale del almacén de vuelta al proveedor (p. ej. devolver un préstamo). Por cada producto escriba cuánto sale: nunca más de lo que hay.</div>' : ''}
                     <div class="per-ancho"><label for="almIngNota">${op === 'DEV_PROVEEDOR' ? 'Motivo (opcional)' : 'Nota (opcional)'}</label><input type="text" id="almIngNota" autocomplete="off" maxlength="150" value="${esc(almIng.nota)}" ${op === 'DEV_PROVEEDOR' ? 'placeholder="Ej.: devolución del préstamo de queso"' : ''} oninput="almIng.nota=this.value"></div>
 `}
             </div>
-            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="submit" class="btn-primary">Comenzar (Enter)</button></div>`}
+            <div class="login-error" id="almFormIngError"></div>
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0"><button type="submit" id="almIngBtnComenzar" class="btn-primary">Comenzar (Enter)</button></div>`}
         </form>`;
     }
     // ---------- Proveedor registrado: buscar (flechas y Enter) o registrar uno nuevo ----------
@@ -21004,16 +21019,57 @@ function revisarPagos(forzar) {
     }
     function almElegirOperacion(k) {
         almProvTexto = ''; almProvIdx = 0;
-        almIng = { operacion: k, proveedorId: '', documento: '', clienteId: '', nota: '', items: [], sel: -1, listo: false, ultimo: '' };
+        almIng = { operacion: k, proveedorId: '', documento: '', clienteId: '', nota: '', pago: '', items: [], sel: -1, listo: false, ultimo: '' };
         almPintar(); almEnfocar();
+    }
+    function almActualizarPagoIng() {
+        if (almIng.operacion !== 'COMPRA') return;
+        const bloque = document.getElementById('almIngPagoBloque');
+        const mostrar = !!(almIng.proveedorId && String(almIng.documento || '').trim());
+        if (!mostrar && almIng.pago) almIng.pago = '';
+        if (bloque) {
+            bloque.classList.toggle('hidden', !mostrar);
+            const bCr = document.getElementById('almBtnCredito'), bCo = document.getElementById('almBtnContado');
+            if (bCr) bCr.classList.toggle('elegido', almIng.pago === 'credito');
+            if (bCo) bCo.classList.toggle('elegido', almIng.pago === 'contado');
+        }
+        const err = document.getElementById('almFormIngError'); if (err) err.textContent = '';
+    }
+    function almElegirPagoIng(p) {
+        almIng.pago = p;
+        almActualizarPagoIng();
+        const btn = document.getElementById('almIngBtnComenzar');
+        if (btn) btn.focus();
     }
     function almComenzarIngreso(ev) {
         ev.preventDefault();
         const v = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
-        if ((almIng.operacion === 'COMPRA' || almIng.operacion === 'DEV_PROVEEDOR') && !almIng.proveedorId) { mostrarBanner('Elija el proveedor (si no está registrado, use "+ Nuevo").', 'warn'); const b = document.getElementById('almIngProv'); if (b) b.focus(); return; }
-        const fis = document.getElementById('almIngFiscal'), pg = document.getElementById('almIngPago');
-        if (almIng.operacion === 'COMPRA' && pg && !pg.value) { mostrarBanner('Elija si la compra es al contado o a crédito (las de contado no van a Cuentas por pagar).', 'warn'); pg.focus(); return; }
-        if (pg) almIng.pago = pg.value;
+        const errEl = document.getElementById('almFormIngError');
+        if (errEl) errEl.textContent = '';
+        if ((almIng.operacion === 'COMPRA' || almIng.operacion === 'DEV_PROVEEDOR') && !almIng.proveedorId) {
+            const msg = 'Elija el proveedor (si no está registrado, use "+ Nuevo").';
+            if (errEl) errEl.textContent = msg;
+            mostrarBanner(msg, 'warn');
+            const b = document.getElementById('almIngProv'); if (b) b.focus();
+            return;
+        }
+        const fis = document.getElementById('almIngFiscal');
+        if (almIng.operacion === 'COMPRA') {
+            if (!v('almIngDoc')) {
+                const msg = 'Escriba el N° de factura o nota.';
+                if (errEl) errEl.textContent = msg;
+                mostrarBanner(msg, 'warn');
+                const d = document.getElementById('almIngDoc'); if (d) d.focus();
+                return;
+            }
+            if (!almIng.pago) {
+                const msg = 'Elija si la compra es a crédito o al contado (las de contado no van a Cuentas por pagar).';
+                if (errEl) errEl.textContent = msg;
+                mostrarBanner(msg, 'warn');
+                const b = document.getElementById('almBtnCredito'); if (b) b.focus();
+                return;
+            }
+        }
         Object.assign(almIng, { documento: v('almIngDoc'), clienteId: v('almIngCli'), nota: v('almIngNota'), fiscal: !!(fis && fis.checked), listo: true });
         almPintar(); almEnfocar();
     }
@@ -21022,7 +21078,7 @@ function revisarPagos(forzar) {
             if (confirm('¿Guardar esta operación (' + almIng.items.length + ' renglón(es)) para seguirla después con F7?\n\nAceptar = guardarla · Cancelar = seguir en ella')) { almGuardarOperacion(true); mostrarBanner('Operación guardada. Tráigala con F7.', 'ok'); }
             else return;
         }
-        almIng = { operacion: '', proveedorId: '', documento: '', clienteId: '', nota: '', items: [], sel: -1, listo: false, ultimo: '' };
+        almIng = { operacion: '', proveedorId: '', documento: '', clienteId: '', nota: '', pago: '', items: [], sel: -1, listo: false, ultimo: '' };
         almPintar(); almEnfocar();
     }
     function almPedirCantidadIngreso(p, mult) {
@@ -21166,7 +21222,7 @@ function revisarPagos(forzar) {
                          nota: op.nota, fiscal: !!op.fiscal, pago: op.operacion === 'COMPRA' ? (op.pago || '') : undefined, claveAdmin, items: op.items.map(x => ({ codigo: x.codigo, cantidad: x.cantidad, costo: x.costo, contado: op.operacion === 'AJUSTE' ? x.contado : undefined })) };
         almMoverLocal(op.items, 1, op.operacion === 'COMPRA');
         almDatos.proximoIngreso = almNumeroTxt((Number(doc.numero) || 0) + 1);
-        almIng = { operacion: op.operacion, proveedorId: '', documento: '', clienteId: '', nota: '', items: [], sel: -1, listo: false, ultimo: '' };
+        almIng = { operacion: op.operacion, proveedorId: '', documento: '', clienteId: '', nota: '', pago: '', items: [], sel: -1, listo: false, ultimo: '' };
         almPintar();
         almPreguntarImprimir('ingreso', doc);
         almEnSegundoPlano(async () => {
@@ -22663,10 +22719,14 @@ Reglas:
         // Total de la factura en bolívares (los costos ya están en $): se compara pasándolo a $
         if (leido && total > 0 && (cmpMonedaFactura() === 'BS' || leido > total * 20)) { const ts = cmpTasaCompra(); if (ts) { enBs = ` (Bs ${fmt(leido)} a ${fmt(ts)})`; leido = leido / ts; } }
         const porTienda = CMP_TIENDAS.map(t => { const v = cmp.lineas.reduce((s, l) => s + (Number(l.dist[t]) || 0) * (l.costo || 0), 0); return v > 0 ? `${CMP_SIGLA[t]} $ ${fmt(v)}` : ''; }).filter(Boolean);
+        const conCant = cmp.lineas.filter(l => (l.codigo || l.descripcion || l.cantidad) && (Number(l.cantidad) || 0) > 0);
+        const vanAlm = conCant.filter(l => cmpR2((l.cantidad || 0) - cmpRepartido(l)) > 0.0005);
         return `<span>Costo de la compra: <b>$ ${fmt(total)}</b></span>${leido ? `<span>Total de la factura (leído): $ ${fmt(leido)}${enBs}${Math.abs(leido - total) > 0.02 * leido ? ' <b style="color:var(--danger)">no coincide: revise cantidades y costos</b>' : ' ✓'}</span>` : ''}
             ${leido && Math.abs(leido - total) > 0.02 * leido ? `<span><button type="button" class="btn-ghost btn-mini" onclick="cmpIvaTodos(16)">Sumar IVA 16 % a todos</button> <button type="button" class="btn-ghost btn-mini" onclick="cmpIvaTodos(0)">Quitar el IVA a todos</button></span>` : ''}
             ${(() => { const n = cmp.lineas.filter(l => cmpAvisoCosto(l, cmpVendeMayor(cmpProd(l)))).length; return n ? `<span class="cmp-aviso-costo">${n} producto(s) con precio de venta igual o muy cerca del costo</span>` : ''; })()}
-            <span>${cmp.lineas.length} renglón(es)</span>${porTienda.length ? `<span>A tiendas (al costo): ${porTienda.join(' · ')}</span>` : '<span>Todo queda en el almacén</span>'}`;
+            <span>${cmp.lineas.length} renglón(es)</span>${porTienda.length ? `<span>A tiendas (al costo): ${porTienda.join(' · ')}</span>` : ''}
+            ${vanAlm.length ? `<div class="cmp-almacen-aviso"><span><b>⚠ Atención: ${vanAlm.length} producto(s) van a almacén</b> (tienen unidades sin repartir en «Queda»). Si toda la mercancía va a tiendas, revise <b>3 · Reparto a tiendas</b> antes de guardar.</span></div>`
+                : conCant.length ? `<span style="color:var(--verde-txt);font-weight:600">✓ Toda la mercancía repartida a tiendas (0 en almacén)</span>` : ''}`;
     }
     function cmpCodigo(i, v) {
         const l = cmp.lineas[i]; l.codigo = String(v || '').trim().toUpperCase();
@@ -22722,7 +22782,8 @@ Reglas:
         cmpEstadoFila(i);
         cmpPieActualizar();
     }
-    async function cmpGuardar() {
+    let cmpPendGuardar = null;
+    function cmpGuardar() {
         const err = document.getElementById('cmpError'); err.textContent = '';
         if (!cmp.proveedorId) { err.textContent = 'Elija el proveedor (si no está, regístrelo).'; return; }
         if (!cmp.factura.trim()) { err.textContent = 'Escriba el N° de la factura.'; return; }
@@ -22745,10 +22806,42 @@ Reglas:
                 : `Renglón ${n}: "${p.descripcion}" no tiene código, así que se reparte completo. Reparta lo que queda o regístrelo en el catálogo para dejarlo en el almacén.`;
             return;
         }
-        if (!cmp.pago) { err.textContent = 'Elija si la compra es al contado o a crédito (las de contado no van a Cuentas por pagar).'; const s = document.getElementById('cmpPago'); if (s) s.focus(); return; }
-        const notas = CMP_TIENDAS.filter(t => lineas.some(l => Number(l.dist[t]) > 0)), alAlmacen = lineas.filter(l => l.codigo).length;
+        if (!cmp.pago) { err.textContent = 'Elija si la compra es al contado o a crédito (las de contado no van a Cuentas por pagar).'; return; }
+        const vanAlmacen = lineas.map(l => ({ l, p: cmpProd(l), q: cmpR2(queda(l)) })).filter(x => x.q > 0.0005);
+        const notas = CMP_TIENDAS.filter(t => lineas.some(l => Number(l.dist[t]) > 0));
         const sinPrecio = lineas.filter(l => !(l.detal > 0) && cmpProd(l).categoria !== 'Insumos').length;
-        if (!confirm(`${alAlmacen ? alAlmacen + ' producto(s) con código entran al almacén. ' : ''}${notas.length ? 'Se emite una nota a: ' + notas.join(', ') + ' (se envían solas a Telegram).' : 'No se reparte nada a las tiendas: no se emiten notas ni se envía nada a Telegram.'}` + (sinPrecio ? `\n${sinPrecio} producto(s) sin precio al detal: quedan "por definir precio".` : '') + '\n\n¿Guardar la compra?')) return;
+        const resumenNotas = `<div class="nota" style="margin:.45rem 0 0">${notas.length ? `Se emite una nota de entrega a: <b>${esc(notas.join(', '))}</b> (se envían solas a Telegram).` : 'No se reparte mercancía a las tiendas: no se emiten notas ni se envía nada a Telegram.'}${sinPrecio ? `<br>${sinPrecio} producto(s) sin precio al detal: quedan «por definir precio».` : ''}</div>`;
+        cmpPendGuardar = lineas;
+        if (vanAlmacen.length) {
+            almVentana(`<div class="req-dlg" style="max-width:560px">
+                <h3>⚠ Hay productos que van a almacén</h3>
+                <div class="cmp-almacen-aviso"><span><b>Advertencia:</b> <b>${vanAlmacen.length} producto(s)</b> tienen cantidad sin repartir y <b>entrarán al almacén</b>. Pulse <b>Aceptar</b> solo si desea dejarlos en el almacén.</span></div>
+                <ul class="cmp-almacen-lista">${vanAlmacen.map(x => `<li><b>${esc((x.p && x.p.descripcion) || x.l.descripcion || x.l.codigo)}</b>${x.l.codigo ? ` <small>(${esc(x.l.codigo)})</small>` : ''}: <b>${almCant(x.q, x.p && x.p.tipo)} ${almUnidad(x.p && x.p.tipo)}</b> al almacén</li>`).join('')}</ul>
+                ${resumenNotas}
+                <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0;flex-wrap:wrap">
+                    <button type="button" class="btn-ghost" autofocus onclick="almCerrar(); cmpSeccion('reparto')">Revisar reparto</button>
+                    <button type="button" class="btn-ghost" onclick="almCerrar()">Cancelar</button>
+                    <button type="button" class="btn-primary" id="cmpBtnAceptarAlmacen" onclick="cmpAceptarGuardar()">Aceptar</button>
+                </div></div>`, () => { cmpPendGuardar = null; });
+            return;
+        }
+        almVentana(`<div class="req-dlg">
+            <h3>Confirmar compra</h3>
+            <div class="banner ok" style="display:block">✓ Todos los productos se reparten completos a las tiendas (<b>0 van al almacén</b>).</div>
+            ${resumenNotas}
+            <div class="req-acciones" style="justify-content:flex-end;margin-bottom:0">
+                <button type="button" class="btn-ghost" onclick="almCerrar()">Cancelar</button>
+                <button type="button" class="btn-primary" autofocus id="cmpBtnAceptarAlmacen" onclick="cmpAceptarGuardar()">Aceptar</button>
+            </div></div>`, () => { cmpPendGuardar = null; });
+    }
+    function cmpAceptarGuardar() {
+        const lineas = cmpPendGuardar;
+        cmpPendGuardar = null;
+        almCerrar();
+        if (lineas && lineas.length) cmpEjecutarGuardar(lineas);
+    }
+    async function cmpEjecutarGuardar(lineas) {
+        const err = document.getElementById('cmpError'); if (err) err.textContent = '';
         const btn = document.getElementById('cmpBtnGuardar'); btnCargando(btn, 'Guardando...');
         clearTimeout(cmpAvanceEspera);
         // (11/11) Ya no se espera a que las fotos terminen de subir a Drive: la compra se guarda enseguida y las fotos se le agregan al
@@ -24028,11 +24121,13 @@ Reglas:
         const col = (re, def) => { const i = cols.findIndex(c => re.test(String(c.t || ''))); return i >= 0 ? i : def; };
         const iCod = col(/^c[oó]digo$/i, 0), iDes = col(/descrip/i, 1), iEx = col(/existencia/i, 2);
         const iDet = col(/detal\s*bcv/i, col(/detal|precio/i, 4)), iCat = col(/categor/i, 7), iUnd = col(/unidad/i, 8);
+        const iMay = col(/^mayor\s*bcv$/i, col(/^(?:precio\s*)?mayor$/i, -1));
         return hoja.filas.map(f => ({
             cod: String(f[iCod] == null ? '' : f[iCod]).trim(),
             desc: String(f[iDes] == null ? '' : f[iDes]).trim(),
             exist: Number(f[iEx]) || 0,
             precio: Math.max(0, Number(f[iDet]) || 0),
+            mayor: iMay >= 0 ? Math.max(0, Number(f[iMay]) || 0) : 0,
             cat: String(f[iCat] == null ? '' : f[iCat]).trim(),
             unit: habUnidadCorta(f[iUnd])
         })).filter(x => x.cod && x.exist > 0).sort((a, b) => ALM_ORDEN.compare(a.desc, b.desc));
@@ -24105,19 +24200,40 @@ Reglas:
         return st && Array.isArray(st.items) ? st.items.find(x => x.cod === cod) : null;
     }
     const habAntesSugerido = p => { const n = Number(p) || 0; return n > 0 ? Math.round(n * 1.25 * 100) / 100 : 0; };
-    function habAgregar(cod, ofe) {
-        const idx = hab.cola.findIndex(x => x.cod === cod);
+    function habAgregar(cod, modo) {
+        const opts = typeof modo === 'object' && modo ? modo : { ofe: !!modo };
+        const idx = hab.cola.findIndex(x => !x.manual && x.cod === cod);
         if (idx >= 0) {
             hab.cola[idx].copias++;
-            if (ofe && !hab.cola[idx].ofe) { hab.cola[idx].ofe = true; if (!(hab.cola[idx].antes > hab.cola[idx].precio)) hab.cola[idx].antes = habAntesSugerido(hab.cola[idx].precio); }
+            if (opts.ofe && !hab.cola[idx].ofe) { hab.cola[idx].ofe = true; if (!(hab.cola[idx].antes > hab.cola[idx].precio)) hab.cola[idx].antes = habAntesSugerido(hab.cola[idx].precio); }
+            if (opts.conMayor && !hab.cola[idx].conMayor) {
+                const it = habItemCatalogo(cod);
+                hab.cola[idx].conMayor = true;
+                if (!(hab.cola[idx].mayor > 0) && it && it.mayor > 0) hab.cola[idx].mayor = it.mayor;
+            }
         } else {
             const it = habItemCatalogo(cod); if (!it) return;
-            hab.cola.push({ cod: it.cod, desc: it.desc, precio: it.precio, unit: it.unit || 'c/u', copias: 1, ofe: !!ofe, antes: ofe ? habAntesSugerido(it.precio) : 0 });
+            const conMayor = !!(opts.conMayor && it.mayor > 0);
+            hab.cola.push({
+                cod: it.cod, desc: it.desc, precio: it.precio, mayor: it.mayor || 0, conMayor,
+                mayorTxt: '', unit: it.unit || 'c/u', copias: 1, ofe: !!opts.ofe,
+                antes: opts.ofe ? habAntesSugerido(it.precio) : 0, manual: false
+            });
         }
         habRepintar();
     }
+    function habAgregarManual() {
+        hab.cola.push({ cod: '', desc: '', precio: 0, mayor: 0, conMayor: false, mayorTxt: '', unit: 'c/u', copias: 1, ofe: false, antes: 0, manual: true });
+        const idx = hab.cola.length - 1;
+        habRepintar();
+        setTimeout(() => { const el = document.getElementById('habDes_' + idx); if (el) el.focus(); }, 20);
+    }
     function habSumar(cod, delta) {
-        const idx = hab.cola.findIndex(x => x.cod === cod); if (idx < 0) return;
+        const idx = hab.cola.findIndex(x => !x.manual && x.cod === cod); if (idx < 0) return;
+        habSumarIdx(idx, delta);
+    }
+    function habSumarIdx(idx, delta) {
+        if (!hab.cola[idx]) return;
         hab.cola[idx].copias += delta;
         if (hab.cola[idx].copias <= 0) hab.cola.splice(idx, 1);
         habRepintar();
@@ -24129,12 +24245,33 @@ Reglas:
         if (x.ofe && !(x.antes > x.precio)) x.antes = habAntesSugerido(x.precio);
         habRepintar();
     }
+    function habAlternarMayor(idx) {
+        const x = hab.cola[idx]; if (!x) return;
+        x.conMayor = !x.conMayor;
+        if (x.conMayor && !(x.mayor > 0)) {
+            const it = x.cod ? habItemCatalogo(x.cod) : null;
+            if (it && it.mayor > 0) x.mayor = it.mayor;
+        }
+        habRepintar();
+        if (x.conMayor) setTimeout(() => { const el = document.getElementById('habMay_' + idx); if (el) { el.focus(); el.select && el.select(); } }, 20);
+    }
+    function habUsarMayorPrincipal(idx) {
+        const x = hab.cola[idx]; if (!x || !(x.mayor > 0)) return;
+        const tmp = Number(x.precio) || 0;
+        x.precio = x.mayor;
+        x.mayor = tmp;
+        if (x.ofe && x.antes <= x.precio) x.antes = habAntesSugerido(x.precio);
+        habRepintar();
+    }
     function habEditarCampo(idx, campo, val) {
         const x = hab.cola[idx]; if (!x) return;
-        if (campo === 'desc') x.desc = String(val || '').toUpperCase().slice(0, 90);
+        if (campo === 'cod') x.cod = String(val || '').toUpperCase().slice(0, 20);
+        else if (campo === 'desc') x.desc = String(val || '').toUpperCase().slice(0, 90);
         else if (campo === 'unit') x.unit = String(val || '').slice(0, 10) || 'c/u';
         else if (campo === 'precio') x.precio = Math.max(0, Number(val) || 0);
         else if (campo === 'antes') x.antes = Math.max(0, Number(val) || 0);
+        else if (campo === 'mayor') x.mayor = Math.max(0, Number(val) || 0);
+        else if (campo === 'mayorTxt') x.mayorTxt = String(val || '').slice(0, 18);
         else if (campo === 'copias') x.copias = Math.min(99, Math.max(1, parseInt(val, 10) || 1));
         const chip = document.getElementById('habAhorraChip_' + idx);
         if (chip && x.ofe) {
@@ -24146,7 +24283,7 @@ Reglas:
     function habFiltrados(st) {
         if (!st || !st.items) return [];
         const q = rptNorm(hab.bus).split(/\s+/).filter(Boolean);
-        let list = st.items.filter(x => (!hab.soloPrecioPos || x.precio > 0) && (!hab.cat || x.cat === hab.cat));
+        let list = st.items.filter(x => (!hab.soloPrecioPos || x.precio > 0 || x.mayor > 0) && (!hab.cat || x.cat === hab.cat));
         if (q.length) {
             list = list.filter(x => { const txt = rptNorm(x.cod + ' ' + x.desc + ' ' + x.cat); return q.every(w => txt.includes(w)); });
             const exacto = rptNorm(hab.bus).trim();
@@ -24160,17 +24297,17 @@ Reglas:
         const list = habFiltrados(st); if (!list.length) return;
         if (quitar) {
             const quitarSet = new Set(list.map(x => x.cod));
-            hab.cola = hab.cola.filter(x => !quitarSet.has(x.cod));
+            hab.cola = hab.cola.filter(x => x.manual || !quitarSet.has(x.cod));
         } else {
-            const enCola = new Set(hab.cola.map(x => x.cod));
+            const enCola = new Set(hab.cola.filter(x => !x.manual).map(x => x.cod));
             list.forEach(it => {
-                if (!enCola.has(it.cod)) hab.cola.push({ cod: it.cod, desc: it.desc, precio: it.precio, unit: it.unit || 'c/u', copias: 1, ofe: false, antes: 0 });
+                if (!enCola.has(it.cod)) hab.cola.push({ cod: it.cod, desc: it.desc, precio: it.precio, mayor: it.mayor || 0, conMayor: false, mayorTxt: '', unit: it.unit || 'c/u', copias: 1, ofe: false, antes: 0, manual: false });
             });
         }
         habRepintar();
     }
     function habAlternarSel(cod, marcar) {
-        const idx = hab.cola.findIndex(x => x.cod === cod);
+        const idx = hab.cola.findIndex(x => !x.manual && x.cod === cod);
         if (marcar && idx < 0) habAgregar(cod, false);
         else if (!marcar && idx >= 0) { hab.cola.splice(idx, 1); habRepintar(); }
     }
@@ -24220,20 +24357,30 @@ Reglas:
             const pct = it.ofe ? habAhorroPct(Number(it.precio) || 0, Number(it.antes) || 0) : 0;
             const ofeValida = !!it.ofe;
             const clsOfe = ofeValida ? 'ofe' : 'normal';
+            const mayNum = (it.conMayor && Number(it.mayor) > 0) ? Number(it.mayor) : 0;
+            const mayFmt = mayNum > 0 ? habFormatearPrecio(mayNum) : null;
+            const mayTxt = mayNum > 0 ? ('$' + mayFmt.ent + mayFmt.dec) : '';
+            const mayCond = esc((it.mayorTxt || '').trim());
+            const mayLabel = mayCond ? `AL MAYOR · ${mayCond}` : 'AL MAYOR';
+            const clsMay = mayTxt ? 'con-may' : '';
+            const clsAll = `${clsTinta} ${clsOfe}${clsMay ? ' ' + clsMay : ''}${clsD ? ' ' + clsD : ''}`;
             const antesTxt = pct > 0 ? ('$' + habFormatearPrecio(it.antes).ent + habFormatearPrecio(it.antes).dec) : '';
             const ahorraTxt = pct > 0 ? (tam === 'peq' ? `-${pct}%` : `AHORRA ${pct}%`) : 'OFERTA';
             const badge = conCod && it.cod ? `<span class="tag-badge">CÓD. ${esc(it.cod)}</span>` : '<span></span>';
             const prod = esc((it.desc || '').trim() || 'PRODUCTO');
             const unit = esc((it.unit || 'c/u').trim());
+            const mayBarHtml = mayTxt ? `<div class="may-bar"><span class="m-lbl">${mayLabel}</span><span class="m-val">${mayTxt}</span></div>` : '';
+            const mayBoxHtml = mayTxt ? `<div class="may-box"><span class="m-lbl">${mayLabel}</span><span class="m-val">${mayTxt}</span></div>` : '';
 
             if (tam === 'peq') {
                 const kicker = ofeValida ? 'OFERTA' : 'PLAZA';
-                return `<div class="tag tag-peq ${clsTinta} ${clsOfe} ${clsD}">
+                return `<div class="tag tag-peq ${clsAll}">
                     <div class="tag-top"><div class="tag-top-left">${logoSvg(ofeValida)}<span class="tag-kicker">${kicker}</span></div>${badge}</div>
                     <div class="peq-body">
                         <div class="peq-left">
                             <div class="tag-prod">${prod}</div>
                             ${ofeValida ? `<div class="peq-ofe-row">${antesTxt ? `<span class="antes">Antes ${tachadoHtml(antesTxt)}</span>` : ''}<span class="save">${ahorraTxt}</span></div>` : ''}
+                            ${mayTxt ? `<div class="peq-may"><span class="m-lbl">${mayLabel}</span><span class="m-val">${mayTxt}</span></div>` : ''}
                         </div>
                         <div class="peq-right p-wrap">
                             <span class="p-sym">$</span><span class="p-int">${ent}</span>
@@ -24241,28 +24388,30 @@ Reglas:
                         </div>
                     </div>${footHtml}</div>`;
             }
-            if ((tam === 'est' || tam === 'gra4') && ofeValida) {
-                const kicker = tam === 'est' ? 'OFERTA' : 'PRECIO ESPECIAL';
-                return `<div class="tag ${tagCls} ${clsTinta} ${clsOfe} ${clsD}">
-                    <div class="tag-top"><div class="tag-top-left">${logoSvg(true)}<span class="tag-kicker">${kicker}</span></div>${badge}</div>
+            if ((tam === 'est' || tam === 'gra4') && (ofeValida || mayTxt)) {
+                const kicker = ofeValida ? (tam === 'est' ? 'OFERTA' : 'PRECIO ESPECIAL') : 'PLAZA VALENCIA';
+                return `<div class="tag ${tagCls} ${clsAll}">
+                    <div class="tag-top"><div class="tag-top-left">${logoSvg(ofeValida)}<span class="tag-kicker">${kicker}</span></div>${badge}</div>
                     <div class="tag-prod">${prod}</div>
                     <div class="tag-mid">
-                        <div class="est-ofe-top">${antesTxt ? `<span class="antes">Antes ${tachadoHtml(antesTxt)}</span>` : ''}<span class="save">${ahorraTxt}</span></div>
+                        ${ofeValida ? `<div class="est-ofe-top">${antesTxt ? `<span class="antes">Antes ${tachadoHtml(antesTxt)}</span>` : ''}<span class="save">${ahorraTxt}</span></div>` : ''}
                         <div class="p-wrap"><span class="p-sym">$</span><span class="p-int">${ent}</span><div class="p-right"><span class="p-dec">${dec}</span><span class="p-unit">${unit}</span></div></div>
+                        ${mayBarHtml}
                     </div>${footHtml}</div>`;
             }
-            if ((tam === 'gra_mc' || tam === 'carta') && ofeValida) {
-                return `<div class="tag ${tagCls} ${clsTinta} ofe ${clsD}">
-                    <div class="tag-top"><div class="tag-top-left">${logoSvg(true)}<span class="tag-kicker">¡OFERTA IMPERDIBLE!</span></div>${badge}</div>
+            if ((tam === 'gra_mc' || tam === 'carta') && (ofeValida || mayTxt)) {
+                const kicker = ofeValida ? '¡OFERTA IMPERDIBLE!' : 'PLAZA VALENCIA · GRAN FORMATO';
+                return `<div class="tag ${tagCls} ${clsAll}">
+                    <div class="tag-top"><div class="tag-top-left">${logoSvg(ofeValida)}<span class="tag-kicker">${kicker}</span></div>${badge}</div>
                     ${marcaCartaHtml}
                     <div class="tag-prod">${prod}</div>
                     <div class="tag-mid oferta">
                         <div class="p-wrap"><span class="p-sym">$</span><span class="p-int">${ent}</span><div class="p-right"><span class="p-dec">${dec}</span><span class="p-unit">${unit}</span></div></div>
-                        <div class="anchor">${antesTxt ? `<div class="antes">Antes ${tachadoHtml(antesTxt)}</div>` : ''}<div class="save">${ahorraTxt}</div></div>
+                        <div class="anchor">${ofeValida ? `${antesTxt ? `<div class="antes">Antes ${tachadoHtml(antesTxt)}</div>` : ''}<div class="save">${ahorraTxt}</div>` : ''}${mayBoxHtml}</div>
                     </div>${footHtml}</div>`;
             }
             const kicker = (tam === 'gra_mc' || tam === 'carta') ? 'PLAZA VALENCIA · GRAN FORMATO' : 'PLAZA VALENCIA';
-            return `<div class="tag ${tagCls} ${clsTinta} normal ${clsD}">
+            return `<div class="tag ${tagCls} ${clsAll}">
                 <div class="tag-top"><div class="tag-top-left">${logoSvg(false)}<span class="tag-kicker">${kicker}</span></div>${badge}</div>
                 ${marcaCartaHtml}
                 <div class="tag-prod">${prod}</div>
@@ -24383,6 +24532,36 @@ Reglas:
             .tag-carta.ofe .p-dec { font-size: 76pt; margin-top: 3.5mm; } .tag-carta.ofe.d2 .p-dec { font-size: 62pt; } .tag-carta.ofe.d3 .p-dec { font-size: 48pt; } .tag-carta.ofe .p-unit { font-size: 30pt; margin-top: 4mm; } .tag-carta.ofe.d2 .p-unit { font-size: 26pt; } .tag-carta.ofe.d3 .p-unit { font-size: 22pt; }
             .tag-carta .anchor { padding-left: 11mm; border-left-width: 1mm; gap: 6mm; } .tag-carta .antes { font-size: 40pt; } .tag-carta .tachado svg path { stroke-width: 3.2px; } .tag-carta .save { font-size: 38pt; padding: 4.5mm 8.5mm; border-radius: 2.8mm; text-shadow: none; }
             .tag-carta .tag-foot { height: 15mm; padding: 0 9mm; font-size: 15.5pt; background: rgba(248, 250, 252, 0.96); } .tag-carta.t-bn .tag-foot { background: rgba(255, 255, 255, 0.97); } .tag-carta .bcv-wrap { gap: 3mm; } .tag-carta .bcv-logo { width: 11mm; height: 11mm; }
+            .may-bar, .may-box, .peq-may { display: inline-flex; align-items: center; justify-content: center; font-weight: 900; white-space: nowrap; }
+            .m-lbl { background: #0f172a; color: #ffffff; text-transform: uppercase; letter-spacing: 0.03em; font-weight: 800; }
+            .t-bn .m-lbl { background: #000000; color: #ffffff; }
+            .m-val { color: #0f172a; font-weight: 900; } .t-bn .m-val { color: #000000; }
+            .t-color .may-bar, .t-color .may-box { border: 0.45mm solid #0f172a; background: rgba(241, 245, 249, 0.94); }
+            .t-bn .may-bar, .t-bn .may-box { border: 0.45mm solid #000000; background: #ffffff; }
+            .tag-peq.con-may .tag-prod { font-size: 6.1pt; line-height: 1.08; -webkit-line-clamp: 2; }
+            .tag-peq .peq-may { gap: 1mm; align-self: flex-start; border-radius: 0.7mm; overflow: hidden; border: 0.3mm solid #0f172a; background: #f8fafc; margin-top: 0.15mm; }
+            .tag-peq.t-bn .peq-may { border-color: #000000; background: #ffffff; }
+            .tag-peq .peq-may .m-lbl { font-size: 5.2pt; padding: 0.32mm 1mm; } .tag-peq .peq-may .m-val { font-size: 7.2pt; padding-right: 1mm; }
+            .tag-peq.ofe.con-may .peq-ofe-row { flex-direction: row; align-items: center; gap: 1mm; margin-top: 0.1mm; }
+            .tag-peq.ofe.con-may .antes { font-size: 7.2pt; } .tag-peq.ofe.con-may .save { font-size: 7pt; padding: 0.3mm 1.2mm; }
+            .tag-est.con-may .tag-mid { flex-direction: column; align-items: center; justify-content: center; gap: 0.9mm; }
+            .tag-est.con-may .p-int { font-size: 30pt; } .tag-est.con-may.d2 .p-int { font-size: 27pt; } .tag-est.con-may.d3 .p-int { font-size: 21pt; } .tag-est.con-may .p-dec { font-size: 13pt; }
+            .tag-est.ofe.con-may .p-int { font-size: 24pt; } .tag-est.ofe.con-may.d2 .p-int { font-size: 21pt; } .tag-est.ofe.con-may.d3 .p-int { font-size: 18pt; } .tag-est.ofe.con-may .p-dec { font-size: 11pt; }
+            .tag-est .may-bar { gap: 1.4mm; padding: 0.35mm 1.5mm; border-radius: 0.9mm; } .tag-est .may-bar .m-lbl { font-size: 5.5pt; padding: 0.35mm 1.1mm; border-radius: 0.5mm; } .tag-est .may-bar .m-val { font-size: 9pt; }
+            .tag-gra4.con-may .tag-mid { flex-direction: column; align-items: center; justify-content: center; gap: 3.5mm; }
+            .tag-gra4.con-may .p-int { font-size: 72pt; } .tag-gra4.con-may.d2 .p-int { font-size: 60pt; } .tag-gra4.con-may.d3 .p-int { font-size: 46pt; }
+            .tag-gra4.ofe.con-may .p-int { font-size: 56pt; } .tag-gra4.ofe.con-may.d2 .p-int { font-size: 46pt; } .tag-gra4.ofe.con-may.d3 .p-int { font-size: 36pt; }
+            .tag-gra4 .may-bar { gap: 2.5mm; padding: 1.4mm 3.5mm; border-radius: 1.6mm; } .tag-gra4 .may-bar .m-lbl { font-size: 11pt; padding: 1mm 2.2mm; border-radius: 1mm; } .tag-gra4 .may-bar .m-val { font-size: 20pt; }
+            .tag-gra-mc.con-may .tag-mid.oferta { justify-content: center; gap: 8mm; }
+            .tag-gra-mc.con-may:not(.ofe) .p-sym { font-size: 32pt; margin-top: 4mm; } .tag-gra-mc.con-may:not(.ofe) .p-int { font-size: 132pt; } .tag-gra-mc.con-may:not(.ofe).d2 .p-int { font-size: 108pt; } .tag-gra-mc.con-may:not(.ofe).d3 .p-int { font-size: 82pt; } .tag-gra-mc.con-may:not(.ofe) .p-dec { font-size: 48pt; margin-top: 2mm; } .tag-gra-mc.con-may:not(.ofe) .p-unit { font-size: 20pt; margin-top: 2.5mm; }
+            .tag-gra-mc .may-box { flex-direction: column; gap: 1.5mm; padding: 2.5mm 4.5mm; border-radius: 2mm; }
+            .tag-gra-mc .may-box .m-lbl { font-size: 14pt; padding: 1.2mm 3.5mm; border-radius: 1.2mm; } .tag-gra-mc .may-box .m-val { font-size: 38pt; line-height: 1; }
+            .tag-gra-mc.ofe.con-may .anchor { gap: 2.5mm; } .tag-gra-mc.ofe.con-may .may-box { padding: 1.8mm 3.5mm; } .tag-gra-mc.ofe.con-may .may-box .m-lbl { font-size: 11pt; } .tag-gra-mc.ofe.con-may .may-box .m-val { font-size: 24pt; }
+            .tag-carta.con-may .tag-mid.oferta { justify-content: center; gap: 11mm; }
+            .tag-carta.con-may:not(.ofe) .p-sym { font-size: 48pt; margin-top: 7mm; margin-right: 2mm; } .tag-carta.con-may:not(.ofe) .p-int { font-size: 212pt; } .tag-carta.con-may:not(.ofe).d2 .p-int { font-size: 166pt; } .tag-carta.con-may:not(.ofe).d3 .p-int { font-size: 124pt; } .tag-carta.con-may:not(.ofe) .p-dec { font-size: 76pt; margin-top: 3.5mm; } .tag-carta.con-may:not(.ofe) .p-unit { font-size: 30pt; margin-top: 4mm; }
+            .tag-carta .may-box { flex-direction: column; gap: 2.5mm; padding: 4mm 7mm; border-radius: 2.8mm; }
+            .tag-carta .may-box .m-lbl { font-size: 20pt; padding: 1.8mm 5mm; border-radius: 1.6mm; } .tag-carta .may-box .m-val { font-size: 56pt; line-height: 1; }
+            .tag-carta.ofe.con-may .anchor { gap: 3.5mm; } .tag-carta.ofe.con-may .antes { font-size: 34pt; } .tag-carta.ofe.con-may .save { font-size: 32pt; padding: 3mm 6.5mm; } .tag-carta.ofe.con-may .may-box { padding: 2.5mm 5mm; gap: 1.5mm; } .tag-carta.ofe.con-may .may-box .m-lbl { font-size: 15pt; } .tag-carta.ofe.con-may .may-box .m-val { font-size: 36pt; }
         </style></head><body>
             <svg xmlns="http://www.w3.org/2000/svg" style="display:none">${bcvDefs}</svg>
             <div class="toolbar no-print"><div><b>Habladores · ${expandidos.length} etiqueta(s) · ${hojas.length} hoja(s) Carta</b> <span style="opacity:.8;font-size:12px;margin-left:8px;">Imprimir en Carta ${cfg.landscape ? 'horizontal' : 'vertical'} · Escala 100 %</span></div>
@@ -24407,8 +24586,8 @@ Reglas:
         setTimeout(() => { try { w.focus(); w.print(); } catch (e) { mostrarBanner('No se pudo abrir la impresión: ' + e.message, 'error'); } }, 250);
     }
     function habImprimirUno(cod) {
-        const idx = hab.cola.findIndex(x => x.cod === cod);
-        const it = idx >= 0 ? hab.cola[idx] : (() => { const c = habItemCatalogo(cod); return c ? { cod: c.cod, desc: c.desc, precio: c.precio, unit: c.unit || 'c/u', copias: 1, ofe: false, antes: 0 } : null; })();
+        const idx = hab.cola.findIndex(x => !x.manual && x.cod === cod);
+        const it = idx >= 0 ? hab.cola[idx] : (() => { const c = habItemCatalogo(cod); return c ? { cod: c.cod, desc: c.desc, precio: c.precio, mayor: c.mayor || 0, conMayor: false, mayorTxt: '', unit: c.unit || 'c/u', copias: 1, ofe: false, antes: 0 } : null; })();
         if (it) habImprimirLista([Object.assign({}, it, { copias: 1 })], false);
     }
     function habColaHTML() {
@@ -24417,6 +24596,7 @@ Reglas:
         const totalEtiq = hab.cola.reduce((s, x) => s + (Math.max(1, parseInt(x.copias, 10) || 1)), 0);
         const hojas = Math.max(1, Math.ceil(totalEtiq / cfg.porHoja));
         return `<div class="hab-cola">
+            <datalist id="habUnitList"><option value="c/u"><option value="kg"><option value="caja"><option value="bulto"><option value="cartón"><option value="paq"><option value="L"><option value="docena"></datalist>
             <div class="hab-cola-cab">
                 <div class="hab-cola-ops">
                     <div><label for="habTam">Tamaño (${totalEtiq} hablador${totalEtiq === 1 ? '' : 'es'} · ${hojas} hoja${hojas === 1 ? '' : 's'} Carta)</label>
@@ -24426,6 +24606,7 @@ Reglas:
                     <label class="hab-chk"><input type="checkbox" ${hab.conCodigo ? 'checked' : ''} onchange="hab.conCodigo=this.checked"> Código arriba</label>
                 </div>
                 <div class="hab-cola-bts">
+                    <button type="button" class="btn-ghost" onclick="habAgregarManual()">+ Hablador manual</button>
                     <button type="button" class="btn-primary" onclick="habImprimirLista(hab.cola, false)">Imprimir (${totalEtiq})</button>
                     <button type="button" class="btn-ghost" onclick="habImprimirLista(hab.cola, true)">Vista previa</button>
                     <button type="button" class="btn-ghost" onclick="hab.cola=[];habRepintar()">Vaciar</button>
@@ -24434,23 +24615,32 @@ Reglas:
             <div class="hab-cola-lista">${hab.cola.map((x, i) => {
                 const pct = x.ofe ? habAhorroPct(x.precio, x.antes) : 0;
                 return `<div class="hab-item">
-                    <span class="hab-item-cod">${esc(x.cod)}</span>
+                    <div class="hab-item-cod"><span class="hab-item-lbl">Código</span>
+                        <input type="text" id="habCod_${i}" maxlength="20" placeholder="Opcional" value="${esc(x.cod)}" oninput="habEditarCampo(${i},'cod',this.value)" onchange="habRepintar()"></div>
                     <div class="hab-item-des"><span class="hab-item-lbl">Descripción en hablador</span>
-                        <input type="text" id="habDes_${i}" maxlength="90" value="${esc(x.desc)}" oninput="habEditarCampo(${i},'desc',this.value)" onchange="habRepintar()"></div>
+                        <input type="text" id="habDes_${i}" maxlength="90" placeholder="Ej. CAJA DE HUEVOS" value="${esc(x.desc)}" oninput="habEditarCampo(${i},'desc',this.value)" onchange="habRepintar()"></div>
                     <div class="hab-item-num"><span class="hab-item-lbl">Precio Ref. $</span>
                         <input type="number" id="habPre_${i}" step="0.01" min="0" value="${x.precio}" oninput="habEditarCampo(${i},'precio',this.value)" onchange="habRepintar()"></div>
                     <div class="hab-item-und"><span class="hab-item-lbl">Unidad</span>
-                        <input type="text" id="habUnd_${i}" data-sin-mayus maxlength="10" value="${esc(x.unit)}" oninput="habEditarCampo(${i},'unit',this.value)" onchange="habRepintar()"></div>
+                        <input type="text" id="habUnd_${i}" list="habUnitList" data-sin-mayus maxlength="10" value="${esc(x.unit)}" oninput="habEditarCampo(${i},'unit',this.value)" onchange="habRepintar()"></div>
                     <div class="hab-ofe-grp">
                         <button type="button" class="${x.ofe ? 'btn-primary' : 'btn-ghost'} btn-mini" onclick="habAlternarOfe(${i})">${x.ofe ? 'En oferta' : 'Normal'}</button>
                         ${x.ofe ? `<div class="hab-item-num"><span class="hab-item-lbl">Antes $</span>
                             <input type="number" id="habAnt_${i}" step="0.01" min="0" value="${x.antes || ''}" oninput="habEditarCampo(${i},'antes',this.value)" onchange="habRepintar()"></div>
                             <span id="habAhorraChip_${i}" class="hab-ofe-chip${pct > 0 ? '' : ' mal'}">${pct > 0 ? `AHORRA ${pct}%` : 'Antes > Precio'}</span>` : ''}
                     </div>
+                    <div class="hab-may-grp">
+                        <button type="button" class="${x.conMayor ? 'btn-primary' : 'btn-ghost'} btn-mini" onclick="habAlternarMayor(${i})">${x.conMayor ? 'Con Mayor' : '+ Al mayor'}</button>
+                        ${x.conMayor ? `<div class="hab-item-num"><span class="hab-item-lbl">Mayor $</span>
+                            <input type="number" id="habMay_${i}" step="0.01" min="0" value="${x.mayor || ''}" oninput="habEditarCampo(${i},'mayor',this.value)" onchange="habRepintar()"></div>
+                            <div class="hab-item-may"><span class="hab-item-lbl">Condición / Und.</span>
+                            <input type="text" id="habMayTxt_${i}" data-sin-mayus maxlength="18" placeholder="ej. desde 3 / caja" value="${esc(x.mayorTxt || '')}" oninput="habEditarCampo(${i},'mayorTxt',this.value)" onchange="habRepintar()"></div>
+                            ${x.mayor > 0 ? `<button type="button" class="btn-ghost btn-mini" title="Intercambiar para poner el precio Al Mayor como precio principal" onclick="habUsarMayorPrincipal(${i})">⇄ Principal</button>` : ''}` : ''}
+                    </div>
                     <div class="hab-item-cop">
-                        <button type="button" class="btn-ghost btn-mini" onclick="habSumar('${esc(x.cod).replace(/'/g, '&#39;')}',-1)">−</button>
+                        <button type="button" class="btn-ghost btn-mini" onclick="habSumarIdx(${i},-1)">−</button>
                         <input type="number" id="habCop_${i}" min="1" max="99" value="${x.copias}" onchange="habEditarCampo(${i},'copias',this.value);habRepintar()">
-                        <button type="button" class="btn-ghost btn-mini" onclick="habSumar('${esc(x.cod).replace(/'/g, '&#39;')}',1)">+</button>
+                        <button type="button" class="btn-ghost btn-mini" onclick="habSumarIdx(${i},1)">+</button>
                     </div>
                     <button type="button" class="btn-ghost btn-mini" onclick="habQuitarIdx(${i})">Quitar</button>
                 </div>`;
@@ -24466,15 +24656,16 @@ Reglas:
             </div>
             <div class="req-acciones">
                 <button type="button" class="btn-primary" onclick="habConsultar()" ${dis}>${ocupado ? 'Consultando BigSoft...' : (st && st.paso === 'listo' ? 'Volver a consultar tienda' : 'Consultar productos con existencia')}</button>
+                <button type="button" class="btn-ghost" onclick="habAgregarManual()">+ Hablador manual (sin existencia)</button>
                 ${ocupado ? `<button type="button" class="btn-ghost" onclick="habDetener()">${ico('detener')}Detener</button>` : ''}
             </div>
             <div class="rpt-estados" id="habEstadoBox">${habEstadoHTML(hab.tienda, st)}</div>
             ${habColaHTML()}`;
         if (!st || st.paso !== 'listo') {
-            return h + (st ? '' : `<div class="nota">Consulta en vivo el BigSoft de la tienda elegida (solo lectura). Lista los productos que tienen existencia disponible para que agregues los que quieras con un clic e imprimas sus habladores en Tamaño Pequeño (6,5 × 2,8 cm · 27/hoja), Estándar (6,5 × 4,5 cm · 15/hoja), Grande Compacto (4/hoja), Media Carta (2/hoja) o Carta Completa (1/hoja con marca de agua).</div>`);
+            return h + (st ? '' : `<div class="nota">Consulta en vivo el BigSoft de la tienda elegida (solo lectura), o toca <b>+ Hablador manual (sin existencia)</b> para crear carteles libres (ej. caja de huevos o bulto de refrescos) con precio al detal y al mayor en los 5 tamaños (6,5 × 2,8 cm · 6,5 × 4,5 cm · Grande 4/hoja · Media Carta · Carta Completa Horizontal).</div>`);
         }
         const cats = [...new Set(st.items.map(x => x.cat).filter(Boolean))].sort((a, b) => ALM_ORDEN.compare(a, b));
-        const filtrados = habFiltrados(st), MAX = 120, ver = filtrados.slice(0, MAX), mapaCola = new Map(hab.cola.map(x => [x.cod, x]));
+        const filtrados = habFiltrados(st), MAX = 120, ver = filtrados.slice(0, MAX), mapaCola = new Map(hab.cola.filter(x => !x.manual).map(x => [x.cod, x]));
         const todosSel = filtrados.length > 0 && filtrados.every(x => mapaCola.has(x.cod));
         const algunosSel = !todosSel && filtrados.some(x => mapaCola.has(x.cod));
         h += `<div class="rpt-vista">
@@ -24484,14 +24675,14 @@ Reglas:
             </div>`;
         if (!ver.length) return h + `<div class="empty">${st.items.length ? 'Ningún producto con estos filtros.' : 'No hay productos con existencia positiva en esta tienda.'}</div>`;
         if (algunosSel) setTimeout(() => { const el = document.getElementById('habSelTodos'); if (el) el.indeterminate = true; }, 0);
-        h += `<div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th style="width:2.2rem"><input type="checkbox" id="habSelTodos" class="hab-sel-chk" ${todosSel ? 'checked' : ''} onchange="habSeleccionarTodos(${todosSel})" title="${todosSel ? 'Quitar todos' : 'Seleccionar todos'} (${filtrados.length})" aria-label="Seleccionar todos"></th><th class="izq">Código</th><th class="izq">Descripción</th><th class="izq">Categoría</th><th>Existencia</th><th>Detal Ref. $</th><th class="izq">Imprimir</th></tr></thead><tbody>
+        h += `<div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th style="width:2.2rem"><input type="checkbox" id="habSelTodos" class="hab-sel-chk" ${todosSel ? 'checked' : ''} onchange="habSeleccionarTodos(${todosSel})" title="${todosSel ? 'Quitar todos' : 'Seleccionar todos'} (${filtrados.length})" aria-label="Seleccionar todos"></th><th class="izq">Código</th><th class="izq">Descripción</th><th class="izq">Categoría</th><th>Existencia</th><th>Detal Ref. $</th><th>Mayor Ref. $</th><th class="izq">Imprimir</th></tr></thead><tbody>
             ${ver.map(it => {
                 const c = mapaCola.get(it.cod), cq = esc(it.cod).replace(/'/g, '&#39;');
                 const btns = c
                     ? `<button type="button" class="btn-primary btn-mini" onclick="habSumar('${cq}',1)">En cola ×${c.copias} (+)</button><button type="button" class="btn-ghost btn-mini" onclick="habSumar('${cq}',-1)">−1</button><button type="button" class="btn-ghost btn-mini" onclick="habImprimirUno('${cq}')">Imprimir</button>`
-                    : `<button type="button" class="btn-ghost btn-mini" onclick="habAgregar('${cq}',false)">+ Normal</button><button type="button" class="btn-ghost btn-mini" onclick="habAgregar('${cq}',true)">+ Oferta</button><button type="button" class="btn-primary btn-mini" onclick="habImprimirUno('${cq}')">Imprimir</button>`;
+                    : `<button type="button" class="btn-ghost btn-mini" onclick="habAgregar('${cq}',false)">+ Normal</button><button type="button" class="btn-ghost btn-mini" onclick="habAgregar('${cq}',true)">+ Oferta</button>${it.mayor > 0 ? `<button type="button" class="btn-ghost btn-mini" onclick="habAgregar('${cq}',{conMayor:true})">+ c/Mayor</button>` : ''}<button type="button" class="btn-primary btn-mini" onclick="habImprimirUno('${cq}')">Imprimir</button>`;
                 return `<tr><td><input type="checkbox" class="hab-sel-chk" ${c ? 'checked' : ''} onchange="habAlternarSel('${cq}',this.checked)" aria-label="Seleccionar ${esc(it.desc)}"></td><td class="izq"><b>${esc(it.cod)}</b></td><td class="izq">${esc(it.desc)}<small>${esc(it.unit)}</small></td><td class="izq">${esc(it.cat) || '—'}</td>
-                    <td>${nfVE(0, 3).format(it.exist)}</td><td><b>${fmt(it.precio)}</b></td><td class="alm-acc">${btns}</td></tr>`;
+                    <td>${nfVE(0, 3).format(it.exist)}</td><td><b>${fmt(it.precio)}</b></td><td>${it.mayor > 0 ? `<b>${fmt(it.mayor)}</b>` : '—'}</td><td class="alm-acc">${btns}</td></tr>`;
             }).join('')}
         </tbody></table></div>${filtrados.length > MAX ? `<div class="nota">Mostrando ${MAX} de ${filtrados.length} productos con existencia. "Seleccionar todos" agrega los ${filtrados.length} completos, o usa Buscar/Categoría para filtrar.</div>` : ''}`;
         return h;
@@ -25978,10 +26169,27 @@ Reglas:
     // ---------- Memoria de la conciliación: cada período cruzado queda guardado hasta "Salir" ----------
     const pagMemoria = {};     // 'desde|hasta' -> { filas, sinFicha, firma }
     const pagEnVuelo = {};     // pedidos en curso (no se repiten)
+    // En Validar pagos, los PM validados desde el correo al subir la ficha muestran su referencia completa y no "manual"
+    async function pagEnriquecerCorreo(filas) {
+        if (!(cfModuloEncendido('caja') || cfModuloEncendido('pagos')) || !Array.isArray(filas) || !filas.length) return;
+        const pend = filas.filter(f => f.estado === 'VERIFICADO' && f.tipo === 'PM' && (!f.asociados || !f.asociados.length) && f.como !== 'correo');
+        if (!pend.length) return;
+        try {
+            const t = await cfToken();
+            const r = await cfPedir({ action: 'pagos_correo_filas', token: t, filas: pend.map(f => f.fila) });
+            if (!r || !r.ok || !r.filas) return;
+            pend.forEach(f => {
+                const info = r.filas[f.fila] || r.filas[String(f.fila)];
+                if (info) { f.como = 'correo'; f.correoInfo = info; }
+            });
+        } catch (e) {}
+    }
+
     function pagLeerConc(desde, hasta) {
         const k = desde + '|' + hasta;
         if (pagEnVuelo[k]) return pagEnVuelo[k];
-        const p = apiPagos({ action: 'conc_listar', desde, hasta }).then(r => {
+        const p = apiPagos({ action: 'conc_listar', desde, hasta }).then(async r => {
+            await pagEnriquecerCorreo(r.filas || []);
             const firma = JSON.stringify([r.filas || [], r.sinFicha || []]), antes = pagMemoria[k];
             pagMemoria[k] = { filas: r.filas || [], sinFicha: r.sinFicha || [], firma, cuando: Date.now() };
             return { datos: pagMemoria[k], cambio: !antes || antes.firma !== firma };
@@ -26139,7 +26347,7 @@ Reglas:
             <th class="izq">Banco · Titular</th><th class="izq">Ref./Lote</th><th>Monto</th><th class="izq">Estado</th><th></th></tr></thead><tbody>`;
         lista.forEach(f => {
             const [txt, cls] = ESTADOS_CONC[f.estado] || [f.estado, 'st-pend'];
-            const extra = f.estado === 'VERIFICADO' ? ` (${f.como === 'auto' ? 'automático' : 'manual'})`
+            const extra = f.estado === 'VERIFICADO' ? ` (${f.como === 'auto' ? 'automático' : f.como === 'correo' ? 'correo' : 'manual'})`
                         : f.estado === 'REF_USADA' ? ` (fila ${f.usadaPorFila})` : f.repetidoCon ? ` (filas ${f.repetidoCon.join(', ')})` : '';
             const marcada = pagSel.has(f.fila);
             const ocupada = pagOcupadas.has(f.fila);
@@ -26177,8 +26385,12 @@ Reglas:
     function pagDetalle(f) {
         const nota = esc(pagNotas[f.fila] || '');
         if (f.estado === 'VERIFICADO') {
-            return `<div class="pag-det"><b>Validado ${f.como === 'auto' ? 'automáticamente' : 'a mano'}.</b>${pagLineaComision(f)}
-                ${f.asociados.length ? '<ul>' + f.asociados.map(m => `<li>${movTexto(m)}</li>`).join('') + '</ul>' : '<div class="nota">Validado sin movimiento del banco (ver nota en BD VALIDACIONES).</div>'}
+            const c = f.como === 'correo' ? f.correoInfo : null;
+            const rec = c ? [c.fecha ? fechaBonita(c.fecha) : '', c.hora].filter(Boolean).join(' ') : '';
+            return `<div class="pag-det"><b>${c ? 'Validado automáticamente desde el correo del banco al subir la ficha.' : `Validado ${f.como === 'auto' ? 'automáticamente' : 'a mano'}.`}</b>${pagLineaComision(f)}
+                ${f.asociados.length ? '<ul>' + f.asociados.map(m => `<li>${movTexto(m)}</li>`).join('') + '</ul>'
+                    : c ? `<ul><li>${rec ? `${esc(rec)} · ` : ''}${esc(c.banco || f.banco)}${c.titular ? ' · ' + esc(c.titular) : ''} · ref <b>${esc(c.ref || f.ref)}</b> · <b>Bs ${fmt(f.monto)}</b>${c.tel ? ' · tel ' + esc(c.tel) : ''}${c.nota ? `<span class="nota-fila">${esc(c.nota)}</span>` : ''}</li></ul>`
+                    : '<div class="nota">Validado sin movimiento del banco (ver nota en BD VALIDACIONES).</div>'}
                 <div class="det-actions"><input type="text" id="pagNota-${f.fila}" value="${nota}" oninput="pagNotas[${f.fila}] = this.value" placeholder="Motivo (opcional)">
                 ${campoClaveAdmin(f.fila)}
                 <button type="button" class="btn-borrar" onclick="pagDesmarcar(${f.fila})">Quitar validación</button></div></div>`;
