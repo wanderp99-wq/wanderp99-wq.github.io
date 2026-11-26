@@ -1614,11 +1614,62 @@
             : r.estado === 'usado' ? ['mal', '✕ Ya se usó por la caja de ' + (r.tienda || 'otro local') + (r.fechaFicha ? ' (' + r.fechaFicha.split('-').reverse().join('/') + (r.turno ? ', ' + r.turno : '') + ')' : '') + (r.nroFicha ? ' · ficha ' + r.nroFicha : '')]
             : r.estado === 'repetido' ? ['mal', '✕ Está repetido en esta ficha']
             : r.estado === 'monto' ? ['duda', 'En ' + bNom + ' esa referencia es por Bs ' + fmt(r.montoBanco) + ': revise el monto']
-            : r.estado === 'no' ? ['duda', r.leido ? 'Todavía no aparece en ' + bNom + tit + ' (revise la referencia y el monto, o espere 1 min)' : 'Buscando en ' + bNom + '...']
+            : r.estado === 'no' ? ['duda', r.leido ? 'Todavía no aparece en ' + bNom + tit + ' (revise la referencia y el monto)' : 'Esperando aviso en ' + bNom + tit + ' (se valida solo al llegar)...']
             : r.estado === 'sinred' ? ['', 'No se pudo revisar ahora (sin internet)'] : ['', ''];
         el.className = 'pm-estado ' + t[0]; el.textContent = t[1];
     }
     // final: al enviar (devuelve los que no cuadran) · silencioso: refresco automático en segundo plano (sin despertar a Google)
+    let pmEsperando = false, pmEsperandoDesde = 0, pmRetryT = 0;
+    let pmWs = null, pmWsAbierto = false, pmWsReintento = 0, pmWsPingId = 0;
+    function pmWsIniciar() {
+        if (pmWs || document.hidden) return;
+        if (!pmRenglones().some(x => /^\d{4}$/.test(x.ref4) && x.monto > 0)) return;
+        try {
+            const wsUrl = CF_API.replace(/\/api$/, '').replace(/^http/, 'ws') + '/vivo?empresa=' + encodeURIComponent(CF_EMPRESA) + '&pm=1';
+            const ws = new WebSocket(wsUrl);
+            pmWs = ws;
+            ws.onopen = () => {
+                pmWsAbierto = true; pmWsReintento = 0;
+                clearInterval(pmWsPingId);
+                pmWsPingId = setInterval(() => { try { if (pmWs && pmWs.readyState === 1) pmWs.send('ping'); } catch (e) {} }, 45000);
+            };
+            ws.onmessage = ev => {
+                let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+                if (m && m.tipo === 'pm_pulso' && pmEsperando && !document.hidden) {
+                    pmRevisar(false, true);
+                }
+            };
+            ws.onclose = () => {
+                pmWsAbierto = false; if (pmWs === ws) pmWs = null;
+                clearInterval(pmWsPingId); pmWsPingId = 0;
+                if (pmEsperando && !document.hidden) {
+                    setTimeout(pmWsIniciar, Math.min(30000, 2000 * (++pmWsReintento)));
+                }
+            };
+            ws.onerror = () => { try { ws.close(); } catch (e) {} };
+        } catch (e) { pmWs = null; pmWsAbierto = false; }
+    }
+    function pmProgramarReintento() {
+        clearTimeout(pmRetryT);
+        if (!pmEsperando || document.hidden) return;
+        const trans = Date.now() - pmEsperandoDesde;
+        const espera = trans < 90000 ? (pmWsAbierto ? 12000 : 4000) : 30000;
+        pmRetryT = setTimeout(() => {
+            if (!document.hidden && pmRenglones().some(x => /^\d{4}$/.test(x.ref4) && x.monto > 0)) pmRevisar(false, true);
+        }, espera);
+    }
+    function pmActualizarEspera(resultados) {
+        const hayPend = Array.isArray(resultados) && resultados.some(v => v && (v.estado === 'no' || v.estado === 'sinred'));
+        if (hayPend) {
+            if (!pmEsperando) pmEsperandoDesde = Date.now();
+            pmEsperando = true;
+            pmWsIniciar();
+            pmProgramarReintento();
+        } else {
+            pmEsperando = false; pmEsperandoDesde = 0;
+            clearTimeout(pmRetryT);
+        }
+    }
     async function pmRevisar(final, silencioso) {
         const l = pmRenglones(), fecha = (document.getElementById('fecha') || {}).value || '';
         const tienda = (document.getElementById('tienda') || {}).value || '';
@@ -1629,6 +1680,7 @@
         l.filter(x => !listos.includes(x)).forEach(x => pmPintar(x, null));
         const idem = pmIdem();
         if (!listos.length) {
+            pmActualizarEspera([]);
             if (pmTeniaBorrador && idem) {
                 pmTeniaBorrador = false;
                 cfPublico('pub_pm_ver', { pagos: [], idem, tienda, turno, cajero }, 6000).catch(() => {});
@@ -1637,20 +1689,34 @@
         }
         pmTeniaBorrador = true;
         const yo = ++pmPidiendo, pagos = listos.map(x => ({ ref4: x.ref4, monto: x.monto, banco: x.banco, titular: x.titular, fecha }));
+        pmWsIniciar();
         let r = await cfPublico('pub_pm_ver', { pagos, idem, tienda, turno, cajero }, 6000);
         if (yo !== pmPidiendo) return [];
-        if (!r) { listos.forEach(x => pmPintar(x, { estado: 'sinred' })); return []; }
-        r.resultados.forEach((v, i) => pmPintar(listos[i], v));
-        // Bancrecer del correo central: si no aparece aún, se le pide a Google leer el correo ahora mismo
-        if (!silencioso && r.resultados.some((v, i) => v.estado === 'no' && /bancrecer/i.test(listos[i].banco))) {
-            try {
-                const resp = await fetch(URL_HOJA, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: JSON.stringify({ consultaFicha: 'pago_movil', equipo: fichaEquipo(), pagos, idem, tienda, turno, cajero }) });
-                const j = JSON.parse(await resp.text());
-                if (yo === pmPidiendo && j && Array.isArray(j.resultados)) r = j;
-            } catch (e) {}
-            if (yo !== pmPidiendo) return [];
-            r.resultados.forEach((v, i) => pmPintar(listos[i], Object.assign({ leido: true }, v)));
+        if (!r) {
+            const sr = listos.map(x => ({ estado: 'sinred' }));
+            listos.forEach((x, i) => pmPintar(x, sr[i]));
+            pmActualizarEspera(sr);
+            return [];
+        }
+        r.resultados.forEach((v, i) => pmPintar(listos[i], final ? Object.assign({ leido: true }, v) : v));
+        pmActualizarEspera(r.resultados);
+        // Bancrecer: si aún usa el correo central en Google (sin reenvío directo a Cloudflare), se consulta aparte sin bloquear el tecleo
+        const dirBcr = Array.isArray(r.directos) && r.directos.some(b => /bancrecer/i.test(b));
+        if (!dirBcr && !silencioso && r.resultados.some((v, i) => v.estado === 'no' && /bancrecer/i.test(listos[i].banco))) {
+            const consultarGoogle = async () => {
+                try {
+                    const resp = await fetch(URL_HOJA, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                        body: JSON.stringify({ consultaFicha: 'pago_movil', equipo: fichaEquipo(), pagos, idem, tienda, turno, cajero }) });
+                    const j = JSON.parse(await resp.text());
+                    if (yo === pmPidiendo && j && Array.isArray(j.resultados)) {
+                        r = j;
+                        r.resultados.forEach((v, i) => pmPintar(listos[i], Object.assign({ leido: true }, v)));
+                        pmActualizarEspera(r.resultados);
+                    }
+                } catch (e) {}
+            };
+            if (final) await consultarGoogle();
+            else consultarGoogle();
         }
         return final ? r.resultados.map((v, i) => Object.assign({}, v, { ref4: listos[i].ref4, monto: listos[i].monto, banco: v.banco || listos[i].banco })).filter(v => v.estado !== 'ok' && v.estado !== 'sin_cuenta' && v.estado !== 'sinred') : [];
     }
@@ -1659,8 +1725,10 @@
         if (el) { el.addEventListener('input', pmRevisarPronto); el.addEventListener('change', pmRevisarPronto); }
     });
     setTimeout(() => pmRevisar(false), 1500);   // lo que quedó del borrador
-    setInterval(() => { if (!document.hidden && pmRenglones().some(x => /^\d{4}$/.test(x.ref4) && x.monto > 0)) pmRevisar(false, true); }, 180000);
-    document.addEventListener('visibilitychange', () => { if (!document.hidden && pmRenglones().some(x => /^\d{4}$/.test(x.ref4) && x.monto > 0)) pmRevisar(false, true); });
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && pmRenglones().some(x => /^\d{4}$/.test(x.ref4) && x.monto > 0)) { pmWsIniciar(); pmRevisar(false, true); }
+        else if (document.hidden) clearTimeout(pmRetryT);
+    });
 
     function calcularPagoMovil() {
         let total = 0;

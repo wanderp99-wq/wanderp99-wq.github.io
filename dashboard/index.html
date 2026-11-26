@@ -4214,7 +4214,7 @@
         // (15/11) Historial de nóminas: del servidor nuevo (con la Nómina encendida allá)
         if (payload.action === 'nom_historial') { const r = await cfNomHistorial(payload); if (r) return r; }
         // (22/11 · 24/11) Campana, usuarios en línea, paquete de utilidades, avisos de tienda, listas de la ficha y cuentas de pago móvil directo al servidor nuevo
-        if (/^(pendientes|enlinea|paq_estado|paq_zip|paq_subir|aviso_tienda|pm_cuentas_estado|pm_cuenta_guardar|pm_cuenta_quitar|pm_cuenta_probar_tg|pm_tg_chats|fl_leer|fl_guardar)$/.test(payload.action) && typeof CF_URL === 'string' && CF_URL) {
+        if (/^(pendientes|enlinea|paq_estado|paq_zip|paq_subir|aviso_tienda|pm_cuentas_estado|pm_cuenta_guardar|pm_cuenta_quitar|pm_dominio_guardar|pm_confirmacion_limpiar|pm_cuenta_probar_tg|pm_tg_chats|fl_leer|fl_guardar)$/.test(payload.action) && typeof CF_URL === 'string' && CF_URL) {
             let cfErr = '';
             try {
                 const t0c = performance.now(), r = await cfPedir(Object.assign({}, payload, { token: await cfToken(), vista: typeof vistaActual === 'string' ? vistaActual : '', disp: DISPOSITIVO }));
@@ -4227,8 +4227,8 @@
                     return r;
                 }
                 if (r && r.sesion === false) cfSes.token = '';
-                else if ((payload.action === 'aviso_tienda' || /^pm_(cuenta|tg_)|^fl_(leer|guardar)$/.test(payload.action)) && r && !r.noAqui && r.error) cfErr = r.error;
-            } catch (e) { if (/Cuenta suspendida/i.test(e && e.message)) cerrarSesion(e.message); if (/^pm_(cuenta|tg_)|^fl_(leer|guardar)$/.test(payload.action)) throw e; }
+                else if ((payload.action === 'aviso_tienda' || /^pm_(cuenta|tg_|dominio|confirmacion)|^fl_(leer|guardar)$/.test(payload.action)) && r && !r.noAqui && r.error) cfErr = r.error;
+            } catch (e) { if (/Cuenta suspendida/i.test(e && e.message)) cerrarSesion(e.message); if (/^pm_(cuenta|tg_|dominio|confirmacion)|^fl_(leer|guardar)$/.test(payload.action)) throw e; }
             if (cfErr) throw new Error(cfErr);
         }
         // (12/11) Lecturas del almacén con "Usar Firebase en el Almacén" encendido: se responden aquí con lo de Firebase (sin Google)
@@ -6696,6 +6696,7 @@
                 if (m.tipo === 'pend') { if (typeof pendRevisar === 'function') pendRevisar(true); return; }   // cambió la campanita
                 if (m.tipo === 'cxp') { CXPCF.refrescar(); cxpAvisoCF(); return; }
                 if (m.tipo === 'vx') { VXCF.aviso(m.local); vxAvisoCF(); return; }   // (15/11) Venta express: otra caja vendió o cerró (o la pasaron al servidor nuevo)   // (15/11) Cuentas por pagar cambió en otro equipo
+                if (m.tipo === 'pm_pulso') { if (typeof pmPulsoVivo === 'function') pmPulsoVivo(); return; }
                 if (m.tipo !== 'versiones') return;
                 const v = Number((m.v || {}).efe || 0);
                 if (cfWsVer !== null && v !== cfWsVer) cfEfeCambio();
@@ -7284,6 +7285,65 @@
         if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(ta.value).then(done).catch(() => { try { document.execCommand('copy'); done(); } catch (e) {} });
         else { try { document.execCommand('copy'); done(); } catch (e) {} }
     }
+    function pmCopiarTexto(txt, btn) {
+        if (!txt) return;
+        const done = () => { if (btn) { const t = btn.textContent; btn.textContent = '¡Copiado!'; setTimeout(() => { btn.textContent = t; }, 2000); } };
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done).catch(() => {});
+        else { const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); done(); } catch (e) {} ta.remove(); }
+    }
+    let pmPulsoT = 0;
+    function pmPulsoVivo() {
+        const fondo = document.getElementById('fbhDlg');
+        if (!fondo || fondo.classList.contains('hidden')) return;
+        const h3 = fondo.querySelector('h3');
+        if (!h3 || !/Pago Móvil|Bancrecer/i.test(h3.textContent) || pmModal.formAbierto) return;
+        clearTimeout(pmPulsoT);
+        pmPulsoT = setTimeout(async () => {
+            try {
+                const est = await DATOS.aGoogle(() => llamarApi({ action: 'pm_cuentas_estado' }));
+                if (est && est.ok) { pmModal.estado = est; pmModalPintar(); }
+            } catch (e) {}
+        }, 200);
+    }
+    async function pmGuardarDominio(btn) {
+        const inp = document.getElementById('pmDomInput');
+        const dom = inp ? inp.value.trim() : '';
+        const texto = btn ? btn.textContent : ''; if (btn) btnCargando(btn, 'Guardando...');
+        try {
+            const r = await DATOS.aGoogle(() => llamarApi({ action: 'pm_dominio_guardar', dominio: dom }));
+            if (pmModal.estado) { pmModal.estado.dominio = r.dominio || ''; pmModal.estado.cuentas = r.cuentas || pmModal.estado.cuentas; }
+            pmModal.msg = r.dominio
+                ? `<div class="banner ok" style="display:block">Dominio guardado: <b>${esc(r.dominio)}</b>. Ya puedes activar el reenvío en tiempo real en cada Gmail.</div>`
+                : '<div class="banner ok" style="display:block">Dominio quitado.</div>';
+        } catch (x) {
+            pmModal.msg = `<div class="banner error" style="display:block">${esc(x.message)}</div>`;
+        } finally { if (btn) { btn.disabled = false; btn.textContent = texto; } }
+        pmModalPintar();
+    }
+    async function pmLimpiarConf(id, btn) {
+        if (btn) btn.disabled = true;
+        try {
+            const r = await DATOS.aGoogle(() => llamarApi({ action: 'pm_confirmacion_limpiar', id }));
+            if (pmModal.estado && r.cuentas) pmModal.estado.cuentas = r.cuentas;
+        } catch (x) { pmModal.msg = `<div class="banner error" style="display:block">${esc(x.message)}</div>`; }
+        pmModalPintar();
+    }
+    async function pmRegenerarCorreo(id, btn) {
+        const c = ((pmModal.estado && pmModal.estado.cuentas) || []).find(x => x.id === id);
+        if (!c || !confirm(`¿Cambiar la dirección de reenvío de "${c.nombre}"?\n\nTendrás que actualizar el filtro en Gmail con la dirección nueva.`)) return;
+        const texto = btn ? btn.textContent : ''; if (btn) btnCargando(btn, 'Cambiando...');
+        try {
+            const r = await DATOS.aGoogle(() => llamarApi({
+                action: 'pm_cuenta_guardar', id: c.id, nombre: c.nombre, banco: c.banco, titular: c.titular,
+                correo: c.correo, remitentes: (c.remitentes || []).join(','), tgModo: c.tgModo || 'ninguno',
+                tgChat: c.tgChat || '', regenerarAlias: true
+            }));
+            if (pmModal.estado) pmModal.estado.cuentas = r.cuentas || [];
+            pmModal.msg = `<div class="banner ok" style="display:block">Nueva dirección generada: <b>${esc((r.cuenta && r.cuenta.correoReceptor) || '')}</b></div>`;
+        } catch (x) { pmModal.msg = `<div class="banner error" style="display:block">${esc(x.message)}</div>`; }
+        finally { if (btn) { btn.disabled = false; btn.textContent = texto; } }
+        pmModalPintar();
+    }
     function pmGenerarScript(c, llave) {
         const srv = (typeof CF_URL === 'string' && CF_URL ? CF_URL : 'https://plaza-software.jdsistemas.workers.dev') + '/api';
         const emp = (typeof CF_EMPRESA === 'string' && CF_EMPRESA) || 'plaza-valencia';
@@ -7569,27 +7629,69 @@ function revisarPagos(forzar) {
             const c = ctas.find(x => x.id === pmModal.scriptId);
             if (c) {
                 const ll = pmModal.llaves[c.id];
+                const dir = c.correoReceptor || '';
+                const domActual = est.dominio || '';
+                const conf = c.confirmacionGoogle;
+                const filtroDe = c.banco === 'R4' ? 'from:(r4conecta.io OR r4banco.com.ve)'
+                    : c.banco === 'Bancrecer' ? 'from:bancrecer.com.ve'
+                    : 'from:(r4conecta.io OR r4banco.com.ve OR bancrecer.com.ve)';
                 scriptHtml = `<div class="card" style="margin:.6rem 0">
                     <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap">
-                        <h4 style="margin:0">Script para ${esc(c.nombre)} (${esc(c.banco)} · ${esc(c.titular)})</h4>
-                        <button type="button" class="btn-ghost btn-mini" onclick="pmModal.scriptId='';pmModalPintar()">Cerrar código</button>
+                        <h4 style="margin:0">Conectar ${esc(c.nombre)} (${esc(c.banco)} · ${esc(c.titular)})</h4>
+                        <button type="button" class="btn-ghost btn-mini" onclick="pmModal.scriptId='';pmModalPintar()">Cerrar</button>
                     </div>
-                    ${ll ? `<div class="nota" style="margin:.4rem 0"><b>Sin IFTTT · correo propio:</b> entra con la cuenta <b>${esc(c.correo || c.titular)}</b> a <a href="https://script.google.com" target="_blank" rel="noopener">script.google.com</a> → <b>Nuevo proyecto</b> → borra todo y pega este código → <b>Guardar</b> → elige <b>activar</b> arriba y pulsa <b>Ejecutar</b> (acepta el permiso de Gmail una sola vez). Listo: revisa cada 1 minuto.</div>
-                        <textarea id="pmScriptArea" readonly rows="8" style="width:100%;font-family:monospace;font-size:.78rem">${esc(pmGenerarScript(c, ll))}</textarea>
+                    <div class="card" style="margin:.55rem 0;border-color:var(--primary)">
+                        <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.35rem">
+                            <b>⚡ Reenvío directo en tiempo real (2–5 segundos)</b>
+                            ${dir ? `<button type="button" class="btn-ghost btn-mini" onclick="pmRegenerarCorreo('${esc(c.id)}', this)">Nueva dirección</button>` : ''}
+                        </div>
+                        ${dir ? `<div style="display:flex;gap:.45rem;align-items:center;flex-wrap:wrap;margin:.35rem 0">
+                                <code style="padding:.35rem .55rem;background:var(--input-bg);border:1px solid var(--border);border-radius:6px;font-size:.86rem">${esc(dir)}</code>
+                                <button type="button" class="btn-primary btn-mini" onclick="pmCopiarTexto('${esc(dir)}', this)">Copiar correo</button>
+                            </div>
+                            ${conf ? `<div class="banner ok" style="display:block;margin:.45rem 0">
+                                <b>Confirmación de Gmail recibida:</b>${conf.codigo ? ` Código <code>${esc(conf.codigo)}</code>` : ''}
+                                ${conf.enlace ? ` · <a href="${esc(conf.enlace)}" target="_blank" rel="noopener">Abrir enlace para confirmar</a>` : ''}
+                                <button type="button" class="btn-ghost btn-mini" style="margin-left:.5rem" onclick="pmLimpiarConf('${esc(c.id)}', this)">Ya confirmé</button>
+                            </div>` : ''}
+                            <ol class="nota" style="margin:.35rem 0 .1rem;padding-left:1.25rem;line-height:1.45">
+                                <li>En el Gmail de <b>${esc(c.correo || c.titular)}</b> entra a <b>Configuración › Ver todos los ajustes › Reenvío y correo POP/IMAP › Añadir una dirección de reenvío</b> y pega <code>${esc(dir)}</code>.</li>
+                                <li>En 2 segundos te aparecerá aquí arriba (y en tu Telegram) el código/enlace de confirmación de Gmail para aprobarlo.</li>
+                                <li>Luego entra a <b>Filtros y direcciones bloqueadas › Crear un filtro</b>: en <b>De</b> pon <code>${esc(filtroDe)}</code> <button type="button" class="btn-ghost btn-mini" onclick="pmCopiarTexto('${esc(filtroDe)}', this)">Copiar</button> y elige <b>Reenviarlo a</b> <code>${esc(dir)}</code> (puedes dejar "Solo reenviar estos" sin mover correos).</li>
+                            </ol>`
+                        : `<div class="nota" style="margin:0">Primero guarda arriba tu <b>Dominio en Cloudflare</b>${domActual ? '' : ' (por ejemplo <code>pagos.tudominio.com</code>)'} para generar la dirección única de esta cuenta.</div>`}
+                    </div>
+                    <details style="margin:.4rem 0 0"><summary style="cursor:pointer;font-weight:600;font-size:.88rem">Respaldo opcional: Script en Google Apps Script (cada 1 minuto)</summary>
+                    ${ll ? `<div class="nota" style="margin:.4rem 0"><b>Respaldo cada 1 min:</b> entra con <b>${esc(c.correo || c.titular)}</b> a <a href="https://script.google.com" target="_blank" rel="noopener">script.google.com</a> → <b>Nuevo proyecto</b> → pega este código → <b>Guardar</b> → elige <b>activar</b> y pulsa <b>Ejecutar</b>.</div>
+                        <textarea id="pmScriptArea" readonly rows="7" style="width:100%;font-family:monospace;font-size:.78rem">${esc(pmGenerarScript(c, ll))}</textarea>
                         <div class="req-acciones" style="justify-content:flex-end;margin:.4rem 0 0"><button type="button" class="btn-primary btn-mini" onclick="pmCopiarScript(this)">Copiar código</button></div>`
-                    : `<div class="nota" style="margin:.4rem 0">Por seguridad, la llave de esta cuenta no se muestra de nuevo una vez cerrada la ventana. Si su script ya está corriendo en Google déjelo así; si vas a instalarlo otra vez, genera un código nuevo (reemplaza la llave anterior).</div>
-                        <div class="req-acciones" style="justify-content:flex-end;margin:.3rem 0 0"><button type="button" class="btn-primary btn-mini" onclick="pmVerScript('${esc(c.id)}', true, this)">Generar código nuevo</button></div>`}
+                    : `<div class="nota" style="margin:.4rem 0">Por seguridad, la llave del script no se muestra de nuevo después de cerrar. Si vas a reinstalarlo como respaldo, genera un código nuevo (no afecta al reenvío directo).</div>
+                        <div class="req-acciones" style="justify-content:flex-end;margin:.3rem 0 0"><button type="button" class="btn-ghost btn-mini" onclick="pmVerScript('${esc(c.id)}', true, this)">Generar código de respaldo</button></div>`}
+                    </details>
                 </div>`;
             }
         }
 
         const pagos = (est.pagos || []).filter(p => !pmModal.filtro || [p.banco, p.titular, p.ref, p.tel].some(v => String(v || '').toLowerCase().includes(pmModal.filtro.toLowerCase())));
-        const html = `<div class="req-dlg" style="width:min(1120px, 96vw);max-width:none"><h3>Cuentas de Pago Móvil por correo (sin IFTTT)</h3>
+        const domVal = est.dominio || '';
+        const html = `<div class="req-dlg" style="width:min(1120px, 96vw);max-width:none"><h3>Cuentas de Pago Móvil por correo</h3>
             ${error ? `<div class="banner error" style="display:block">${esc(error)}</div>` : `
             ${pmModal.msg || ''}
-            <div class="req-sub">Cada persona conecta su propio Gmail con Google Apps Script (sin reenviar correos ni pagar IFTTT). Todos los pagos llegan a Plaza Software para validar al instante en la ficha y el panel.</div>
+            <div class="req-sub">Con <b>Reenvío directo en Cloudflare</b> cada pago móvil llega en <b>2–5 segundos</b> y se valida en vivo en la ficha sin tocar el teclado. (Google Apps Script queda como respaldo opcional).</div>
+            <div class="card" style="margin:.55rem 0;padding:.65rem .8rem">
+                <div style="display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;justify-content:space-between">
+                    <div style="flex:1 1 260px">
+                        <div style="font-weight:700;font-size:.9rem">⚡ Dominio receptor en Cloudflare (tiempo real) ${domVal ? `<span class="chip st-ok" style="margin-left:.3rem">${esc(domVal)}</span>` : '<span class="chip st-pend" style="margin-left:.3rem">Sin configurar</span>'}</div>
+                        <small style="color:var(--text-muted)">En tu panel de Cloudflare: <b>Email › Email Routing › Catch-all</b> (o regla) → <b>Send to a Worker</b>: <code>plaza-software</code>.</small>
+                    </div>
+                    <div style="display:flex;gap:.35rem;align-items:center;flex:0 1 auto">
+                        <input id="pmDomInput" value="${esc(domVal)}" placeholder="ej. pagos.tuempresa.com" style="min-width:210px">
+                        <button type="button" class="btn-primary btn-mini" onclick="pmGuardarDominio(this)">Guardar dominio</button>
+                    </div>
+                </div>
+            </div>
             <div class="req-acciones" style="justify-content:space-between;align-items:center;margin:.45rem 0">
-                <b>Cuentas independientes (${ctas.length})</b>
+                <b>Cuentas (${ctas.length})</b>
                 <div style="display:flex;gap:.35rem">
                     <button type="button" class="btn-ghost btn-mini" onclick="pmAbrir(this)">Actualizar</button>
                     <button type="button" class="btn-primary btn-mini" onclick="pmEditar('')">+ Agregar cuenta</button>
@@ -7598,23 +7700,28 @@ function revisarPagos(forzar) {
             <div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Cuenta</th><th class="izq">Banco · Titular</th><th class="izq">Correo y estado</th><th class="izq">Telegram</th><th></th></tr></thead><tbody>
                 ${ctas.map(c => {
                     const u = c.ultimo;
-                    const estCta = !u ? '<span class="chip st-pend">Pendiente de instalar script</span>'
+                    const esDirecto = u && u.via === 'correo_cf';
+                    const estCta = !u ? `<span class="chip st-pend">${c.correoReceptor ? 'Listo · esperando primer correo' : 'Pendiente de configurar'}</span>`
                         : u.error ? `<span class="chip st-falta">${esc(u.error)}</span>`
-                        : `<span class="chip st-ok">Activo · ${esc(pmFmtFecha(u.cuando))}</span><small> ${fmtNum(u.leidos || 0)} leídos</small>`;
+                        : `<span class="chip st-ok">${esDirecto ? '⚡ Tiempo real' : '⏱ Script'} · ${esc(pmFmtFecha(u.cuando))}</span><small> ${fmtNum(u.leidos || 0)} leídos</small>`;
                     const tgTxt = c.tgModo === 'ninguno' || !c.tgChat ? '<small>Sin avisos</small>'
                         : `<span class="chip st-info">${esc(txtModo[c.tgModo] || c.tgModo)}</span><small> ${esc(c.tgTitulo || c.tgChat)}</small>`;
+                    const conf = c.confirmacionGoogle;
                     return `<tr>
                         <td class="izq"><b>${esc(c.nombre)}</b></td>
                         <td class="izq">${esc(c.banco)} · ${esc(c.titular)}</td>
-                        <td class="izq">${esc((u && u.email) || c.correo || '—')}<br>${estCta}</td>
+                        <td class="izq">${esc((u && u.email) || c.correo || '—')}
+                            ${c.correoReceptor ? `<br><small>Reenvío: <code>${esc(c.correoReceptor)}</code> <button type="button" class="btn-ghost btn-mini" onclick="pmCopiarTexto('${esc(c.correoReceptor)}', this)">Copiar</button></small>` : ''}
+                            ${conf ? `<br><small style="color:var(--ok);font-weight:700">🔑 Código Gmail: <code>${esc(conf.codigo || 'ver enlace')}</code>${conf.enlace ? ` · <a href="${esc(conf.enlace)}" target="_blank" rel="noopener">Confirmar</a>` : ''}</small>` : ''}
+                            <br>${estCta}</td>
                         <td class="izq">${tgTxt}</td>
                         <td style="white-space:nowrap">
-                            <button type="button" class="btn-ghost btn-mini" onclick="pmVerScript('${esc(c.id)}', false, this)">Script</button>
+                            <button type="button" class="btn-ghost btn-mini" onclick="pmVerScript('${esc(c.id)}', false, this)">Conectar</button>
                             <button type="button" class="btn-ghost btn-mini" onclick="pmEditar('${esc(c.id)}')">Editar</button>
                             ${c.tgChat ? `<button type="button" class="btn-ghost btn-mini" onclick="pmProbarChat('${esc(c.id)}', this)">Probar TG</button>` : ''}
                             <button type="button" class="btn-ghost btn-mini" onclick="pmQuitarCuenta('${esc(c.id)}', this)" title="Quitar">✕</button>
                         </td></tr>`;
-                }).join('') || '<tr><td colspan="5" class="izq">Todavía no hay cuentas independientes configuradas (pulsa "+ Agregar cuenta" para R4 Wander, Raimary, Junior, Lisbeth...).</td></tr>'}
+                }).join('') || '<tr><td colspan="5" class="izq">Todavía no hay cuentas configuradas (pulsa "+ Agregar cuenta" para R4, Bancrecer, etc.).</td></tr>'}
             </tbody></table></div>
             ${formHtml}${scriptHtml}
             ${bcr ? `<details style="margin:.6rem 0"${bcr.lectura || bcr.error ? ' open' : ''}><summary style="cursor:pointer;font-weight:600">Cuenta central de Google Apps Script (${esc(bcr.cuenta || 'Bancrecer / R4')} · respaldo cada 5 min)</summary>
