@@ -7169,7 +7169,7 @@
         pmModalPintar(error);
     }
     function pmFmtFecha(f) { return String(f || '').slice(8, 10) + '/' + String(f || '').slice(5, 7) + ' ' + String(f || '').slice(11, 16); }
-    function pmEditar(id) {
+    function pmEditar(id, foco) {
         const est = pmModal.estado || {}, ctas = est.cuentas || [];
         const c = id ? ctas.find(x => x.id === id) : null;
         pmModal.edit = c ? {
@@ -7177,13 +7177,50 @@
             remitentes: (c.remitentes || []).join(', '), tgModo: c.tgModo || 'ninguno', tgChat: c.tgChat || '',
             regenerarLlave: false, agregarListaFicha: false
         } : {
-            id: '', nombre: '', banco: 'R4', titular: '', correo: '', remitentes: '', tgModo: 'ninguno', tgChat: '',
+            id: '', nombre: '', banco: 'R4', titular: '', correo: '', remitentes: '', tgModo: 'todo', tgChat: '',
             regenerarLlave: true, agregarListaFicha: true
         };
         pmModal.formAbierto = true;
         pmModal.scriptId = '';
         pmModal.msg = '';
         pmModalPintar();
+        if (foco === 'tg') {
+            setTimeout(() => { const el = document.getElementById('pmFTgChat'); if (el) { el.focus(); el.select && el.select(); } }, 30);
+        }
+    }
+    function pmTgListaOpciones() {
+        const est = pmModal.estado || {};
+        const mapa = new Map();
+        ((est.telegram && est.telegram.chatsGuardados) || []).forEach(x => { if (x && x.id) mapa.set(String(x.id), Object.assign({}, x)); });
+        ((pmModal.tgChats && pmModal.tgChats.chats) || []).forEach(x => { if (x && x.id) mapa.set(String(x.id), Object.assign({}, mapa.get(String(x.id)) || {}, x)); });
+        return Array.from(mapa.values());
+    }
+    function pmRefrescarChipsTg() {
+        const inp = document.getElementById('pmFTgChat');
+        const sel = new Set(String((inp && inp.value) || '').split(/[,;\n]+/).map(s => s.trim()).filter(Boolean));
+        document.querySelectorAll('[data-pm-tg-id]').forEach(b => {
+            const on = sel.has(b.dataset.pmTgId);
+            b.className = (on ? 'btn-primary' : 'btn-ghost') + ' btn-mini';
+        });
+    }
+    function pmAlternarTgChat(id) {
+        const inp = document.getElementById('pmFTgChat');
+        const modo = document.getElementById('pmFTgModo');
+        if (!inp) return;
+        const arr = String(inp.value || '').split(/[,;\n]+/).map(s => s.trim()).filter(Boolean);
+        const i = arr.indexOf(id);
+        if (i >= 0) arr.splice(i, 1);
+        else arr.push(id);
+        inp.value = arr.join(', ');
+        if (modo && arr.length && modo.value === 'ninguno') modo.value = 'todo';
+        if (pmModal.edit) { pmModal.edit.tgChat = inp.value; if (modo) pmModal.edit.tgModo = modo.value; }
+        pmRefrescarChipsTg();
+    }
+    function pmSyncTgModoInput(val) {
+        const modo = document.getElementById('pmFTgModo');
+        if (modo && String(val || '').trim() && modo.value === 'ninguno') modo.value = 'todo';
+        if (pmModal.edit) { pmModal.edit.tgChat = String(val || ''); if (modo) pmModal.edit.tgModo = modo.value; }
+        pmRefrescarChipsTg();
     }
     async function pmGuardarCuenta(ev, btn) {
         if (ev) ev.preventDefault();
@@ -7256,7 +7293,19 @@
         }
         pmModalPintar();
     }
+    function pmSyncFormEdit() {
+        if (!pmModal.formAbierto || !pmModal.edit) return;
+        const g = id => (document.getElementById(id) || {}).value;
+        if (g('pmFNueNombre') !== undefined) pmModal.edit.nombre = g('pmFNueNombre');
+        if (g('pmFBanco') !== undefined) pmModal.edit.banco = g('pmFBanco');
+        if (g('pmFTitular') !== undefined) pmModal.edit.titular = g('pmFTitular');
+        if (g('pmFCorreo') !== undefined) pmModal.edit.correo = g('pmFCorreo');
+        if (g('pmFRem') !== undefined) pmModal.edit.remitentes = g('pmFRem');
+        if (g('pmFTgModo') !== undefined) pmModal.edit.tgModo = g('pmFTgModo');
+        if (g('pmFTgChat') !== undefined) pmModal.edit.tgChat = g('pmFTgChat');
+    }
     async function pmBuscarChats(btn) {
+        pmSyncFormEdit();
         const texto = btn ? btn.textContent : ''; if (btn) btnCargando(btn, 'Buscando...');
         try {
             const r = await DATOS.aGoogle(() => llamarApi({ action: 'pm_tg_chats' }));
@@ -7267,6 +7316,7 @@
         pmModalPintar();
     }
     async function pmProbarChat(id, btn) {
+        pmSyncFormEdit();
         const texto = btn ? btn.textContent : ''; if (btn) btnCargando(btn, 'Enviando...');
         try {
             const payload = id ? { action: 'pm_cuenta_probar_tg', id } : { action: 'pm_cuenta_probar_tg', tgChat: (document.getElementById('pmFTgChat') || {}).value || '' };
@@ -7628,37 +7678,44 @@ function revisarPagos(forzar) {
         if (pmModal.formAbierto && pmModal.edit) {
             const ed = pmModal.edit;
             const yaEnLista = ed.titular && (est.titularesFicha || []).some(t => t.toLowerCase() === ed.titular.trim().toLowerCase());
-            const chats = (pmModal.tgChats && pmModal.tgChats.chats) || [];
+            const opcionesTg = pmTgListaOpciones();
+            const selTgSet = new Set(String(ed.tgChat || '').split(/[,;\n]+/).map(s => s.trim()).filter(Boolean));
             formHtml = `<form class="card" style="margin:.6rem 0" onsubmit="pmGuardarCuenta(event, document.getElementById('pmBtnGuardarCta'))">
                 <h4 style="margin:0 0 .4rem">${ed.id ? 'Editar cuenta' : 'Nueva cuenta independiente (sin IFTTT)'}</h4>
                 <div class="filters">
-                    <div><label for="pmFNueNombre">Nombre de cuenta</label><input id="pmFNueNombre" value="${esc(ed.nombre)}" placeholder="Ej. R4 Wander Paredes" required></div>
+                    <div><label for="pmFNueNombre">Nombre de cuenta</label><input id="pmFNueNombre" value="${esc(ed.nombre)}" placeholder="Ej. R4 Junior Lanz" required></div>
                     <div><label for="pmFBanco">Banco que llega al correo</label><select id="pmFBanco">
                         <option value="R4"${ed.banco === 'R4' ? ' selected' : ''}>R4 (R4 Conecta)</option>
                         <option value="Bancrecer"${ed.banco === 'Bancrecer' ? ' selected' : ''}>Bancrecer</option>
                         <option value="Todos"${ed.banco === 'Todos' ? ' selected' : ''}>Ambos (R4 y Bancrecer)</option>
                     </select></div>
-                    <div><label for="pmFTitular">Titular en la ficha</label><input id="pmFTitular" list="pmTitSug" value="${esc(ed.titular)}" placeholder="Ej. Wander Daniel Paredes" required>
+                    <div><label for="pmFTitular">Titular / receptor en la ficha</label><input id="pmFTitular" list="pmTitSug" value="${esc(ed.titular)}" placeholder="Ej. Junior Lanz" required>
                         <datalist id="pmTitSug">${titsSug.map(t => `<option value="${esc(t)}">`).join('')}</datalist></div>
-                    <div><label for="pmFCorreo">Correo Gmail de esta cuenta</label><input id="pmFCorreo" type="email" value="${esc(ed.correo)}" placeholder="wander.p.99@gmail.com"></div>
+                    <div><label for="pmFCorreo">Correo Gmail de esta cuenta</label><input id="pmFCorreo" type="email" value="${esc(ed.correo)}" placeholder="correo@gmail.com"></div>
                     <div style="grid-column:1/-1"><label for="pmFRem">Correos extra autorizados para reenvíos (opcional)</label><input id="pmFRem" value="${esc(ed.remitentes)}" placeholder="Ej. correo@outlook.com"></div>
-                    <div><label for="pmFTgModo">Telegram para esta cuenta</label><select id="pmFTgModo">
+                    <div><label for="pmFTgModo">Telegram para este receptor</label><select id="pmFTgModo">
                         <option value="ninguno"${ed.tgModo === 'ninguno' ? ' selected' : ''}>Sin avisos (solo guardar y validar)</option>
                         <option value="alertas"${ed.tgModo === 'alertas' ? ' selected' : ''}>Solo alertas cuando una ficha no cuadre</option>
                         <option value="todo"${ed.tgModo === 'todo' ? ' selected' : ''}>Cada pago recibido + alertas</option>
                     </select></div>
-                    <div><label for="pmFTgChat">Chat o grupo de Telegram (opcional)</label>
-                        <div style="display:flex;gap:.35rem"><input id="pmFTgChat" value="${esc(ed.tgChat)}" placeholder="ID o #-100...">
-                            <button type="button" class="btn-ghost btn-mini" onclick="pmBuscarChats(this)">Detectar</button>
-                            <button type="button" class="btn-ghost btn-mini" onclick="pmProbarChat('', this)">Probar</button></div>
+                    <div><label for="pmFTgChat">ID(s) de chat o grupo de Telegram (uno o varios separados por coma)</label>
+                        <div style="display:flex;gap:.35rem;flex-wrap:wrap"><input id="pmFTgChat" value="${esc(ed.tgChat)}" oninput="pmSyncTgModoInput(this.value)" placeholder="ID (ej. 123456789) o -100... (varios con coma)" style="flex:1 1 200px">
+                            <button type="button" class="btn-ghost btn-mini" onclick="pmBuscarChats(this)">Detectar nuevos</button>
+                            <button type="button" class="btn-ghost btn-mini" onclick="pmProbarChat('', this)">Probar</button>
+                            <button type="button" class="btn-ghost btn-mini" onclick="document.getElementById('pmFTgChat').value='';pmSyncTgModoInput('')">Limpiar</button></div>
                     </div>
                 </div>
-                ${pmModal.tgChats ? `<div class="nota" style="margin-top:.35rem">${pmModal.tgChats.webhook ? 'El bot tiene un webhook activo; copie el ID del chat manualmente.' : chats.length ? 'Toque un chat o grupo reciente (' + esc(pmModal.tgChats.bot || tgBot) + '): ' + chats.map(c => `<button type="button" class="btn-ghost btn-mini" style="margin:.15rem .2rem" onclick="document.getElementById('pmFTgChat').value='${esc(c.id)}'">${esc(c.titulo)} (${esc(c.tipo === 'private' ? 'privado' : 'grupo')})</button>`).join('') : 'No hay chats recientes. Escríbale <b>/start</b> a ' + esc(pmModal.tgChats.bot || tgBot || 'tu bot') + ' (o agrégalo al grupo) y vuelve a pulsar Detectar.'}</div>` : ''}
+                <div class="nota" style="margin-top:.45rem">
+                    ${opcionesTg.length ? `<b>Elige uno o varios chats para este receptor (${esc((pmModal.tgChats && pmModal.tgChats.bot) || tgBot || 'bot')}):</b><br>
+                        <div style="display:flex;flex-wrap:wrap;gap:.25rem;margin:.3rem 0">${opcionesTg.map(c => `<button type="button" data-pm-tg-id="${esc(c.id)}" class="${selTgSet.has(String(c.id)) ? 'btn-primary' : 'btn-ghost'} btn-mini" onclick="pmAlternarTgChat('${esc(c.id)}')">${esc(c.titulo)} · ID <code>${esc(c.id)}</code> (${esc(/privad|private/i.test(c.tipo) ? 'privado' : 'grupo')})</button>`).join('')}</div>` : ''}
+                    ${pmModal.tgChats && pmModal.tgChats.webhook ? '<span>El bot tiene webhook activo; escribe el ID manualmente o usa un grupo guardado.</span>'
+                        : `<small>¿No aparece el chat privado de alguien (ej. Junior) o un grupo nuevo? Dile que le escriba <b>/start</b> a ${esc((pmModal.tgChats && pmModal.tgChats.bot) || tgBot || 'tu bot')} (o agrégalo al grupo) y toca <b>Detectar nuevos</b>. También puedes pegar su ID numérico directo.</small>`}
+                </div>
                 ${!yaEnLista ? `<label class="interruptor" style="margin:.45rem 0"><input type="checkbox" id="pmFAgrLista"${ed.agregarListaFicha ? ' checked' : ''}><span class="sw-pista"></span> Agregar también este titular a "Listas de la ficha"</label>` : ''}
                 ${ed.id ? `<label class="interruptor" style="margin:.35rem 0"><input type="checkbox" id="pmFRegen"${ed.regenerarLlave ? ' checked' : ''}><span class="sw-pista"></span> Generar llave nueva (invalida el script anterior)</label>` : ''}
                 <div class="req-acciones" style="justify-content:flex-end;margin:.5rem 0 0">
                     <button type="button" class="btn-ghost btn-mini" onclick="pmModal.formAbierto=false;pmModalPintar()">Cancelar</button>
-                    <button type="submit" class="btn-primary btn-mini" id="pmBtnGuardarCta">Guardar cuenta y ver código</button>
+                    <button type="submit" class="btn-primary btn-mini" id="pmBtnGuardarCta">${ed.id ? 'Guardar cambios' : 'Guardar cuenta'}</button>
                 </div>
             </form>`;
         }
@@ -7675,9 +7732,9 @@ function revisarPagos(forzar) {
                 const dir = c.correoReceptor || cmCorreo || '';
                 const confPropia = !!c.confirmacionGoogle;
                 const conf = c.confirmacionGoogle || (confGlobal && (!confGlobal.origen || !c.correo || confGlobal.origen.toLowerCase() === c.correo.toLowerCase()) ? confGlobal : null);
-                const filtroDe = c.banco === 'R4' ? 'from:(r4conecta.io OR r4banco.com.ve)'
-                    : c.banco === 'Bancrecer' ? 'from:bancrecer.com.ve'
-                    : 'from:(r4conecta.io OR r4banco.com.ve OR bancrecer.com.ve)';
+                const filtroDe = c.banco === 'R4' ? 'r4conecta.io OR r4banco.com.ve'
+                    : c.banco === 'Bancrecer' ? 'bancrecer.com.ve'
+                    : 'r4conecta.io OR r4banco.com.ve OR bancrecer.com.ve';
                 scriptHtml = `<div class="card" style="margin:.6rem 0">
                     <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap">
                         <h4 style="margin:0">Conectar ${esc(c.nombre)} (${esc(c.banco)} · ${esc(c.titular)})</h4>
@@ -7748,8 +7805,8 @@ function revisarPagos(forzar) {
                     </div>
                     <div style="display:flex;flex-wrap:wrap;gap:.4rem;align-items:flex-end">
                         <div style="flex:1 1 260px">
-                            <label for="pmCmInput" style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.2rem">2. Correo receptor que te dio CloudMailin (<code>@cloudmta.net</code>):</label>
-                            <input id="pmCmInput" type="email" value="${esc(cmCorreo)}" placeholder="ej. a1b2c3d4@cloudmta.net" style="width:100%">
+                            <label for="pmCmInput" style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.2rem">2. Correo receptor que te dio CloudMailin (<code>@cloudmailin.net</code> o <code>@cloudmta.net</code>):</label>
+                            <input id="pmCmInput" type="email" value="${esc(cmCorreo)}" placeholder="ej. a1b2c3d4@cloudmailin.net" style="width:100%">
                         </div>
                         <button type="button" class="btn-primary btn-mini" onclick="pmGuardarCloudMailin(this)">Guardar correo</button>
                     </div>
@@ -7759,7 +7816,7 @@ function revisarPagos(forzar) {
                         <li>Entra a <a href="https://www.cloudmailin.com/users/sign_up" target="_blank" rel="noopener"><b>cloudmailin.com</b></a> y crea tu cuenta gratis (Free Plan, 10.000 correos/mes, sin tarjeta).</li>
                         <li>Toca <b>Create Address</b> y elige formato <b>JSON (Normalized)</b> (el que viene por defecto).</li>
                         <li>En <b>Target URL</b> pega el enlace del punto 1 de arriba (botón <b>Copiar enlace</b>) y guarda.</li>
-                        <li>Copia la dirección <code>@cloudmta.net</code> que te da CloudMailin, pégala en el punto 2 de arriba y pulsa <b>Guardar correo</b>. <i>(Un solo correo de CloudMailin sirve para todas tus cuentas de Gmail).</i></li>
+                        <li>Copia la dirección <code>@cloudmailin.net</code> que te da CloudMailin, pégala en el punto 2 de arriba y pulsa <b>Guardar correo</b>. <i>(Un solo correo de CloudMailin sirve para todas tus cuentas de Gmail).</i></li>
                     </ol>
                 </details>
             </div>
@@ -7792,8 +7849,9 @@ function revisarPagos(forzar) {
                     const estCta = !u ? `<span class="chip st-pend">${destino ? 'Listo · esperando primer correo' : 'Pendiente de configurar'}</span>`
                         : u.error ? `<span class="chip st-falta">${esc(u.error)}</span>`
                         : `<span class="chip st-ok">${esDirecto ? '⚡ Tiempo real' : '⏱ Script'} · ${esc(pmFmtFecha(u.cuando))}</span><small> ${fmtNum(u.leidos || 0)} leídos</small>`;
-                    const tgTxt = c.tgModo === 'ninguno' || !c.tgChat ? '<small>Sin avisos</small>'
-                        : `<span class="chip st-info">${esc(txtModo[c.tgModo] || c.tgModo)}</span><small> ${esc(c.tgTitulo || c.tgChat)}</small>`;
+                    const tgTxt = c.tgModo === 'ninguno' || !c.tgChat
+                        ? `<small>Sin avisos</small> <button type="button" class="btn-ghost btn-mini" onclick="pmEditar('${esc(c.id)}', 'tg')">Elegir ID</button>`
+                        : `<span class="chip st-info">${esc(txtModo[c.tgModo] || c.tgModo)}</span> <button type="button" class="btn-ghost btn-mini" onclick="pmEditar('${esc(c.id)}', 'tg')">Cambiar ID</button><br><small>${esc(c.tgTitulo || c.tgChat)}${c.tgTitulo && c.tgTitulo !== c.tgChat ? ` · <code>${esc(c.tgChat)}</code>` : ''}</small>`;
                     const conf = c.confirmacionGoogle;
                     return `<tr>
                         <td class="izq"><b>${esc(c.nombre)}</b></td>
