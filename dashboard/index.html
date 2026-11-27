@@ -1699,6 +1699,9 @@
         .menu-volver:hover { text-decoration: underline; }
         .m-estado.listo-n { color: var(--text-muted); font-size: .8rem; }
         .menu-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; }
+        .menu-grupos { display: flex; flex-direction: column; gap: 1.35rem; }
+        @media (min-width: 641px) { .menu-grupos .menu-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); } }
+        .menu-grupo { margin: 0 0 .65rem; font-size: .82rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); padding-bottom: .35rem; border-bottom: 1px solid var(--border); }
         .menu-btn { background: var(--list-bg); border: 1px solid var(--border); border-radius: 12px; padding: 1.75rem 1.25rem; color: var(--text-main); display: flex; flex-direction: column; align-items: center; gap: 0.75rem; text-align: center; transition: border-color 0.15s, transform 0.15s; }
         .menu-btn:hover { border-color: var(--primary); transform: translateY(-2px); }
         .menu-btn .m-title { font-size: 1.1rem; font-weight: 600; }
@@ -1798,6 +1801,8 @@
         .mt-flecha svg { width: 16px; height: 16px; }
         .mt-area[aria-expanded="true"] .mt-flecha { transform: rotate(180deg); }
         .mt-sub { display: flex; flex-direction: column; padding-left: 22px; margin-bottom: 4px; }
+        .mt-grupo { font-size: .72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; padding: 10px 10px 3px; border-left: 1px solid var(--border); opacity: .85; user-select: none; }
+        .mt-grupo:first-child { padding-top: 4px; }
         .mt-sub .mt-item { font-weight: 400; font-size: .88rem; min-height: 38px; color: var(--text-muted); border-left: 1px solid var(--border); border-radius: 0 10px 10px 0; }
         .mt-sub .mt-item.activo { color: #ffffff; }
         .mt-pie { border-top: 1px solid var(--border); padding: 8px 10px; display: flex; flex-direction: column; flex: none; }
@@ -8672,6 +8677,7 @@ function revisarPagos(forzar) {
         return true;
     }
     const moduloPermitido = m => moduloEnPlan(m.id) && (m.acceso ? m.acceso.some(p => permisos.includes(p)) : permisos.includes(m.id));
+    const vistaPermitida = id => { const m = MODULOS.find(x => x.id === id); return m ? moduloPermitido(m) : permisos.includes(id); };
     function abrirModulo(id) { const m = MODULOS.find(x => x.id === id); if (m && m.abrir) m.abrir(); else irA(id); }
     MODULOS.forEach(m => { if (!m.area) m.area = 'admin'; });
     let areaActual = null;   // área abierta en el menú (null = menú de áreas)
@@ -9025,7 +9031,7 @@ function revisarPagos(forzar) {
         else if (!(opciones && opciones.sinHistorial) && vista !== vistaActual) recordarVista();
         if (MODULOS.some(m => m.id === vista)) precargaPrioridad = vista;   // la precarga deja terminar lo que está cargando, carga este módulo y sigue con lo demás
         // "admin" no es un módulo con permiso: lo protege la clave principal, que se pide al entrar
-        if (vista !== 'login' && vista !== 'menu' && vista !== 'admin' && vista !== 'marcaje' && !permisos.includes(vista)) vista = 'menu';
+        if (vista !== 'login' && vista !== 'menu' && vista !== 'admin' && vista !== 'marcaje' && !vistaPermitida(vista)) vista = 'menu';
         if (vistaActual === 'marcaje' && vista !== 'marcaje') { marcaDetenerCamara(); clearInterval(marcaReloj); }
         if (vista !== 'cuadre' && seleccion !== null) { const v = vistaActual; vistaActual = vista; cuaCerrarCaja(); vistaActual = v; }   // la ventana de la caja no sigue abierta en otro módulo
 
@@ -9211,10 +9217,13 @@ function revisarPagos(forzar) {
     // Lo guardado primero (en su orden) y lo nuevo al final, en el orden de siempre
     const menuOrdenar = (lista, clave) => { const o = menuOrden()[clave] || []; return lista.slice().sort((a, b) => { const x = o.indexOf(a.id), y = o.indexOf(b.id); return (x < 0 ? 999 : x) - (y < 0 ? 999 : y); }); };
     let menuVisibles = {};   // clave -> ids en pantalla (para mover con ‹ ›)
-    function menuMover(clave, id, paso) {
-        const ids = (menuVisibles[clave] || []).slice(), i = ids.indexOf(id), j = i + paso;
-        if (i < 0 || j < 0 || j >= ids.length) return;
-        [ids[i], ids[j]] = [ids[j], ids[i]];
+    function menuMover(clave, id, paso, grupoClave) {
+        const grupo = (grupoClave && menuVisibles[grupoClave] ? menuVisibles[grupoClave] : menuVisibles[clave]) || [];
+        const i = grupo.indexOf(id), j = i + paso;
+        if (i < 0 || j < 0 || j >= grupo.length) return;
+        const ids = (menuVisibles[clave] || grupo).slice(), a = ids.indexOf(grupo[i]), b = ids.indexOf(grupo[j]);
+        if (a < 0 || b < 0) return;
+        [ids[a], ids[b]] = [ids[b], ids[a]];
         const o = menuOrden(); o[clave] = ids; menuOrdenGuardar(o);
         renderMenu();
     }
@@ -9223,8 +9232,8 @@ function revisarPagos(forzar) {
     const menuLapiz = clave => menuOrdenando
         ? `<span class="menu-lapiz-barra"><button type="button" class="btn-primary btn-mini" onclick="menuOrdenarCambiar(false)">✓ Listo</button><button type="button" class="btn-ghost btn-mini" onclick="menuOrdenRestablecer('${clave}')">Orden de siempre</button></span>`
         : `<span class="menu-lapiz-barra"><button type="button" class="btn-ghost btn-mini" onclick="menuOrdenarCambiar(true)" title="Cambiar el orden de los cuadros">✎ Ordenar</button></span>`;
-    const menuFlechas = (clave, id, i, n) => `<span class="menu-mover"><button type="button" class="btn-ghost btn-mini" aria-label="Mover antes" ${i === 0 ? 'disabled' : ''} onclick="menuMover('${clave}', '${id}', -1)">‹</button>
-        <button type="button" class="btn-ghost btn-mini" aria-label="Mover después" ${i === n - 1 ? 'disabled' : ''} onclick="menuMover('${clave}', '${id}', 1)">›</button></span>`;
+    const menuFlechas = (clave, id, i, n, grupoClave) => `<span class="menu-mover"><button type="button" class="btn-ghost btn-mini" aria-label="Mover antes" ${i === 0 ? 'disabled' : ''} onclick="menuMover('${clave}', '${id}', -1, '${grupoClave || ''}')">‹</button>
+        <button type="button" class="btn-ghost btn-mini" aria-label="Mover después" ${i === n - 1 ? 'disabled' : ''} onclick="menuMover('${clave}', '${id}', 1, '${grupoClave || ''}')">›</button></span>`;
     function renderMenu() {
         const permitidos = MODULOS.filter(moduloPermitido);
         const areas = menuOrdenar(AREAS.filter(a => permitidos.some(m => m.area === a.id)), '_areas');
@@ -9232,14 +9241,16 @@ function revisarPagos(forzar) {
         tableroPintar();   // (20/11) gráficos del inicio, arriba de los cuadros
         const abierta = areas.length === 1 ? areas[0].id : areaActual;   // con una sola área se entra directo
         const sub = document.querySelector('#vistaMenu .menu-sub');
+        const cont = document.getElementById('menuModulos');
         // Cuadro: botón normal, o (ordenando) un cuadro quieto con ‹ › para moverlo
-        const cuadro = (onclick, contenido, clave, id, i, n) => menuOrdenando
-            ? `<div class="menu-btn ordenando">${contenido}${menuFlechas(clave, id, i, n)}</div>`
+        const cuadro = (onclick, contenido, clave, id, i, n, grupoClave) => menuOrdenando
+            ? `<div class="menu-btn ordenando">${contenido}${menuFlechas(clave, id, i, n, grupoClave)}</div>`
             : `<button type="button" class="menu-btn" onclick="${onclick}">${contenido}</button>`;
         if (!abierta && areas.length) {
             sub.innerHTML = 'Dashboard general · Seleccione un área' + (areas.length > 1 ? menuLapiz('_areas') : '');
             menuVisibles._areas = areas.map(a => a.id);
-            document.getElementById('menuModulos').innerHTML = areas.map((a, i) => {
+            cont.className = 'menu-grid';
+            cont.innerHTML = areas.map((a, i) => {
                 const mods = permitidos.filter(m => m.area === a.id), listos = mods.filter(m => m.listo).length;
                 return cuadro(`abrirArea('${a.id}')`, `
                     <span class="menu-icon">${ICONOS['area_' + a.id]}</span>
@@ -9251,19 +9262,34 @@ function revisarPagos(forzar) {
             return;
         }
         const area = AREAS.find(a => a.id === abierta), clave = area ? area.id : '_todos';
-        const disponibles = menuOrdenar(permitidos.filter(m => !area || m.area === area.id), clave);
+        const gruposBase = area ? navGruposDe(area.id) : [['', permitidos]];
+        const grupos = gruposBase.map(([t, ms]) => [t, menuOrdenar(ms, clave)]).filter(g => g[1].length);
+        const disponibles = grupos.reduce((l, g) => l.concat(g[1]), []);
+        const conSub = grupos.some(([t]) => !!t);
         sub.innerHTML = (areas.length > 1
             ? `<a href="#" class="menu-volver" onclick="abrirArea(null); return false;">← Áreas</a> <b>${area.titulo}</b> · Seleccione un módulo`
-            : 'Seleccione un módulo') + (disponibles.length > 1 ? menuLapiz(clave) : '');
+            : 'Seleccione un módulo') + (grupos.some(g => g[1].length > 1) ? menuLapiz(clave) : '');
         menuVisibles[clave] = disponibles.map(m => m.id);
-        document.getElementById('menuModulos').innerHTML = disponibles.length
-            ? disponibles.map((m, i) => cuadro(`abrirModulo('${m.id}')`, `
-                    <span class="menu-icon">${ICONOS[m.id]}</span>
-                    <span class="m-title">${m.titulo}</span>
-                    <span class="m-desc">${m.desc}</span>
-                    ${m.listo ? `<span class="m-estado" data-mod="${m.id}"></span>` : '<span class="chip st-pend">En construcción</span>'}
-                    <span class="m-pend" data-pend-mod="${m.id}"></span>`, clave, m.id, i, disponibles.length)).join('')
-            : '<div class="empty">Esta clave no tiene módulos habilitados.</div>';
+        const tarjeta = (m, i, n, gk) => cuadro(`abrirModulo('${m.id}')`, `
+                <span class="menu-icon">${ICONOS[m.id]}</span>
+                <span class="m-title">${m.titulo}</span>
+                <span class="m-desc">${m.desc}</span>
+                ${m.listo ? `<span class="m-estado" data-mod="${m.id}"></span>` : '<span class="chip st-pend">En construcción</span>'}
+                <span class="m-pend" data-pend-mod="${m.id}"></span>`, clave, m.id, i, n, gk);
+        if (!disponibles.length) {
+            cont.className = 'menu-grid';
+            cont.innerHTML = '<div class="empty">Esta clave no tiene módulos habilitados.</div>';
+        } else if (conSub) {
+            cont.className = 'menu-grupos';
+            cont.innerHTML = grupos.map(([t, ms], gi) => {
+                const gk = `${clave}:g${gi}`;
+                menuVisibles[gk] = ms.map(m => m.id);
+                return `<section class="menu-seccion">${t ? `<h3 class="menu-grupo">${esc(t)}</h3>` : ''}<div class="menu-grid">${ms.map((m, i) => tarjeta(m, i, ms.length, gk)).join('')}</div></section>`;
+            }).join('');
+        } else {
+            cont.className = 'menu-grid';
+            cont.innerHTML = disponibles.map((m, i) => tarjeta(m, i, disponibles.length)).join('');
+        }
         pintarEstadoMenu();
         pendPintarMenu();
     }
@@ -9417,8 +9443,8 @@ function revisarPagos(forzar) {
         if (!(lado || cajon)) return;
         const por = navPend(), areas = navAreas(), actual = vistaActual;
         if (!navAbiertas) { navAbiertas = {}; areas.forEach(id => { navAbiertas[id] = false; }); }
-        const sub = id => navGruposDe(id).reduce((l, g) => l.concat(g[1]), []).map(m =>
-            `<button type="button" class="mt-item${actual === m.id ? ' activo' : ''}" onclick="navIr('${m.id}')"><span class="mt-t">${esc(m.titulo)}</span>${navN(por[m.id])}</button>`).join('');
+        const sub = id => navGruposDe(id).filter(g => g[1].length).map(([t, ms]) =>
+            `${t ? `<div class="mt-grupo">${esc(t)}</div>` : ''}${ms.map(m => `<button type="button" class="mt-item${actual === m.id ? ' activo' : ''}" onclick="navIr('${m.id}')"><span class="mt-t">${esc(m.titulo)}</span>${navN(por[m.id])}</button>`).join('')}`).join('');
         pintarConservando(el, `<div class="mt-cab">${CF_SOLO ? LOGO_ACTUAL_CF : LOGO_SVG}<b>${esc(CF_SOLO ? (TITULOS.menu || 'JD Solution') : 'Plaza Software')}</b>${compu ? '' : `<button type="button" class="btn-ghost btn-icono" onclick="navTodo()" aria-label="Cerrar el menú">${NAV_ICO.x}</button>`}</div>
             <nav class="mt-cuerpo" aria-label="Todos los módulos">
                 <button type="button" class="mt-item${actual === 'menu' ? ' activo' : ''}" onclick="navInicio()">${NAV_ICO.inicio}<span class="mt-t">Inicio</span></button>
@@ -9983,7 +10009,7 @@ function revisarPagos(forzar) {
     }
     function pendCerrar() { const p = document.getElementById('pendPanel'); if (p) p.classList.add('hidden'); const b = document.getElementById('btnCampana'); if (b) b.setAttribute('aria-expanded', 'false'); }
     function pendAlternar(e) { if (e) e.stopPropagation(); const p = document.getElementById('pendPanel'); if (p && p.classList.contains('hidden')) pendAbrir(); else pendCerrar(); }
-    function pendIr(modulo) { pendCerrar(); if (permisos.includes(modulo)) irA(modulo); }
+    function pendIr(modulo) { pendCerrar(); if (vistaPermitida(modulo)) abrirModulo(modulo); }
     document.addEventListener('click', e => { const p = document.getElementById('pendPanel'); if (p && !p.classList.contains('hidden') && !e.target.closest('#pendPanel, #btnCampana')) pendCerrar(); });
     document.addEventListener('keydown', e => { if (e.key === 'Escape') { const p = document.getElementById('pendPanel'); if (p && !p.classList.contains('hidden')) { e.stopPropagation(); pendCerrar(); } } }, true);
     // Contador sutil en las tarjetas del menú (módulo y área)
