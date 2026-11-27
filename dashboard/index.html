@@ -2127,10 +2127,6 @@
         .efe-moneda { grid-column: 1 / -1; order: 99; }
         .efe-moneda .efe-seg { display: inline-flex; flex-wrap: wrap; width: auto; }
         .efe-moneda .efe-seg button { flex: 0 0 auto; white-space: nowrap; }
-        .efe-resp-btns { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .35rem; }
-        .efe-resp-btns button { background: var(--list-bg); color: var(--text-main); border: 1px solid var(--border); border-radius: 999px; padding: .22rem .6rem; min-height: 0; font-size: .78rem; font-weight: 500; cursor: pointer; }
-        .efe-resp-btns button.activo { background: var(--primary); color: #ffffff; border-color: var(--primary); }
-        .efe-resp-btns:empty { display: none; }
         tr.cc-sinverificar td { background: color-mix(in srgb, var(--warn) 7%, transparent); }
 
         /* ===== TELÉFONO: las tablas se ven como tablas (compactas) y se deslizan de lado dentro de su recuadro si no caben ===== */
@@ -2982,7 +2978,9 @@
                 <div class="efe-gasto-campos">
                     <div><label for="efeEFecha">Fecha</label><input type="date" id="efeEFecha" required onchange="efeFechaRevisar('E')"></div>
                     <div class="efe-concepto"><label for="efeEConcepto">Concepto</label><input type="text" id="efeEConcepto" maxlength="120" required placeholder="Ej. Pago a proveedor de hielo"></div>
-                    <div><label for="efeEResp">Responsable</label><input type="text" id="efeEResp" maxlength="60" placeholder="Quién retira" oninput="efeERespSinc()"><div class="efe-resp-btns" id="efeERespBtns"></div></div>
+                    <div class="efe-resp" style="grid-column:1 / -1"><label for="efeEResp">Responsable <small class="nota">(personas con acceso a caja chica y flujo general)</small></label>
+                        <div class="segmentado efe-seg" id="efeERespBtns"></div>
+                        <input type="text" id="efeEResp" class="hidden" maxlength="60" placeholder="Quién retira" style="margin-top:.4rem" oninput="efeERespSinc()"></div>
                     <div><label for="efeEBs">Monto Bs</label><input type="number" id="efeEBs" step="0.01" min="0" placeholder="0,00"></div>
                     <div><label for="efeEUsd">Monto $</label><input type="number" id="efeEUsd" step="0.01" min="0" placeholder="0,00"></div>
                     <div class="efe-gasto-btn"><button type="submit" class="btn-save" id="efeEBtn">Registrar gasto</button></div>
@@ -28206,7 +28204,7 @@ Reglas:
                 mostrarBanner(`Gasto registrado: ${concepto}.`, 'ok');
             }
             ['efeEConcepto', 'efeEResp', 'efeEBs', 'efeEUsd', 'efeEFoto'].forEach(id => document.getElementById(id).value = '');
-            efeERespSinc();
+            efeERespModoOtro = false; efePintarRespFlujo();
             document.getElementById('efeEFotoVista').innerHTML = '';
             efeFechaReiniciar('E');
             if (fb) efeCargar(true); else await efeUsarRespuesta(resp);
@@ -28379,32 +28377,43 @@ Reglas:
             : '<span class="nota">Actualice para ver las personas con acceso a caja chica.</span>';
         efePintarRespFlujo();
     }
-    function efeERespLista() {
-        const vistos = new Map(), agregar = (nombre, peso = 0) => {
-            const s = String(nombre || '').trim(); if (!s || s.length > 40) return;
-            const k = s.toLowerCase(); const cur = vistos.get(k);
-            if (!cur) vistos.set(k, { nombre: s, peso }); else cur.peso += peso;
-        };
-        (efeDatos.responsablesCaja || []).forEach(n => agregar(n, 5));
-        (efeDatos.filas || []).filter(f => f.tipo && f.tipo !== 'INGRESO').forEach(f => agregar(f.cajero, 1));
-        if (nombreUsuario) agregar(nombreUsuario, 3);
-        return [...vistos.values()].sort((a, b) => b.peso - a.peso || a.nombre.localeCompare(b.nombre, 'es')).slice(0, 8).map(x => x.nombre);
-    }
+    let efeERespModoOtro = false;
     function efeERespSinc() {
-        const val = (document.getElementById('efeEResp')?.value || '').trim().toLowerCase();
-        document.querySelectorAll('#efeERespBtns button').forEach(b => b.classList.toggle('activo', !!val && b.dataset.n.trim().toLowerCase() === val));
+        const inp = document.getElementById('efeEResp'), box = document.getElementById('efeERespBtns');
+        if (!inp || !box) return;
+        const val = inp.value.trim(), valMin = val.toLowerCase();
+        const btns = [...box.querySelectorAll('button[data-n]')];
+        const match = btns.find(b => b.dataset.n.trim().toLowerCase() === valMin);
+        btns.forEach(b => b.classList.toggle('activo', !!match && b === match && !efeERespModoOtro));
+        const otro = box.querySelector('button[data-otro="1"]');
+        if (otro) otro.classList.toggle('activo', efeERespModoOtro);
+        inp.classList.toggle('hidden', !efeERespModoOtro);
     }
     function efeElegirResp(nombre) {
         const inp = document.getElementById('efeEResp'); if (!inp) return;
-        const igual = inp.value.trim().toLowerCase() === String(nombre || '').trim().toLowerCase();
-        inp.value = igual ? '' : nombre;
+        if (nombre === '__otro__') {
+            efeERespModoOtro = true;
+            const lista = efeDatos.responsablesCaja || [];
+            if (lista.some(n => n.trim().toLowerCase() === inp.value.trim().toLowerCase())) inp.value = '';
+            efeERespSinc();
+            inp.focus();
+            return;
+        }
+        efeERespModoOtro = false;
+        inp.value = nombre;
         efeERespSinc();
-        if (igual) inp.focus();
     }
     function efePintarRespFlujo() {
-        const box = document.getElementById('efeERespBtns'); if (!box) return;
-        const lista = efeERespLista();
-        box.innerHTML = lista.map(n => `<button type="button" data-n="${esc(n)}" onclick="efeElegirResp(this.dataset.n)">${esc(n)}</button>`).join('');
+        const box = document.getElementById('efeERespBtns'), inp = document.getElementById('efeEResp');
+        if (!box || !inp) return;
+        const lista = efeDatos.responsablesCaja || [];
+        let actual = inp.value.trim();
+        if (!efeERespModoOtro && !lista.includes(actual)) {
+            actual = lista.find(n => n.trim().toLowerCase() === String(nombreUsuario || '').trim().toLowerCase()) || '';
+            inp.value = actual;
+        }
+        box.innerHTML = lista.map(n => `<button type="button" data-n="${esc(n)}" onclick="efeElegirResp(this.dataset.n)">${esc(n)}</button>`).join('')
+            + `<button type="button" data-otro="1" onclick="efeElegirResp('__otro__')">Otro (escribir)</button>`;
         efeERespSinc();
     }
     function efeCajaFiltro(v) { document.getElementById('efeCFiltroMoneda').value = v; efeRenderCaja(); }
