@@ -2591,6 +2591,7 @@
         }
         // Mientras se escribe: puntos de miles automáticos, coma decimal, y el cursor queda en su lugar
         function vivo(el, ev) {
+            if (ev && (ev.isComposing || ev.inputType === 'insertCompositionText')) return;
             const raw = nativo.get.call(el), dec = decimales(el);
             let pos = el.selectionStart == null ? raw.length : el.selectionStart, s = raw;
             if (dec > 0 && s[pos - 1] === '.' && !s.includes(',')) s = s.slice(0, pos - 1) + ',' + s.slice(pos);   // el punto recién escrito es la coma
@@ -15706,15 +15707,46 @@ function revisarPagos(forzar) {
         if (selAbierto === t) selAbierto = null;
         selVaciarPendientes(t, t);
     }, true);
+    let imeActivoEl = null;
+    const imeEsCampoTexto = el => !!el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && !el._num && /^(text|search|tel|email|url)$/i.test(el.type || 'text')));
+    const imeComponiendoEn = el => !!(imeActivoEl && el && el.contains(imeActivoEl));
+    document.addEventListener('compositionstart', e => {
+        const t = e.target;
+        if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) imeActivoEl = t;
+    }, true);
+    document.addEventListener('input', e => {
+        const t = e.target;
+        if (!t || (t.tagName !== 'INPUT' && t.tagName !== 'TEXTAREA')) return;
+        if (e.isComposing || e.inputType === 'insertCompositionText' || t === imeActivoEl) {
+            t._imePend = true;
+            if (imeEsCampoTexto(t)) e.stopPropagation();   // espera a que Android entregue la palabra completa en compositionend
+        }
+    }, true);
+    document.addEventListener('compositionend', e => {
+        const t = e.target;
+        if (imeActivoEl === t) imeActivoEl = null;
+        if (!t || (t.tagName !== 'INPUT' && t.tagName !== 'TEXTAREA')) return;
+        setTimeout(() => {
+            const conMayus = typeof almMayus === 'function' && almMayus(t);
+            if (conMayus) almAMayusculas(t);
+            if (t._imePend || conMayus) {
+                t._imePend = false;
+                if (t._num) NUM.vivo(t);
+                t.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+            selVaciarPendientes(t);
+        }, 0);
+    }, true);
     document.addEventListener('blur', e => {
         const t = e.target;
+        if (imeActivoEl && t === imeActivoEl) { imeActivoEl = null; t._imePend = false; selVaciarPendientes(t); }
         if (!selAbierto || t !== selAbierto) return;
         selAbierto = null;
         selVaciarPendientes(t);
     }, true);
     function pintarConservando(el, html, alDiferir) {
         if (!el) return;
-        if (selectAbiertoEn(el)) {
+        if (selectAbiertoEn(el) || imeComponiendoEn(el)) {
             el._pendPintar = alDiferir ? { fn: alDiferir } : { html };
             el.setAttribute('data-pend-pintar', '1');
             return;
@@ -17470,7 +17502,10 @@ function revisarPagos(forzar) {
             const no = (c === 'C' ? ['M', 'T'] : c === 'M' || c === 'T' ? [c] : []).some(x => !horPuede(w, i, x));
             return `<button type="button" class="hcel ${c}${no ? ' no-puede' : ''}" onclick="horCiclar('${esc(w.id)}', ${i})" title="${no ? 'Según su ficha no puede este turno. ' : ''}Toque para cambiar">${c || '+'}<small>${c ? HOR_COD[c] : ''}</small></button>`;
         };
-        const filas = ws.map(w => {
+        const soloW = horSoloId ? (perDatos.trabajadores || []).find(w => w.id === horSoloId) : null;
+        if (horSoloId && !soloW) horSoloId = '';
+        const wsVer = soloW ? ws.filter(w => w.id === horSoloId) : ws;
+        const filas = wsVer.map(w => {
             const d = plan[w.id] || Array(7).fill(''), av = horAvisosTrabajador(w, d), fuera = horAfuera(w, local);
             const base = horBase(w), usados = horUsados(d) + horUsadosAfuera(w, local), total = base + Math.max(horMasDe(w.id), usados - base);
             const est = usados === total ? 'ok' : usados < total ? 'falta' : 'sobra';
@@ -17495,25 +17530,29 @@ function revisarPagos(forzar) {
                 <details class="hor-mas">
                     <summary class="btn-ghost">Más acciones ▾</summary>
                     <div class="hor-mas-menu">
+                        <button type="button" class="btn-ghost" onclick="this.closest('details').open=false; horElegirUnoVentana()">${soloW ? 'Cambiar trabajador filtrado…' : 'Ver solo un trabajador…'}</button>
+                        ${soloW ? `<button type="button" class="btn-ghost" onclick="this.closest('details').open=false; horSolo('')">Ver todos los trabajadores</button>` : ''}
                         ${ant ? '<button type="button" class="btn-ghost" onclick="this.closest(\'details\').open=false; horCopiarAnterior()">Copiar la semana anterior</button>' : ''}
                         <button type="button" class="btn-ghost" onclick="this.closest(\'details\').open=false; horLimpiar()" ${ws.length ? '' : 'disabled'} title="Quita todos los turnos de esta semana (queda en borrador hasta Guardar)">Limpiar horario</button>
                         <button type="button" class="btn-ghost" onclick="this.closest(\'details\').open=false; horRecuperar()" ${guardado.length ? '' : 'disabled'} title="${guardado.length ? 'Descarta los cambios sin guardar y vuelve al horario guardado' : 'Todavía no hay horario guardado'}">Recuperar horario guardado</button>
                     </div>
                 </details>
+                ${soloW ? `<button type="button" class="btn-ghost" onclick="horSolo('')" title="Volver a ver todo el personal">Solo: <b>${esc(horCorto(soloW.nombre))}</b> ×</button>`
+                        : `<button type="button" class="btn-ghost" onclick="horElegirUnoVentana()" ${ws.length ? '' : 'disabled'} title="Ver solo a una persona para revisar sus días y tiendas">Ver solo uno</button>`}
                 <span class="espacio"></span>
                 <button type="button" class="btn-save" onclick="horGuardar(this)" ${sinGuardar ? '' : 'disabled'}>Guardar</button>
                 <button type="button" class="${listoEnviar ? 'btn-primary' : 'btn-ghost'}" onclick="horEnviar()" ${listoEnviar ? '' : 'disabled'} title="${sinGuardar ? 'Guarde primero los cambios' : pasada ? 'Esta semana ya pasó' : !guardado.length ? 'Guarde primero el horario' : 'Grupo de la tienda y encargados'}">Enviar por Telegram</button>
             </div>
             <div class="per-filtro-activo">${guardado.length ? `Guardado${enviado ? ` · enviado ${esc(enviado)}` : ' · todavía no se ha enviado'}` : 'Todavía no hay horario guardado para esta semana'}${sinGuardar ? ' · <b>hay cambios sin guardar</b>' : ''}
-                ${horSemana === actual ? ' · al enviarlo dirá "vigente a partir de hoy"' : ''}</div>
-            ${ws.length ? horTablero(local, ws, plan) : ''}
-            ${ws.length ? `<div class="tabla-wrap"><table class="req-tabla hor-tabla"><thead><tr><th class="izq">Trabajador</th>${HOR_DIAS.map((_, i) => { const f = sumarDias(horSemana, i); return `<th>${diaSemana(f)}<small>${fechaBonita(f).slice(0, 5)}</small></th>`; }).join('')}<th>Turnos</th></tr></thead>
+                ${horSemana === actual ? ' · al enviarlo dirá "vigente a partir de hoy"' : ''}${soloW ? ` · <b>Mostrando solo a ${esc(soloW.nombre)}</b> <a href="#" onclick="horSolo(''); return false;" style="margin-left:.35rem">Ver todos</a>` : ''}</div>
+            ${ws.length ? (wsVer.length ? horTablero(local, wsVer, plan) : `<div class="empty">${esc(soloW ? soloW.nombre : 'Este trabajador')} no trabaja ni está llamado en ${esc(local)} esta semana. <button type="button" class="btn-ghost btn-mini" onclick="horSolo('')">Ver todos</button></div>`) : ''}
+            ${wsVer.length ? `<div class="tabla-wrap"><table class="req-tabla hor-tabla"><thead><tr><th class="izq">Trabajador</th>${HOR_DIAS.map((_, i) => { const f = sumarDias(horSemana, i); return `<th>${diaSemana(f)}<small>${fechaBonita(f).slice(0, 5)}</small></th>`; }).join('')}<th>Turnos</th></tr></thead>
                 <tbody>${filas}</tbody><tfoot>${cob('M')}${cob('T')}</tfoot></table></div>
                 <div class="hor-ley"><span><i style="background:var(--amar-bg)"></i>Mañana</span><span><i style="background:var(--primary)"></i>Tarde</span>
                     <span><i style="background:#1e40af"></i>Corrido (cuenta 2)</span>
                     <span><i style="background:var(--list-bg);border:1px solid var(--border)"></i>Libre</span><span><i style="border:1px dashed var(--border)"></i>En otra tienda</span>
                     <span>Toque una casilla para cambiar el turno.</span></div>`
-              : `<div class="empty">No hay trabajadores activos de ${esc(local)}. En Talento humano › Trabajadores, elija ${esc(local)} como su local.</div>`}
+              : ws.length ? '' : `<div class="empty">No hay trabajadores activos de ${esc(local)}. En Talento humano › Trabajadores, elija ${esc(local)} como su local.</div>`}
             ${problemas ? `<div class="banner warn">${problemas} cosa(s) por revisar (en rojo).</div>` : ws.length ? '<div class="banner ok">El horario cumple: todos con un día libre y un día corrido, y caja en cada turno.</div>' : ''}
             ${msj ? `<details class="grafico-card"><summary>Último mensaje enviado</summary><pre class="hor-msj">${esc(msj)}</pre></details>` : ''}
             <div class="nota">Mañana = turno de la mañana · Tarde = turno de la tarde · Corrido = trabaja los dos turnos ese día · Libre = no trabaja. "Generar automáticamente" reparte un día libre y un día corrido a cada uno,
@@ -17522,13 +17561,35 @@ function revisarPagos(forzar) {
     }
     // ---------- (20/11) Todas las tiendas juntas: cada trabajador en su tienda de origen y, cada día, dónde trabaja (también si está
     // prestado o libre en otra). Lo que choca (dos turnos a la vez en dos tiendas) sale en rojo. Para cambiar, se abre su tienda.
+    let horSoloId = '';
+    function horSolo(id) { horSoloId = id || ''; const f = document.getElementById('horSoloDlg'); if (f) f.classList.add('hidden'); perPintar(); }
+    function horElegirUnoVentana() {
+        let fondo = document.getElementById('horSoloDlg');
+        if (!fondo) { fondo = document.createElement('div'); fondo.id = 'horSoloDlg'; fondo.className = 'req-dlg-fondo hidden'; fondo.addEventListener('click', e => { if (e.target === fondo) fondo.classList.add('hidden'); }); document.body.appendChild(fondo); }
+        const todos = (perDatos.trabajadores || []).filter(w => w.activo);
+        const grupos = new Map();
+        todos.forEach(w => { const k = w.local || 'Sin tienda'; (grupos.get(k) || grupos.set(k, []).get(k)).push(w); });
+        fondo.innerHTML = `<div class="req-dlg hor-llamar" role="dialog" aria-label="Ver solo un trabajador"><div class="prg-head"><h3>Ver solo un trabajador</h3><button type="button" class="prg-x" title="Cerrar" onclick="document.getElementById('horSoloDlg').classList.add('hidden')">✕</button></div>
+            <div class="req-sub">Elija una persona para ver únicamente sus días, turnos y tiendas en esta semana.</div>
+            <input type="search" id="horSoloBuscar" placeholder="Buscar por nombre o cargo" oninput="const q = asisgClave(this.value); document.querySelectorAll('#horSoloDlg .hl-fila').forEach(f => f.classList.toggle('hidden', !!q && !f.dataset.q.includes(q)))">
+            ${horSoloId ? `<div style="margin-bottom:.5rem"><button type="button" class="btn-ghost btn-mini" onclick="horSolo('')">Ver todos los trabajadores</button></div>` : ''}
+            ${grupos.size ? [...grupos.entries()].sort((a, b) => a[0].localeCompare(b[0], 'es')).map(([tienda, ws]) => `<div class="hl-tienda">${esc(tienda)}</div>` +
+                ws.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')).map(w => `<div class="hl-fila" data-q="${esc(asisgClave(w.nombre + ' ' + (w.cargo || '') + ' ' + (w.local || '')))}">
+                    <span class="hor-ficha" style="--fc:${horColor(w.cargo)};cursor:default">${esc(horCorto(w.nombre))}</span>
+                    <div><b>${esc(w.nombre)}</b><small>${esc(w.cargo || 'sin cargo')} · ${esc(w.local || 'sin tienda')}</small></div>
+                    <button type="button" class="btn-primary btn-mini" onclick="horSolo('${esc(w.id)}')">Ver</button></div>`).join('')).join('')
+              : '<div class="empty">No hay trabajadores activos.</div>'}</div>`;
+        fondo.classList.remove('hidden');
+        setTimeout(() => { const i = document.getElementById('horSoloBuscar'); if (i) i.focus({ preventScroll: true }); }, 80);
+    }
     function horTodasVista() {
         const locales = perDatos.locales || [], corta = l => String(l || '').split(/\s+/)[0];
         const turnos = c => c === 'C' ? ['M', 'T'] : c === 'M' || c === 'T' ? [c] : [];
         const planes = {}; locales.forEach(l => { planes[l] = horPlan(l); });
+        const soloW = horSoloId ? (perDatos.trabajadores || []).find(w => w.id === horSoloId) : null;
         let choques = 0;
         const grupos = locales.map(l => {
-            const ws = horTrabajadores(l).filter(w => w.local === l && w.activo);
+            const ws = horTrabajadores(l).filter(w => w.local === l && w.activo && (!soloW || w.id === soloW.id));
             if (!ws.length) return '';
             const filas = ws.map(w => {
                 const celdas = HOR_DIAS.map((_, i) => {
@@ -17544,7 +17605,8 @@ function revisarPagos(forzar) {
             }).join('');
             return `<tr class="hor-loc"><td colspan="8"><button type="button" class="btn-ghost btn-mini" onclick="horElegirLocal('${esc(l)}')">${esc(l)} ›</button></td></tr>${filas}`;
         }).join('');
-        return `<div class="per-filtro-activo">Todas las tiendas juntas: cada persona en su tienda y, cada día, dónde trabaja. Para cambiar un horario, toque el nombre de la tienda.</div>
+        return `<div class="per-filtro-activo" style="display:flex;align-items:center;justify-content:space-between;gap:.6rem;flex-wrap:wrap"><span>${soloW ? `Mostrando solo a <b>${esc(soloW.nombre)}</b> (${esc(soloW.local || 'sin tienda')}) en todas las tiendas.` : 'Todas las tiendas juntas: cada persona en su tienda y, cada día, dónde trabaja. Para cambiar un horario, toque el nombre de la tienda.'}</span>
+                <span>${soloW ? '<button type="button" class="btn-ghost btn-mini" onclick="horSolo(\'\')">Ver todos</button> ' : ''}<button type="button" class="btn-ghost btn-mini" onclick="horElegirUnoVentana()">${soloW ? 'Cambiar persona…' : 'Ver solo uno…'}</button></span></div>
             ${choques ? `<div class="banner error" style="display:block">${choques} día(s) con la misma persona en dos tiendas al mismo tiempo (en rojo).</div>` : ''}
             <div class="tabla-wrap"><table class="req-tabla hor-tabla hor-todas"><thead><tr><th class="izq">Trabajador</th>${HOR_DIAS.map((_, i) => { const f = sumarDias(horSemana, i); return `<th>${diaSemana(f)}<small>${fechaBonita(f).slice(0, 5)}</small></th>`; }).join('')}</tr></thead>
             <tbody>${grupos || '<tr><td colspan="8" class="empty">No hay trabajadores activos.</td></tr>'}</tbody></table></div>`;
@@ -20494,12 +20556,6 @@ function revisarPagos(forzar) {
         const el = e.target;
         if (!almMayus(el) || e.isComposing || e.inputType === 'insertCompositionText') return;
         almAMayusculas(el);
-    }, true);
-    document.addEventListener('compositionend', e => {
-        const el = e.target;
-        if (!almMayus(el)) return;
-        // después de que el teclado entregue la palabra (y después de los oninput de cada campo)
-        setTimeout(() => { almAMayusculas(el); el.dispatchEvent(new Event('input', { bubbles: true })); }, 0);
     }, true);
     // Enter en un campo de un formulario con data-enter: pasa al siguiente; en el último, guarda
     document.addEventListener('keydown', e => {
