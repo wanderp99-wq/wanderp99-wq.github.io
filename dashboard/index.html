@@ -718,7 +718,7 @@
         #efeCTabla th:nth-child(1) { width: 82px; } #efeCTabla th:nth-child(2) { width: 84px; } #efeCTabla th:nth-child(5), #efeCTabla th:nth-child(6) { width: 150px; }
         #vistaEfectivo td:nth-child(n+5) { white-space: nowrap; }
         @media (max-width: 900px) { #vistaEfectivo table { table-layout: auto; min-width: 640px; } }
-        .efe-gasto-campos { display: grid; grid-template-columns: 150px 2fr 1fr 130px 110px auto; gap: 0.6rem; align-items: end; }
+        .efe-gasto-campos { display: grid; grid-template-columns: 150px 1fr 130px 110px auto; gap: 0.6rem; align-items: end; }
         .efe-gasto-btn button { width: 100%; white-space: nowrap; }
         @media (max-width: 960px) { .efe-gasto-campos { grid-template-columns: repeat(2, 1fr); } .efe-concepto { grid-column: 1 / -1; } }
         #efeHistorial .kpis { margin-bottom: 0.75rem; }
@@ -27794,6 +27794,7 @@ Reglas:
     const efeYaRecibido = f => (f.bs > 0 && f.bsOk) || (f.usd > 0 && f.usdOk);
 
     function efeRenderResumen() {
+        efePintarRespFlujo();
         const t = efeTotales(efeDatos.filas);
         const kpi = (titulo, valor, sub, cls) => `<div class="kpi ${cls || ''}"><div class="k-label">${titulo}</div><div class="k-value">${valor}</div>${sub ? `<div class="k-label">${sub}</div>` : ''}</div>`;
         document.getElementById('efeKpis').innerHTML =
