@@ -915,7 +915,12 @@
         .per-hist tbody tr:nth-child(even) td { background: var(--list-bg); }
         .per-hist .ph-cargo { color: var(--bad); } .per-hist .ph-abono { color: var(--ok); }
         /* Horarios de trabajo */
-        .hor-acc { margin-top: 0; flex-wrap: wrap; } .hor-acc .espacio { flex: 1 1 auto; } .hor-acc input[type=text] { width: auto; flex: 0 1 220px; }
+        .hor-acc { margin-top: 0; flex-wrap: wrap; align-items: center; } .hor-acc .espacio { flex: 1 1 auto; } .hor-acc input[type=text] { width: auto; flex: 0 1 220px; }
+        .hor-mas { position: relative; }
+        .hor-mas > summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: .35rem; user-select: none; }
+        .hor-mas > summary::-webkit-details-marker { display: none; }
+        .hor-mas-menu { position: absolute; left: 0; top: calc(100% + 6px); z-index: 30; min-width: 230px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 10px 26px var(--shadow); padding: .35rem; display: flex; flex-direction: column; gap: .25rem; }
+        .hor-mas-menu button { width: 100%; text-align: left; justify-content: flex-start; border: 0; }
         .hor-tabla td, .hor-tabla th { text-align: center; } .hor-tabla th small { display: block; font-weight: 400; } .hor-tabla td.izq small { display: block; }
         .hor-sel { width: auto; min-width: 6.2rem; padding: .25rem .3rem; border-radius: 8px; font-size: .85rem; }
         .hor-M { background: color-mix(in srgb, var(--c1, #3b82f6) 18%, var(--input-bg)); } .hor-T { background: color-mix(in srgb, #f59e0b 20%, var(--input-bg)); }
@@ -1129,6 +1134,15 @@
         .per-check input { width: auto; }
         .per-calculo { margin-top: .75rem; padding: .6rem .8rem; border-radius: 8px; background: var(--list-bg); border: 1px solid var(--border); font-size: .85rem; display: grid; gap: .35rem; }
         .per-calculo:empty { display: none; }
+        .per-resumen-pago { margin-top: .65rem; padding: .5rem .75rem; border-radius: 8px; background: var(--list-bg); border: 1px solid var(--border); font-size: .84rem; display: flex; flex-wrap: wrap; gap: .25rem .75rem; align-items: center; }
+        .per-resumen-pago:empty { display: none; }
+        .per-avanzado { margin-top: .75rem; border: 1px solid var(--border); border-radius: 10px; background: color-mix(in srgb, var(--list-bg) 55%, transparent); }
+        .per-avanzado > summary { list-style: none; cursor: pointer; padding: .6rem .8rem; font-size: .86rem; font-weight: 600; color: var(--text-main); display: flex; align-items: center; justify-content: space-between; gap: .5rem; flex-wrap: wrap; user-select: none; }
+        .per-avanzado > summary::-webkit-details-marker { display: none; }
+        .per-avanzado > summary::after { content: '▾'; font-size: .8rem; color: var(--text-muted); transition: transform .15s; }
+        .per-avanzado[open] > summary::after { transform: rotate(180deg); }
+        .per-avanzado > summary small { color: var(--text-muted); font-weight: 400; font-size: .76rem; margin-right: auto; }
+        .per-avanzado-cuerpo { padding: .15rem .8rem .8rem; border-top: 1px solid var(--border); }
         .per-desglose { width: 100%; border-collapse: collapse; }
         .per-desglose td { padding: .2rem .3rem; } .per-desglose td:nth-child(2) { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
         .per-desglose td:nth-child(3) { color: var(--text-muted); font-size: .78rem; }
@@ -2113,6 +2127,10 @@
         .efe-moneda { grid-column: 1 / -1; order: 99; }
         .efe-moneda .efe-seg { display: inline-flex; flex-wrap: wrap; width: auto; }
         .efe-moneda .efe-seg button { flex: 0 0 auto; white-space: nowrap; }
+        .efe-resp-btns { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .35rem; }
+        .efe-resp-btns button { background: var(--list-bg); color: var(--text-main); border: 1px solid var(--border); border-radius: 999px; padding: .22rem .6rem; min-height: 0; font-size: .78rem; font-weight: 500; cursor: pointer; }
+        .efe-resp-btns button.activo { background: var(--primary); color: #ffffff; border-color: var(--primary); }
+        .efe-resp-btns:empty { display: none; }
         tr.cc-sinverificar td { background: color-mix(in srgb, var(--warn) 7%, transparent); }
 
         /* ===== TELÉFONO: las tablas se ven como tablas (compactas) y se deslizan de lado dentro de su recuadro si no caben ===== */
@@ -2964,7 +2982,7 @@
                 <div class="efe-gasto-campos">
                     <div><label for="efeEFecha">Fecha</label><input type="date" id="efeEFecha" required onchange="efeFechaRevisar('E')"></div>
                     <div class="efe-concepto"><label for="efeEConcepto">Concepto</label><input type="text" id="efeEConcepto" maxlength="120" required placeholder="Ej. Pago a proveedor de hielo"></div>
-                    <div><label for="efeEResp">Responsable</label><input type="text" id="efeEResp" maxlength="60" placeholder="Quién retira"></div>
+                    <div><label for="efeEResp">Responsable</label><input type="text" id="efeEResp" maxlength="60" placeholder="Quién retira" oninput="efeERespSinc()"><div class="efe-resp-btns" id="efeERespBtns"></div></div>
                     <div><label for="efeEBs">Monto Bs</label><input type="number" id="efeEBs" step="0.01" min="0" placeholder="0,00"></div>
                     <div><label for="efeEUsd">Monto $</label><input type="number" id="efeEUsd" step="0.01" min="0" placeholder="0,00"></div>
                     <div class="efe-gasto-btn"><button type="submit" class="btn-save" id="efeEBtn">Registrar gasto</button></div>
@@ -16342,6 +16360,8 @@ function revisarPagos(forzar) {
             <div class="nom-barra" role="img" aria-label="Pagado ${perUsd(pagado)}, por pagar ${perUsd(porPagar)}">${seg('pag', pagado, nPag, 'Pagado')}${seg('pend', porPagar, nPend, 'Por pagar')}</div>
             <div class="nom-barra-pie"><span>Pagado: <b>${perUsd(pagado)}</b> <small>${bsPagado != null ? 'Bs ' + fmt(bsPagado) : nomBs(pagado)}</small></span><span>Por pagar: <b>${perUsd(porPagar)}</b> <small>${bsPorPagar != null ? 'Bs ' + fmt(bsPorPagar) : nomBs(porPagar)}</small>${cerradoSinPagar ? `<small> · ${perUsd(cerradoSinPagar)} ya cerrado, esperando el pago</small>` : ''}</span></div></div>`;
     }
+    let nomModo = (() => { try { return localStorage.getItem('nom_modo') || 'simple'; } catch (e) { return 'simple'; } })();
+    function nomCambiarModo(m) { nomModo = m === 'detalle' ? 'detalle' : 'simple'; try { localStorage.setItem('nom_modo', nomModo); } catch (e) {} perPintar(); }
     function nomCabecera() {
         const actual = inicioSemana(fechaLocalHoy());
         return `<div class="nom-cab">
@@ -16353,6 +16373,7 @@ function revisarPagos(forzar) {
                 <label>Estado <select onchange="nomElegirEstado(this.value)">${[['', 'Todos'], ['pend', 'Por cerrar'], ['cerr', 'Cerrados']].map(([v, t]) => `<option value="${v}" ${nomEstado === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
                 <label class="nom-tasa">Tasa (Bs por $) <span><input type="number" id="nomTasa" step="0.0001" min="0" value="${nomTasa() || ''}" onchange="nomCambiarTasa(this.value)">
                     ${nomTasaManual ? `<button type="button" class="btn-ghost btn-mini" onclick="nomTasaManual=0;perPintar()" title="Volver a la tasa BCV de hoy">BCV ${fmt(nomTasaBcv())}</button>` : '<small>BCV de hoy</small>'}</span></label>
+                <div class="nom-modo"><span style="font-size:.78rem;color:var(--text-muted);display:block;margin-bottom:.2rem">Vista</span><div class="segmentado"><button type="button" class="${nomModo === 'simple' ? 'activo' : ''}" onclick="nomCambiarModo('simple')">Simple</button><button type="button" class="${nomModo === 'detalle' ? 'activo' : ''}" onclick="nomCambiarModo('detalle')">Detallada</button></div></div>
             </div>`;
     }
     function nomVista() {
@@ -16373,6 +16394,7 @@ function revisarPagos(forzar) {
         const pag = cerr.filter(n => n.cerrada.pagado), cerrSinPagar = cerr.filter(n => !n.cerrada.pagado);
         const netoPag = r2(pag.reduce((s, n) => s + n.cerrada.neto, 0)), bsPag = r2(pag.reduce((s, n) => s + (n.cerrada.netoBs || 0), 0));
         const netoCerrSin = r2(cerrSinPagar.reduce((s, n) => s + n.cerrada.neto, 0)), bsCerrSin = r2(cerrSinPagar.reduce((s, n) => s + (n.cerrada.netoBs || n.cerrada.neto * nomTasa()), 0));
+        const simple = nomModo === 'simple';
         const porPagar = r2(suma(pend, 'neto') + netoCerrSin), porPagarBs = r2(suma(pend, 'neto') * nomTasa() + bsCerrSin);
         const fila = n => {
             const c = n.cerrada, gen = c ? c.generado : n.generado, des = c ? c.descontado : n.descontar, neto = c ? c.neto : n.neto;
@@ -16381,28 +16403,38 @@ function revisarPagos(forzar) {
                 : n.avisos.length ? n.avisos.map(a => `<span class="chip st-falta">${esc(a)}</span>`).join(' ') : '<span class="chip st-pend">Por cerrar</span>';
             const marca = c ? '' : `<input type="checkbox" class="nom-check" aria-label="Cerrar la nómina de ${esc(n.t.nombre)}" ${nomSel.has(n.t.id) ? 'checked' : ''} ${n.avisos.length ? 'disabled title="Corrija los avisos antes de cerrar"' : ''} onchange="nomMarcar('${esc(n.t.id)}', this.checked)">`;
             return `<tr class="${c ? 'per-pagado' : nomSel.has(n.t.id) ? 'nom-sel' : ''}"><td class="nom-col-check">${marca}</td><td class="izq"><button type="button" class="chip st-pend chip-nombre" onclick="nomAbrir('${esc(n.t.id)}')">${esc(n.t.nombre)}</button>
-                    <small>${esc(n.t.id)}${n.p ? ' · ' + esc(n.p.nombre) : ''}</small></td><td class="izq">${esc(n.t.local || '—')}</td>
+                    ${simple ? '' : `<small>${esc(n.t.id)}${n.p ? ' · ' + esc(n.p.nombre) : ''}</small>`}</td><td class="izq">${esc(n.t.local || '—')}</td>
                 <td>${c ? c.turnos : n.normales.length}${(c ? c.horasExtra : n.horasExtra) ? `<small>+ ${reqN(c ? c.horasExtra : n.horasExtra, 2)} h extra</small>` : ''}</td>
-                <td>${perUsd(gen)}</td><td>${des ? perUsd(des) : '—'}${!c && n.aDebitar > n.descontar + 0.004 ? `<small>quedan ${perUsd(n.aDebitar - n.descontar)} en CxC</small>` : ''}</td>
+                ${simple ? '' : `<td>${perUsd(gen)}</td>`}<td>${des ? perUsd(des) : '—'}${!c && n.aDebitar > n.descontar + 0.004 ? `<small>quedan ${perUsd(n.aDebitar - n.descontar)} en CxC</small>` : ''}</td>
                 <td><b>${perUsd(neto)}</b><small>${c ? (c.netoBs ? 'Bs ' + fmt(c.netoBs) + ' · tasa ' + fmt(c.tasa) : '') : nomBs(neto)}</small></td><td class="izq">${estado}</td></tr>`;
         };
-        return nomCabecera() + `<div class="kpis">
+        const irPagar = cerrSinPagar.length && vistaPermitida('pagonomina')
+            ? `<div class="banner warn nom-ir-pagar" style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap;margin-bottom:.75rem"><span>Hay <b>${cerrSinPagar.length}</b> nómina(s) cerrada(s) esperando pago (${perUsd(netoCerrSin)}).</span><button type="button" class="btn-primary btn-mini" onclick="abrirModulo('pagonomina')">Ir a Pagos de nómina →</button></div>` : '';
+        const kpisHTML = simple
+            ? `<div class="kpis">
+                <div class="kpi"><div class="k-label">Trabajadores</div><div class="k-value">${lista.length}</div><div class="k-label">${pag.length} pagado(s) · ${cerrSinPagar.length} por pagar · ${pend.length} por cerrar</div></div>
+                <div class="kpi amar"><div class="k-label">Total por pagar</div><div class="k-value">${perUsd(porPagar)}</div><div class="k-label">${porPagarBs ? 'Bs ' + fmt(porPagarBs) : 'sin tasa'}${nomTasa() ? ' · tasa ' + fmt(nomTasa()) : ''}</div></div>
+            </div>`
+            : `<div class="kpis">
                 <div class="kpi"><div class="k-label">Trabajadores</div><div class="k-value">${lista.length}</div><div class="k-label">${pag.length} pagado(s) · ${cerrSinPagar.length} cerrado(s) sin pagar · ${pend.length} por cerrar</div></div>
                 <div class="kpi"><div class="k-label">Generado (por cerrar)</div><div class="k-value">${perUsd(suma(pend, 'generado'))}</div><div class="k-label">incluye bonos y horas extra</div></div>
                 <div class="kpi bad"><div class="k-label">Gastos a debitar</div><div class="k-value">${perUsd(suma(pend, 'descontar'))}</div></div>
                 <div class="kpi amar"><div class="k-label">Por pagar</div><div class="k-value">${perUsd(porPagar)}</div><div class="k-label">${porPagarBs ? 'Bs ' + fmt(porPagarBs) : 'sin tasa'}${nomTasa() ? ' · tasa ' + fmt(nomTasa()) : ''}</div></div>
             </div>
-            ${nomGrafico(netoPag, porPagar, pag.length, cerrSinPagar.length + pend.length, bsPag, porPagarBs, netoCerrSin)}
+            ${nomGrafico(netoPag, porPagar, pag.length, cerrSinPagar.length + pend.length, bsPag, porPagarBs, netoCerrSin)}`;
+        return nomCabecera()
+            + (simple ? '<div class="req-sub" style="margin-bottom:.6rem"><b>1.</b> Toca un nombre si quieres revisar o ajustar · <b>2.</b> Marca a quienes vas a pagar y pulsa <b>Cerrar</b> · <b>3.</b> Paga en Pagos de nómina.</div>' : '')
+            + irPagar
+            + kpisHTML + `
             ${vista.length ? `<div class="tabla-wrap nom-scroll"><table class="req-tabla" data-sin-paginar><thead><tr><th class="nom-col-check">${pagables.length ? `<input type="checkbox" aria-label="Marcar todos" ${sel.length && sel.length === pagables.length ? 'checked' : ''} onchange="nomMarcarTodos(this.checked)">` : ''}</th><th class="izq">Trabajador</th><th class="izq">Local o departamento</th><th>Turnos</th>
-                <th>Generado</th><th>Gastos a debitar</th><th>A cobrar</th><th class="izq">Estado</th></tr></thead><tbody>${vista.map(fila).join('')}</tbody>
+                ${simple ? '' : '<th>Generado</th>'}<th>${simple ? 'Descuentos' : 'Gastos a debitar'}</th><th>A cobrar</th><th class="izq">Estado</th></tr></thead><tbody>${vista.map(fila).join('')}</tbody>
                 ${pend.length && nomEstado !== 'cerr' ? `<tfoot class="nom-pie"><tr><td></td>${sel.length
-                    ? `<td class="izq" colspan="3"><b>Seleccionados (${sel.length})</b></td><td><b>${perUsd(suma(sel, 'generado'))}</b></td><td><b>${perUsd(suma(sel, 'descontar'))}</b></td>
+                    ? `<td class="izq" colspan="${simple ? 2 : 3}"><b>Seleccionados (${sel.length})</b></td>${simple ? '' : `<td><b>${perUsd(suma(sel, 'generado'))}</b></td>`}<td><b>${perUsd(suma(sel, 'descontar'))}</b></td>
                        <td class="nom-pie-cobrar"><b>${perUsd(suma(sel, 'neto'))}</b> <small>${nomBs(suma(sel, 'neto'))}</small></td>`
-                    : `<td class="izq" colspan="6"><small>Marque a quién se le cierra la nómina (casilla a la izquierda); aquí sale su total.</small></td>`}
+                    : `<td class="izq" colspan="${simple ? 5 : 6}"><small>Marque a quién se le cierra la nómina (casilla a la izquierda); aquí sale su total.</small></td>`}
                     <td><button type="button" class="btn-save btn-mini" ${sel.length ? '' : 'disabled'} onclick="nomAbrir('*')" title="Pasan a Pagos de nómina, donde se registra el pago con su comprobante">Cerrar (${sel.length})</button></td></tr></tfoot>` : ''}</table></div>`
               : `<div class="empty">${nomEstado === 'pend' && lista.length ? 'Ya se cerró la nómina de todos los trabajadores de esta semana.' : nomEstado === 'cerr' && lista.length ? 'Todavía no se ha cerrado la nómina de ningún trabajador de esta semana.' : 'No hay trabajadores con estos filtros.'}</div>`}
-            <div class="nota">Toque un trabajador para ver su detalle: turnos, horas extra, bonos y gastos. Pago por turnos según su perfil; un turno que no estaba en su horario de la semana (o, sin horario, distinto al de su perfil) o trabajar su día libre cuenta como hora extra.
-                Se descuenta todo lo que debe, sin pasar de lo que generó; lo que falte (y lo excluido) queda pendiente en Cuentas por cobrar.</div>`;
+            <div class="nota">${simple ? 'Toca un trabajador para ver su detalle completo (sueldo base, ayuda social, bonos, horas extra y gastos).' : 'Toque un trabajador para ver su detalle: turnos, horas extra, bonos y gastos. Pago por turnos según su perfil; un turno que no estaba en su horario de la semana (o, sin horario, distinto al de su perfil) o trabajar su día libre cuenta como hora extra. Se descuenta todo lo que debe, sin pasar de lo que generó; lo que falte (y lo excluido) queda pendiente en Cuentas por cobrar.'}</div>`;
     }
     // Ventana: un trabajador (nomAbierto = su ID) o el cierre de toda la semana (nomAbierto = '*')
     // cerrada: una fila de BD PAGOS NOMINA (desde "Nóminas cerradas"): su hoja de solo lectura, con lo que quedó guardado al cerrar
@@ -17457,15 +17489,22 @@ function revisarPagos(forzar) {
                         + ws.filter(w => horAvisosTrabajador(w, plan[w.id] || Array(7).fill('')).length).length;
         const ant = horDatos.anterior.some(x => x.local === local);
         const msj = horUltimoMsj[horClave(local)];
+        const listoEnviar = guardado.length && !sinGuardar && !pasada;
         return horCabecera(true) + `
+            <div class="req-sub" style="margin-bottom:.55rem"><b>1.</b> Genera o toca una casilla para ajustar · <b>2.</b> Guarda · <b>3.</b> Envía por Telegram.</div>
             <div class="req-acciones hor-acc">
                 <button type="button" class="btn-primary" onclick="horGenerarYa()" ${ws.length ? '' : 'disabled'}>Generar automáticamente</button>
-                ${ant ? '<button type="button" class="btn-ghost" onclick="horCopiarAnterior()">Copiar la semana anterior</button>' : ''}
-                <button type="button" class="btn-ghost" onclick="horLimpiar()" ${ws.length ? '' : 'disabled'} title="Quita todos los turnos de esta semana (queda en borrador hasta Guardar)">Limpiar horario</button>
-                <button type="button" class="btn-ghost" onclick="horRecuperar()" ${guardado.length ? '' : 'disabled'} title="${guardado.length ? 'Descarta los cambios sin guardar y vuelve al horario guardado' : 'Todavía no hay horario guardado'}">Recuperar horario guardado</button>
+                <details class="hor-mas">
+                    <summary class="btn-ghost">Más acciones ▾</summary>
+                    <div class="hor-mas-menu">
+                        ${ant ? '<button type="button" class="btn-ghost" onclick="this.closest(\'details\').open=false; horCopiarAnterior()">Copiar la semana anterior</button>' : ''}
+                        <button type="button" class="btn-ghost" onclick="this.closest(\'details\').open=false; horLimpiar()" ${ws.length ? '' : 'disabled'} title="Quita todos los turnos de esta semana (queda en borrador hasta Guardar)">Limpiar horario</button>
+                        <button type="button" class="btn-ghost" onclick="this.closest(\'details\').open=false; horRecuperar()" ${guardado.length ? '' : 'disabled'} title="${guardado.length ? 'Descarta los cambios sin guardar y vuelve al horario guardado' : 'Todavía no hay horario guardado'}">Recuperar horario guardado</button>
+                    </div>
+                </details>
                 <span class="espacio"></span>
                 <button type="button" class="btn-save" onclick="horGuardar(this)" ${sinGuardar ? '' : 'disabled'}>Guardar</button>
-                <button type="button" class="btn-ghost" onclick="horEnviar()" ${guardado.length && !sinGuardar && !pasada ? '' : 'disabled'} title="${sinGuardar ? 'Guarde primero los cambios' : pasada ? 'Esta semana ya pasó' : !guardado.length ? 'Guarde primero el horario' : 'Grupo de la tienda y encargados'}">Enviar por Telegram</button>
+                <button type="button" class="${listoEnviar ? 'btn-primary' : 'btn-ghost'}" onclick="horEnviar()" ${listoEnviar ? '' : 'disabled'} title="${sinGuardar ? 'Guarde primero los cambios' : pasada ? 'Esta semana ya pasó' : !guardado.length ? 'Guarde primero el horario' : 'Grupo de la tienda y encargados'}">Enviar por Telegram</button>
             </div>
             <div class="per-filtro-activo">${guardado.length ? `Guardado${enviado ? ` · enviado ${esc(enviado)}` : ' · todavía no se ha enviado'}` : 'Todavía no hay horario guardado para esta semana'}${sinGuardar ? ' · <b>hay cambios sin guardar</b>' : ''}
                 ${horSemana === actual ? ' · al enviarlo dirá "vigente a partir de hoy"' : ''}</div>
@@ -17780,6 +17819,7 @@ function revisarPagos(forzar) {
                 <div class="kpi ${sinPerfil ? 'bad' : 'ok'}"><div class="k-label">Activos sin perfil</div><div class="k-value">${sinPerfil}</div></div>
                 <div class="kpi"><div class="k-label">Perfiles</div><div class="k-value">${perDatos.perfiles.length}</div></div>
             </div>
+            <div class="req-sub" style="margin-bottom:.65rem">Paso 1: agrega o edita al trabajador con su <b>perfil</b> y <b>local</b> (las opciones avanzadas son opcionales).</div>
             <div class="req-acciones" style="margin-top:0">
                 <button type="button" class="btn-primary" onclick="perEditarTrabajador('')">+ Nuevo trabajador</button>
                 <button type="button" class="btn-ghost" id="perBtnImportar" onclick="perImportar()">Importar la lista de la ficha</button>
@@ -17842,30 +17882,39 @@ function revisarPagos(forzar) {
     function perEditarTrabajador(id) {
         const t = id ? perDatos.trabajadores.find(x => x.id === id) : { activo: true, ingreso: fechaLocalHoy() };
         if (!t) return;
+        const extras = [t.foto ? 'con foto' : '', (t.restricciones || []).length ? `${t.restricciones.length} restricción(es)` : '', t.telegram ? 'Telegram' : '', t.notas ? 'con notas' : ''].filter(Boolean);
         perVentana(`<form class="req-dlg per-dlg" onsubmit="perGuardarTrabajador(event, '${esc(id)}')">
-            <h3>${id ? 'Modificar trabajador' : 'Nuevo trabajador'}</h3>${id ? `<div class="req-sub">${esc(t.id)}</div>` : '<div class="req-sub">El ID se asigna solo al guardar.</div>'}
+            <h3>${id ? 'Modificar trabajador' : 'Nuevo trabajador'}</h3>${id ? `<div class="req-sub">${esc(t.id)}</div>` : '<div class="req-sub">Completa lo básico y guarda; el ID y el carnet se crean solos.</div>'}
             <div class="per-grid">
-                <div class="per-ancho"><label for="perTN">Nombre y apellido</label><input type="text" id="perTN" maxlength="80" required value="${esc(t.nombre || '')}"></div>
+                <div class="per-ancho"><label for="perTN">Nombre y apellido</label><input type="text" id="perTN" maxlength="80" required value="${esc(t.nombre || '')}" placeholder="Ej.: María Pérez"></div>
                 <div><label for="perTC">Cédula (opcional)</label><input type="text" id="perTC" maxlength="15" value="${esc(t.cedula || '')}" placeholder="V12345678"></div>
                 <div><label for="perTT">Teléfono (opcional)</label><input type="tel" id="perTT" maxlength="20" value="${esc(t.telefono || '')}" placeholder="0414 1234567"></div>
                 <div class="per-ancho"><label for="perTP">Perfil (pago y bonos)</label><select id="perTP" onchange="perAplicarPerfil()"><option value="">(sin perfil)</option>${perOpciones(perDatos.perfiles.map(p => p.nombre), t.perfil)}</select></div>
-                <div><label for="perTCa">Cargo</label><input type="text" id="perTCa" maxlength="40" value="${esc(t.cargo || '')}" placeholder="Cajero, charcutero..."></div>
-                <div><label for="perTI">Fecha de ingreso</label><input type="date" id="perTI" value="${esc(t.ingreso || '')}"></div>
                 <div><label for="perTL">Local o departamento</label><select id="perTL" onchange="perVistaPago()"><option value="">—</option>${perOpciones(perLugares(), t.local)}</select></div>
                 <div><label for="perTTu">Turno</label><select id="perTTu" onchange="perVistaPago()"><option value="">—</option>${perOpciones(['Mañana', 'Tarde', 'Rotativo'], t.turno)}</select></div>
-                <div><label for="perTG">Telegram (id del chat, opcional)</label><input type="text" id="perTG" inputmode="numeric" maxlength="16" value="${esc(t.telegram || '')}" placeholder="Ej.: 123456789"
-                    title="Los encargados reciben aquí el horario de su tienda. La persona escribe primero al bot; el id lo muestra la función telegramVerChats."></div>
-                <div class="per-ancho"><label for="perTNo">Notas</label><input type="text" id="perTNo" maxlength="150" value="${esc(t.notas || '')}"></div>
-                <div class="per-ancho per-foto"><div class="per-foto-vista" id="perTFVista">${t.foto ? `<img src="${fotoDrive(t.foto, 200)}" alt="Foto">` : '<span>Sin foto</span>'}</div>
-                    <div><label for="perTF">Foto para el carnet ${t.foto ? '(cambiar)' : '(opcional)'}</label><input type="file" id="perTF" accept="image/*" onchange="perVistaFoto()"></div></div>
+                <div class="per-ancho"><label for="perTCa">Cargo</label><input type="text" id="perTCa" maxlength="40" value="${esc(t.cargo || '')}" placeholder="Cajero, charcutero, encargado..."></div>
                 ${id ? `<div class="per-ancho per-carnet-acc"><span>Carnet · código terminado en <b>${esc(String(t.codigo || '').slice(-4) || '—')}</b></span>
                     <button type="button" class="btn-ghost btn-mini" onclick="perImprimirCarnets(['${esc(id)}'])">Imprimir carnet</button>
                     <button type="button" class="btn-ghost btn-mini" onclick="perCarnetNuevo('${esc(id)}')">Carnet nuevo (si lo perdió)</button></div>`
-                     : '<div class="per-ancho nota" style="margin:0">Al guardar se crea su carnet con un código propio: es su clave para marcar la asistencia.</div>'}
-                ${perRestriccionesTabla(t.restricciones)}
+                     : '<div class="per-ancho nota" style="margin:0">Al guardar se crea su carnet con código propio para marcar asistencia.</div>'}
                 <label class="per-check per-ancho interruptor"><input type="checkbox" id="perTA" ${t.activo ? 'checked' : ''}><span class="sw-pista"></span> Activo (sale en la ficha y en la nómina)</label>
             </div>
-            <div class="per-calculo" id="perTCalc"></div>
+            <div class="per-resumen-pago" id="perTResumen"></div>
+            <details class="per-avanzado">
+                <summary><span>Opciones avanzadas (foto, horario y simulación)</span>${extras.length ? `<small>${esc(extras.join(' · '))}</small>` : ''}</summary>
+                <div class="per-avanzado-cuerpo">
+                    <div class="per-grid" style="margin-top:.55rem">
+                        <div><label for="perTI">Fecha de ingreso</label><input type="date" id="perTI" value="${esc(t.ingreso || '')}"></div>
+                        <div><label for="perTG">Telegram (id del chat, opcional)</label><input type="text" id="perTG" inputmode="numeric" maxlength="16" value="${esc(t.telegram || '')}" placeholder="Ej.: 123456789"
+                            title="Los encargados reciben aquí el horario de su tienda. La persona escribe primero al bot; el id lo muestra la función telegramVerChats."></div>
+                        <div class="per-ancho"><label for="perTNo">Notas</label><input type="text" id="perTNo" maxlength="150" value="${esc(t.notas || '')}"></div>
+                        <div class="per-ancho per-foto"><div class="per-foto-vista" id="perTFVista">${t.foto ? `<img src="${fotoDrive(t.foto, 200)}" alt="Foto">` : '<span>Sin foto</span>'}</div>
+                            <div><label for="perTF">Foto para el carnet ${t.foto ? '(cambiar)' : '(opcional)'}</label><input type="file" id="perTF" accept="image/*" onchange="perVistaFoto()"></div></div>
+                        ${perRestriccionesTabla(t.restricciones)}
+                    </div>
+                    <div class="per-calculo" id="perTCalc"></div>
+                </div>
+            </details>
             ${perPie()}</form>`);
         perVistaPago();
     }
@@ -17879,11 +17928,18 @@ function revisarPagos(forzar) {
     }
     // Cálculo en vivo del trabajador según su perfil
     function perVistaPago() {
-        if (!document.getElementById('perTCalc')) return;
+        const res = document.getElementById('perTResumen'), calc = document.getElementById('perTCalc');
+        if (!res && !calc) return;
         const p = perDatos.perfiles.find(x => x.nombre === document.getElementById('perTP').value);
         const hor = perHorario(document.getElementById('perTL').value, document.getElementById('perTTu').value);
-        perRedibujar('perTCalc', (hor ? `<div><b>Horario:</b> ${hor}</div>` : '') +
-            (p ? perTablaDesglose(p, 'perTD', 'perVistaPago()') : '<div class="nota">Elija un perfil para ver cuánto gana.</div>'));
+        if (res) {
+            res.innerHTML = (p ? `<span><b>Pago base:</b> ${perPagoTxt(p)}</span>` : '<span style="color:var(--text-muted)">Elija un perfil para asignar el pago.</span>')
+                + (hor ? `<span><b>Horario:</b> ${hor}</span>` : '');
+        }
+        if (calc) {
+            perRedibujar('perTCalc', (hor ? `<div><b>Horario:</b> ${hor}</div>` : '') +
+                (p ? perTablaDesglose(p, 'perTD', 'perVistaPago()') : '<div class="nota">Elija un perfil para simular el pago semanal.</div>'));
+        }
     }
     async function perGuardarTrabajador(ev, id) {
         ev.preventDefault();
@@ -17924,6 +17980,7 @@ function revisarPagos(forzar) {
                 <div class="per-config-campo"><label for="perMin">$ por semana</label><input type="number" id="perMin" min="0" step="0.01" required value="${minimo || ''}" placeholder="0,00"></div>
                 <button type="submit" class="btn-primary" id="perBtnMin">Guardar</button>
             </form>
+            <div class="req-sub" style="margin-bottom:.65rem">Paso 1: agrega o edita al trabajador con su <b>perfil</b> y <b>local</b> (las opciones avanzadas son opcionales).</div>
             <div class="req-acciones" style="margin-top:0"><button type="button" class="btn-primary" onclick="perEditarPerfil('')">+ Nuevo perfil</button></div>
             ${perDatos.perfiles.length ? `<div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">Perfil</th><th class="izq">Cargo</th><th class="izq">Local · turno</th>
                 <th>Pago</th><th>Bono puntualidad<small>por semana</small></th><th>Bono productividad<small>por semana</small></th><th>Turnos mínimos<small>para los bonos</small></th><th>Hora extra<small>sugerida</small></th><th>Semana de 7 turnos</th><th>Trabajadores</th><th></th></tr></thead><tbody>
@@ -18945,6 +19002,7 @@ function revisarPagos(forzar) {
                 ${nAlm ? `<div class="kpi"><div class="k-label">Clientes del almacén</div><div class="k-value">${nAlm}</div></div>` : ''}
                 ${nProv ? `<div class="kpi"><div class="k-label">Proveedores del almacén</div><div class="k-value">${nProv}</div></div>` : ''}
             </div>
+            <div class="req-sub" style="margin-bottom:.65rem">Paso 1: agrega o edita al trabajador con su <b>perfil</b> y <b>local</b> (las opciones avanzadas son opcionales).</div>
             <div class="req-acciones" style="margin-top:0"><button type="button" class="btn-primary" onclick="perEditarCliente('')">+ Nuevo cliente</button></div>
             ${lista.length ? `<div class="tabla-wrap"><table class="req-tabla"><thead><tr><th class="izq">ID</th><th class="izq">Nombre</th><th class="izq">Tipo</th><th class="izq">Teléfono</th><th class="izq">RIF / Cédula</th><th class="izq">Notas</th><th></th></tr></thead><tbody>
             ${lista.map(c => `<tr><td class="izq"><small>${esc(c.id)}</small></td><td class="izq"><b>${esc(c.nombre)}</b></td>
@@ -25339,6 +25397,7 @@ Reglas:
                 <div class="kpi"><div class="k-label">Con existencia</div><div class="k-value">${activos.filter(p => p.existencia > 0).length}</div></div>
                 <div class="kpi"><div class="k-label">Bajo el mínimo</div><div class="k-value" style="color:var(--bad)">${activos.filter(bajo).length}</div></div>
                 <div class="kpi"><div class="k-label">Valor a costo $</div><div class="k-value">${fmt(activos.reduce((s, p) => s + Math.max(0, p.existencia) * p.costo, 0))}</div></div></div>
+            <div class="req-sub" style="margin-bottom:.65rem">Paso 1: agrega o edita al trabajador con su <b>perfil</b> y <b>local</b> (las opciones avanzadas son opcionales).</div>
             <div class="req-acciones" style="margin-top:0"><button type="button" class="btn-primary" onclick="almEditarProducto('')">+ Nuevo producto</button>
                 <button type="button" class="btn-ghost" onclick="almExportarExistencia()">Exportar existencia a Excel</button>
                 ${permisos.includes('inventario') ? `<label class="btn-ghost" style="cursor:pointer">Importar Excel<input type="file" accept=".xlsx,.xls" hidden onchange="almImportarExcel(this.files[0]); this.value=''"></label>` : ''}</div>
@@ -28147,6 +28206,7 @@ Reglas:
                 mostrarBanner(`Gasto registrado: ${concepto}.`, 'ok');
             }
             ['efeEConcepto', 'efeEResp', 'efeEBs', 'efeEUsd', 'efeEFoto'].forEach(id => document.getElementById(id).value = '');
+            efeERespSinc();
             document.getElementById('efeEFotoVista').innerHTML = '';
             efeFechaReiniciar('E');
             if (fb) efeCargar(true); else await efeUsarRespuesta(resp);
@@ -28317,6 +28377,35 @@ Reglas:
         }
         document.getElementById('efeCRespBtns').innerHTML = lista.length ? lista.map(n => `<button type="button" data-n="${esc(n)}" class="${n === actual ? 'activo' : ''}" onclick="efeCajaResponsable(this.dataset.n)">${esc(n)}</button>`).join('')
             : '<span class="nota">Actualice para ver las personas con acceso a caja chica.</span>';
+        efePintarRespFlujo();
+    }
+    function efeERespLista() {
+        const vistos = new Map(), agregar = (nombre, peso = 0) => {
+            const s = String(nombre || '').trim(); if (!s || s.length > 40) return;
+            const k = s.toLowerCase(); const cur = vistos.get(k);
+            if (!cur) vistos.set(k, { nombre: s, peso }); else cur.peso += peso;
+        };
+        (efeDatos.responsablesCaja || []).forEach(n => agregar(n, 5));
+        (efeDatos.filas || []).filter(f => f.tipo && f.tipo !== 'INGRESO').forEach(f => agregar(f.cajero, 1));
+        if (nombreUsuario) agregar(nombreUsuario, 3);
+        return [...vistos.values()].sort((a, b) => b.peso - a.peso || a.nombre.localeCompare(b.nombre, 'es')).slice(0, 8).map(x => x.nombre);
+    }
+    function efeERespSinc() {
+        const val = (document.getElementById('efeEResp')?.value || '').trim().toLowerCase();
+        document.querySelectorAll('#efeERespBtns button').forEach(b => b.classList.toggle('activo', !!val && b.dataset.n.trim().toLowerCase() === val));
+    }
+    function efeElegirResp(nombre) {
+        const inp = document.getElementById('efeEResp'); if (!inp) return;
+        const igual = inp.value.trim().toLowerCase() === String(nombre || '').trim().toLowerCase();
+        inp.value = igual ? '' : nombre;
+        efeERespSinc();
+        if (igual) inp.focus();
+    }
+    function efePintarRespFlujo() {
+        const box = document.getElementById('efeERespBtns'); if (!box) return;
+        const lista = efeERespLista();
+        box.innerHTML = lista.map(n => `<button type="button" data-n="${esc(n)}" onclick="efeElegirResp(this.dataset.n)">${esc(n)}</button>`).join('');
+        efeERespSinc();
     }
     function efeCajaFiltro(v) { document.getElementById('efeCFiltroMoneda').value = v; efeRenderCaja(); }
 
