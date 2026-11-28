@@ -916,10 +916,11 @@
         .per-hist .ph-cargo { color: var(--bad); } .per-hist .ph-abono { color: var(--ok); }
         /* Horarios de trabajo */
         .hor-acc { margin-top: 0; flex-wrap: wrap; align-items: center; } .hor-acc .espacio { flex: 1 1 auto; } .hor-acc input[type=text] { width: auto; flex: 0 1 220px; }
+        .hor-acc > button, .hor-mas > button { display: inline-flex; align-items: center; justify-content: center; gap: .35rem; border: 1px solid transparent; box-sizing: border-box; }
+        .hor-acc > .btn-ghost, .hor-mas > .btn-ghost { border-color: var(--border); }
         .hor-mas { position: relative; }
-        .hor-mas > summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: .35rem; user-select: none; }
-        .hor-mas > summary::-webkit-details-marker { display: none; }
         .hor-mas-menu { position: absolute; left: 0; top: calc(100% + 6px); z-index: 30; min-width: 230px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 10px 26px var(--shadow); padding: .35rem; display: flex; flex-direction: column; gap: .25rem; }
+        .hor-mas:not(.abierto) .hor-mas-menu { display: none; }
         .hor-mas-menu button { width: 100%; text-align: left; justify-content: flex-start; border: 0; }
         .hor-tabla td, .hor-tabla th { text-align: center; } .hor-tabla th small { display: block; font-weight: 400; } .hor-tabla td.izq small { display: block; }
         .hor-sel { width: auto; min-width: 6.2rem; padding: .25rem .3rem; border-radius: 8px; font-size: .85rem; }
@@ -1665,11 +1666,11 @@
         .alm-filtros { grid-template-columns: repeat(3, minmax(0, 1fr)); }
         .alm-acc { white-space: nowrap; } .alm-acc .btn-mini + .btn-mini { margin-left: .3rem; }
         tr.alm-anulada td { opacity: .55; text-decoration: line-through; } tr.alm-anulada td:last-child, tr.alm-anulada td:nth-last-child(2) { text-decoration: none; }
-        /* Al pasar el cursor por una fila de Productos/Almacén se ilumina en blanco (o tono elevado en modo oscuro) para seguir código, descripción y existencia sin perderse */
-        #vistaAlm .req-tabla:not(.alm-notas-tabla) tbody td { transition: background-color .08s ease; }
-        #vistaAlm .req-tabla:not(.alm-notas-tabla) tbody tr:not(.alm-fila-total):hover td { background: var(--card-bg); }
-        #vistaAlm .req-tabla:not(.alm-notas-tabla) tbody tr:not(.alm-fila-total):hover td:first-child { box-shadow: inset 3px 0 0 var(--primary); }
-        :root:not([data-theme="light"]) #vistaAlm .req-tabla:not(.alm-notas-tabla) tbody tr:not(.alm-fila-total):hover td { background: var(--input-bg); }
+        /* Al pasar el cursor por una fila de Productos/Almacén y Cuentas por pagar se ilumina en blanco (o tono elevado en modo oscuro) para seguir la línea sin perderse */
+        #vistaAlm .req-tabla:not(.alm-notas-tabla) tbody td, #vistaCxp .req-tabla tbody td { transition: background-color .08s ease; }
+        #vistaAlm .req-tabla:not(.alm-notas-tabla) tbody tr:not(.alm-fila-total):hover td, #vistaCxp .req-tabla tbody tr:not(.alm-fila-total):hover td { background: var(--card-bg); }
+        #vistaAlm .req-tabla:not(.alm-notas-tabla) tbody tr:not(.alm-fila-total):hover td:first-child, #vistaCxp .req-tabla tbody tr:not(.alm-fila-total):hover td:first-child { box-shadow: inset 3px 0 0 var(--primary); }
+        :root:not([data-theme="light"]) #vistaAlm .req-tabla:not(.alm-notas-tabla) tbody tr:not(.alm-fila-total):hover td, :root:not([data-theme="light"]) #vistaCxp .req-tabla tbody tr:not(.alm-fila-total):hover td { background: var(--input-bg); }
         .alm-aviso { color: var(--bad); font-size: .78rem; margin-top: .25rem; line-height: 1.35; } .alm-aviso .btn-mini { margin-left: .3rem; } .alm-ok { color: var(--ok); font-weight: 600; }
         .alm-teclado { float: right; font: 700 .68rem ui-monospace, Consolas, monospace; background: var(--list-bg); border: 1px solid var(--border); border-radius: 6px; padding: .05rem .4rem; color: var(--text-muted); cursor: pointer; }
         @media (hover: hover) and (pointer: fine) { .alm-teclado { display: none; } }   /* solo en teléfonos y tabletas */ input.alm-mal { border-color: var(--bad) !important; }
@@ -17504,14 +17505,15 @@ function revisarPagos(forzar) {
         };
         const soloW = horSoloId ? (perDatos.trabajadores || []).find(w => w.id === horSoloId) : null;
         if (horSoloId && !soloW) horSoloId = '';
-        const wsVer = soloW ? ws.filter(w => w.id === horSoloId) : ws;
+        const soloExterno = !!(soloW && !ws.some(w => w.id === soloW.id));
+        const wsVer = soloW ? [soloW] : ws;
         const filas = wsVer.map(w => {
-            const d = plan[w.id] || Array(7).fill(''), av = horAvisosTrabajador(w, d), fuera = horAfuera(w, local);
-            const base = horBase(w), usados = horUsados(d) + horUsadosAfuera(w, local), total = base + Math.max(horMasDe(w.id), usados - base);
+            const d = soloExterno ? Array(7).fill('') : (plan[w.id] || Array(7).fill('')), av = soloExterno ? [] : horAvisosTrabajador(w, d), fuera = horAfuera(w, local);
+            const base = soloExterno ? horTurnosDe(w) : horBase(w), usados = soloExterno ? horUsados(fuera.map(x => x ? x.c : '')) : (horUsados(d) + horUsadosAfuera(w, local)), total = soloExterno ? base : (base + Math.max(horMasDe(w.id), usados - base));
             const est = usados === total ? 'ok' : usados < total ? 'falta' : 'sobra';
-            return `<tr><td class="izq"><b>${esc(w.nombre)}</b><small>${esc(w.cargo || 'sin cargo')}${horEsPrestado(w) ? ' · de ' + esc(w.local || 'otra tienda') : ''}${w.restricciones && w.restricciones.length ? ' · no puede: ' + esc(w.restricciones.join(', ')) : ''}</small>
+            return `<tr><td class="izq"><b>${esc(w.nombre)}</b><small>${esc(w.cargo || 'sin cargo')}${soloExterno || horEsPrestado(w) ? ' · de ' + esc(w.local || 'otra tienda') : ''}${w.restricciones && w.restricciones.length ? ' · no puede: ' + esc(w.restricciones.join(', ')) : ''}</small>
                     ${av.map(a => `<span class="hor-aviso">${esc(a)}</span>`).join('')}</td>
-                ${HOR_DIAS.map((_, i) => `<td>${cel(w, i, d, fuera)}</td>`).join('')}
+                ${HOR_DIAS.map((_, i) => `<td>${soloExterno ? (fuera[i] ? cel(w, i, d, fuera) : '<span class="hcel">—</span>') : cel(w, i, d, fuera)}</td>`).join('')}
                 <td><div class="hor-cuenta ${est}">${usados} de ${total}<small>${est === 'ok' ? 'completo' : est === 'falta' ? 'faltan ' + (total - usados) : 'sobran ' + (usados - total)}</small></div></td></tr>`;
         }).join('');
         // Cobertura de cada turno: gente, faltantes según la composición y si hay caja
@@ -17527,16 +17529,16 @@ function revisarPagos(forzar) {
             <div class="req-sub" style="margin-bottom:.55rem"><b>1.</b> Genera o toca una casilla para ajustar · <b>2.</b> Guarda · <b>3.</b> Envía por Telegram.</div>
             <div class="req-acciones hor-acc">
                 <button type="button" class="btn-primary" onclick="horGenerarYa()" ${ws.length ? '' : 'disabled'}>Generar automáticamente</button>
-                <details class="hor-mas">
-                    <summary class="btn-ghost">Más acciones ▾</summary>
+                <div class="hor-mas">
+                    <button type="button" class="btn-ghost" onclick="this.parentElement.classList.toggle('abierto')">Más acciones ▾</button>
                     <div class="hor-mas-menu">
-                        <button type="button" class="btn-ghost" onclick="this.closest('details').open=false; horElegirUnoVentana()">${soloW ? 'Cambiar trabajador filtrado…' : 'Ver solo un trabajador…'}</button>
-                        ${soloW ? `<button type="button" class="btn-ghost" onclick="this.closest('details').open=false; horSolo('')">Ver todos los trabajadores</button>` : ''}
-                        ${ant ? '<button type="button" class="btn-ghost" onclick="this.closest(\'details\').open=false; horCopiarAnterior()">Copiar la semana anterior</button>' : ''}
-                        <button type="button" class="btn-ghost" onclick="this.closest(\'details\').open=false; horLimpiar()" ${ws.length ? '' : 'disabled'} title="Quita todos los turnos de esta semana (queda en borrador hasta Guardar)">Limpiar horario</button>
-                        <button type="button" class="btn-ghost" onclick="this.closest(\'details\').open=false; horRecuperar()" ${guardado.length ? '' : 'disabled'} title="${guardado.length ? 'Descarta los cambios sin guardar y vuelve al horario guardado' : 'Todavía no hay horario guardado'}">Recuperar horario guardado</button>
+                        <button type="button" class="btn-ghost" onclick="this.closest('.hor-mas').classList.remove('abierto'); horElegirUnoVentana()">${soloW ? 'Cambiar trabajador filtrado…' : 'Ver solo un trabajador…'}</button>
+                        ${soloW ? `<button type="button" class="btn-ghost" onclick="this.closest('.hor-mas').classList.remove('abierto'); horSolo('')">Ver todos los trabajadores</button>` : ''}
+                        ${ant ? `<button type="button" class="btn-ghost" onclick="this.closest('.hor-mas').classList.remove('abierto'); horCopiarAnterior()">Copiar la semana anterior</button>` : ''}
+                        <button type="button" class="btn-ghost" onclick="this.closest('.hor-mas').classList.remove('abierto'); horLimpiar()" ${ws.length ? '' : 'disabled'} title="Quita todos los turnos de esta semana (queda en borrador hasta Guardar)">Limpiar horario</button>
+                        <button type="button" class="btn-ghost" onclick="this.closest('.hor-mas').classList.remove('abierto'); horRecuperar()" ${guardado.length ? '' : 'disabled'} title="${guardado.length ? 'Descarta los cambios sin guardar y vuelve al horario guardado' : 'Todavía no hay horario guardado'}">Recuperar horario guardado</button>
                     </div>
-                </details>
+                </div>
                 ${soloW ? `<button type="button" class="btn-ghost" onclick="horSolo('')" title="Volver a ver todo el personal">Solo: <b>${esc(horCorto(soloW.nombre))}</b> ×</button>`
                         : `<button type="button" class="btn-ghost" onclick="horElegirUnoVentana()" ${ws.length ? '' : 'disabled'} title="Ver solo a una persona para revisar sus días y tiendas">Ver solo uno</button>`}
                 <span class="espacio"></span>
@@ -17545,14 +17547,14 @@ function revisarPagos(forzar) {
             </div>
             <div class="per-filtro-activo">${guardado.length ? `Guardado${enviado ? ` · enviado ${esc(enviado)}` : ' · todavía no se ha enviado'}` : 'Todavía no hay horario guardado para esta semana'}${sinGuardar ? ' · <b>hay cambios sin guardar</b>' : ''}
                 ${horSemana === actual ? ' · al enviarlo dirá "vigente a partir de hoy"' : ''}${soloW ? ` · <b>Mostrando solo a ${esc(soloW.nombre)}</b> <a href="#" onclick="horSolo(''); return false;" style="margin-left:.35rem">Ver todos</a>` : ''}</div>
-            ${ws.length ? (wsVer.length ? horTablero(local, wsVer, plan) : `<div class="empty">${esc(soloW ? soloW.nombre : 'Este trabajador')} no trabaja ni está llamado en ${esc(local)} esta semana. <button type="button" class="btn-ghost btn-mini" onclick="horSolo('')">Ver todos</button></div>`) : ''}
+            ${wsVer.length ? horTablero(local, wsVer, plan, soloExterno) : ''}
             ${wsVer.length ? `<div class="tabla-wrap"><table class="req-tabla hor-tabla"><thead><tr><th class="izq">Trabajador</th>${HOR_DIAS.map((_, i) => { const f = sumarDias(horSemana, i); return `<th>${diaSemana(f)}<small>${fechaBonita(f).slice(0, 5)}</small></th>`; }).join('')}<th>Turnos</th></tr></thead>
                 <tbody>${filas}</tbody><tfoot>${cob('M')}${cob('T')}</tfoot></table></div>
                 <div class="hor-ley"><span><i style="background:var(--amar-bg)"></i>Mañana</span><span><i style="background:var(--primary)"></i>Tarde</span>
                     <span><i style="background:#1e40af"></i>Corrido (cuenta 2)</span>
                     <span><i style="background:var(--list-bg);border:1px solid var(--border)"></i>Libre</span><span><i style="border:1px dashed var(--border)"></i>En otra tienda</span>
                     <span>Toque una casilla para cambiar el turno.</span></div>`
-              : ws.length ? '' : `<div class="empty">No hay trabajadores activos de ${esc(local)}. En Talento humano › Trabajadores, elija ${esc(local)} como su local.</div>`}
+              : `<div class="empty">No hay trabajadores activos de ${esc(local)}. En Talento humano › Trabajadores, elija ${esc(local)} como su local.</div>`}
             ${problemas ? `<div class="banner warn">${problemas} cosa(s) por revisar (en rojo).</div>` : ws.length ? '<div class="banner ok">El horario cumple: todos con un día libre y un día corrido, y caja en cada turno.</div>' : ''}
             ${msj ? `<details class="grafico-card"><summary>Último mensaje enviado</summary><pre class="hor-msj">${esc(msj)}</pre></details>` : ''}
             <div class="nota">Mañana = turno de la mañana · Tarde = turno de la tarde · Corrido = trabaja los dos turnos ese día · Libre = no trabaja. "Generar automáticamente" reparte un día libre y un día corrido a cada uno,
@@ -17702,9 +17704,14 @@ function revisarPagos(forzar) {
         horPrestados[k] = (horPrestados[k] || []).filter(x => x !== id); delete (horMas[k] || {})[id]; delete horPlan(horLocal)[id];
         perPintar();
     }
-    function horTablero(local, ws, plan) {
+    function horTablero(local, ws, plan, soloExterno) {
         horSelPintada = false;
         const pool = ws.filter(w => w.activo).map(w => {
+            if (soloExterno) {
+                const lugares = [...new Set(horAfuera(w, local).filter(Boolean).map(x => x.local))];
+                return `<span class="hortb-grupo"><span class="hortb-de">de ${esc(w.local || 'otra tienda')}</span><b>${esc(horCorto(w.nombre))}</b><small>${lugares.length ? `asignado en ${esc(lugares.join(', '))}` : 'sin turnos asignados esta semana'}</small>
+                    <button type="button" class="btn-ghost btn-mini" onclick="horLlamar('${esc(w.id)}')">+ Llamar a ${esc(local)}</button></span>`;
+            }
             const d = plan[w.id] || Array(7).fill(''), base = horBase(w), fuera = horUsadosAfuera(w, local), usados = horUsados(d) + fuera, mas = Math.max(horMasDe(w.id), usados - base), total = base + mas, quedan = total - usados, prest = horEsPrestado(w);
             const lugares = [...new Set(horAfuera(w, local).filter(Boolean).map(x => x.local))];
             const txt = (quedan > 0 ? `${quedan} de ${total}` : `${horCorto(w.nombre)} completo`) + (mas && !prest ? ` · <span class="hor-extra">${mas} de más</span>` : '') + (fuera && !prest ? ` · ${fuera} en ${esc(lugares.join(', '))}` : '');
@@ -17718,7 +17725,7 @@ function revisarPagos(forzar) {
         // Lo que cada uno tiene en otra tienda esa semana (turnos y días libres), también de los llamados: se ve en su celda
         const afuera = ws.map(w => ({ w, dias: horAfuera(w, local) })).filter(a => a.dias.some(Boolean));
         const filas = HOR_SECCIONES.map(([cod, titulo, color, esta]) => `<tr class="hortb-sec" style="--hs:${color}"><td colspan="7">${titulo}${ayuda[cod] ? `<small>${ayuda[cod]}</small>` : ''}</td></tr>
-            <tr>${HOR_DIAS.map((_, i) => `<td class="hortb-celda${horElegida ? ' hor-elegible' : ''}" data-hor-drop="${i}|${cod}">${ws.filter(w => esta((plan[w.id] || [])[i])).map(w => horFicha(w, i, cod)).join('')}${
+            <tr>${HOR_DIAS.map((_, i) => `<td class="hortb-celda${horElegida && !soloExterno ? ' hor-elegible' : ''}" data-hor-drop="${i}|${cod}">${soloExterno ? '' : ws.filter(w => esta((plan[w.id] || [])[i])).map(w => horFicha(w, i, cod)).join('')}${
                 afuera.filter(a => a.dias[i] && esta(a.dias[i].c)).map(a => `<span class="hor-afuera" title="${esc(a.w.nombre)} trabaja este turno en ${esc(a.dias[i].local)}"><b>${esc(horCorto(a.w.nombre))}</b>en ${esc(a.dias[i].local)}</span>`).join('')}</td>`).join('')}</tr>`).join('');
         return `<div class="grafico-card"><div class="grafico-head"><h3>Arrastre cada nombre al día y turno</h3><button type="button" class="btn-ghost btn-mini" onclick="horLlamarVentana()">+ Llamar de otra tienda</button></div>
             <div class="hortb-pool" data-hor-drop="pool">${pool || '<span class="nota">No hay trabajadores activos.</span>'}</div>
@@ -19522,9 +19529,14 @@ function revisarPagos(forzar) {
     }
     function cxpModo(t) { cxp.tab = t; cxpPintar(); window.scrollTo({ top: 0 }); }
     function cxpBuscar(v) { cxp.buscar = v; cxpPintar(); }
+    function cxpOrdenarPor(campo) {
+        if ((cxp.orden || 'fecha') === campo) cxp.ordenDir = -(cxp.ordenDir || (campo === 'monto' ? -1 : 1));
+        else { cxp.orden = campo; cxp.ordenDir = campo === 'monto' ? -1 : 1; }
+        cxpPintar();
+    }
     const cxpNorm = v => String(v || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
     const cxpCoincide = (...t) => { const b = cxpNorm(cxp.buscar || ''); return !b || cxpNorm(t.join(' ')).includes(b); };
-    const cxpBuscador = ph => `<div class="filters" style="grid-template-columns:minmax(0,22rem)"><div><label for="cxpBus">Buscar</label><input id="cxpBus" type="search" placeholder="${ph}" value="${esc(cxp.buscar)}" oninput="cxpBuscar(this.value)"></div></div>`;
+    const cxpBuscador = (ph, extra = '') => `<div class="filters" style="grid-template-columns:minmax(0,22rem)${extra ? ' auto' : ''};align-items:end;justify-content:space-between"><div><label for="cxpBus">Buscar</label><input id="cxpBus" type="search" placeholder="${ph}" value="${esc(cxp.buscar)}" oninput="cxpBuscar(this.value)"></div>${extra}</div>`;
 
     // (15/11) Gráficos (barras de CSS, sin librerías: no pesan nada): lo que vence por semana y lo que se debe a cada proveedor
     function cxpGraficos(ren) {
@@ -19546,9 +19558,20 @@ function revisarPagos(forzar) {
         const primera = {}; ren.forEach(x => { if (x.cuota && !(x.d.id in primera)) primera[x.d.id] = x.cuota; });
         const l = ren.filter(x => (!x.cuota || x.dias <= 7 || primera[x.d.id] === x.cuota) && cxpCoincide(x.quien, x.doc)), tasa = cxpTasa();
         if (!cxp.docs.length && !cxp.error) return '<div class="empty">No hay nada por pagar. Las facturas que registra el almacén (o Administración) aparecen aquí al aprobarlas.</div>';
+        const ord = cxp.orden || 'fecha', dir = cxp.ordenDir || (ord === 'monto' ? -1 : 1);
+        const cmpOrd = (a, b) => ord === 'nombre'
+            ? (dir * String(a.quien || '').localeCompare(String(b.quien || ''), 'es', { sensitivity: 'base' }) || String(a.vence || '').localeCompare(String(b.vence || '')))
+            : ord === 'monto'
+                ? (dir * ((Number(a.saldo) || 0) - (Number(b.saldo) || 0)) || String(a.vence || '').localeCompare(String(b.vence || '')))
+                : (dir * String(a.vence || '').localeCompare(String(b.vence || '')) || String(a.quien || '').localeCompare(String(b.quien || ''), 'es', { sensitivity: 'base' }));
+        const ordUI = `<div><label>Ordenar por</label><div class="segmentado" id="cxpOrdenBtns">
+            <button type="button" class="${ord === 'fecha' ? 'activo' : ''}" onclick="cxpOrdenarPor('fecha')">Fecha${ord === 'fecha' ? (dir > 0 ? ' ↑' : ' ↓') : ''}</button>
+            <button type="button" class="${ord === 'nombre' ? 'activo' : ''}" onclick="cxpOrdenarPor('nombre')">Nombre${ord === 'nombre' ? (dir > 0 ? ' ↑' : ' ↓') : ''}</button>
+            <button type="button" class="${ord === 'monto' ? 'activo' : ''}" onclick="cxpOrdenarPor('monto')">Monto${ord === 'monto' ? (dir > 0 ? ' ↑' : ' ↓') : ''}</button>
+        </div></div>`;
         const grupos = [['Vencidas', x => x.dias < 0], ['Hoy', x => x.dias === 0], ['Próximos 7 días', x => x.dias > 0 && x.dias <= 7], ['Más adelante', x => x.dias > 7]];
-        return cxpGraficos(ren) + cxpBuscador('Proveedor, banco o N° de factura') + grupos.map(([t, f]) => {
-            const g = l.filter(f); if (!g.length) return '';
+        return cxpGraficos(ren) + cxpBuscador('Proveedor, banco o N° de factura', ordUI) + grupos.map(([t, f]) => {
+            const g = l.filter(f).slice().sort(cmpOrd); if (!g.length) return '';
             return `<h4 class="per-sub">${t} <small class="nota" style="display:inline">· ${g.length} · ${cxpUsd(cxpR(g.reduce((s, x) => s + x.saldo, 0)))}</small></h4>
             <div class="tabla-wrap"><table class="req-tabla" data-sin-paginar><thead><tr><th class="izq">Proveedor</th><th class="izq">Documento</th><th class="izq">Factura</th><th class="izq">Vence</th><th>Saldo $</th><th>≈ Bs hoy</th><th class="izq">Pronto pago</th><th></th></tr></thead><tbody>${g.map(x => `
                 <tr><td class="izq"><b>${esc(x.quien)}</b></td><td class="izq">${esc(x.doc || '—')}</td><td class="izq">${cxpF(x.desde)}</td>
@@ -24316,7 +24339,8 @@ Reglas:
             // Columnas con color según el signo (Diferencia): amarillo si sobra, rojo si falta (sin la fila TOTAL)
             colsF.forEach((col, i) => { if (col.cond === 'signo' && filas.length) colores.push({ hoja: wb.SheetNames.length, ref: `${X.utils.encode_col(i)}2:${X.utils.encode_col(i)}${filas.length + 1}` }); });
         });
-        await rptGuardarExcel(X, wb, `${titulo.replace(/\//g, '-')} ${varias ? 'todas las tiendas' : c.tiendas[0]}.xlsx`.replace(/[\\/:*?"<>|]/g, ''), colores);
+        const sufFecha = c.desde ? '' : ' ' + fechaBonita(fechaLocalHoy()).replace(/\//g, '-');
+        await rptGuardarExcel(X, wb, `${titulo.replace(/\//g, '-')} ${varias ? 'todas las tiendas' : c.tiendas[0]}${sufFecha}.xlsx`.replace(/[\\/:*?"<>|]/g, ''), colores);
     }
     // Guarda el Excel. Con colores: se agrega a la hoja una regla de formato condicional de Excel (si alguien corrige un número,
     // el color cambia solo): más de 0,01 amarillo, menos de -0,01 rojo, 0 o casi 0 (hasta 10 g o 0,01 und) sin color. SheetJS no la escribe: se mete en el XML con JSZip.
